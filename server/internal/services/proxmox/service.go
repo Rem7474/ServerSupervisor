@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
@@ -30,6 +31,7 @@ type Repository interface {
 
 	ListProxmoxGuests(ctx context.Context, connectionID, guestType, status string) ([]models.ProxmoxGuest, error)
 	ListProxmoxGuestsByNode(ctx context.Context, connectionID, nodeName string) ([]models.ProxmoxGuest, error)
+	GetProxmoxGuestByID(ctx context.Context, id string) (*models.ProxmoxGuest, error)
 	GetProxmoxGuestMetricsSummary(ctx context.Context, guestID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error)
 
 	ListProxmoxGuestLinks(ctx context.Context, status string) ([]models.ProxmoxGuestLink, error)
@@ -59,6 +61,8 @@ type Repository interface {
 	ListProxmoxTasksByNode(ctx context.Context, connectionID, nodeName string, limit int) ([]models.ProxmoxTask, error)
 	ListProxmoxBackupJobs(ctx context.Context, connectionID string) ([]models.ProxmoxBackupJob, error)
 	ListProxmoxBackupRuns(ctx context.Context, connectionID string) ([]models.ProxmoxBackupRun, error)
+
+	GetExposureByIPs(ctx context.Context, ips []string, since time.Time) (map[string]*models.HostExposure, error)
 }
 
 // Service holds the Proxmox HTTP use-cases + owns the background poller.
@@ -528,25 +532,171 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 	if err != nil {
 		return nil, err
 	}
+	return fetchGuestNetworksForNode(ctx, client, node, guests), nil
+}
+
+// guestPrimaryIPs picks one IP per guest out of a vmid → interfaces map —
+// the first non-link-local (fe80), non-empty address across a guest's
+// interfaces, in PVE's own reported order. This mirrors the primary-IP
+// selection ProxmoxNodeGuestsTab.vue's IP column already does client-side
+// (guestPrimaryIp): the rest of the app already treats "this guest's IP" as
+// one address, not a set, so exposure correlation matches that instead of
+// inventing a second, wider notion of "guest IP" nothing else uses.
+func guestPrimaryIPs(networks map[int][]proxmoxclient.GuestNetworkIface) map[int]string {
+	result := make(map[int]string, len(networks))
+	for vmid, ifaces := range networks {
+	iface:
+		for _, iface := range ifaces {
+			for _, cidr := range iface.IPs {
+				ip := strings.SplitN(cidr, "/", 2)[0]
+				if ip == "" || strings.HasPrefix(ip, "fe80") {
+					continue
+				}
+				result[vmid] = ip
+				break iface
+			}
+		}
+	}
+	return result
+}
+
+// NodeGuestExposure answers, for every guest on a node, which NPM domains
+// route to it — the same IP-matched correlation GetHostExposure gives a
+// ServerSupervisor host, but keyed by a guest's own live primary IP (fetched
+// the same way NodeGuestNetworks does) rather than a persisted
+// hosts.ip_address, since proxmox_guests has no IP column. A guest with no
+// resolvable IP, or whose IP matches no NPM proxy host, is simply absent
+// from the result.
+func (s *Service) NodeGuestExposure(ctx context.Context, nodeID string, period time.Duration) (map[int]*models.HostExposure, error) {
+	networks, err := s.NodeGuestNetworks(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	vmidIP := guestPrimaryIPs(networks)
+	if len(vmidIP) == 0 {
+		return map[int]*models.HostExposure{}, nil
+	}
+
+	ipSet := map[string]struct{}{}
+	for _, ip := range vmidIP {
+		ipSet[ip] = struct{}{}
+	}
+	ips := make([]string, 0, len(ipSet))
+	for ip := range ipSet {
+		ips = append(ips, ip)
+	}
+
+	since := time.Now().Add(-period)
+	byIP, err := s.repo.GetExposureByIPs(ctx, ips, since)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int]*models.HostExposure, len(vmidIP))
+	for vmid, ip := range vmidIP {
+		if exp, ok := byIP[ip]; ok && len(exp.Domains) > 0 {
+			result[vmid] = exp
+		}
+	}
+	return result, nil
+}
+
+// GuestExposure is the single-guest counterpart of NodeGuestExposure — same
+// IP-matched NPM correlation, but resolved for one guest by DB ID rather than
+// batched across a whole node. Used by the guest detail page, which (unlike
+// the node guest list) doesn't necessarily know the guest's node UUID up
+// front — only its own connection_id/node_name, carried on the guest row
+// itself. Unlike NodeGuestExposure, this always returns the guest's IP (once
+// known) even with zero domain matches, so the caller can still show "this
+// guest's IP is X" — mirrors GetHostExposure, which does the same.
+func (s *Service) GuestExposure(ctx context.Context, guestID string, period time.Duration) (*models.HostExposure, error) {
+	guest, err := s.repo.GetProxmoxGuestByID(ctx, guestID)
+	if err != nil {
+		return nil, err
+	}
+	since := time.Now().Add(-period)
+	result := &models.HostExposure{Since: since, Domains: []models.HostExposedDomain{}}
+
+	nodes, err := s.repo.ListProxmoxNodesByConnection(ctx, guest.ConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	var node *models.ProxmoxNode
+	for i := range nodes {
+		if nodes[i].NodeName == guest.NodeName {
+			node = &nodes[i]
+			break
+		}
+	}
+	if node == nil {
+		return result, nil
+	}
+
+	secret, conn, err := s.resolveSecret(ctx, node.ConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	networks := fetchGuestNetworksForNode(ctx, client, node, []models.ProxmoxGuest{*guest})
+	ip := guestPrimaryIPs(networks)[guest.VMID]
+	if ip == "" {
+		return result, nil
+	}
+	result.IPAddress = ip
+
+	byIP, err := s.repo.GetExposureByIPs(ctx, []string{ip}, since)
+	if err != nil {
+		return nil, err
+	}
+	if exp, ok := byIP[ip]; ok {
+		return exp, nil
+	}
+	return result, nil
+}
+
+// fetchGuestNetworksForNode fans out one goroutine per guest on a single
+// node. A running guest is queried live (QEMU guest agent for VMs, the LXC
+// interfaces API for containers); if that yields nothing — agent not
+// installed/running, or the guest is stopped — it falls back to the
+// guest's persisted config ("netN"'s ip= for LXC, cloud-init's
+// "ipconfigN" for VMs), which only ever exposes a *statically* assigned
+// address (see proxmoxclient.ParseStaticConfigIPs). A guest with neither is
+// silently omitted from the result rather than surfaced as an error — this
+// mirrors PVE's own behavior when nothing is reachable.
+func fetchGuestNetworksForNode(ctx context.Context, client *proxmoxclient.Client, node *models.ProxmoxNode, guests []models.ProxmoxGuest) map[int][]proxmoxclient.GuestNetworkIface {
 	result := make(map[int][]proxmoxclient.GuestNetworkIface)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, g := range guests {
-		if g.Status != "running" {
-			continue
-		}
 		wg.Add(1)
 		go func(guest models.ProxmoxGuest) {
 			defer wg.Done()
-			defer safego.Recover(ctx, "proxmox.NodeGuestNetworks")
+			defer safego.Recover(ctx, "proxmox.fetchGuestNetworksForNode")
 			var ifaces []proxmoxclient.GuestNetworkIface
-			var ferr error
-			if guest.GuestType == "vm" {
-				ifaces, ferr = client.GetVMNetworkInterfaces(node.NodeName, guest.VMID)
-			} else {
-				ifaces, ferr = client.GetLXCInterfaces(node.NodeName, guest.VMID)
+			if guest.Status == "running" {
+				var ferr error
+				if guest.GuestType == "vm" {
+					ifaces, ferr = client.GetVMNetworkInterfaces(node.NodeName, guest.VMID)
+				} else {
+					ifaces, ferr = client.GetLXCInterfaces(node.NodeName, guest.VMID)
+				}
+				if ferr != nil {
+					ifaces = nil
+				}
 			}
-			if ferr != nil || len(ifaces) == 0 {
+			if len(ifaces) == 0 {
+				var cfg map[string]any
+				var cerr error
+				if guest.GuestType == "vm" {
+					cfg, cerr = client.GetVMConfig(node.NodeName, guest.VMID)
+				} else {
+					cfg, cerr = client.GetLXCConfig(node.NodeName, guest.VMID)
+				}
+				if cerr == nil {
+					ifaces = proxmoxclient.ParseStaticConfigIPs(cfg)
+				}
+			}
+			if len(ifaces) == 0 {
 				return
 			}
 			mu.Lock()
@@ -555,7 +705,85 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 		}(g)
 	}
 	wg.Wait()
+	return result
+}
+
+// maxConcurrentNodeNetworkFetches bounds how many Proxmox nodes are queried
+// for live guest network interfaces at once from AllGuestNetworks, so a
+// deployment with many nodes doesn't burst an unbounded number of goroutines
+// (each node itself already fans out one goroutine per running guest).
+const maxConcurrentNodeNetworkFetches = 4
+
+// AllGuestNetworks fetches live guest network interfaces for every running
+// VM/LXC guest across all Proxmox connections/nodes. It backs the Network
+// page's IP inventory: a real-time, non-persisted snapshot (no caching, no
+// DB storage of the resulting IPs) — same live-call approach the Proxmox
+// node view already uses per node, just fanned out across all nodes.
+func (s *Service) AllGuestNetworks(ctx context.Context) (map[string]map[int][]proxmoxclient.GuestNetworkIface, error) {
+	nodes, err := s.repo.ListProxmoxNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]map[int][]proxmoxclient.GuestNetworkIface, len(nodes))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxConcurrentNodeNetworkFetches)
+	for _, n := range nodes {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(node models.ProxmoxNode) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			defer safego.Recover(ctx, "proxmox.AllGuestNetworks")
+
+			secret, conn, serr := s.resolveSecret(ctx, node.ConnectionID)
+			if serr != nil {
+				return
+			}
+			client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+			guests, gerr := s.repo.ListProxmoxGuestsByNode(ctx, node.ConnectionID, node.NodeName)
+			if gerr != nil {
+				return
+			}
+			nets := fetchGuestNetworksForNode(ctx, client, &node, guests)
+			if len(nets) == 0 {
+				return
+			}
+			mu.Lock()
+			result[node.ID] = nets
+			mu.Unlock()
+		}(n)
+	}
+	wg.Wait()
 	return result, nil
+}
+
+// validGuestAction whitelists the power actions this server will forward to
+// PVE — deliberately excludes the hard "stop" (immediate power-off, no
+// graceful shutdown) to keep this feature's blast radius limited to actions
+// an admin can't easily make worse by clicking twice.
+var validGuestAction = map[string]bool{"start": true, "shutdown": true, "reboot": true}
+
+// GuestAction issues a start/shutdown/reboot power action on a VM or LXC
+// container, resolving its connection/node from the stored guest record.
+func (s *Service) GuestAction(ctx context.Context, guestID, action string) (string, error) {
+	if !validGuestAction[action] {
+		return "", apperr.Validation("invalid guest action")
+	}
+	guest, err := s.repo.GetProxmoxGuestByID(ctx, guestID)
+	if err != nil {
+		return "", apperr.NotFound("guest not found")
+	}
+	secret, conn, err := s.resolveSecret(ctx, guest.ConnectionID)
+	if err != nil {
+		return "", err
+	}
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	upid, err := client.GuestAction(guest.NodeName, guest.VMID, guest.GuestType, action)
+	if err != nil {
+		return "", apperr.BadGateway(err.Error())
+	}
+	return upid, nil
 }
 
 // MigrateGuest migrates a guest to target; guestType defaults to "vm".

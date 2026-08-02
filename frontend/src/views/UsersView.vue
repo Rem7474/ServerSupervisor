@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Utilisateurs"
+      :interval-sec="USERS_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <div class="page-pretitle">
@@ -19,14 +25,6 @@
           Gestion des rôles (admin / operator / viewer)
         </div>
       </div>
-      <button
-        type="button"
-        class="btn btn-outline-secondary"
-        :disabled="loading"
-        @click="fetchUsers"
-      >
-        Actualiser
-      </button>
     </div>
 
     <!-- Create User Form -->
@@ -110,6 +108,18 @@
       </div>
     </div>
 
+    <div
+      v-if="actionMessage"
+      :class="['alert alert-dismissible mb-3', actionSuccess ? 'alert-success' : 'alert-danger']"
+    >
+      {{ actionMessage }}
+      <a
+        class="btn-close"
+        data-bs-dismiss="alert"
+        aria-label="close"
+      />
+    </div>
+
     <!-- Users List -->
     <div class="card">
       <div
@@ -123,7 +133,7 @@
       </div>
       <div
         v-else
-        class="table-responsive"
+        class="table-responsive scroll-table"
       >
         <table class="table table-vcenter card-table">
           <thead>
@@ -181,11 +191,8 @@
               </td>
             </tr>
             <tr v-if="!users.length && !loading">
-              <td
-                colspan="4"
-                class="text-center text-secondary py-4"
-              >
-                Aucun utilisateur
+              <td colspan="4">
+                <EmptyState title="Aucun utilisateur" />
               </td>
             </tr>
           </tbody>
@@ -197,6 +204,8 @@
 
 <script setup lang="ts">
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useUsers } from '../composables/useUsers'
 
 const {
@@ -208,10 +217,14 @@ const {
   newUserForm,
   createMessage,
   createSuccess,
+  actionMessage,
+  actionSuccess,
+  autoRefresh,
+  lastUpdatedAt,
+  USERS_REFRESH_SEC,
   formatDate,
   isLastAdmin,
   getDeleteButtonTitle,
-  fetchUsers,
   createUser,
   saveRole,
   deleteUser,

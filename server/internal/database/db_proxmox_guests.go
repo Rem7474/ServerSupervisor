@@ -81,6 +81,25 @@ func (db *DB) ListProxmoxGuests(ctx context.Context, connectionID, guestType, st
 	return scanGuests(rows)
 }
 
+// GetProxmoxGuestByID returns a single guest, needed to resolve its
+// connection/node/vmid before issuing a live PVE API call (e.g. a power action).
+func (db *DB) GetProxmoxGuestByID(ctx context.Context, id string) (*models.ProxmoxGuest, error) {
+	var g models.ProxmoxGuest
+	err := db.conn.QueryRowContext(ctx, `
+		SELECT id, connection_id, node_name, guest_type, vmid, name, status,
+		       cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, tags, uptime, last_seen_at
+		FROM proxmox_guests WHERE id=$1`, id,
+	).Scan(
+		&g.ID, &g.ConnectionID, &g.NodeName, &g.GuestType, &g.VMID, &g.Name, &g.Status,
+		&g.CPUAlloc, &g.CPUUsage, &g.MemAlloc, &g.MemUsage, &g.DiskAlloc, &g.Tags, &g.Uptime,
+		&g.LastSeenAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &g, nil
+}
+
 func scanGuests(rows *sql.Rows) ([]models.ProxmoxGuest, error) {
 	var guests []models.ProxmoxGuest
 	for rows.Next() {

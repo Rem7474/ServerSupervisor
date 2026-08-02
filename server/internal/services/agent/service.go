@@ -74,6 +74,7 @@ type Repository interface {
 	UpdateAuditLogStatus(ctx context.Context, id int64, status, details string) error
 	UpdateScheduledTaskStatus(ctx context.Context, id, status string) error
 	UpsertAptStatus(ctx context.Context, status *models.AptStatus) error
+	UpsertResticStatus(ctx context.Context, hostID string, status *models.ResticStatus) error
 	GetRecentCommandsByHost(ctx context.Context, hostID string, limit int) ([]models.RemoteCommand, error)
 	GetMetricsHistory(ctx context.Context, hostID string, hours int) ([]models.SystemMetrics, error)
 	GetMetricsAggregatesByType(ctx context.Context, hostID string, hours int, aggregationType string) ([]models.SystemMetrics, error)
@@ -242,6 +243,20 @@ func (s *Service) UpdateAptStatus(ctx context.Context, hostID string, status *mo
 		return apperr.Failed("failed to update apt status")
 	}
 	s.bus.Publish(events.TopicApt)
+	s.bus.Publish(events.HostTopic(hostID))
+	return nil
+}
+
+// UpdateResticStatus upserts a host's Restic status pushed out-of-band by the
+// agent — used right after a run_backup command completes, so the UI reflects
+// the fresh state without waiting for the next periodic report.
+func (s *Service) UpdateResticStatus(ctx context.Context, hostID string, status *models.ResticStatus) error {
+	if status == nil {
+		return apperr.Validation("restic status is required")
+	}
+	if err := s.repo.UpsertResticStatus(ctx, hostID, status); err != nil {
+		return apperr.Failed("failed to update restic status")
+	}
 	s.bus.Publish(events.HostTopic(hostID))
 	return nil
 }
@@ -456,6 +471,12 @@ func (s *Service) storeContainersAndPackages(ctx context.Context, hostID, safeHo
 	if report.ComposeProjects != nil {
 		if err := s.repo.UpsertComposeProjects(ctx, hostID, report.ComposeProjects); err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store compose projects for host %s: %v", safeHostID, err))
+		}
+	}
+
+	if report.Restic != nil {
+		if err := s.repo.UpsertResticStatus(ctx, hostID, report.Restic); err != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store restic status for host %s: %v", safeHostID, err))
 		}
 	}
 }

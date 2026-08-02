@@ -18,7 +18,7 @@ const summaryData = {
   },
 }
 
-vi.mock('../api', () => ({
+vi.mock('../../api', () => ({
   default: {
     getWebLogsSummary: vi.fn(async () => summaryData),
     getWebLogsTimeseries: vi.fn(async () => ({ data: { points: [] } })),
@@ -41,14 +41,14 @@ vi.mock('topojson-client', () => ({
   feature: () => ({ features: [] }),
 }))
 
-import apiClient from '../api'
-import TrafficView from './TrafficView.vue'
+import apiClient from '../../api'
+import TrafficOverviewPanel from './TrafficOverviewPanel.vue'
 
-describe('TrafficView (characterization)', () => {
+describe('TrafficOverviewPanel (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // TrafficView calls useHostsStore() in setup; install a fresh Pinia so the
-    // store resolves without the app having to register the plugin.
+    // TrafficOverviewPanel calls useHostsStore() in setup; install a fresh Pinia
+    // so the store resolves without the app having to register the plugin.
     setActivePinia(createPinia())
   })
 
@@ -66,20 +66,19 @@ describe('TrafficView (characterization)', () => {
   }
 
   it('fetches web-logs summary on mount', async () => {
-    mount(TrafficView, mountOpts)
+    mount(TrafficOverviewPanel, mountOpts)
     await flushPromises()
     expect(apiClient.getWebLogsSummary).toHaveBeenCalled()
     expect(apiClient.getWebLogsTimeseries).toHaveBeenCalled()
     expect(apiClient.getWebLogsLive).toHaveBeenCalled()
   })
 
-  it('renders the page shell + KPI labels once data has loaded', async () => {
-    const wrapper = mount(TrafficView, mountOpts)
+  it('renders the KPI labels once data has loaded', async () => {
+    const wrapper = mount(TrafficOverviewPanel, mountOpts)
     await flushPromises()
     await flushPromises()
 
     const text = wrapper.text()
-    expect(text).toContain('Stats web')
     expect(text).toContain('Requêtes totales')
     expect(text).toContain('Bande passante')
     expect(text).toContain('Taux 5xx')
@@ -87,7 +86,7 @@ describe('TrafficView (characterization)', () => {
   })
 
   it('renders the formatted total requests KPI value', async () => {
-    const wrapper = mount(TrafficView, mountOpts)
+    const wrapper = mount(TrafficOverviewPanel, mountOpts)
     await flushPromises()
     await flushPromises()
     // fr-FR grouping uses a (narrow) no-break space; strip whitespace first.

@@ -32,6 +32,7 @@ type Capabilities struct {
 	WebLogs bool `json:"web_logs"`
 	Systemd bool `json:"systemd"`
 	Journal bool `json:"journal"`
+	Restic  bool `json:"restic"`
 }
 
 // DockerPayload is the "docker" section of a report. The server decodes it into
@@ -58,6 +59,7 @@ type Report struct {
 	DiskHealth         []collector.DiskHealth              `json:"disk_health,omitempty"`       // SMART disk health data
 	CustomTasks        []config.TaskSummary                `json:"custom_tasks,omitempty"`      // Available custom tasks from tasks.yaml
 	TasksConfigYAML    string                              `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
+	Restic             *collector.ResticStatus             `json:"restic,omitempty"`
 	Timestamp          time.Time                           `json:"timestamp"`
 }
 
@@ -269,6 +271,37 @@ func (s *Sender) SendAptStatus(ctx context.Context, status interface{}) error {
 
 	if resp.StatusCode != http.StatusOK {
 		slog.Warn("server returned non-OK status when pushing apt status", "status", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// SendResticStatus pushes a fresh Restic status snapshot to the server
+// out-of-band, after a run_backup command has already reported its terminal
+// status. This lets the UI refresh without waiting for the next periodic
+// report. Best-effort: the periodic report remains the source of truth.
+func (s *Sender) SendResticStatus(ctx context.Context, status *collector.ResticStatus) error {
+	data, err := json.Marshal(status)
+	if err != nil {
+		return fmt.Errorf("failed to marshal restic status: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", s.cfg.ServerURL+"/api/agent/restic-status", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+
+	resp, err := s.commandClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send restic status: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Warn("server returned non-OK status when pushing restic status", "status", resp.StatusCode)
 	}
 
 	return nil

@@ -8,7 +8,7 @@
         <span class="badge bg-secondary-lt text-secondary">{{ showFullHistory ? total : displayedCommands.length }}</span>
       </div>
     </div>
-    <div class="table-responsive">
+    <div class="table-responsive scroll-table">
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
@@ -41,7 +41,7 @@
             <td>
               <button
                 type="button"
-                class="btn btn-sm btn-ghost-secondary"
+                class="btn btn-icon btn-sm btn-ghost-secondary"
                 title="Voir les logs"
                 @click="$emit('watch-command', cmd)"
               >

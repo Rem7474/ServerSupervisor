@@ -7,18 +7,18 @@
     v-else-if="link.status === 'suggested'"
     class="d-flex align-items-center gap-1"
   >
-    <span class="badge bg-warning-lt text-warning">Suggéré</span>
+    <span class="badge bg-yellow-lt text-yellow">Suggéré</span>
     <span class="text-muted small">{{ link.host_hostname || link.host_name }}</span>
     <button
       type="button"
-      class="btn btn-xs btn-success ms-1"
+      class="btn btn-sm btn-success ms-1"
       @click="emit('confirm')"
     >
       ✓
     </button>
     <button
       type="button"
-      class="btn btn-xs btn-outline-secondary"
+      class="btn btn-sm btn-outline-secondary"
       @click="emit('ignore')"
     >
       ✗
@@ -28,10 +28,10 @@
     v-else-if="link.status === 'confirmed'"
     class="d-flex align-items-center gap-1"
   >
-    <span class="badge bg-success-lt text-success">Lié</span>
+    <span class="badge bg-green-lt text-green">Lié</span>
     <button
       type="button"
-      class="btn btn-xs btn-outline-primary ms-1"
+      class="btn btn-sm btn-outline-primary ms-1"
       title="Voir la fiche hôte"
       @click="emit('go')"
     >

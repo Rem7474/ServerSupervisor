@@ -1,6 +1,11 @@
 package alerts
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/serversupervisor/server/internal/models"
+)
 
 func TestNtfyTopicURL(t *testing.T) {
 	tests := []struct {
@@ -56,7 +61,7 @@ func TestNtfyTopicURL(t *testing.T) {
 	}
 }
 
-func TestFormatCooldownDuration(t *testing.T) {
+func TestFormatDuration(t *testing.T) {
 	tests := []struct {
 		seconds int
 		want    string
@@ -66,11 +71,40 @@ func TestFormatCooldownDuration(t *testing.T) {
 		{seconds: 300, want: "5 min"},
 		{seconds: 3600, want: "1h"},
 		{seconds: 7200, want: "2h"},
+		{seconds: 86400, want: "1j"},
+		{seconds: 90000, want: "1j1h"},
+		{seconds: 183600, want: "2j3h"},
 	}
 
 	for _, tt := range tests {
-		if got := formatCooldownDuration(tt.seconds); got != tt.want {
-			t.Errorf("formatCooldownDuration(%d) = %q, want %q", tt.seconds, got, tt.want)
+		if got := formatDuration(tt.seconds); got != tt.want {
+			t.Errorf("formatDuration(%d) = %q, want %q", tt.seconds, got, tt.want)
 		}
+	}
+}
+
+func TestResolvedEvent(t *testing.T) {
+	rule := models.AlertRule{ID: 3, Metric: "cpu"}
+	host := models.Host{ID: "host-1", Name: "srv-01"}
+	inc := models.AlertIncident{
+		ID:          42,
+		Value:       91.5,
+		TriggeredAt: time.Now().Add(-90 * time.Second),
+	}
+
+	ev := resolvedEvent(rule, host, inc)
+
+	if len(ev.Channels) != 1 || ev.Channels[0] != "browser" {
+		t.Errorf("resolvedEvent Channels = %v, want [browser]", ev.Channels)
+	}
+	if ev.Push == nil {
+		t.Fatal("resolvedEvent Push = nil, want non-nil")
+	}
+	want := "srv-01 — revenu à la normale (91.50%, durée 1 min)"
+	if ev.Push.Body != want {
+		t.Errorf("resolvedEvent Push.Body = %q, want %q", ev.Push.Body, want)
+	}
+	if ev.Push.Status != "resolved" {
+		t.Errorf("resolvedEvent Push.Status = %q, want %q", ev.Push.Status, "resolved")
 	}
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -63,13 +64,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, requireMFA, err := h.svc.Authenticate(c.Request.Context(), req.Username, req.Password, req.TOTPCode, c.ClientIP(), c.GetHeader("User-Agent"))
+	user, mfaRequirement, err := h.svc.Authenticate(c.Request.Context(), req.Username, req.Password, req.TOTPCode, c.ClientIP(), c.GetHeader("User-Agent"))
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	if requireMFA {
-		c.JSON(http.StatusOK, gin.H{"require_mfa": true, "message": "MFA code required"})
+	if mfaRequirement != nil {
+		c.JSON(http.StatusOK, gin.H{"require_mfa": true, "message": "MFA required", "mfa_methods": mfaRequirement})
 		return
 	}
 
@@ -313,6 +314,128 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// ===== WebAuthn (passkeys / security keys) — an additional MFA factor next to TOTP =====
+
+// ListWebAuthnCredentials returns the current user's registered passkeys.
+func (h *AuthHandler) ListWebAuthnCredentials(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		respondError(c, apperr.Unauthorized("unauthorized"))
+		return
+	}
+	creds, err := h.svc.ListWebAuthnCredentials(c.Request.Context(), username)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"credentials": creds})
+}
+
+// BeginWebAuthnRegistration starts a "register a new passkey" ceremony for the current user.
+func (h *AuthHandler) BeginWebAuthnRegistration(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		respondError(c, apperr.Unauthorized("unauthorized"))
+		return
+	}
+	creation, sessionToken, err := h.svc.BeginWebAuthnRegistration(c.Request.Context(), username)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"options": creation, "session_token": sessionToken})
+}
+
+// FinishWebAuthnRegistration completes registration and persists the new credential.
+func (h *AuthHandler) FinishWebAuthnRegistration(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		respondError(c, apperr.Unauthorized("unauthorized"))
+		return
+	}
+	var req struct {
+		SessionToken string          `json:"session_token" binding:"required"`
+		Name         string          `json:"name"`
+		Credential   json.RawMessage `json:"credential" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, apperr.Validation("invalid request"))
+		return
+	}
+	cred, err := h.svc.FinishWebAuthnRegistration(c.Request.Context(), username, req.SessionToken, req.Name, req.Credential)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, cred)
+}
+
+// DeleteWebAuthnCredential removes one of the current user's own passkeys.
+func (h *AuthHandler) DeleteWebAuthnCredential(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		respondError(c, apperr.Unauthorized("unauthorized"))
+		return
+	}
+	if err := h.svc.DeleteWebAuthnCredential(c.Request.Context(), username, c.Param("id")); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// BeginWebAuthnLogin starts the passkey/security-key assertion ceremony as an
+// alternative to submitting a TOTP code during the MFA step of login. Public
+// (no session yet) — re-verifies the password itself, same as Authenticate.
+func (h *AuthHandler) BeginWebAuthnLogin(c *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, apperr.Validation("invalid request"))
+		return
+	}
+	assertion, sessionToken, err := h.svc.BeginWebAuthnLogin(c.Request.Context(), req.Username, req.Password, c.ClientIP(), c.GetHeader("User-Agent"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"options": assertion, "session_token": sessionToken})
+}
+
+// FinishWebAuthnLogin verifies the assertion and, on success, issues a session
+// exactly like a successful password+TOTP login.
+func (h *AuthHandler) FinishWebAuthnLogin(c *gin.Context) {
+	var req struct {
+		Username     string          `json:"username" binding:"required"`
+		SessionToken string          `json:"session_token" binding:"required"`
+		Credential   json.RawMessage `json:"credential" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, apperr.Validation("invalid request"))
+		return
+	}
+	user, err := h.svc.FinishWebAuthnLogin(c.Request.Context(), req.Username, req.SessionToken, req.Credential, c.ClientIP(), c.GetHeader("User-Agent"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	tokens, err := h.svc.IssueSession(c.Request.Context(), user)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.writeSession(c, tokens)
+	c.JSON(http.StatusOK, gin.H{
+		"username":             user.Username,
+		"role":                 user.Role,
+		"expires_at":           tokens.AccessExpiresAt,
+		"must_change_password": user.MustChangePassword,
+		"csrf_token":           tokens.CSRFToken,
+	})
 }
 
 // GetAllLoginEventsAdmin returns paginated login events for all users (admin only).

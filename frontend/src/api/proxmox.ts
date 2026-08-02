@@ -12,6 +12,7 @@ import type {
   ProxmoxGuestLinkRequest,
   ProxmoxGuestLinkUpdate,
 } from '../types/proxmox'
+import type { HostExposure } from '../types/host'
 
 // Re-exported so existing `import { ProxmoxConnection } from '.../api/proxmox'`
 // sites keep working now that the type lives in the shared types layer.
@@ -46,6 +47,10 @@ export const proxmoxApi = {
   getProxmoxGuestMetrics: (guestId: string, hours?: number, bucketMinutes?: number, signal?: AbortSignal) =>
     api.get(`/v1/proxmox/guests/${guestId}/metrics`, { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 }, signal }),
   getProxmoxGuestLink: (guestId: string, signal?: AbortSignal) => api.get(`/v1/proxmox/guests/${guestId}/link`, { signal }),
+  getProxmoxGuestExposure: (guestId: string, period?: string, signal?: AbortSignal) =>
+    api.get<HostExposure>(`/v1/proxmox/guests/${guestId}/exposure`, { params: { period: period ?? '24h' }, signal }),
+  proxmoxGuestAction: (guestId: string, action: 'start' | 'shutdown' | 'reboot') =>
+    api.post<{ upid: string; message: string }>(`/v1/proxmox/guests/${guestId}/action`, { action }),
 
   // Guest ↔ host links
   getProxmoxLinks: (status?: string) =>
@@ -92,6 +97,10 @@ export const proxmoxApi = {
   // Guest network interfaces
   getProxmoxNodeGuestNetworks: (nodeId: string) =>
     api.get(`/v1/proxmox/nodes/${nodeId}/guest-networks`),
+
+  // Guest ↔ NPM domain correlation, keyed by vmid (string keys — JSON object)
+  getProxmoxNodeGuestExposure: (nodeId: string, period?: string) =>
+    api.get<Record<string, HostExposure>>(`/v1/proxmox/nodes/${nodeId}/guest-exposure`, { params: { period: period ?? '24h' } }),
 
   // Node actions
   refreshProxmoxNodeApt: (nodeId: string) => api.post(`/v1/proxmox/nodes/${nodeId}/apt-refresh`),

@@ -10,7 +10,11 @@
         class="btn btn-sm btn-primary"
         @click="openAddForm"
       >
-        + Ajouter une connexion
+        <IconPlus
+          :size="16"
+          class="icon me-1"
+        />
+        Ajouter une connexion
       </button>
     </div>
 
@@ -124,11 +128,8 @@
         </thead>
         <tbody>
           <tr v-if="connections.length === 0">
-            <td
-              colspan="7"
-              class="text-center text-muted py-4"
-            >
-              Aucune connexion NPM configurée.
+            <td colspan="7">
+              <EmptyState title="Aucune connexion NPM configurée." />
             </td>
           </tr>
           <tr
@@ -152,16 +153,16 @@
               >Désactivé</span>
               <span
                 v-else-if="conn.last_error"
-                class="badge bg-danger-lt text-danger"
+                class="badge bg-red-lt text-red"
                 :title="conn.last_error"
               >Erreur</span>
               <span
                 v-else-if="conn.last_success_at"
-                class="badge bg-success-lt text-success"
+                class="badge bg-green-lt text-green"
               >OK</span>
               <span
                 v-else
-                class="badge bg-warning-lt text-warning"
+                class="badge bg-yellow-lt text-yellow"
               >En attente</span>
             </td>
             <td class="text-muted small">
@@ -176,36 +177,36 @@
                 <!-- Edit -->
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="openEditForm(conn)"
                 >
                   <IconPencil
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
                 <!-- Refresh -->
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-info"
+                  class="btn btn-icon btn-sm btn-ghost-info"
                   title="Rafraîchir maintenant"
                   @click="refreshNow(conn)"
                 >
                   <IconRefresh
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
                 <!-- Delete -->
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="remove(conn)"
                 >
                   <IconTrash
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
@@ -227,10 +228,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue'
+import { IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import { npmApi } from '../../api/npm'
 import type { NPMConnection } from '../../types/npm'
 import { getApiErrorMessage } from '../../api/client'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import EmptyState from '../EmptyState.vue'
+
+const { confirm } = useConfirmDialog()
 
 withDefaults(defineProps<{
   authIsAdmin?: boolean
@@ -379,7 +384,12 @@ async function refreshNow(conn: NPMConnection): Promise<void> {
 }
 
 async function remove(conn: NPMConnection): Promise<void> {
-  if (!confirm(`Supprimer la connexion NPM « ${conn.name} » ? Les proxy hosts et leurs sondes uptime/SSL associées ne seront PAS supprimés.`)) return
+  const confirmed = await confirm({
+    title: 'Supprimer la connexion NPM ?',
+    message: `Supprimer la connexion NPM « ${conn.name} » ? Les proxy hosts et leurs sondes uptime/SSL associées ne seront PAS supprimés.`,
+    variant: 'danger',
+  })
+  if (!confirmed) return
   try {
     await npmApi.deleteConnection(conn.id)
     await load()

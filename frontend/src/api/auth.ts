@@ -1,7 +1,8 @@
 import { api } from './client'
-import type { IPTimelineResponse } from '../types/security'
+import type { IPTimelineResponse, DomainDetailsParams } from '../types/security'
 import type { LoginEvent } from '../types/generated'
 import type { SecurityData } from '../components/security/AuditSecurityPanel.vue'
+import type { WebAuthnCredential } from '../types/webauthn'
 
 export const authApi = {
   login: (username: string, password: string, totpCode?: string) =>
@@ -32,9 +33,21 @@ export const authApi = {
     api.get<IPTimelineResponse>(`/v1/security/web-logs/ip/${encodeURIComponent(ip)}`, {
       params: { host_id: hostId ?? '', period, limit },
     }),
-  getDomainDetails: (domain: string, period: string = '24h', hostId?: string, source?: string, limit: number = 300) =>
+  getDomainDetails: (domain: string, period: string = '24h', params: DomainDetailsParams = {}) =>
     api.get(`/v1/security/web-logs/domain/${encodeURIComponent(domain)}`, {
-      params: { period, host_id: hostId ?? '', source: source ?? '', limit },
+      params: {
+        period,
+        host_id: params.hostId ?? '',
+        source: params.source ?? '',
+        page: params.page ?? 1,
+        limit: params.limit ?? 50,
+        status: params.status ?? '',
+        method: params.method ?? '',
+        path: params.path ?? '',
+        ip: params.ip ?? '',
+        sort: params.sort ?? '',
+        dir: params.dir ?? '',
+      },
     }),
   getCommand: (id: string) => api.get(`/v1/commands/${id}`),
   blockCrowdSecIP: (ip: string, hostId: string, duration: string = '4h') =>
@@ -51,4 +64,17 @@ export const authApi = {
   verifyMFA: (secret: string, totpCode: string, backupCodes: string[]) =>
     api.post('/v1/auth/mfa/verify', { secret, totp_code: totpCode, backup_codes: backupCodes }),
   disableMFA: (password: string) => api.post('/v1/auth/mfa/disable', { password }),
+
+  // WebAuthn (passkeys / security keys) — an additional MFA factor alongside TOTP.
+  listWebAuthnCredentials: (signal?: AbortSignal) =>
+    api.get<{ credentials: WebAuthnCredential[] }>('/v1/auth/webauthn/credentials', { signal }),
+  beginWebAuthnRegistration: () =>
+    api.post<{ options: unknown; session_token: string }>('/v1/auth/webauthn/register/begin', {}),
+  finishWebAuthnRegistration: (sessionToken: string, name: string, credential: unknown) =>
+    api.post<WebAuthnCredential>('/v1/auth/webauthn/register/finish', { session_token: sessionToken, name, credential }),
+  deleteWebAuthnCredential: (id: string) => api.delete(`/v1/auth/webauthn/credentials/${id}`),
+  beginWebAuthnLogin: (username: string, password: string) =>
+    api.post<{ options: unknown; session_token: string }>('/auth/webauthn/login/begin', { username, password }),
+  finishWebAuthnLogin: (username: string, sessionToken: string, credential: unknown) =>
+    api.post('/auth/webauthn/login/finish', { username, session_token: sessionToken, credential }),
 }

@@ -10,7 +10,11 @@
         class="btn btn-sm btn-primary"
         @click="openAddForm"
       >
-        + Ajouter une connexion
+        <IconPlus
+          :size="16"
+          class="icon me-1"
+        />
+        Ajouter une connexion
       </button>
     </div>
 
@@ -134,11 +138,8 @@
         </thead>
         <tbody>
           <tr v-if="instances.length === 0">
-            <td
-              colspan="8"
-              class="text-center text-muted py-4"
-            >
-              Aucune connexion Proxmox configurée.
+            <td colspan="8">
+              <EmptyState title="Aucune connexion Proxmox configurée." />
             </td>
           </tr>
           <tr
@@ -163,16 +164,16 @@
               >Désactivé</span>
               <span
                 v-else-if="inst.last_error"
-                class="badge bg-danger-lt text-danger"
+                class="badge bg-red-lt text-red"
                 :title="inst.last_error"
               >Erreur</span>
               <span
                 v-else-if="inst.last_success_at"
-                class="badge bg-success-lt text-success"
+                class="badge bg-green-lt text-green"
               >OK</span>
               <span
                 v-else
-                class="badge bg-warning-lt text-warning"
+                class="badge bg-yellow-lt text-yellow"
               >En attente</span>
             </td>
             <td class="text-muted small">
@@ -186,45 +187,45 @@
               <div class="d-flex gap-1 justify-content-end">
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="openEditForm(inst)"
                 >
                   <IconPencil
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-info"
+                  class="btn btn-icon btn-sm btn-ghost-info"
                   title="Tester"
                   @click="testById(inst)"
                 >
                   <IconClock
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-primary"
+                  class="btn btn-icon btn-sm btn-ghost-primary"
                   title="Collecter maintenant"
                   @click="pollNow(inst)"
                 >
                   <IconRefresh
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="remove(inst)"
                 >
                   <IconTrash
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
@@ -246,10 +247,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { IconClock, IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue'
+import { IconClock, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
 import type { ProxmoxConnection } from '../../types/proxmox'
 import { getApiErrorMessage } from '../../api/client'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import EmptyState from '../EmptyState.vue'
+
+const { confirm } = useConfirmDialog()
 
 // Use the shared domain type (the settings card only reads a subset of fields).
 type ProxmoxInstance = ProxmoxConnection
@@ -422,7 +427,12 @@ async function pollNow(inst: ProxmoxInstance): Promise<void> {
 }
 
 async function remove(inst: ProxmoxInstance): Promise<void> {
-  if (!confirm(`Supprimer la connexion Proxmox « ${inst.name} » ? Toutes les données collectées seront effacées.`)) return
+  const confirmed = await confirm({
+    title: 'Supprimer la connexion Proxmox ?',
+    message: `Supprimer la connexion Proxmox « ${inst.name} » ? Toutes les données collectées seront effacées.`,
+    variant: 'danger',
+  })
+  if (!confirmed) return
   try {
     await api.deleteProxmoxInstance(inst.id)
     await load()

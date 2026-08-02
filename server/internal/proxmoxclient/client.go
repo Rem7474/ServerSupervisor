@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -658,6 +659,102 @@ func (c *Client) GetLXCInterfaces(node string, vmid int) ([]GuestNetworkIface, e
 	return result, nil
 }
 
+// GetLXCConfig returns the raw persisted config of an LXC container (its
+// pct config, e.g. "net0", "cores", "memory", ...). Unlike GetLXCInterfaces,
+// this works even when the container is stopped — it only reflects what's
+// written to the config file, not the live network stack.
+func (c *Client) GetLXCConfig(node string, vmid int) (map[string]any, error) {
+	var raw map[string]any
+	if err := c.get(fmt.Sprintf("/nodes/%s/lxc/%d/config", node, vmid), &raw); err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+// GetVMConfig returns the raw persisted config of a QEMU VM. Same
+// stopped-guest advantage as GetLXCConfig, but with a real limitation: a
+// plain "netN" line never carries an IP (that lives inside the guest OS,
+// invisible to Proxmox without qemu-guest-agent) — only cloud-init's
+// "ipconfigN" keys do, and only when cloud-init is actually in use.
+func (c *Client) GetVMConfig(node string, vmid int) (map[string]any, error) {
+	var raw map[string]any
+	if err := c.get(fmt.Sprintf("/nodes/%s/qemu/%d/config", node, vmid), &raw); err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+var (
+	configNetKeyRe       = regexp.MustCompile(`^net\d+$`)
+	configIPConfigKeyRe  = regexp.MustCompile(`^ipconfig(\d+)$`)
+	staticIPPlaceholders = map[string]bool{"": true, "dhcp": true, "manual": true, "auto": true}
+)
+
+// parseConfigLine splits a PVE config value line ("name=eth0,bridge=vmbr0,
+// ip=192.168.1.10/24,...") into its comma-separated key=value pairs.
+func parseConfigLine(line string) map[string]string {
+	out := make(map[string]string)
+	for _, part := range strings.Split(line, ",") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		out[kv[0]] = kv[1]
+	}
+	return out
+}
+
+// ParseStaticConfigIPs extracts statically-configured IPs from a guest's raw
+// PVE config: LXC "netN" lines (ip=.../ip6=...) and VM cloud-init
+// "ipconfigN" lines. A DHCP/manual/auto-assigned address ("ip=dhcp" etc.) is
+// never visible here — Proxmox only persists what's actually written to the
+// config file, so this is strictly a fallback for guests (or fields) a live
+// agent/interfaces query can't reach, not a full replacement for it.
+func ParseStaticConfigIPs(cfg map[string]any) []GuestNetworkIface {
+	var result []GuestNetworkIface
+	for key, val := range cfg {
+		line, ok := val.(string)
+		if !ok {
+			continue
+		}
+		switch {
+		case configNetKeyRe.MatchString(key):
+			kv := parseConfigLine(line)
+			name := kv["name"]
+			if name == "" {
+				name = key
+			}
+			ips := staticIPsFromKV(kv)
+			if len(ips) == 0 {
+				continue
+			}
+			result = append(result, GuestNetworkIface{Name: name, MAC: kv["hwaddr"], IPs: ips})
+		case configIPConfigKeyRe.MatchString(key):
+			idx := configIPConfigKeyRe.FindStringSubmatch(key)[1]
+			kv := parseConfigLine(line)
+			ips := staticIPsFromKV(kv)
+			if len(ips) == 0 {
+				continue
+			}
+			// cloud-init's ipconfigN doesn't name its interface; netN/eth
+			// numbering conventionally lines up with the same index N.
+			result = append(result, GuestNetworkIface{Name: "eth" + idx, IPs: ips})
+		}
+	}
+	return result
+}
+
+func staticIPsFromKV(kv map[string]string) []string {
+	var ips []string
+	if ip := kv["ip"]; !staticIPPlaceholders[ip] {
+		ips = append(ips, ip)
+	}
+	if ip6 := kv["ip6"]; !staticIPPlaceholders[ip6] {
+		ips = append(ips, ip6)
+	}
+	return ips
+}
+
 // NodeServiceAction performs an action on a service. Requires Sys.Modify.
 // action must be one of: start | stop | restart | reload.
 // MigrateGuest migrates a VM or LXC container to another node.
@@ -701,6 +798,48 @@ func (c *Client) MigrateGuest(node string, vmid int, guestType, target string, o
 
 	var envelope struct {
 		Data string `json:"data"` // UPID of the migration task
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", fmt.Errorf("parse response: %w", err)
+	}
+	return envelope.Data, nil
+}
+
+// GuestAction issues a power action (start/shutdown/reboot) on a VM or LXC
+// container. guestType must be "vm" or "lxc". Returns the UPID of the
+// resulting PVE task — the action itself is async on the PVE side.
+func (c *Client) GuestAction(node string, vmid int, guestType, action string) (string, error) {
+	var apiPath string
+	if guestType == "lxc" {
+		apiPath = fmt.Sprintf("/nodes/%s/lxc/%d/status/%s", node, vmid, action)
+	} else {
+		apiPath = fmt.Sprintf("/nodes/%s/qemu/%d/status/%s", node, vmid, action)
+	}
+	reqURL := c.baseURL + apiPath
+	req, err := http.NewRequest(http.MethodPost, reqURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
+		}
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
+	}
+
+	var envelope struct {
+		Data string `json:"data"` // UPID of the task
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
 		return "", fmt.Errorf("parse response: %w", err)

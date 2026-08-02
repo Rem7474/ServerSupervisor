@@ -55,11 +55,8 @@
       </thead>
       <tbody>
         <tr v-if="!sortedDisks.length">
-          <td
-            colspan="6"
-            class="text-center text-muted py-4"
-          >
-            Aucun disque détecté sur ce nœud.
+          <td colspan="6">
+            <EmptyState title="Aucun disque détecté sur ce nœud." />
           </td>
         </tr>
         <tr
@@ -79,11 +76,11 @@
           <td>
             <span
               v-if="d.health === 'PASSED'"
-              class="badge bg-success-lt text-success"
+              class="badge bg-green-lt text-green"
             >PASSED</span>
             <span
               v-else-if="d.health === 'FAILED'"
-              class="badge bg-danger-lt text-danger"
+              class="badge bg-red-lt text-red"
             >FAILED</span>
             <span
               v-else
@@ -117,7 +114,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import SortableHeader from '../common/SortableHeader.vue'
+import EmptyState from '../EmptyState.vue'
 import type { ProxmoxDisk } from '../../types/proxmox'
+import { compareValues } from '../../utils/sort'
 
 const props = defineProps<{ disks: ProxmoxDisk[] }>()
 
@@ -131,19 +130,6 @@ function toggleSort(key: string) {
   }
   sortKey.value = key
   sortDir.value = 'asc'
-}
-
-function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc' = 'asc'): number {
-  const dir = direction === 'asc' ? 1 : -1
-  if (a == null && b == null) return 0
-  if (a == null) return 1 * dir
-  if (b == null) return -1 * dir
-  if (typeof a === 'string' || typeof b === 'string') {
-    return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' }) * dir
-  }
-  if (a < b) return -1 * dir
-  if (a > b) return 1 * dir
-  return 0
 }
 
 const sortedDisks = computed(() => {

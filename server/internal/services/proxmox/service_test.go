@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
@@ -15,6 +16,13 @@ import (
 type fakeRepo struct {
 	link    *models.ProxmoxGuestLink
 	created bool
+
+	// Used by AllGuestNetworks tests only; nil/empty for every other test,
+	// which preserves their existing nil-returning behavior below.
+	nodes        []models.ProxmoxNode
+	enabledConns []database.ProxmoxConnectionFull
+	connByID     map[string]*models.ProxmoxConnection
+	guestsByNode map[string][]models.ProxmoxGuest
 }
 
 func (f *fakeRepo) ListProxmoxConnections(context.Context) ([]models.ProxmoxConnection, error) {
@@ -24,7 +32,10 @@ func (f *fakeRepo) CreateProxmoxConnection(context.Context, string, string, stri
 	f.created = true
 	return "id", nil
 }
-func (f *fakeRepo) GetProxmoxConnectionByID(context.Context, string) (*models.ProxmoxConnection, error) {
+func (f *fakeRepo) GetProxmoxConnectionByID(_ context.Context, id string) (*models.ProxmoxConnection, error) {
+	if f.connByID != nil {
+		return f.connByID[id], nil
+	}
 	return nil, nil
 }
 func (f *fakeRepo) UpdateProxmoxConnection(context.Context, string, string, string, string, string, bool, bool, int) error {
@@ -32,7 +43,7 @@ func (f *fakeRepo) UpdateProxmoxConnection(context.Context, string, string, stri
 }
 func (f *fakeRepo) DeleteProxmoxConnection(context.Context, string) error { return nil }
 func (f *fakeRepo) GetEnabledProxmoxConnections(context.Context) ([]database.ProxmoxConnectionFull, error) {
-	return nil, nil
+	return f.enabledConns, nil
 }
 func (f *fakeRepo) GetProxmoxTokenSecret(context.Context, string) (string, error) { return "", nil }
 func (f *fakeRepo) GetProxmoxSummary(context.Context) (models.ProxmoxSummary, error) {
@@ -41,8 +52,14 @@ func (f *fakeRepo) GetProxmoxSummary(context.Context) (models.ProxmoxSummary, er
 func (f *fakeRepo) ListProxmoxGuests(context.Context, string, string, string) ([]models.ProxmoxGuest, error) {
 	return nil, nil
 }
-func (f *fakeRepo) ListProxmoxGuestsByNode(context.Context, string, string) ([]models.ProxmoxGuest, error) {
+func (f *fakeRepo) ListProxmoxGuestsByNode(_ context.Context, connectionID, nodeName string) ([]models.ProxmoxGuest, error) {
+	if f.guestsByNode != nil {
+		return f.guestsByNode[connectionID+"|"+nodeName], nil
+	}
 	return nil, nil
+}
+func (f *fakeRepo) GetProxmoxGuestByID(context.Context, string) (*models.ProxmoxGuest, error) {
+	return nil, errors.New("not found")
 }
 func (f *fakeRepo) GetProxmoxGuestMetricsSummary(context.Context, string, int, int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	return nil, nil
@@ -69,7 +86,9 @@ func (f *fakeRepo) GetProxmoxGuestLinkByHost(context.Context, string) (*models.P
 func (f *fakeRepo) ListProxmoxLinkCandidates(context.Context, string) ([]models.ProxmoxGuest, error) {
 	return nil, nil
 }
-func (f *fakeRepo) ListProxmoxNodes(context.Context) ([]models.ProxmoxNode, error) { return nil, nil }
+func (f *fakeRepo) ListProxmoxNodes(context.Context) ([]models.ProxmoxNode, error) {
+	return f.nodes, nil
+}
 func (f *fakeRepo) ListProxmoxNodesByConnection(context.Context, string) ([]models.ProxmoxNode, error) {
 	return nil, nil
 }
@@ -107,6 +126,9 @@ func (f *fakeRepo) ListProxmoxBackupJobs(context.Context, string) ([]models.Prox
 	return nil, nil
 }
 func (f *fakeRepo) ListProxmoxBackupRuns(context.Context, string) ([]models.ProxmoxBackupRun, error) {
+	return nil, nil
+}
+func (f *fakeRepo) GetExposureByIPs(context.Context, []string, time.Time) (map[string]*models.HostExposure, error) {
 	return nil, nil
 }
 
@@ -169,6 +191,30 @@ func TestNodeServiceAction_InvalidAction(t *testing.T) {
 	_, err := newSvc(&fakeRepo{}).NodeServiceAction(context.Background(), "node", "pveproxy", "frobnicate")
 	if status(err) != 400 {
 		t.Fatalf("invalid action should be 400, got %v", err)
+	}
+}
+
+func TestGuestAction_InvalidAction(t *testing.T) {
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "guest-1", "frobnicate")
+	if status(err) != 400 {
+		t.Fatalf("invalid action should be 400, got %v", err)
+	}
+}
+
+// stop (hard power-off, no ACPI shutdown) is deliberately excluded from the
+// whitelist — see the "Proxmox integration" note in the root CLAUDE.md.
+func TestGuestAction_ExcludesHardStop(t *testing.T) {
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "guest-1", "stop")
+	if status(err) != 400 {
+		t.Fatalf("hard stop must not be whitelisted, got %v", err)
+	}
+}
+
+func TestGuestAction_GuestNotFound(t *testing.T) {
+	// GetProxmoxGuestByID's fakeRepo stub always errors -> not found.
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "missing", "start")
+	if status(err) != 404 {
+		t.Fatalf("missing guest should be 404, got %v", err)
 	}
 }
 

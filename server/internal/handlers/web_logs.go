@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
+	"github.com/serversupervisor/server/internal/database"
 	weblogssvc "github.com/serversupervisor/server/internal/services/weblogs"
 )
 
@@ -190,7 +191,17 @@ func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
 	}
 	hostID := strings.TrimSpace(c.Query("host_id"))
 	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
-	data, err := h.svc.DomainDetails(c.Request.Context(), domain, since, hostID, source, webLogsLimit(c, 300))
+	page := clampQueryInt(c, "page", 1, 1<<31-1)
+	limit := webLogsLimit(c, 50)
+	filter := database.DomainDetailsFilter{
+		Status: strings.ToLower(strings.TrimSpace(c.Query("status"))),
+		Method: strings.ToUpper(strings.TrimSpace(c.Query("method"))),
+		Path:   strings.TrimSpace(c.Query("path")),
+		IP:     strings.TrimSpace(c.Query("ip")),
+		Sort:   strings.ToLower(strings.TrimSpace(c.Query("sort"))),
+		Dir:    strings.ToLower(strings.TrimSpace(c.Query("dir"))),
+	}
+	data, err := h.svc.DomainDetails(c.Request.Context(), domain, since, hostID, source, filter, limit, (page-1)*limit)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -201,6 +212,8 @@ func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
 		"since":   since,
 		"host_id": hostID,
 		"source":  source,
+		"page":    page,
+		"limit":   limit,
 		"details": data,
 	})
 }

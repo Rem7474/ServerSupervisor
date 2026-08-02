@@ -17,39 +17,28 @@
         class="btn btn-primary"
         @click="openCreateTask"
       >
-        Nouvelle tache
+        Nouvelle tâche
       </button>
     </div>
     <div class="card">
       <div
         v-if="tasksLoading"
-        class="card-body text-center py-5"
+        class="card-body"
       >
-        <span class="spinner-border text-primary" />
+        <LoadingSkeleton variant="table" />
       </div>
       <div
         v-else-if="!tasks.length"
-        class="card-body text-center py-5"
+        class="card-body"
       >
-        <IconClock
-          :size="40"
-          class="icon mb-3 text-muted"
-          :stroke-width="1.5"
+        <EmptyState
+          :icon="IconClock"
+          :icon-size="40"
+          title="Aucune tâche planifiée"
+          subtitle="Automatisez vos opérations en créant une tâche planifiée."
+          :cta-label="canRunApt ? 'Nouvelle tâche' : ''"
+          @cta="openCreateTask"
         />
-        <h3 class="mb-1">
-          Aucune tache planifiee
-        </h3>
-        <p class="text-secondary mb-3">
-          Automatisez vos operations en creant une tache planifiee.
-        </p>
-        <button
-          v-if="canRunApt"
-          type="button"
-          class="btn btn-primary"
-          @click="openCreateTask"
-        >
-          Nouvelle tache
-        </button>
       </div>
       <div
         v-else
@@ -58,19 +47,34 @@
         <table class="table table-vcenter table-hover card-table mb-0">
           <thead>
             <tr>
-              <th>Nom</th>
+              <th>
+                <SortableHeader
+                  label="Nom"
+                  :active="sortKey === 'name'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('name')"
+                />
+              </th>
               <th>Module / Action</th>
               <th>Planification</th>
-              <th>Prochaine exécution</th>
-              <th>Dernier resultat</th>
-              <th>Activee</th>
+              <th>
+                <SortableHeader
+                  label="Prochaine exécution"
+                  :active="sortKey === 'next_run_at'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('next_run_at')"
+                />
+              </th>
+              <th>Dernier résultat</th>
+              <th>Activée</th>
               <th />
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="task in tasks"
+              v-for="task in sortedTasks"
               :key="task.id"
+              :class="{ 'opacity-60': !task.enabled && !isManualOnly(task) }"
             >
               <td>{{ task.name }}</td>
               <td>
@@ -104,9 +108,9 @@
               <td>
                 <span
                   v-if="task.last_run_status"
-                  :class="task.last_run_status === 'completed' ? 'badge bg-success-lt' : task.last_run_status === 'pending' || task.last_run_status === 'running' ? 'badge bg-warning-lt' : 'badge bg-danger-lt'"
+                  :class="getExecutionStateClass(task.last_run_status)"
                 >
-                  {{ task.last_run_status }}
+                  {{ commandStatusLabel(task.last_run_status) }}
                   <span
                     v-if="task.last_run_at"
                     class="ms-1 text-muted small"
@@ -136,7 +140,7 @@
                   <button
                     v-if="task.last_command_id"
                     type="button"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Voir les logs"
                     @click="openTaskLogs(task)"
                   >
@@ -186,6 +190,7 @@
   <Teleport to="body">
     <template v-if="showTaskModal">
       <div
+        ref="modalRef"
         class="modal modal-blur fade show d-block"
         tabindex="-1"
         role="dialog"
@@ -195,7 +200,7 @@
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">
-                {{ editingTask ? 'Modifier la tache' : 'Nouvelle tache planifiee' }}
+                {{ editingTask ? 'Modifier la tâche' : 'Nouvelle tâche planifiée' }}
               </h5>
               <button
                 type="button"
@@ -308,7 +313,7 @@
                       id="task-yaml-hint"
                       class="form-hint"
                     >
-                      Aucune tache detectee dans <code>tasks.yaml</code> - saisissez l'ID manuellement.
+                      Aucune tâche détectée dans <code>tasks.yaml</code> - saisissez l'ID manuellement.
                     </div>
                   </template>
                 </template>
@@ -370,7 +375,7 @@
                   v-if="taskSaving"
                   class="spinner-border spinner-border-sm me-1"
                 />
-                {{ editingTask ? 'Enregistrer' : 'Creer' }}
+                {{ editingTask ? 'Enregistrer' : 'Créer' }}
               </button>
             </div>
           </div>
@@ -391,7 +396,7 @@
           </div>
           <button
             type="button"
-            class="btn-close btn-close-white me-2 m-auto"
+            class="btn-close me-2 m-auto"
             @click="taskRunResult = null"
           />
         </div>
@@ -401,15 +406,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { IconClock, IconList } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
+import SortableHeader from '../common/SortableHeader.vue'
+import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import apiClient from '../../api'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useToast } from '../../composables/useToast'
+import { useModalChrome } from '../../composables/useModalChrome'
 import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
+import { getExecutionStateClass } from '../../utils/statusClasses'
+import { commandStatusLabel } from '../../utils/commandStatus'
 
 type TaskModule = 'apt' | 'docker' | 'systemd' | 'journal' | 'processes' | 'custom'
 
@@ -473,11 +484,38 @@ const props = withDefaults(defineProps<{
 const dialog = useConfirmDialog()
 const { formatExactDate: formatTaskDate } = useDateFormatter()
 const tasks = ref<Task[]>([])
+type TaskSortKey = 'name' | 'next_run_at'
+const sortKey = ref<TaskSortKey>('name')
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+function toggleSort(key: TaskSortKey): void {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortKey.value = key
+  sortDir.value = 'asc'
+}
+
+const sortedTasks = computed(() => {
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return [...tasks.value].sort((a, b) => {
+    if (sortKey.value === 'next_run_at') {
+      const av = a.next_run_at ? new Date(a.next_run_at).getTime() : 0
+      const bv = b.next_run_at ? new Date(b.next_run_at).getTime() : 0
+      return (av - bv) * dir
+    }
+    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()) * dir
+  })
+})
+
 const tasksLoading = ref(false)
 const tasksError = ref('')
 const taskRunningId = ref<string | number | null>(null)
 const { value: taskRunResult, showToast: showTaskRunResult } = useToast<TaskRunResult | null>(null)
 const showTaskModal = ref(false)
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => showTaskModal.value, { onClose: closeTaskModal })
 const editingTask = ref<Task | null>(null)
 const taskSaving = ref(false)
 const taskModalError = ref('')
@@ -641,8 +679,8 @@ function openTaskLogs(task: Task): void {
 
 async function confirmDeleteTask(task: Task): Promise<void> {
   const confirmed = await dialog.confirm({
-    title: 'Supprimer la tache',
-    message: `Supprimer la tache "${task.name}" ?\nCette action est irreversible.`,
+    title: 'Supprimer la tâche',
+    message: `Supprimer la tâche "${task.name}" ?\nCette action est irréversible.`,
     variant: 'danger',
   })
   if (!confirmed) return

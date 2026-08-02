@@ -16,19 +16,14 @@
     </div>
     <div
       v-else-if="metrics.length === 0"
-      class="card-body text-center text-muted py-5"
+      class="card-body"
     >
-      <IconClock
-        :size="36"
-        class="mb-2 icon icon-md icon-responsive-lg"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconClock"
+        :icon-size="36"
+        title="Aucune donnée de disque disponible"
+        subtitle="L'agent doit être actif pour collecter les métriques disque"
       />
-      <div class="small fw-medium">
-        Aucune donnée de disque disponible
-      </div>
-      <div class="mt-1 opacity-75 small">
-        L'agent doit être actif pour collecter les métriques disque
-      </div>
     </div>
     <div
       v-else
@@ -109,6 +104,7 @@
 import { onMounted } from 'vue'
 import { IconClock } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import { useDiskMetrics, type DiskMetric } from '../../composables/useDiskMetrics'
 
 const props = withDefaults(defineProps<{

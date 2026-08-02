@@ -85,39 +85,24 @@
     </div>
 
     <div v-show="activeTab === 'webhooks'">
-      <div
+      <LoadingSkeleton
         v-if="loadingWebhooks"
-        class="text-center py-5"
-      >
-        <div
-          class="spinner-border text-primary"
-          role="status"
-        />
-      </div>
+        variant="card"
+        :lines="3"
+      />
 
       <div
         v-else-if="webhooks.length === 0"
         class="card"
       >
-        <div class="card-body text-center py-5 text-muted">
-          <IconGitBranch
-            :size="48"
-            class="mb-3 d-block mx-auto opacity-50"
-            :stroke-width="1.5"
+        <div class="card-body">
+          <EmptyState
+            :icon="IconGitBranch"
+            title="Aucun webhook configuré."
+            subtitle="Recevez des événements depuis GitHub, GitLab, Gitea ou Forgejo pour déclencher des scripts sur vos VMs."
+            cta-label="Créer le premier webhook"
+            @cta="openCreateWebhook"
           />
-          <p class="mb-2">
-            Aucun webhook configuré.
-          </p>
-          <p class="text-muted small">
-            Recevez des événements depuis GitHub, GitLab, Gitea ou Forgejo pour déclencher des scripts sur vos VMs.
-          </p>
-          <button
-            type="button"
-            class="btn btn-sm btn-primary"
-            @click="openCreateWebhook"
-          >
-            Créer le premier webhook
-          </button>
         </div>
       </div>
 
@@ -143,7 +128,7 @@
                 <div class="ms-auto d-flex gap-1">
                   <span
                     v-if="!webhook.enabled"
-                    class="badge bg-secondary"
+                    class="badge bg-secondary-lt text-secondary"
                   >Désactivé</span>
                 </div>
               </div>
@@ -168,7 +153,17 @@
                       class="text-muted"
                       style="min-width:60px"
                     >VM</span>
-                    <span class="text-truncate">{{ webhook.host_name || webhook.host_id }}</span>
+                    <router-link
+                      v-if="webhook.host_id"
+                      :to="`/hosts/${webhook.host_id}`"
+                      class="text-truncate text-decoration-none"
+                    >
+                      {{ webhook.host_name || webhook.host_id }}
+                    </router-link>
+                    <span
+                      v-else
+                      class="text-truncate"
+                    >{{ webhook.host_name || webhook.host_id }}</span>
                   </div>
                   <div class="d-flex gap-2 mb-1">
                     <span
@@ -186,7 +181,7 @@
                   <span
                     class="ms-1 badge"
                     :class="execStatusBadge(webhook.last_execution.status || '')"
-                  >{{ webhook.last_execution.status }}</span>
+                  >{{ commandStatusLabel(webhook.last_execution.status) }}</span>
                   <span class="ms-1 text-muted">{{ formatRelative(webhook.last_execution.triggered_at || '') }}</span>
                 </div>
                 <div
@@ -220,7 +215,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger ms-auto"
+                  class="btn btn-icon btn-sm btn-outline-danger ms-auto"
                   @click="confirmDeleteWebhook(webhook)"
                 >
                   <IconTrash :size="14" />
@@ -241,39 +236,24 @@
     </div>
 
     <div v-show="activeTab === 'trackers'">
-      <div
+      <LoadingSkeleton
         v-if="loadingTrackers"
-        class="text-center py-5"
-      >
-        <div
-          class="spinner-border text-primary"
-          role="status"
-        />
-      </div>
+        variant="card"
+        :lines="3"
+      />
 
       <div
         v-else-if="trackers.length === 0"
         class="card"
       >
-        <div class="card-body text-center py-5 text-muted">
-          <IconActivity
-            :size="48"
-            class="mb-3 d-block mx-auto opacity-50"
-            :stroke-width="1.5"
+        <div class="card-body">
+          <EmptyState
+            :icon="IconActivity"
+            title="Aucun tracker configuré."
+            subtitle="Surveillez les releases Git ou les images Docker et déclenchez automatiquement un script sur une VM lors d'une mise à jour."
+            cta-label="Créer le premier tracker"
+            @cta="openCreateTracker"
           />
-          <p class="mb-2">
-            Aucun tracker configuré.
-          </p>
-          <p class="text-muted small">
-            Surveillez les releases Git ou les images Docker et déclenchez automatiquement un script sur une VM lors d'une mise à jour.
-          </p>
-          <button
-            type="button"
-            class="btn btn-sm btn-primary"
-            @click="openCreateTracker"
-          >
-            Créer le premier tracker
-          </button>
         </div>
       </div>
 
@@ -305,7 +285,7 @@
                 <div class="ms-auto">
                   <span
                     v-if="!tracker.enabled"
-                    class="badge bg-secondary"
+                    class="badge bg-secondary-lt text-secondary"
                   >Désactivé</span>
                 </div>
               </div>
@@ -355,7 +335,12 @@
                         class="text-muted"
                         style="min-width:60px"
                       >VM</span>
-                      <span class="text-truncate">{{ tracker.host_name || tracker.host_id }}</span>
+                      <router-link
+                        :to="`/hosts/${tracker.host_id}`"
+                        class="text-truncate text-decoration-none"
+                      >
+                        {{ tracker.host_name || tracker.host_id }}
+                      </router-link>
                     </div>
                     <div class="d-flex gap-2 mb-1">
                       <span
@@ -371,7 +356,12 @@
                         class="text-muted"
                         style="min-width:60px"
                       >VM</span>
-                      <span class="text-truncate">{{ tracker.host_name || tracker.host_id }}</span>
+                      <router-link
+                        :to="`/hosts/${tracker.host_id}`"
+                        class="text-truncate text-decoration-none"
+                      >
+                        {{ tracker.host_name || tracker.host_id }}
+                      </router-link>
                     </div>
                     <div class="d-flex gap-2 mb-1">
                       <span
@@ -397,7 +387,7 @@
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Derniere</span>
+                    >Dernière</span>
                     <span class="badge bg-green-lt text-green">{{ tracker.last_release_tag }}</span>
                   </div>
                   <div class="d-flex gap-2 mb-1">
@@ -433,19 +423,19 @@
                     <span
                       class="ms-1 badge"
                       :class="execStatusBadge(tracker.last_execution.status || '')"
-                    >{{ tracker.last_execution.status }}</span>
+                    >{{ commandStatusLabel(tracker.last_execution.status) }}</span>
                     <span class="ms-1 text-muted">{{ formatRelative(tracker.last_execution.triggered_at || '') }}</span>
                   </template>
                   <template v-else-if="tracker.last_checked_at">
                     <span class="text-muted">Dernière vérif : {{ formatRelative(tracker.last_checked_at) }}</span>
                     <span
                       v-if="tracker.last_error"
-                      class="ms-1 badge bg-danger-lt text-danger"
+                      class="ms-1 badge bg-red-lt text-red"
                       :title="(tracker.last_error as string)"
                     >erreur</span>
                     <span
                       v-else-if="!tracker.last_release_tag && tracker.tracker_type !== 'docker'"
-                      class="ms-1 badge bg-warning-lt text-warning"
+                      class="ms-1 badge bg-yellow-lt text-yellow"
                     >aucune release trouvée</span>
                   </template>
                   <template v-else>
@@ -469,7 +459,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-info"
+                  class="btn btn-icon btn-sm btn-outline-info"
                   title="Verifier maintenant"
                   @click="checkNow(tracker)"
                 >
@@ -485,7 +475,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger ms-auto"
+                  class="btn btn-icon btn-sm btn-outline-danger ms-auto"
                   @click="confirmDeleteTracker(tracker)"
                 >
                   <IconTrash :size="14" />
@@ -549,52 +539,58 @@
       @created="onBulkCreated"
     />
 
-    <div
-      v-if="newWebhookSecret"
-      class="modal modal-blur show d-block"
-      style="background:rgba(0,0,0,.7)"
-    >
-      <div class="modal-dialog modal-md">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              Webhook créé
-            </h5>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-warning">
-              Copiez ce secret maintenant, il ne sera plus affiché en clair.
+    <template v-if="newWebhookSecret">
+      <div
+        ref="secretModalRef"
+        class="modal modal-blur fade show d-block"
+      >
+        <div class="modal-dialog modal-md">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                Webhook créé
+              </h5>
             </div>
-            <WebhookUrlCard
-              :webhook-id="newWebhookId"
-              :secret="newWebhookSecret"
-              :initial-secret="true"
-            />
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-primary"
-              @click="closeSecretModal"
-            >
-              J'ai copié le secret
-            </button>
+            <div class="modal-body">
+              <div class="alert alert-warning">
+                Copiez ce secret maintenant, il ne sera plus affiché en clair.
+              </div>
+              <WebhookUrlCard
+                :webhook-id="newWebhookId"
+                :secret="newWebhookSecret"
+                :initial-secret="true"
+              />
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-primary"
+                @click="closeSecretModal"
+              >
+                J'ai copié le secret
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      <div class="modal-backdrop fade show" />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
+import { commandStatusLabel } from '../utils/commandStatus'
 import { IconActivity, IconGitBranch, IconPlus, IconRefresh, IconSearch, IconTrash } from '@tabler/icons-vue'
+import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import TrackableContainersModal from '../components/webhooks/TrackableContainersModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { ref } from 'vue'
+import { useModalChrome } from '../composables/useModalChrome'
 const {
   activeTab,
   hosts,
@@ -644,6 +640,12 @@ const {
   closeTrackerLogs,
   openTrackerLogs,
 } = useGitWebhooksPage()
+
+// No dismiss affordance by design — the secret is shown once, and the
+// only way out is the "J'ai copié le secret" button, so ESC/backdrop
+// close must stay disabled (persistent: true).
+const secretModalRef = ref<HTMLElement | null>(null)
+useModalChrome(secretModalRef, () => !!newWebhookSecret.value, { persistent: true })
 
 const showDiscoverModal = ref(false)
 

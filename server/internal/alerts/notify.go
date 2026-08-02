@@ -151,7 +151,7 @@ func alertEmailData(cfg *config.Config, rule models.AlertRule, host models.Host,
 
 	cooldownMsg := ""
 	if rule.Actions.Cooldown > 0 {
-		cooldownMsg = formatCooldownDuration(rule.Actions.Cooldown)
+		cooldownMsg = formatDuration(rule.Actions.Cooldown)
 	}
 
 	return notify.AlertEmailData{
@@ -169,11 +169,21 @@ func alertEmailData(cfg *config.Config, rule models.AlertRule, host models.Host,
 	}
 }
 
-// formatCooldownDuration renders AlertActions.Cooldown (seconds) as a short
-// human string for the email footer ("no further notifications for X").
-func formatCooldownDuration(seconds int) string {
+// formatDuration renders a number of seconds as a short human string. Used
+// both for AlertActions.Cooldown (the email footer's "no further
+// notifications for X") and for how long a resolved incident stayed open
+// (resolvedEvent below), hence the days branch cooldowns never hit in
+// practice but multi-day incidents can.
+func formatDuration(seconds int) string {
 	d := time.Duration(seconds) * time.Second
 	switch {
+	case d >= 24*time.Hour:
+		days := int(d.Hours()) / 24
+		hours := int(d.Hours()) % 24
+		if hours == 0 {
+			return fmt.Sprintf("%dj", days)
+		}
+		return fmt.Sprintf("%dj%dh", days, hours)
 	case d >= time.Hour:
 		return fmt.Sprintf("%dh", int(d.Hours()))
 	case d >= time.Minute:
@@ -206,19 +216,25 @@ func ntfyTopicURL(base, topic string) string {
 	return u.String()
 }
 
-// resolvedEvent builds the notifychannels.Event for an incident that just
-// resolved. Resolution only ever goes out over "browser" — smtp/ntfy/legacy
-// webhook don't fire on resolve, matching the pre-existing (fired-only)
-// behavior of those channels. The Web Push payload reuses the exact tag the
-// fired notification used, so the service worker updates it in place instead
-// of leaving the Android/PWA notification stuck in the alerting state.
-func resolvedEvent(rule models.AlertRule, host models.Host) notifychannels.Event {
+// resolvedEvent builds the notifychannels.Event for an incident (inc) that
+// just resolved on rule/host. Resolution only ever goes out over "browser" —
+// smtp/ntfy/legacy webhook don't fire on resolve, matching the pre-existing
+// (fired-only) behavior of those channels. The Web Push payload reuses the
+// exact tag the fired notification used, so the service worker updates it in
+// place instead of leaving the Android/PWA notification stuck in the
+// alerting state. The body carries the incident's last known value (same
+// field the incidents history table shows) and how long it was open, so a
+// resolved push isn't just "back to normal" with no context — every caller
+// already has the resolved AlertIncident row in hand, so this needs no extra
+// query.
+func resolvedEvent(rule models.AlertRule, host models.Host, inc models.AlertIncident) notifychannels.Event {
+	duration := formatDuration(int(time.Since(inc.TriggeredAt).Seconds()))
 	return notifychannels.Event{
 		LogID:    fmt.Sprintf("rule:%d", rule.ID),
 		Channels: []string{"browser"},
 		Push: &push.Payload{
 			Title:  "Résolu : " + rule.DisplayName(),
-			Body:   fmt.Sprintf("%s — revenu à la normale", host.Name),
+			Body:   fmt.Sprintf("%s — revenu à la normale (%.2f%s, durée %s)", host.Name, inc.Value, alertMetricUnit(rule.Metric), duration),
 			Tag:    fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
 			URL:    "/alerts?tab=incidents",
 			Status: "resolved",

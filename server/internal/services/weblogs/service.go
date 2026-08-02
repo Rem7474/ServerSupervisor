@@ -18,6 +18,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/safego"
@@ -31,7 +32,7 @@ type Repository interface {
 	GetWebLogsTopClientIPs(ctx context.Context, since time.Time, hostID, source string, limit int) ([]map[string]any, error)
 	GetWebLogsKPIWindow(ctx context.Context, since, until time.Time, hostID, source string) (map[string]any, error)
 	GetIPTimeline(ctx context.Context, ip string, since time.Time, hostID string, limit int) ([]models.WebLogIPTimelineRow, error)
-	GetDomainDetails(ctx context.Context, domain string, since time.Time, hostID, source string, limit int) (map[string]any, error)
+	GetDomainDetails(ctx context.Context, domain string, since time.Time, hostID, source string, filter database.DomainDetailsFilter, limit, offset int) (map[string]any, error)
 	GetWebLogsTimeseries(ctx context.Context, since time.Time, hostID, source, bucket string) ([]map[string]any, error)
 	GetWebLogsLive(ctx context.Context, hostID, source string, limit int) ([]map[string]any, error)
 }
@@ -193,6 +194,14 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 		s.applyThreatScoring(threats)
 		// No traffic block in this scope; promote only applies the crowdsec bump.
 		promoteBlockedIntoThreats(map[string]any{"threats": threats}, threats)
+		// Same geoloc helper the "full" scope uses for its traffic map, run
+		// inline here instead of in a goroutine: applyThreatScoring already
+		// capped top_ips at 25 (vs. 120 for traffic), so this is a fraction of
+		// the fan-out the full scope already accepts, bounded by the same
+		// 4-worker/2s-timeout/24h-cache resolveIPsWithContext.
+		if ips, ok := threats["top_ips"].([]map[string]any); ok {
+			threats["country_distribution"] = countryDistribution(ips)
+		}
 		return &SummaryResult{Since: since, Threats: threats}, nil
 	}
 
@@ -304,8 +313,8 @@ func (s *Service) IPTimeline(ctx context.Context, ip string, since time.Time, ho
 }
 
 // DomainDetails returns aggregated details for a domain.
-func (s *Service) DomainDetails(ctx context.Context, domain string, since time.Time, hostID, source string, limit int) (map[string]any, error) {
-	return s.repo.GetDomainDetails(ctx, domain, since, hostID, source, limit)
+func (s *Service) DomainDetails(ctx context.Context, domain string, since time.Time, hostID, source string, filter database.DomainDetailsFilter, limit, offset int) (map[string]any, error) {
+	return s.repo.GetDomainDetails(ctx, domain, since, hostID, source, filter, limit, offset)
 }
 
 // Timeseries returns bucketed web-log counts.

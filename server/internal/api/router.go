@@ -20,6 +20,8 @@ import (
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
+	backupsvc "github.com/serversupervisor/server/internal/services/backup"
+	dashboardsvc "github.com/serversupervisor/server/internal/services/dashboard"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
@@ -69,9 +71,10 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	aptH := handlers.NewAptHandler(aptsvc.NewService(db, dispatcher), db)
 	dockerH := handlers.NewDockerHandler(dockersvc.NewService(db, dispatcher), db)
 	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
-	networkH := handlers.NewNetworkHandler(networksvc.NewService(db, func(ctx context.Context) (*models.NetworkSnapshot, error) {
+	networkSvc := networksvc.NewService(db, func(ctx context.Context) (*models.NetworkSnapshot, error) {
 		return networkview.BuildSnapshot(ctx, db)
-	}, bus))
+	}, bus)
+	networkH := handlers.NewNetworkHandler(networkSvc)
 	auditH := handlers.NewAuditHandler(auditsvc.NewService(db))
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	pushSvc := pushsvc.NewService(db)
@@ -103,16 +106,25 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	runbookH := handlers.NewRunbooksHandler(runbooksvc.NewService(db, dispatcher))
+	backupH := handlers.NewBackupHandler(backupsvc.NewService(db, dispatcher, cfg, notifHub, pushSvc), db)
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
 	agentH.AddCompletionListener(runbookH)
+	agentH.AddCompletionListener(backupH)
 
-	proxmoxH := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg, bus))
+	proxmoxService := proxmoxsvc.NewService(db, cfg, bus)
+	proxmoxH := handlers.NewProxmoxHandler(proxmoxService)
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
 	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher, cfg))
-	npmH := handlers.NewNPMHandler(npmsvc.NewService(db))
+	npmService := npmsvc.NewService(db)
+	npmH := handlers.NewNPMHandler(npmService)
+	dashboardH := handlers.NewDashboardHandler(dashboardsvc.NewService(db))
+
+	networkSvc.SetIPInventoryBuilder(func(ctx context.Context) (*models.NetworkIPInventory, error) {
+		return networkview.BuildIPInventory(ctx, db, proxmoxService, npmService)
+	})
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
@@ -140,7 +152,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerHostPermissionRoutes(v1, hostPermH)
 	registerUptimeRoutes(v1, uptimeH)
 	registerSSLRoutes(v1, sslH)
+	registerBackupRoutes(v1, backupH)
 	registerNPMRoutes(v1, npmH)
+	registerDashboardRoutes(v1, dashboardH)
 
 	registerStaticFiles(r)
 
@@ -156,6 +170,11 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.D
 	r.POST("/api/auth/login", h.Login)
 	r.POST("/api/auth/refresh", h.RefreshToken)
 	r.POST("/api/auth/logout", h.Logout)
+	// WebAuthn login ceremony: alternative to submitting a TOTP code during the
+	// MFA step, so it must be reachable before a session exists — each of these
+	// re-verifies the password itself (see BeginWebAuthnLogin's doc comment).
+	r.POST("/api/auth/webauthn/login/begin", h.BeginWebAuthnLogin)
+	r.POST("/api/auth/webauthn/login/finish", h.FinishWebAuthnLogin)
 	r.GET("/api/health", func(c *gin.Context) {
 		if err := db.Ping(); err != nil {
 			c.JSON(503, gin.H{"status": "degraded", "db": "unreachable", "error": err.Error()})
@@ -185,6 +204,7 @@ func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *
 	g.POST("/command/result", h.ReportCommandResult)
 	g.POST("/command/stream", h.StreamCommandOutput)
 	g.POST("/apt-status", h.ReceiveAptStatus)
+	g.POST("/restic-status", h.ReceiveResticStatus)
 	g.POST("/audit", h.LogAuditAction)
 	// Optional low-latency command push channel — see ws.WSHandler.AgentChannel.
 	g.GET("/ws", wsH.AgentChannel)
@@ -202,6 +222,10 @@ func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
 	g.POST("/auth/mfa/disable", h.DisableMFA)
 	g.GET("/auth/security", h.GetSecuritySummary)
 	g.DELETE("/auth/blocked-ips/:ip", h.UnblockIP)
+	g.GET("/auth/webauthn/credentials", h.ListWebAuthnCredentials)
+	g.POST("/auth/webauthn/register/begin", h.BeginWebAuthnRegistration)
+	g.POST("/auth/webauthn/register/finish", h.FinishWebAuthnRegistration)
+	g.DELETE("/auth/webauthn/credentials/:id", h.DeleteWebAuthnCredential)
 }
 
 func registerWebLogsRoutes(g *gin.RouterGroup, h *handlers.WebLogsHandler) {
@@ -267,6 +291,7 @@ func registerDockerRoutes(g *gin.RouterGroup, dockerH *handlers.DockerHandler, s
 	g.GET("/network/topology", networkH.GetTopologySnapshot)
 	g.GET("/network/config", networkH.GetTopologyConfig)
 	g.PUT("/network/config", networkH.SaveTopologyConfig)
+	g.GET("/network/ip-inventory", networkH.GetIPInventory)
 }
 
 func registerAPTRoutes(g *gin.RouterGroup, h *handlers.AptHandler) {
@@ -417,6 +442,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/guests", h.ListGuests)
 	g.GET("/proxmox/guests/:id/metrics", h.GetGuestMetricsSummary)
 	g.GET("/proxmox/guests/:id/link", h.GetLinkByGuest)
+	g.GET("/proxmox/guests/:id/exposure", h.GetGuestExposure)
 	// Connection management — admin only
 	proxmoxAdmin := g.Group("")
 	proxmoxAdmin.Use(AdminOnlyMiddleware())
@@ -429,6 +455,11 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	proxmoxAdmin.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
 	proxmoxAdmin.POST("/proxmox/instances/:id/poll-now", h.PollNow)
 	proxmoxAdmin.PUT("/proxmox/nodes/:id/sensor-source", h.UpdateNodeSensorSource)
+	// Guest power actions (start/shutdown/reboot) — admin only: unlike the
+	// migrate/service-action routes above (open to any authenticated user,
+	// gated only by the PVE token's own Sys.Modify scope), this can power off
+	// a running VM/CT directly, so it's gated at the app layer too.
+	proxmoxAdmin.POST("/proxmox/guests/:id/action", h.GuestAction)
 	// Guest ↔ host link management
 	g.GET("/proxmox/links", h.ListLinks)
 	g.POST("/proxmox/links", h.CreateLink)
@@ -459,6 +490,8 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 
 	// Guest network interfaces (live — VM via QEMU agent, LXC native)
 	g.GET("/proxmox/nodes/:id/guest-networks", h.GetNodeGuestNetworks)
+	// Guest ↔ NPM domain correlation (live IP matched against npm_proxy_hosts.forward_host)
+	g.GET("/proxmox/nodes/:id/guest-exposure", h.GetNodeGuestExposure)
 
 	// Node actions (write — require Sys.Modify on the Proxmox token)
 	g.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)
@@ -481,6 +514,10 @@ func registerUptimeRoutes(g *gin.RouterGroup, h *handlers.UptimeHandler) {
 	admin.POST("/uptime/probes/:id/check-now", h.CheckNow)
 }
 
+func registerDashboardRoutes(g *gin.RouterGroup, h *handlers.DashboardHandler) {
+	g.GET("/dashboard/attention", h.Attention)
+}
+
 func registerSSLRoutes(g *gin.RouterGroup, h *handlers.SSLHandler) {
 	g.GET("/ssl/certificates", h.List)
 	g.GET("/ssl/certificates/:id", h.Get)
@@ -492,6 +529,13 @@ func registerSSLRoutes(g *gin.RouterGroup, h *handlers.SSLHandler) {
 	admin.PUT("/ssl/certificates/:id", h.Update)
 	admin.DELETE("/ssl/certificates/:id", h.Delete)
 	admin.POST("/ssl/certificates/:id/check-now", h.CheckNow)
+}
+
+func registerBackupRoutes(g *gin.RouterGroup, h *handlers.BackupHandler) {
+	g.GET("/hosts/:id/backup", h.GetStatus)
+	g.GET("/hosts/:id/backup/runs", h.ListRuns)
+	g.GET("/backup/runs/:runId", h.GetRun)
+	g.POST("/hosts/:id/backup/run", h.RunBackup)
 }
 
 func registerNPMRoutes(g *gin.RouterGroup, h *handlers.NPMHandler) {

@@ -18,6 +18,8 @@ export interface NetworkHost {
 export interface NetworkService {
   id: string | number
   hostId?: string
+  /** Set instead of hostId for a service auto-generated for a Proxmox guest node (no agent). */
+  guestId?: string
   name?: string
   domain?: string
   path?: string
@@ -27,6 +29,18 @@ export interface NetworkService {
   linkToAuthelia?: boolean
   exposedToInternet?: boolean
   tags?: string
+}
+
+/**
+ * A Proxmox VM/LXC guest with no ServerSupervisor agent — rendered as its own
+ * compound node (like a host) so an NPM-detected domain correlation can still
+ * be shown even though the guest never appears in the agent-based host list.
+ */
+export interface NetworkGuestNode {
+  id: string
+  label: string
+  sublabel?: string
+  status?: string
 }
 
 export interface HostPortOverride {
@@ -53,6 +67,8 @@ export interface BuildNetworkElementsInput {
   autheliaPortId: string
   /** status -> hex colour map (canvas can't read CSS vars). */
   statusColors: Record<string, string>
+  /** Proxmox guests to render as their own nodes (see NetworkGuestNode). */
+  guests?: NetworkGuestNode[]
 }
 
 /**
@@ -96,6 +112,56 @@ export function buildNetworkElements(input: BuildNetworkElementsInput): ElementD
 
   // Collect external ports exposed via proxy (for the single aggregated internet→proxy edge)
   const internetViaProxyPorts: number[] = []
+
+  // Shared by both the host loop and the guest loop below: renders one
+  // service node under `parentId` plus its proxy/authelia/internet routing
+  // edges. Extracted so a Proxmox guest node (no hostId, no ports/status)
+  // can carry NPM-detected domain services the exact same way a host does.
+  function pushServiceNode(parentId: string, idKeyPrefix: string, svc: NetworkService): void {
+    const internalPort = Number(svc.internalPort || 0)
+    const domain = svc.domain || ''
+    const path = svc.path || '/'
+    const sublabel = domain ? `${domain}${path}` : path
+
+    // idKeyPrefix (not parentId) matches the original `svc-${host.id}-${svc.id}`
+    // scheme for host-scoped services — nodePositions persists by this exact
+    // ID, so it must stay stable across the refactor that introduced this
+    // shared helper (only the new guest-scoped path gets a fresh scheme).
+    const nodeId = `svc-${idKeyPrefix}-${svc.id}`
+    elements.push({
+      group: 'nodes',
+      data: {
+        id: nodeId,
+        label: svc.name || 'Service',
+        sublabel,
+        type: 'service',
+        parent: parentId,
+        hostId: svc.hostId,
+        guestId: svc.guestId,
+        internalPort,
+        externalPort: svc.externalPort || null,
+        isProxyLinked: svc.linkToProxy || false,
+        isAutheliaLinked: svc.linkToAuthelia || false,
+        isInternetExposed: svc.exposedToInternet || false,
+        tags: svc.tags || '',
+      },
+    })
+
+    // proxy → service (direct, only when not going through Authelia)
+    if (svc.linkToProxy && !svc.linkToAuthelia) {
+      elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: proxyNodeId, target: nodeId, edgeType: 'proxy' } })
+    }
+    // authelia → service
+    if (svc.linkToAuthelia) {
+      elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: autheliaNodeId, target: nodeId, edgeType: 'authelia' } })
+    }
+    // internet routing: via proxy (aggregated) or direct
+    if (svc.exposedToInternet && svc.linkToProxy) {
+      internetViaProxyPorts.push(svc.externalPort || 443)
+    } else if (svc.exposedToInternet && !svc.linkToProxy) {
+      elements.push({ group: 'edges', data: { id: `e-inet-${nodeId}`, source: 'internet', target: nodeId, edgeType: 'internet', externalPort: svc.externalPort } })
+    }
+  }
 
   // === Host nodes (compound parents) ===
   for (const host of input.data) {
@@ -189,44 +255,32 @@ export function buildNetworkElements(input: BuildNetworkElementsInput): ElementD
 
     // Service nodes
     for (const svc of servicesByHost.get(host.id) || []) {
-      const internalPort = Number(svc.internalPort || 0)
-      const domain = svc.domain || ''
-      const path = svc.path || '/'
-      const sublabel = domain ? `${domain}${path}` : path
+      pushServiceNode(`host-${host.id}`, host.id, { ...svc, hostId: host.id })
+    }
+  }
 
-      const nodeId = `svc-${host.id}-${svc.id}`
-      elements.push({
-        group: 'nodes',
-        data: {
-          id: nodeId,
-          label: svc.name || 'Service',
-          sublabel,
-          type: 'service',
-          parent: `host-${host.id}`,
-          hostId: host.id,
-          internalPort,
-          externalPort: svc.externalPort || null,
-          isProxyLinked: svc.linkToProxy || false,
-          isAutheliaLinked: svc.linkToAuthelia || false,
-          isInternetExposed: svc.exposedToInternet || false,
-          tags: svc.tags || '',
-        },
-      })
+  // === Proxmox guest nodes (no agent — only rendered when NPM-correlated) ===
+  const servicesByGuest = new Map<string, NetworkService[]>()
+  for (const svc of input.services || []) {
+    if (!svc?.guestId) continue
+    if (!servicesByGuest.has(svc.guestId)) servicesByGuest.set(svc.guestId, [])
+    servicesByGuest.get(svc.guestId)!.push(svc)
+  }
 
-      // proxy → service (direct, only when not going through Authelia)
-      if (svc.linkToProxy && !svc.linkToAuthelia) {
-        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: proxyNodeId, target: nodeId, edgeType: 'proxy' } })
-      }
-      // authelia → service
-      if (svc.linkToAuthelia) {
-        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: autheliaNodeId, target: nodeId, edgeType: 'authelia' } })
-      }
-      // internet routing: via proxy (aggregated) or direct
-      if (svc.exposedToInternet && svc.linkToProxy) {
-        internetViaProxyPorts.push(svc.externalPort || 443)
-      } else if (svc.exposedToInternet && !svc.linkToProxy) {
-        elements.push({ group: 'edges', data: { id: `e-inet-${nodeId}`, source: 'internet', target: nodeId, edgeType: 'internet', externalPort: svc.externalPort } })
-      }
+  for (const guest of input.guests || []) {
+    elements.push({
+      group: 'nodes',
+      data: {
+        id: `guest-${guest.id}`,
+        label: guest.label,
+        sublabel: guest.sublabel || '',
+        type: 'proxmox_guest',
+        status: guest.status || 'unknown',
+        guestId: guest.id,
+      },
+    })
+    for (const svc of servicesByGuest.get(guest.id) || []) {
+      pushServiceNode(`guest-${guest.id}`, `guest-${guest.id}`, { ...svc, guestId: guest.id })
     }
   }
 

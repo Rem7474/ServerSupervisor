@@ -14,33 +14,14 @@
       v-if="enabled"
       class="border rounded p-3 bg-dark-subtle"
     >
-      <div class="row g-2 align-items-end">
-        <div
-          v-if="!isDockerRule"
-          class="col-md-4"
-        >
-          <label class="form-label form-label-sm">Module</label>
-          <select
-            :value="modelValue.module"
-            class="form-select form-select-sm"
-            @change="onModuleChange(($event.target as HTMLSelectElement).value as CommandModule)"
-          >
-            <option value="processes">
-              Processus (top)
-            </option>
-            <option value="journal">
-              Journal systemd
-            </option>
-            <option value="systemd">
-              Service systemd
-            </option>
-            <option value="docker">
-              Conteneur Docker
-            </option>
-          </select>
-        </div>
-
-        <div :class="isDockerRule ? 'col-md-6' : 'col-md-4'">
+      <!-- Docker-scoped rules resolve module + target automatically from the
+           rule's own scope (a specific container, a compose project, or the
+           incident's container) — there is nothing to pick, only the action. -->
+      <div
+        v-if="isDockerRule"
+        class="row g-2 align-items-end"
+      >
+        <div class="col-md-6">
           <label class="form-label form-label-sm">Action</label>
           <select
             :value="modelValue.action"
@@ -57,30 +38,24 @@
           </select>
         </div>
 
-        <div
-          v-if="!isDockerRule && commandNeedsTarget"
-          class="col-md-4"
-        >
-          <label class="form-label form-label-sm">Cible</label>
-          <input
-            :value="modelValue.target"
-            class="form-control form-control-sm"
-            :placeholder="commandTargetPlaceholder"
-            aria-describedby="command-target-hint"
-            @input="onTargetChange(($event.target as HTMLInputElement).value)"
-          >
-        </div>
-
-        <div
-          v-if="isDockerRule"
-          class="col-md-6 d-flex align-items-end"
-        >
+        <div class="col-md-6 d-flex align-items-end">
           <div class="text-muted small">
             <span class="badge bg-teal-lt text-teal me-1">Docker</span>
             {{ dockerTargetHint }}
           </div>
         </div>
       </div>
+
+      <DispatchStepEditor
+        v-else
+        v-model:module="local.module"
+        v-model:action="local.action"
+        v-model:target="local.target"
+        :show-host="false"
+        :modules="ALERT_TRIGGER_MODULES"
+        :actions-for-module="alertActionsForModule"
+        :target-config="alertTargetConfig"
+      />
 
       <small
         id="command-target-hint"
@@ -91,7 +66,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
+import DispatchStepEditor from '../DispatchStepEditor.vue'
+import type { DispatchOption } from '../../utils/dispatchStep'
 
 type CommandModule = 'processes' | 'journal' | 'systemd' | 'docker'
 
@@ -139,6 +116,9 @@ interface ActionOption {
   label: string
 }
 
+// Labels are deliberately incomplete — some actions (status/read/list) never
+// got a French label and fall back to the raw value below, matching the
+// original behavior rather than "fixing" copy nobody asked to change.
 const ACTION_LABELS: Record<string, string> = {
   logs: 'Voir les logs',
   restart: 'Redémarrer',
@@ -151,36 +131,12 @@ const ACTION_LABELS: Record<string, string> = {
   compose_restart: 'Redémarrer (Compose)',
 }
 
-const commandModuleActions: Record<CommandModule, string[]> = {
-  processes: ['list'],
-  journal: ['read'],
-  systemd: ['status', 'start', 'stop', 'restart'],
-  docker: ['logs', 'restart', 'start', 'stop'],
-}
-
 const commandActions = computed((): ActionOption[] => {
-  if (isDockerRule.value) {
-    const isCompose = props.dockerScope?.scope_mode === 'compose_project'
-    const actions = isCompose
-      ? ['compose_up', 'compose_down', 'compose_pull', 'compose_logs', 'compose_restart', 'logs', 'restart', 'start', 'stop']
-      : ['logs', 'restart', 'start', 'stop']
-    return actions.map(v => ({ value: v, label: ACTION_LABELS[v] || v }))
-  }
-  const moduleName = (props.modelValue.module || 'processes') as CommandModule
-  const actions = commandModuleActions[moduleName] || ['list']
+  const isCompose = props.dockerScope?.scope_mode === 'compose_project'
+  const actions = isCompose
+    ? ['compose_up', 'compose_down', 'compose_pull', 'compose_logs', 'compose_restart', 'logs', 'restart', 'start', 'stop']
+    : ['logs', 'restart', 'start', 'stop']
   return actions.map(v => ({ value: v, label: ACTION_LABELS[v] || v }))
-})
-
-const commandNeedsTarget = computed(() => {
-  const moduleName = props.modelValue.module
-  return moduleName === 'journal' || moduleName === 'systemd' || moduleName === 'docker'
-})
-
-const commandTargetPlaceholder = computed(() => {
-  const moduleName = props.modelValue.module
-  if (moduleName === 'journal' || moduleName === 'systemd') return 'nom du service (ex: nginx)'
-  if (moduleName === 'docker') return 'nom du conteneur'
-  return ''
 })
 
 const dockerTargetHint = computed((): string => {
@@ -191,16 +147,58 @@ const dockerTargetHint = computed((): string => {
   return 'Conteneur concerné par l\'incident (résolu au déclenchement)'
 })
 
-function onModuleChange(mod: CommandModule): void {
-  const nextActions = commandModuleActions[mod] || ['list']
-  emit('update:modelValue', { module: mod, action: nextActions[0], target: '' })
-}
-
 function onActionChange(action: string): void {
   emit('update:modelValue', { ...props.modelValue, action })
 }
 
-function onTargetChange(target: string): void {
-  emit('update:modelValue', { ...props.modelValue, target })
+// Non-docker-rule branch: module/action/target are all user-editable via the
+// shared DispatchStepEditor. This module list is narrower than
+// DISPATCH_MODULES (no apt, no custom) — a pre-existing product scoping this
+// migration preserves rather than silently widens.
+const ALERT_TRIGGER_MODULES: DispatchOption[] = [
+  { value: 'processes', label: 'Processus (top)' },
+  { value: 'journal', label: 'Journal systemd' },
+  { value: 'systemd', label: 'Service systemd' },
+  { value: 'docker', label: 'Conteneur Docker' },
+]
+
+const ALERT_MODULE_ACTIONS: Record<string, string[]> = {
+  processes: ['list'],
+  journal: ['read'],
+  systemd: ['status', 'start', 'stop', 'restart'],
+  docker: ['logs', 'restart', 'start', 'stop'],
 }
+
+function alertActionsForModule(mod: string): DispatchOption[] {
+  const actions = ALERT_MODULE_ACTIONS[mod] || ['list']
+  return actions.map(v => ({ value: v, label: ACTION_LABELS[v] || v }))
+}
+
+function alertTargetConfig(mod: string): { label: string; placeholder?: string } | null {
+  if (mod !== 'journal' && mod !== 'systemd' && mod !== 'docker') return null
+  return { label: 'Cible', placeholder: mod === 'docker' ? 'nom du conteneur' : 'nom du service (ex: nginx)' }
+}
+
+// DispatchStepEditor expects real v-models bound to a locally-owned reactive
+// object (the same shape RunbooksView's `step` and GlobalScheduledTasksView's
+// `createForm` already give it) — but modelValue here is a fully controlled
+// prop instead. `local` is a synchronous local mirror, bound to
+// DispatchStepEditor directly (`v-model:module="local.module"`) so its own
+// module-change handler's cascade of writes (module, then action, then
+// target, all within one synchronous tick) lands on a plain reactive object
+// with no round-trip through a computed setter re-reading a prop that only
+// updates after the parent's next render pass — that earlier design clobbered
+// each write with the still-stale `props.modelValue` from before the cascade
+// started. A single deep watch pushes the settled object up as one update.
+const local = reactive<CommandTrigger>({ ...props.modelValue })
+
+watch(() => props.modelValue, (v) => {
+  if (v.module !== local.module || v.action !== local.action || v.target !== local.target) {
+    local.module = v.module
+    local.action = v.action
+    local.target = v.target
+  }
+})
+
+watch(local, (v) => emit('update:modelValue', { ...v }), { deep: true })
 </script>

@@ -2,7 +2,7 @@
   <div
     v-if="dialog.isOpen.value"
     ref="modalRef"
-    class="modal modal-blur fade show"
+    class="modal modal-blur fade show modal-confirm"
     style="display: block;"
     tabindex="-1"
     role="dialog"
@@ -72,7 +72,7 @@
   </div>
   <div
     v-if="dialog.isOpen.value"
-    class="modal-backdrop fade show"
+    class="modal-backdrop fade show modal-confirm-backdrop"
   />
 </template>
 
@@ -80,14 +80,14 @@
 import { ref, watch, nextTick } from 'vue'
 import { IconAlertTriangle } from '@tabler/icons-vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
-import { useModalFocusTrap } from '../composables/useModalFocusTrap'
+import { useModalChrome } from '../composables/useModalChrome'
 
 const dialog = useConfirmDialog()
 const typedText = ref('')
 const inputRef = ref<HTMLInputElement | null>(null)
 const modalRef = ref<HTMLElement | null>(null)
 
-useModalFocusTrap(modalRef)
+useModalChrome(modalRef, () => dialog.isOpen.value, { onClose: handleCancel })
 
 watch(dialog.isOpen, (val) => {
   if (val) {

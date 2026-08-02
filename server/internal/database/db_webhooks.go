@@ -32,7 +32,7 @@ func (db *DB) CreateGitWebhook(ctx context.Context, w models.GitWebhook) (*model
 		channels = []string{}
 	}
 	var result models.GitWebhook
-	err = db.conn.QueryRowContext(ctx, 
+	err = db.conn.QueryRowContext(ctx,
 		`INSERT INTO git_webhooks
 		 (name, secret, provider, repo_filter, branch_filter, event_filter,
 		  host_id, custom_task_id, notify_channels, notify_on_success, notify_on_failure, enabled)
@@ -57,7 +57,7 @@ func (db *DB) CreateGitWebhook(ctx context.Context, w models.GitWebhook) (*model
 }
 
 func (db *DB) ListGitWebhooks(ctx context.Context) ([]models.GitWebhook, error) {
-	rows, err := db.conn.QueryContext(ctx, 
+	rows, err := db.conn.QueryContext(ctx,
 		`SELECT w.id, w.name, w.provider, w.repo_filter, w.branch_filter, w.event_filter,
 		        w.host_id, w.custom_task_id, w.notify_channels, w.notify_on_success, w.notify_on_failure,
 		        w.enabled, w.last_triggered_at, w.created_at,
@@ -123,7 +123,7 @@ func (db *DB) ListGitWebhooks(ctx context.Context) ([]models.GitWebhook, error) 
 
 func (db *DB) GetGitWebhookByID(ctx context.Context, id string) (*models.GitWebhook, error) {
 	var wh models.GitWebhook
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT w.id, w.name, w.secret, w.provider, w.repo_filter, w.branch_filter, w.event_filter,
 		        w.host_id, w.custom_task_id, w.notify_channels, w.notify_on_success, w.notify_on_failure,
 		        w.enabled, w.last_triggered_at, w.created_at,
@@ -149,7 +149,7 @@ func (db *DB) GetGitWebhookByID(ctx context.Context, id string) (*models.GitWebh
 // GetGitWebhookForReceive returns minimal webhook data (including secret) for the public receiver endpoint.
 func (db *DB) GetGitWebhookForReceive(ctx context.Context, id string) (*models.GitWebhook, error) {
 	var wh models.GitWebhook
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT id, name, secret, provider, repo_filter, branch_filter, event_filter,
 		        host_id, custom_task_id, notify_channels, notify_on_success, notify_on_failure, enabled
 		 FROM git_webhooks WHERE id = $1`, id,
@@ -172,7 +172,7 @@ func (db *DB) UpdateGitWebhook(ctx context.Context, id string, w models.GitWebho
 	if channels == nil {
 		channels = []string{}
 	}
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE git_webhooks SET
 		 name=$1, provider=$2, repo_filter=$3, branch_filter=$4, event_filter=$5,
 		 host_id=$6, custom_task_id=$7, notify_channels=$8,
@@ -211,24 +211,26 @@ func (db *DB) UpdateGitWebhookLastTriggered(ctx context.Context, id string) erro
 
 func (db *DB) CreateWebhookExecution(ctx context.Context, e models.GitWebhookExecution) (*models.GitWebhookExecution, error) {
 	var result models.GitWebhookExecution
-	err := db.conn.QueryRowContext(ctx, 
+	var rawPayload sql.NullString
+	err := db.conn.QueryRowContext(ctx,
 		`INSERT INTO git_webhook_executions
-		 (webhook_id, command_id, provider, repo_name, branch, commit_sha, commit_message, pusher, status)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-		 RETURNING id, webhook_id, command_id, provider, repo_name, branch, commit_sha, commit_message, pusher, status, triggered_at, completed_at`,
+		 (webhook_id, command_id, provider, repo_name, branch, commit_sha, commit_message, pusher, status, raw_payload)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''))
+		 RETURNING id, webhook_id, command_id, provider, repo_name, branch, commit_sha, commit_message, pusher, status, triggered_at, completed_at, raw_payload`,
 		e.WebhookID, e.CommandID, e.Provider, e.RepoName, e.Branch,
-		e.CommitSHA, e.CommitMessage, e.Pusher, e.Status,
+		e.CommitSHA, e.CommitMessage, e.Pusher, e.Status, e.RawPayload,
 	).Scan(
 		&result.ID, &result.WebhookID, &result.CommandID,
 		&result.Provider, &result.RepoName, &result.Branch,
 		&result.CommitSHA, &result.CommitMessage, &result.Pusher,
-		&result.Status, &result.TriggeredAt, &result.CompletedAt,
+		&result.Status, &result.TriggeredAt, &result.CompletedAt, &rawPayload,
 	)
+	result.RawPayload = rawPayload.String
 	return &result, err
 }
 
 func (db *DB) UpdateWebhookExecutionCommandID(ctx context.Context, execID, commandID string) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE git_webhook_executions SET command_id=$1 WHERE id=$2`,
 		commandID, execID,
 	)
@@ -236,7 +238,7 @@ func (db *DB) UpdateWebhookExecutionCommandID(ctx context.Context, execID, comma
 }
 
 func (db *DB) UpdateWebhookExecutionStatus(ctx context.Context, id, status string, completedAt *time.Time) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE git_webhook_executions SET status=$1, completed_at=$2 WHERE id=$3`,
 		status, completedAt, id,
 	)
@@ -248,7 +250,7 @@ func (db *DB) UpdateWebhookExecutionStatus(ctx context.Context, id, status strin
 func (db *DB) UpdateWebhookExecutionByCommandID(ctx context.Context, commandID, status string) (webhookID string, notifyOnSuccess bool, notifyOnFailure bool, channels []string, err error) {
 	now := time.Now()
 	var chArr pq.StringArray
-	err = db.conn.QueryRowContext(ctx, 
+	err = db.conn.QueryRowContext(ctx,
 		`UPDATE git_webhook_executions e
 		 SET status=$1, completed_at=$2
 		 FROM git_webhooks w
@@ -266,7 +268,7 @@ func (db *DB) UpdateWebhookExecutionByCommandID(ctx context.Context, commandID, 
 // GetRunningExecutionForWebhook returns true if there is a pending/running execution for the given webhook.
 func (db *DB) GetRunningExecutionForWebhook(ctx context.Context, webhookID string) (bool, error) {
 	var count int
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM git_webhook_executions
 		 WHERE webhook_id=$1 AND status IN ('pending','running')`,
 		webhookID,
@@ -278,8 +280,8 @@ func (db *DB) ListWebhookExecutions(ctx context.Context, webhookID string, limit
 	if limit <= 0 {
 		limit = 50
 	}
-	rows, err := db.conn.QueryContext(ctx, 
-		`SELECT id, webhook_id, command_id, provider, repo_name, branch, commit_sha, commit_message, pusher, status, triggered_at, completed_at
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT id, webhook_id, command_id, provider, repo_name, branch, commit_sha, commit_message, pusher, status, triggered_at, completed_at, raw_payload
 		 FROM git_webhook_executions
 		 WHERE webhook_id=$1
 		 ORDER BY triggered_at DESC LIMIT $2`,
@@ -293,14 +295,16 @@ func (db *DB) ListWebhookExecutions(ctx context.Context, webhookID string, limit
 	var execs []models.GitWebhookExecution
 	for rows.Next() {
 		var e models.GitWebhookExecution
+		var rawPayload sql.NullString
 		if err := rows.Scan(
 			&e.ID, &e.WebhookID, &e.CommandID,
 			&e.Provider, &e.RepoName, &e.Branch,
 			&e.CommitSHA, &e.CommitMessage, &e.Pusher,
-			&e.Status, &e.TriggeredAt, &e.CompletedAt,
+			&e.Status, &e.TriggeredAt, &e.CompletedAt, &rawPayload,
 		); err != nil {
 			return nil, err
 		}
+		e.RawPayload = rawPayload.String
 		execs = append(execs, e)
 	}
 	return execs, rows.Err()

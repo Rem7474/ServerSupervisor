@@ -135,6 +135,7 @@ function isBenignRejection(reason: unknown): boolean {
     msg.includes('timed out') ||                    // iOS Safari: "The request timed out."
     msg.includes('timeout') ||                      // Axios: "timeout of 30000ms exceeded"
     msg.includes('websocket') ||
+    msg.includes('serviceworker') ||                 // Chrome: "Failed to update a ServiceWorker for scope ... fetching the script"
     // axios cancel / browser abort
     (reason instanceof Error && reason.name === 'CanceledError') ||
     (reason instanceof Error && reason.name === 'AbortError')
@@ -171,9 +172,16 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       .then((registration) => {
         console.log('[PWA] Service worker registered successfully:', registration)
 
-        // Check for updates every hour
+        // Check for updates every hour. A failed check (network not fully
+        // back yet after device wake, transient DNS/TLS hiccup, ...) has no
+        // impact — the current service worker keeps running and the next
+        // hourly tick retries — so it must never surface as an unhandled
+        // rejection (see router/index.ts's purgeChunkRelatedCaches for the
+        // same .catch() on the same call).
         setInterval(() => {
-          registration.update()
+          registration.update().catch((error) => {
+            console.warn('[PWA] Service worker update check failed (ignored):', error)
+          })
         }, 60 * 60 * 1000)
       })
       .catch((error) => {

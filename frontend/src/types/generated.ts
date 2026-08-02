@@ -285,9 +285,61 @@ export interface TOTPSecretResponse {
   qr_code: string; // Data URL for QR code
   backup_codes: string[]; // 10 single-use backup codes
 }
+/**
+ * MFARequirement describes which second factors are available for a user who
+ * still needs to complete an MFA step at login — the frontend uses this to
+ * decide whether to show the TOTP code field, a "use your security key"
+ * button, or both.
+ */
+export interface MFARequirement {
+  totp: boolean;
+  webauthn: boolean;
+}
 export const RoleAdmin = "admin"; // Full access
 export const RoleOperator = "operator"; // Can launch APT commands + read all
 export const RoleViewer = "viewer"; // Read-only
+
+//////////
+// source: backup.go
+
+/**
+ * BackupRun is one Restic backup execution — dispatched via
+ * module=restic action=run_backup (manual trigger or a scheduled task) and
+ * populated from the linked remote_commands row's terminal result. Never
+ * contains restic/Swift/SMTP credentials.
+ */
+export interface BackupRun {
+  id: string;
+  host_id: string;
+  profile?: string;
+  command_id?: string;
+  triggered_by?: string;
+  status: string; // running | ok | warning | error
+  started_at: string;
+  finished_at?: string;
+  duration_sec?: number /* int */;
+  progress_percent?: number /* float64 */;
+  files_done?: number /* int64 */;
+  files_total?: number /* int64 */;
+  bytes_done?: number /* int64 */;
+  bytes_total?: number /* int64 */;
+  snapshot_id?: string;
+  snapshot_time?: string;
+  repo_size_bytes?: number /* int64 */;
+  error_message?: string;
+  raw_summary?: string;
+  created_at: string;
+}
+/**
+ * BackupStatus is the aggregated view returned by GET .../backup: the latest
+ * backup_runs row when one exists, else a fallback built from the periodic,
+ * passive ResticStatus report (for hosts whose backups aren't dispatched by
+ * ServerSupervisor at all).
+ */
+export interface BackupStatus {
+  latest_run?: BackupRun;
+  passive_state?: ResticStatus;
+}
 
 //////////
 // source: command.go
@@ -356,6 +408,26 @@ export interface AuditLog {
   details: string; // JSON payload (command output, new privileges, etc.)
   status: string; // pending, completed, failed
   created_at: string;
+}
+
+//////////
+// source: dashboard.go
+
+/**
+ * AttentionItem is one entry in the aggregated "needs attention" feed served
+ * by GET /v1/dashboard/attention — signals the backend already detects but
+ * that are otherwise only visible by landing on the exact right page (a
+ * suggested Proxmox link only shows on that host's detail page, an NPM host
+ * with monitoring off only shows in the NPM list, ...). Mirrors the shape
+ * frontend/src/composables/useAttentionCenter.ts previously computed
+ * client-side from five separate list endpoints.
+ */
+export interface AttentionItem {
+  key: string;
+  label: string;
+  count: number /* int */;
+  to: string;
+  severity: string; // "info" | "warning"
 }
 
 //////////
@@ -638,19 +710,23 @@ export interface DiskHealth {
 // source: host_exposure.go
 
 /**
- * HostExposedDomain is one NPM domain that routes to a specific host (matched
- * by npm_proxy_hosts.forward_host == host.ip_address), enriched with
- * aggregated web-log traffic for that domain over the requested window. The
- * traffic rows are looked up by domain, not host_id: they are collected by
- * whichever agent parses the reverse-proxy's access logs (typically the NPM
- * host itself), which is usually a different host than the backend this
- * domain forwards to.
+ * HostExposedDomain is one NPM domain name that routes to a specific host
+ * (matched by npm_proxy_hosts.forward_host == host.ip_address), enriched with
+ * aggregated web-log traffic for that one domain over the requested window.
+ * One row per domain name, not per NPM proxy host record: an NPM proxy host
+ * can carry several domain-name aliases pointing at the same target, and
+ * each alias gets its own real per-domain traffic figures (an NPM proxy host
+ * entry isn't itself a traffic-bearing unit — domains are). The traffic rows
+ * are looked up by domain, not host_id: they are collected by whichever
+ * agent parses the reverse-proxy's access logs (typically the NPM host
+ * itself), which is usually a different host than the backend this domain
+ * forwards to.
  */
 export interface HostExposedDomain {
   proxy_host_id: string;
   connection_id: string;
   connection_name: string;
-  domain_names: string[];
+  domain_name: string;
   forward_port: number /* int */;
   ssl_enabled: boolean;
   npm_enabled: boolean;
@@ -748,6 +824,43 @@ export interface TopologySnapshot {
   containers: NetworkContainer[];
   config?: NetworkTopologyConfig;
   updated_at: string;
+}
+/**
+ * NetworkProxmoxGuestIP is a Proxmox VM/LXC guest with its live-fetched IP
+ * addresses, correlated with a ServerSupervisor Host when a confirmed
+ * proxmox_guest_links entry exists.
+ */
+export interface NetworkProxmoxGuestIP {
+  guest_id: string;
+  name: string;
+  node: string;
+  guest_type: string; // "vm" | "lxc"
+  vmid: number /* int */;
+  status: string;
+  ip_addresses: string[];
+  host_id?: string;
+  host_name?: string;
+}
+/**
+ * NetworkNPMEntry is an Nginx Proxy Manager proxy host entry, correlated by
+ * IP with a ServerSupervisor Host or a Proxmox guest when possible.
+ */
+export interface NetworkNPMEntry {
+  proxy_host_id: number /* int */;
+  domain_names: string[];
+  forward_host: string;
+  forward_port: number /* int */;
+  matched_type?: string; // "host" | "proxmox_guest"
+  matched_id?: string;
+  matched_name?: string;
+}
+/**
+ * NetworkIPInventory is the combined, real-time (non-persisted) IP inventory
+ * shown on the Network page's cards view.
+ */
+export interface NetworkIPInventory {
+  proxmox_guests: NetworkProxmoxGuestIP[];
+  npm_hosts: NetworkNPMEntry[];
 }
 
 //////////
@@ -1039,6 +1152,17 @@ export interface ProxmoxSummary {
   storage_near_full: number /* int */; // usage > 80 %
   storage_offline: number /* int */; // active=false or enabled=false
   recent_failed_tasks: number /* int */; // exit_status != 'OK' in last 24 h
+  /**
+   * IDs of the proxmox_nodes rows behind each health signal above, so the
+   * frontend can filter/highlight the node table instead of showing an
+   * inactionable count. Node-level (NodesDown) is a direct proxmox_nodes
+   * query; the other three join through proxmox_storages/proxmox_tasks on
+   * (connection_id, node_name) since those tables don't carry a node ID.
+   */
+  nodes_down_ids?: string[];
+  storage_near_full_node_ids?: string[];
+  storage_offline_node_ids?: string[];
+  failed_task_node_ids?: string[];
 }
 /**
  * ProxmoxNodeMetricsSummary is a time-bucketed aggregate used for dashboard trend charts.
@@ -1110,6 +1234,25 @@ export interface AgentCapabilities {
   web_logs: boolean; // Web access log parsing enabled
   systemd: boolean; // Systemd unit monitoring enabled
   journal: boolean; // Journald log collection enabled
+  restic: boolean; // Restic backup collector enabled
+}
+/**
+ * ResticStatus mirrors agent/internal/collector.ResticStatus — the periodic,
+ * passive snapshot of Restic's state. Never contains resticconf content or
+ * resolved credential values.
+ */
+export interface ResticStatus {
+  installed: boolean;
+  last_run_at?: string;
+  last_status?: string;
+  duration_sec?: number /* int */;
+  files_new?: number /* int */;
+  files_changed?: number /* int */;
+  bytes_added?: number /* int64 */;
+  snapshot_id?: string;
+  repo_size_bytes?: number /* int64 */;
+  error_message?: string;
+  source: string;
 }
 /**
  * AgentReport is the full status report sent by the agent to the server
@@ -1128,6 +1271,7 @@ export interface AgentReport {
   disk_health?: DiskHealth[];
   custom_tasks?: CustomTaskSummary[];
   tasks_config_yaml?: string;
+  restic?: ResticStatus;
   timestamp: string;
 }
 
@@ -1268,6 +1412,15 @@ export interface UptimeProbe {
   consecutive_failures: number /* int */;
   created_at: string;
   updated_at: string;
+  /**
+   * NPMProxyHostID/Domain are set when this probe was created (and is still
+   * referenced) by an NPM proxy host's monitoring toggle — see
+   * npm.Service.UpdateProxyHostMonitoring. Deleting a probe with this set
+   * silently desyncs that proxy host's toggle state (the FK is ON DELETE
+   * SET NULL, not RESTRICT), so callers should warn before deleting.
+   */
+  npm_proxy_host_id?: string;
+  npm_proxy_host_domain?: string;
 }
 /**
  * UptimeProbeRequest is the create/update body for an uptime probe. The pointer
@@ -1329,6 +1482,11 @@ export interface SSLCertificate {
   last_error?: string;
   created_at: string;
   updated_at: string;
+  /**
+   * NPMProxyHostID/Domain — see the identical UptimeProbe fields' comment.
+   */
+  npm_proxy_host_id?: string;
+  npm_proxy_host_domain?: string;
 }
 /**
  * SSLCertificateRequest is the create/update body for a monitored TLS endpoint.
@@ -1711,6 +1869,22 @@ export interface WebLogIPTimelineRow {
 }
 
 //////////
+// source: webauthn.go
+
+/**
+ * WebAuthnCredential is a registered passkey/security key for a user — an
+ * additional MFA factor alongside TOTP. Credential holds the full go-webauthn
+ * record (public key, sign counter, flags, attestation) needed to run a login
+ * ceremony; it's never serialized to the client (json:"-"), only Name/dates are.
+ */
+export interface WebAuthnCredential {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at?: string;
+}
+
+//////////
 // source: webhook.go
 
 export interface GitWebhook {
@@ -1763,6 +1937,12 @@ export interface GitWebhookExecution {
   status: string;
   triggered_at: string;
   completed_at?: string;
+  /**
+   * RawPayload is the provider's raw JSON delivery body, truncated to a
+   * bounded size (see gitwebhook.maxStoredPayloadBytes) — kept for debugging
+   * "why didn't this trigger", not as an unbounded audit log.
+   */
+  raw_payload?: string;
 }
 
 //////////
@@ -1918,6 +2098,22 @@ export interface WSWebhookNotification {
 export interface WSWebhookExecutionMessage {
   type: string;
   notification: WSWebhookNotification;
+}
+/**
+ * WSBackupNotification is the nested payload of a "backup_run" message.
+ */
+export interface WSBackupNotification {
+  host_id: string;
+  status: string;
+  triggered_at: string;
+}
+/**
+ * WSBackupRunMessage is pushed when a restic run_backup command fails
+ * (type "backup_run").
+ */
+export interface WSBackupRunMessage {
+  type: string;
+  notification: WSBackupNotification;
 }
 /**
  * WSReleaseTrackerNotification is the nested payload of release-tracker messages.

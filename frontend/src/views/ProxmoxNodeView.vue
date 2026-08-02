@@ -18,6 +18,13 @@
       {{ error }}
     </div>
     <div v-else-if="node">
+      <PageRefreshBar
+        v-model="autoRefresh"
+        label="Nœud Proxmox"
+        :interval-sec="LIVE_STATUS_REFRESH_SEC"
+        :last-updated-at="lastUpdatedAt"
+      />
+
       <!-- Header -->
       <div class="page-header mb-4">
         <div class="page-pretitle">
@@ -274,21 +281,19 @@
             </div>
           </div>
 
-          <!-- Live refresh timestamp + error (absolute, no added height) -->
+          <!-- Live refresh error + in-flight indicator (absolute, no added height) -->
+          <!-- last-updated timestamp itself now lives in the page-level PageRefreshBar above -->
           <div class="position-absolute bottom-0 end-0 pb-2 pe-3 d-flex align-items-center gap-2 node-live-meta">
             <span
               v-if="liveStatusError"
               class="text-danger node-live-meta-text"
             >{{ liveStatusError }}</span>
             <span
-              v-if="liveStatus"
+              v-if="liveStatus && liveStatusLoading"
               class="text-muted node-live-meta-text"
             >
-              <span
-                v-if="liveStatusLoading"
-                class="spinner-border me-1 node-live-meta-spinner"
-              />
-              Actualisé à {{ liveStatusTime }}
+              <span class="spinner-border me-1 node-live-meta-spinner" />
+              Actualisation…
             </span>
           </div>
         </div>
@@ -333,140 +338,101 @@
       <div class="side-layout">
         <div class="side-main">
           <div class="card">
-            <div class="card-header">
-              <ul class="nav nav-tabs card-header-tabs proxmox-node-tabs">
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'vms' }"
-                    @click="tab = 'vms'; loadGuestNetworks()"
-                  >
-                    VMs <span class="badge bg-azure-lt text-azure ms-1">{{ vms.length }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'lxc' }"
-                    @click="tab = 'lxc'; loadGuestNetworks()"
-                  >
-                    LXC <span class="badge bg-azure-lt text-azure ms-1">{{ lxcs.length }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'storage' }"
-                    @click="tab = 'storage'"
-                  >
-                    Stockage <span class="badge bg-azure-lt text-azure ms-1">{{ node.storages?.length ?? 0 }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'disks' }"
-                    @click="tab = 'disks'"
-                  >
-                    Disques <span class="badge bg-azure-lt text-azure ms-1">{{ node.disks?.length ?? 0 }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'tasks' }"
-                    @click="tab = 'tasks'"
-                  >
-                    Tâches <span class="badge bg-azure-lt text-azure ms-1">{{ node.tasks?.length ?? 0 }}</span>
-                    <span
-                      v-if="failedTaskCount > 0"
-                      class="badge bg-warning ms-1"
-                    >{{ failedTaskCount }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'updates' }"
-                    @click="tab = 'updates'"
-                  >
-                    Mises à jour
-                    <span
-                      v-if="node.pending_updates > 0"
-                      class="badge ms-1 bg-warning-lt text-warning"
-                    >
-                      {{ node.pending_updates }}
-                    </span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'services' }"
-                    @click="tab = 'services'; loadServices()"
-                  >
-                    Services
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'security' }"
-                    @click="tab = 'security'"
-                  >
-                    Sécurité <span class="badge bg-azure-lt text-azure ms-1">{{ securityEventsCount }}</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            <!-- VMs tab -->
-            <div
-              v-if="isTabMounted('vms')"
-              v-show="tab === 'vms'"
+            <EntityTabShell
+              :model-value="tab"
+              :tabs="proxmoxTabs"
+              nav-class="proxmox-node-tabs"
+              card-header
+              @update:model-value="onTabClick"
             >
-              <ProxmoxNodeGuestsTab
-                kind="vm"
-                :guests="vms"
-                :guest-networks="guestNetworks"
-                :guest-networks-loading="guestNetworksLoading"
-                :links="guestLinks"
-                :peer-nodes="peerNodes"
-                :node-id="String(route.params.id)"
-                @confirm-link="confirmGuestLink"
-                @ignore-link="ignoreGuestLink"
-                @go-host="goToHost"
-                @migrate="openMigrateModal($event, 'vm')"
-              />
-            </div>
+              <template #vms>
+                <ProxmoxNodeGuestsTab
+                  kind="vm"
+                  :guests="vms"
+                  :guest-networks="guestNetworks"
+                  :guest-networks-loading="guestNetworksLoading"
+                  :guest-exposure="guestExposure"
+                  :guest-exposure-loading="guestExposureLoading"
+                  :links="guestLinks"
+                  :peer-nodes="peerNodes"
+                  :node-id="String(route.params.id)"
+                  :action-loading="guestActionLoading"
+                  @confirm-link="confirmGuestLink"
+                  @ignore-link="ignoreGuestLink"
+                  @go-host="goToHost"
+                  @migrate="openMigrateModal($event, 'vm')"
+                  @guest-action="handleGuestAction"
+                />
+              </template>
 
-            <!-- LXC tab -->
-            <div
-              v-if="isTabMounted('lxc')"
-              v-show="tab === 'lxc'"
-            >
-              <ProxmoxNodeGuestsTab
-                kind="lxc"
-                :guests="lxcs"
-                :guest-networks="guestNetworks"
-                :guest-networks-loading="guestNetworksLoading"
-                :links="guestLinks"
-                :peer-nodes="peerNodes"
-                :node-id="String(route.params.id)"
-                @confirm-link="confirmGuestLink"
-                @ignore-link="ignoreGuestLink"
-                @go-host="goToHost"
-                @migrate="openMigrateModal($event, 'lxc')"
-              />
-            </div>
+              <template #lxc>
+                <ProxmoxNodeGuestsTab
+                  kind="lxc"
+                  :guests="lxcs"
+                  :guest-networks="guestNetworks"
+                  :guest-networks-loading="guestNetworksLoading"
+                  :guest-exposure="guestExposure"
+                  :guest-exposure-loading="guestExposureLoading"
+                  :links="guestLinks"
+                  :peer-nodes="peerNodes"
+                  :node-id="String(route.params.id)"
+                  :action-loading="guestActionLoading"
+                  @confirm-link="confirmGuestLink"
+                  @ignore-link="ignoreGuestLink"
+                  @go-host="goToHost"
+                  @migrate="openMigrateModal($event, 'lxc')"
+                  @guest-action="handleGuestAction"
+                />
+              </template>
+
+              <template #disks>
+                <ProxmoxNodeDisksTab :disks="node.disks || []" />
+              </template>
+
+              <template #tasks>
+                <ProxmoxNodeTasksTab
+                  :tasks="node.tasks || []"
+                  :active-upid="activeUpid"
+                  @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
+                />
+              </template>
+
+              <template #updates>
+                <ProxmoxNodeUpdatesTab
+                  :pending-updates="node.pending_updates"
+                  :last-update-check-at="node.last_update_check_at"
+                  :apt-refreshing="aptRefreshing"
+                  :apt-refresh-msg="aptRefreshMsg"
+                  :apt-refresh-ok="aptRefreshOk"
+                  @refresh-apt="triggerAptRefresh"
+                />
+              </template>
+
+              <template #services>
+                <ProxmoxNodeServicesTab
+                  :services="services"
+                  :loading="servicesLoading"
+                  :error="servicesError"
+                  :action-msg="svcActionMsg"
+                  :action-ok="svcActionOk"
+                  :action-loading="svcActionLoading"
+                  @refresh="loadServices"
+                  @action="svcAction($event.name, $event.action)"
+                />
+              </template>
+
+              <template #security>
+                <ProxmoxNodeSecurityTab
+                  :node-id="String(route.params.id)"
+                  :active="tab === 'security'"
+                  @count="securityEventsCount = $event"
+                />
+              </template>
+
+              <template #storage>
+                <ProxmoxNodeStorageTab :storages="node.storages || []" />
+              </template>
+            </EntityTabShell>
 
             <!-- Link action feedback -->
             <div
@@ -474,77 +440,6 @@
               class="card-footer py-2"
             >
               <span :class="['small', linkMsgOk ? 'text-success' : 'text-danger']">{{ linkMsg }}</span>
-            </div>
-
-            <!-- Disks tab -->
-            <div
-              v-if="isTabMounted('disks')"
-              v-show="tab === 'disks'"
-            >
-              <ProxmoxNodeDisksTab :disks="node.disks || []" />
-            </div>
-
-            <!-- Tasks tab -->
-            <div
-              v-if="isTabMounted('tasks')"
-              v-show="tab === 'tasks'"
-            >
-              <ProxmoxNodeTasksTab
-                :tasks="node.tasks || []"
-                :active-upid="activeUpid"
-                @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
-              />
-            </div>
-
-            <!-- Updates tab -->
-            <div
-              v-if="isTabMounted('updates')"
-              v-show="tab === 'updates'"
-            >
-              <ProxmoxNodeUpdatesTab
-                :pending-updates="node.pending_updates"
-                :last-update-check-at="node.last_update_check_at"
-                :apt-refreshing="aptRefreshing"
-                :apt-refresh-msg="aptRefreshMsg"
-                :apt-refresh-ok="aptRefreshOk"
-                @refresh-apt="triggerAptRefresh"
-              />
-            </div>
-
-            <!-- Services tab -->
-            <div
-              v-if="isTabMounted('services')"
-              v-show="tab === 'services'"
-            >
-              <ProxmoxNodeServicesTab
-                :services="services"
-                :loading="servicesLoading"
-                :error="servicesError"
-                :action-msg="svcActionMsg"
-                :action-ok="svcActionOk"
-                @refresh="loadServices"
-                @action="svcAction($event.name, $event.action)"
-              />
-            </div>
-
-            <!-- Security tab -->
-            <div
-              v-if="isTabMounted('security')"
-              v-show="tab === 'security'"
-            >
-              <ProxmoxNodeSecurityTab
-                :node-id="String(route.params.id)"
-                :active="tab === 'security'"
-                @count="securityEventsCount = $event"
-              />
-            </div>
-
-            <!-- Storage tab -->
-            <div
-              v-if="isTabMounted('storage')"
-              v-show="tab === 'storage'"
-            >
-              <ProxmoxNodeStorageTab :storages="node.storages || []" />
             </div>
           </div>
         </div> <!-- /side-main -->
@@ -561,91 +456,96 @@
     </div> <!-- /v-else-if node -->
 
     <!-- Migration modal -->
-    <div
-      v-if="migrateModal.open"
-      class="modal modal-blur fade show d-block"
-      tabindex="-1"
-      style="background:rgba(0,0,0,.5)"
-      @click.self="migrateModal.open = false"
-    >
-      <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              Migrer {{ migrateModal.guest?.name || `VMID ${migrateModal.guest?.vmid}` }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="migrateModal.open = false"
-            />
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">Nœud cible</label>
-              <select
-                v-model="migrateModal.target"
-                class="form-select"
-              >
-                <option
-                  v-for="n in peerNodes"
-                  :key="n.node_name"
-                  :value="n.node_name"
-                >
-                  {{ n.node_name }}
-                </option>
-              </select>
-            </div>
-            <div class="mb-2">
-              <label class="form-check">
-                <input
-                  v-model="migrateModal.online"
-                  type="checkbox"
-                  class="form-check-input"
-                >
-                <span class="form-check-label">Migration à chaud (sans arrêt)</span>
-              </label>
-            </div>
-            <div
-              v-if="migrateModal.error"
-              class="alert alert-danger mb-0 mt-2 py-2 small"
-            >
-              {{ migrateModal.error }}
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              @click="migrateModal.open = false"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              :disabled="migrateModal.loading || !migrateModal.target"
-              @click="submitMigration"
-            >
-              <span
-                v-if="migrateModal.loading"
-                class="spinner-border spinner-border-sm me-1"
+    <template v-if="migrateModal.open">
+      <div
+        ref="migrateModalRef"
+        class="modal modal-blur fade show d-block"
+        tabindex="-1"
+        @click.self="migrateModal.open = false"
+      >
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                Migrer {{ migrateModal.guest?.name || `VMID ${migrateModal.guest?.vmid}` }}
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                @click="migrateModal.open = false"
               />
-              Migrer
-            </button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Nœud cible</label>
+                <select
+                  v-model="migrateModal.target"
+                  class="form-select"
+                >
+                  <option
+                    v-for="n in peerNodes"
+                    :key="n.node_name"
+                    :value="n.node_name"
+                  >
+                    {{ n.node_name }}
+                  </option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-check">
+                  <input
+                    v-model="migrateModal.online"
+                    type="checkbox"
+                    class="form-check-input"
+                  >
+                  <span class="form-check-label">Migration à chaud (sans arrêt)</span>
+                </label>
+              </div>
+              <div
+                v-if="migrateModal.error"
+                class="alert alert-danger mb-0 mt-2 py-2 small"
+              >
+                {{ migrateModal.error }}
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                @click="migrateModal.open = false"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="migrateModal.loading || !migrateModal.target"
+                @click="submitMigration"
+              >
+                <span
+                  v-if="migrateModal.loading"
+                  class="spinner-border spinner-border-sm me-1"
+                />
+                Migrer
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      <div class="modal-backdrop fade show" />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
+import EntityTabShell from '../components/EntityTabShell.vue'
+import type { EntityTab } from '../components/EntityTabShell.vue'
 import ProxmoxNodeDisksTab from '../components/proxmox/ProxmoxNodeDisksTab.vue'
 import ProxmoxNodeStorageTab from '../components/proxmox/ProxmoxNodeStorageTab.vue'
 import ProxmoxNodeTasksTab from '../components/proxmox/ProxmoxNodeTasksTab.vue'
@@ -654,6 +554,7 @@ import ProxmoxNodeServicesTab from '../components/proxmox/ProxmoxNodeServicesTab
 import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab.vue'
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
 import { useProxmoxNode } from '../composables/useProxmoxNode'
+import { useModalChrome } from '../composables/useModalChrome'
 
 const route = useRoute()
 
@@ -662,7 +563,6 @@ const {
   loading,
   error,
   tab,
-  isTabMounted,
   guestLinks,
   linkMsg,
   linkMsgOk,
@@ -692,8 +592,10 @@ const {
   submitMigration,
   liveStatus,
   liveStatusLoading,
-  liveStatusTime,
   liveStatusError,
+  lastUpdatedAt,
+  autoRefresh,
+  LIVE_STATUS_REFRESH_SEC,
   rrdTimeframe,
   rrdCpuChart,
   rrdRamChart,
@@ -710,11 +612,15 @@ const {
   guestNetworks,
   guestNetworksLoading,
   loadGuestNetworks,
+  guestExposure,
+  guestExposureLoading,
+  loadGuestExposure,
   services,
   servicesLoading,
   servicesError,
   svcActionMsg,
   svcActionOk,
+  svcActionLoading,
   loadServices,
   svcAction,
   vms,
@@ -723,11 +629,56 @@ const {
   confirmGuestLink,
   ignoreGuestLink,
   goToHost,
+  guestActionLoading,
+  handleGuestAction,
 } = useProxmoxNode()
+
+const migrateModalRef = ref<HTMLElement | null>(null)
+useModalChrome(migrateModalRef, () => migrateModal.value.open, { onClose: () => { migrateModal.value.open = false } })
 
 // Trivial UI-only state fed by ProxmoxNodeSecurityTab's @count emit — no API/WS
 // logic attached, so it stays here rather than in the composable.
 const securityEventsCount = ref(0)
+
+const azureBadge = 'badge bg-azure-lt text-azure ms-1'
+
+const proxmoxTabs = computed<EntityTab[]>(() => [
+  { key: 'vms', label: 'VMs', badges: [{ value: vms.value.length, badgeClass: azureBadge }], lazy: true },
+  { key: 'lxc', label: 'LXC', badges: [{ value: lxcs.value.length, badgeClass: azureBadge }], lazy: true },
+  { key: 'storage', label: 'Stockage', badges: [{ value: node.value?.storages?.length ?? 0, badgeClass: azureBadge }], lazy: true },
+  { key: 'disks', label: 'Disques', badges: [{ value: node.value?.disks?.length ?? 0, badgeClass: azureBadge }], lazy: true },
+  {
+    key: 'tasks',
+    label: 'Tâches',
+    badges: [
+      { value: node.value?.tasks?.length ?? 0, badgeClass: azureBadge },
+      ...(failedTaskCount.value > 0 ? [{ value: failedTaskCount.value, badgeClass: 'badge bg-yellow text-white ms-1' }] : []),
+    ],
+    lazy: true,
+  },
+  {
+    key: 'updates',
+    label: 'Mises à jour',
+    badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-yellow-lt text-yellow' }] : [],
+    lazy: true,
+  },
+  { key: 'services', label: 'Services', lazy: true },
+  // Labeled "Journaux sécurité" (not "Sécurité") to avoid colliding with
+  // HostDetailView's "Permissions" tab — same word previously used on both,
+  // unrelated content (PVE syslog auth-failure search here vs. per-host RBAC there).
+  { key: 'security', label: 'Journaux sécurité', badges: [{ value: securityEventsCount.value, badgeClass: azureBadge }], lazy: true },
+])
+
+// VMs/LXC and Services fetch their own supporting data lazily, only when the
+// user actually switches to them — not on a tab restored programmatically
+// from a ?tab= deep link (load() sets `tab` directly and has its own,
+// deliberately narrower, initial-load sequencing). Listening to the shell's
+// click emit rather than watching `tab` itself preserves that distinction.
+function onTabClick(key: string): void {
+  tab.value = key
+  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure() }
+  if (key === 'services') loadServices()
+}
 
 function memPct(n: { mem_used?: number; mem_total?: number }): string | number {
   if (!n.mem_total) return 0
@@ -788,14 +739,17 @@ function formatDate(iso: string | undefined): string {
 </script>
 
 <style scoped>
-.proxmox-node-tabs {
+/* .proxmox-node-tabs is applied via a prop to EntityTabShell's own <ul>, so
+   these selectors target markup owned by a child component's template —
+   :deep() is required for scoped CSS to reach it. */
+:deep(.proxmox-node-tabs) {
   flex-wrap: nowrap;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
-.proxmox-node-tabs .nav-item {
+:deep(.proxmox-node-tabs .nav-item) {
   flex: 0 0 auto;
 }
 
@@ -828,7 +782,7 @@ function formatDate(iso: string | undefined): string {
 }
 
 @media (max-width: 768px) {
-  .proxmox-node-tabs .nav-link {
+  :deep(.proxmox-node-tabs .nav-link) {
     white-space: nowrap;
     padding-inline: 0.6rem;
   }

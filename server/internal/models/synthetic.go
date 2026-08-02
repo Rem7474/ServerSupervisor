@@ -8,16 +8,16 @@ import "time"
 type UptimeProbe struct {
 	ID                  string     `json:"id"`
 	Name                string     `json:"name"`
-	Type                string     `json:"type"`              // "http" | "tcp"
-	Target              string     `json:"target"`            // URL for http, host:port for tcp
+	Type                string     `json:"type"`   // "http" | "tcp"
+	Target              string     `json:"target"` // URL for http, host:port for tcp
 	IntervalSec         int        `json:"interval_sec"`
 	TimeoutSec          int        `json:"timeout_sec"`
-	ExpectedStatus      int        `json:"expected_status"`   // http only
+	ExpectedStatus      int        `json:"expected_status"` // http only
 	ExpectedBodyRegex   string     `json:"expected_body_regex"`
 	FollowRedirects     bool       `json:"follow_redirects"`
 	VerifyTLS           bool       `json:"verify_tls"`
 	Enabled             bool       `json:"enabled"`
-	LastStatus          string     `json:"last_status"`       // up | down | unknown
+	LastStatus          string     `json:"last_status"` // up | down | unknown
 	LastLatencyMs       *int       `json:"last_latency_ms,omitempty"`
 	LastStatusCode      *int       `json:"last_status_code,omitempty"`
 	LastError           string     `json:"last_error,omitempty"`
@@ -25,6 +25,13 @@ type UptimeProbe struct {
 	ConsecutiveFailures int        `json:"consecutive_failures"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+	// NPMProxyHostID/Domain are set when this probe was created (and is still
+	// referenced) by an NPM proxy host's monitoring toggle — see
+	// npm.Service.UpdateProxyHostMonitoring. Deleting a probe with this set
+	// silently desyncs that proxy host's toggle state (the FK is ON DELETE
+	// SET NULL, not RESTRICT), so callers should warn before deleting.
+	NPMProxyHostID     *string `json:"npm_proxy_host_id,omitempty"`
+	NPMProxyHostDomain string  `json:"npm_proxy_host_domain,omitempty"`
 }
 
 // UptimeProbeRequest is the create/update body for an uptime probe. The pointer
@@ -84,6 +91,9 @@ type SSLCertificate struct {
 	LastError     string     `json:"last_error,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+	// NPMProxyHostID/Domain — see the identical UptimeProbe fields' comment.
+	NPMProxyHostID     *string `json:"npm_proxy_host_id,omitempty"`
+	NPMProxyHostDomain string  `json:"npm_proxy_host_domain,omitempty"`
 }
 
 // SSLCertificateRequest is the create/update body for a monitored TLS endpoint.

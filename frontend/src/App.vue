@@ -34,291 +34,90 @@
           >
             <ul class="navbar-nav">
               <!-- Badge hôtes hors ligne -->
-              <li class="nav-item">
-                <span
-                  v-if="hostsDownCount > 0"
-                  class="badge bg-red-lt text-red ms-2 py-2 hosts-down-badge"
-                >
+              <li
+                v-if="hostsDownCount > 0"
+                class="nav-item d-flex align-items-center"
+              >
+                <span class="badge bg-red-lt text-red ms-2 py-2 hosts-down-badge">
                   <IconAlertTriangle class="icon icon-sm me-1" />
                   {{ hostsDownCount }} HORS LIGNE
                 </span>
               </li>
-              <!-- Éléments principaux -->
-              <li class="nav-item">
-                <router-link
-                  to="/"
-                  class="nav-link"
-                  active-class="active"
+
+              <!-- 6 sections d'intention (config/navigation.ts) -->
+              <li
+                v-for="section in visibleSections"
+                :key="section.key"
+                class="nav-item dropdown"
+                :class="{ active: isSectionActive(section) }"
+              >
+                <button
+                  class="nav-link dropdown-toggle nav-dropdown-toggle"
+                  type="button"
+                  :aria-expanded="openSectionKey === section.key"
+                  :aria-label="section.label"
+                  aria-haspopup="menu"
+                  @click="toggleSection(section.key)"
                 >
                   <span class="nav-link-icon">
-                    <IconLayoutDashboard class="icon" />
+                    <component
+                      :is="section.icon"
+                      class="icon"
+                    />
                   </span>
-                  <span class="nav-link-title">Dashboard</span>
-                </router-link>
-              </li>
-              <li class="nav-item">
-                <router-link
-                  to="/docker"
-                  class="nav-link"
-                  active-class="active"
+                  <span class="nav-link-title">{{ section.label }}</span>
+                </button>
+                <div
+                  class="dropdown-menu"
+                  :class="{ show: openSectionKey === section.key }"
+                  role="menu"
                 >
-                  <span class="nav-link-icon">
-                    <IconBrandDocker class="icon" />
-                  </span>
-                  <span class="nav-link-title">Docker</span>
-                </router-link>
-              </li>
-              <li class="nav-item">
-                <router-link
-                  to="/apt"
-                  class="nav-link"
-                  active-class="active"
-                >
-                  <span class="nav-link-icon">
-                    <IconRefresh class="icon" />
-                  </span>
-                  <span class="nav-link-title">Mises à jour</span>
-                </router-link>
-              </li>
-              <li class="nav-item">
-                <router-link
-                  to="/proxmox"
-                  class="nav-link"
-                  active-class="active"
-                >
-                  <span class="nav-link-icon">
-                    <IconServer2 class="icon" />
-                  </span>
-                  <span class="nav-link-title">
-                    Proxmox
+                  <router-link
+                    v-for="item in section.items"
+                    :key="item.to"
+                    :to="item.to"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="openSectionKey = null"
+                  >
+                    <component
+                      :is="item.icon"
+                      :size="16"
+                      class="icon icon-sm me-2"
+                    />
+                    {{ item.label }}
                     <span
-                      v-if="suggestedProxmoxLinksCount > 0"
+                      v-if="item.to === '/proxmox' && suggestedProxmoxLinksCount > 0"
                       class="badge bg-azure-lt text-azure ms-1"
                       :title="`${suggestedProxmoxLinksCount} liaison(s) hôte ↔ VM/LXC suggérée(s), à confirmer`"
                     >{{ suggestedProxmoxLinksCount }}</span>
-                  </span>
-                </router-link>
-              </li>
-              <li class="nav-item">
-                <router-link
-                  to="/alerts"
-                  class="nav-link"
-                  active-class="active"
-                >
-                  <span class="nav-link-icon">
-                    <IconBell class="icon" />
-                  </span>
-                  <span class="nav-link-title">Alertes</span>
-                </router-link>
-              </li>
-
-              <!-- Dropdown "Plus" — éléments secondaires -->
-              <li
-                class="nav-item dropdown"
-                :class="{ active: isSecondaryActive }"
-              >
-                <button
-                  class="nav-link dropdown-toggle nav-dropdown-toggle"
-                  type="button"
-                  :aria-expanded="secondaryMenuOpen"
-                  aria-label="Plus d'options"
-                  aria-haspopup="menu"
-                  @click="toggleSecondaryMenu"
-                >
-                  <span class="nav-link-icon">
-                    <IconDots class="icon" />
-                  </span>
-                  <span class="nav-link-title">Plus</span>
-                </button>
-                <div
-                  class="dropdown-menu"
-                  :class="{ show: secondaryMenuOpen }"
-                  role="menu"
-                >
-                  <router-link
-                    v-if="auth.isAdmin"
-                    to="/threats"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="secondaryMenuOpen = false"
-                  >
-                    <IconShieldCheck
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Menaces web
-                  </router-link>
-                  <router-link
-                    v-if="auth.isAdmin"
-                    to="/traffic"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="secondaryMenuOpen = false"
-                  >
-                    <IconChartLine
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Stats web
-                  </router-link>
-                  <div
-                    v-if="auth.isAdmin"
-                    class="dropdown-divider"
-                  />
-                  <router-link
-                    to="/scheduled-tasks"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="secondaryMenuOpen = false"
-                  >
-                    <IconClock
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Tâches planifiées
-                  </router-link>
-                  <router-link
-                    v-if="auth.isAdmin"
-                    to="/runbooks"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="secondaryMenuOpen = false"
-                  >
-                    <IconPlayerPlay
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Runbooks
-                  </router-link>
-                  <router-link
-                    to="/commands"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="secondaryMenuOpen = false"
-                  >
-                    <IconTerminal2
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Commandes en cours
-                  </router-link>
-                  <router-link
-                    to="/network"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="secondaryMenuOpen = false"
-                  >
-                    <IconTopologyStar3
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Réseau
-                  </router-link>
-                  <router-link
-                    to="/monitoring"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="secondaryMenuOpen = false"
-                  >
-                    <IconActivity
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Monitoring
-                  </router-link>
-                  <router-link
-                    to="/npm"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="secondaryMenuOpen = false"
-                  >
-                    <IconBox
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    NPM
-                  </router-link>
-                </div>
-              </li>
-
-              <!-- Dropdown "Administration" — admin uniquement -->
-              <li
-                v-if="auth.isAdmin"
-                class="nav-item dropdown"
-                :class="{ active: isAdminActive }"
-              >
-                <button
-                  class="nav-link dropdown-toggle nav-dropdown-toggle"
-                  type="button"
-                  :aria-expanded="adminMenuOpen"
-                  aria-label="Options administrateur"
-                  aria-haspopup="menu"
-                  @click="toggleAdminMenu"
-                >
-                  <span class="nav-link-icon">
-                    <IconShieldLock class="icon" />
-                  </span>
-                  <span class="nav-link-title">Admin</span>
-                </button>
-                <div
-                  class="dropdown-menu"
-                  :class="{ show: adminMenuOpen }"
-                  role="menu"
-                >
-                  <router-link
-                    to="/git-webhooks"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="adminMenuOpen = false"
-                  >
-                    <IconGitBranch
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Git / Automatisation
-                  </router-link>
-                  <router-link
-                    to="/audit"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="adminMenuOpen = false"
-                  >
-                    <IconClipboardList
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Audit
-                  </router-link>
-                  <router-link
-                    to="/users"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="adminMenuOpen = false"
-                  >
-                    <IconUsers
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Utilisateurs
-                  </router-link>
-                  <div class="dropdown-divider" />
-                  <router-link
-                    to="/settings"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="adminMenuOpen = false"
-                  >
-                    <IconSettings
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    Paramètres
                   </router-link>
                 </div>
               </li>
             </ul>
 
             <div class="ms-auto d-flex align-items-center gap-2">
+              <button
+                type="button"
+                class="btn btn-outline-secondary d-none d-sm-flex align-items-center gap-2 command-palette-trigger"
+                title="Rechercher (Ctrl+K)"
+                @click="paletteToggle"
+              >
+                <IconSearch
+                  :size="16"
+                  class="icon"
+                />
+                <span class="text-secondary small">Rechercher…</span>
+                <kbd class="ms-2">Ctrl K</kbd>
+              </button>
+              <button
+                type="button"
+                class="btn btn-icon d-sm-none"
+                aria-label="Rechercher"
+                @click="paletteToggle"
+              >
+                <IconSearch :size="18" />
+              </button>
               <NotificationBell />
               <div
                 ref="userMenuRef"
@@ -416,6 +215,9 @@
       <ConfirmDialog />
       <!-- Global Toast Notifications -->
       <ToastContainer />
+      <!-- Command palette — mounted only while open so its search input gets
+           a fresh onMounted focus every time (see CommandPalette.vue) -->
+      <CommandPalette v-if="paletteOpen" />
     </div>
 
     <!-- Login page (no sidebar) -->
@@ -424,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { useRouter, useRoute } from 'vue-router'
@@ -432,26 +234,24 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
-import {
-  IconAlertTriangle, IconLayoutDashboard, IconBrandDocker, IconRefresh,
-  IconServer2, IconBell, IconDots, IconShieldLock, IconShieldCheck,
-  IconChartLine, IconClock, IconTerminal2, IconTopologyStar3, IconActivity,
-  IconBox, IconGitBranch, IconClipboardList, IconUsers, IconSettings, IconServer,
-  IconPlayerPlay,
-} from '@tabler/icons-vue'
+import { IconAlertTriangle, IconServer, IconSearch } from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
+import CommandPalette from './components/CommandPalette.vue'
 import { subscribeHttpErrors, subscribeNetworkOk } from './utils/httpErrorBus'
+import { useCommandPalette } from './composables/useCommandPalette'
+import { useAttentionCenter } from './composables/useAttentionCenter'
 import apiClient from './api'
+import { visibleNavSections, type NavSection } from './config/navigation'
 
 const auth = useAuthStore()
 const hostsStore = useHostsStore()
 const router = useRouter()
 const route = useRoute()
+const { isOpen: paletteOpen, toggle: paletteToggle } = useCommandPalette()
 const navbarOpen = ref(false)
 const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)
-const secondaryMenuOpen = ref(false)
-const adminMenuOpen = ref(false)
+const openSectionKey = ref<string | null>(null)
 const httpError = ref('')
 // True when the backend is unreachable (network error) even though the browser
 // reports it is online — drives the connectivity banner, auto-clears on recovery.
@@ -467,45 +267,13 @@ const hostsDownCount = computed(() => {
   ).length
 })
 
-// Liens Proxmox guest<->hôte suggérés (auto-détectés) en attente de confirmation —
-// invisibles ailleurs dans l'app tant qu'on ne tombe pas sur la bonne page hôte/nœud.
-const suggestedProxmoxLinksCount = ref(0)
-let proxmoxLinksRefreshTimer: ReturnType<typeof setInterval> | null = null
-
-async function refreshSuggestedProxmoxLinksCount(): Promise<void> {
-  try {
-    const res = await apiClient.getProxmoxLinks('suggested')
-    suggestedProxmoxLinksCount.value = Array.isArray(res.data) ? res.data.length : 0
-  } catch {
-    // non-critique — on garde le dernier compte connu
-  }
-}
-
-// Gated on isAuthenticated (not a bare onMounted call): App.vue mounts once
-// for the whole SPA lifetime, including on the login page — an unconditional
-// authenticated-only call here 401s on every unauthenticated load, and the
-// 401 handler's hard reload back to /login re-triggers this same mount,
-// producing an infinite reload loop. Login is a soft router.push (no
-// remount), so the watcher — not onMounted — is what starts polling once a
-// session actually exists, and stops it again on logout so a still-open tab
-// doesn't 401 five minutes after signing out.
-watch(
-  () => auth.isAuthenticated,
-  (isAuth) => {
-    if (isAuth) {
-      refreshSuggestedProxmoxLinksCount()
-      if (!proxmoxLinksRefreshTimer) {
-        proxmoxLinksRefreshTimer = setInterval(refreshSuggestedProxmoxLinksCount, 5 * 60 * 1000)
-      }
-    } else {
-      suggestedProxmoxLinksCount.value = 0
-      if (proxmoxLinksRefreshTimer) {
-        clearInterval(proxmoxLinksRefreshTimer)
-        proxmoxLinksRefreshTimer = null
-      }
-    }
-  },
-  { immediate: true }
+// Suggested Proxmox links badge: shares useAttentionCenter's module-level
+// state (and its own auth-gated poll/watch — see that composable) rather
+// than fetching independently, so this badge and DashboardView's "Attention
+// requise" card can no longer disagree about the count.
+const { items: attentionItems } = useAttentionCenter()
+const suggestedProxmoxLinksCount = computed(
+  () => attentionItems.value.find((i) => i.key === 'proxmox-links')?.count ?? 0
 )
 
 // Offline detection — tracks browser connectivity via navigator.onLine events.
@@ -537,11 +305,15 @@ function handlePageShow(event: PageTransitionEvent): void {
   }
 }
 
-const secondaryRoutes = ['/threats', '/traffic', '/scheduled-tasks', '/network', '/monitoring', '/npm']
-const adminRoutes = ['/git-webhooks', '/audit', '/users', '/settings']
+const visibleSections = computed(() => visibleNavSections(auth))
 
-const isSecondaryActive = computed(() => secondaryRoutes.some(r => route.path.startsWith(r)))
-const isAdminActive = computed(() => adminRoutes.some(r => route.path.startsWith(r)))
+function isItemActive(to: string): boolean {
+  return to === '/' ? route.path === '/' : route.path.startsWith(to)
+}
+
+function isSectionActive(section: NavSection): boolean {
+  return section.items.some((item) => isItemActive(item.to))
+}
 
 async function handleLogout(): Promise<void> {
   userMenuOpen.value = false
@@ -570,25 +342,17 @@ async function handleLogout(): Promise<void> {
 }
 
 function toggleUserMenu(): void {
-  secondaryMenuOpen.value = false
-  adminMenuOpen.value = false
+  openSectionKey.value = null
   userMenuOpen.value = !userMenuOpen.value
 }
 
-function toggleSecondaryMenu(): void {
+function toggleSection(key: string): void {
   userMenuOpen.value = false
-  adminMenuOpen.value = false
-  secondaryMenuOpen.value = !secondaryMenuOpen.value
-}
-
-function toggleAdminMenu(): void {
-  userMenuOpen.value = false
-  secondaryMenuOpen.value = false
-  adminMenuOpen.value = !adminMenuOpen.value
+  openSectionKey.value = openSectionKey.value === key ? null : key
 }
 
 function handleOutsideClick(event: MouseEvent): void {
-  if (!userMenuOpen.value && !secondaryMenuOpen.value && !adminMenuOpen.value) return
+  if (!userMenuOpen.value && !openSectionKey.value) return
   const el = userMenuRef.value
   const target = event.target as Node
   if (userMenuOpen.value && el && !el.contains(target)) {
@@ -596,8 +360,7 @@ function handleOutsideClick(event: MouseEvent): void {
   }
   const navbar = document.getElementById('navbar-menu')
   if (navbar && !navbar.contains(target)) {
-    secondaryMenuOpen.value = false
-    adminMenuOpen.value = false
+    openSectionKey.value = null
   }
 }
 
@@ -623,8 +386,7 @@ onMounted(() => {
   // Auto-close all menus after navigation
   router.afterEach(() => {
     navbarOpen.value = false
-    secondaryMenuOpen.value = false
-    adminMenuOpen.value = false
+    openSectionKey.value = null
     userMenuOpen.value = false
   })
 })
@@ -638,9 +400,6 @@ onUnmounted(() => {
   window.removeEventListener('pageshow', handlePageShow)
   window.removeEventListener('focus', notifyAppResume)
   document.removeEventListener('click', handleOutsideClick, true)
-  if (proxmoxLinksRefreshTimer) {
-    clearInterval(proxmoxLinksRefreshTimer)
-  }
   if (resumeDebounceTimer) {
     clearTimeout(resumeDebounceTimer)
   }
@@ -680,6 +439,20 @@ onUnmounted(() => {
 
 .hosts-down-badge {
   line-height: 1.5;
+}
+
+/* Tabler's default <kbd> (--tblr-code-bg, a near-black code-block swatch in
+   dark mode + h5-scale font) reads as a mismatched "code snippet" chip next
+   to the button's small, muted "Rechercher…" label instead of a subtle
+   keyboard-shortcut hint. Sized/toned down to match. */
+.command-palette-trigger kbd {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--tblr-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 4px;
 }
 
 .app-network-alert {

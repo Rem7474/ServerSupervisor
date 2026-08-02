@@ -80,17 +80,21 @@
         <div>
           <label class="form-label mb-0">Services manuels via proxy</label>
           <div class="text-secondary small mt-1">
-            Services definis manuellement, non detectes automatiquement.
-            Pour les ports decouverts, utilisez la section "Ports decouverts" ci-dessous
+            Services définis manuellement, non détectés automatiquement.
+            Pour les ports découverts, utilisez la section "Ports découverts" ci-dessous
             et cochez "Proxy".
           </div>
         </div>
         <button
           type="button"
-          class="btn btn-outline-light btn-sm ms-2"
+          class="btn btn-outline-secondary btn-sm ms-2"
           @click="addServiceRow"
         >
-          + Ajouter
+          <IconPlus
+            :size="16"
+            class="icon me-1"
+          />
+          Ajouter
         </button>
       </div>
       <div class="table-responsive network-config-table">
@@ -202,19 +206,11 @@
               </td>
             </tr>
             <tr v-if="networkServices.length === 0">
-              <td
-                colspan="10"
-                class="text-center py-4"
-              >
-                <div class="text-secondary small">
-                  Aucun service configure
-                </div>
-                <div
-                  class="text-muted"
-                  style="font-size:.8rem"
-                >
-                  Ajoutez un service pour le faire apparaitre dans la topologie reseau
-                </div>
+              <td colspan="10">
+                <EmptyState
+                  title="Aucun service configuré"
+                  subtitle="Ajoutez un service pour le faire apparaître dans la topologie réseau"
+                />
               </td>
             </tr>
           </tbody>
@@ -485,7 +481,7 @@
                     <button
                       v-if="isPortModified(host.id, port.port)"
                       type="button"
-                      class="btn btn-sm btn-ghost-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       title="Reinitialiser ce port"
                       aria-label="Reinitialiser ce port"
                       @click="resetPortSetting(host.id, port.port)"
@@ -498,19 +494,11 @@
                   </td>
                 </tr>
                 <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
-                  <td
-                    colspan="7"
-                    class="text-center py-4"
-                  >
-                    <div class="text-secondary small">
-                      Aucun port detecte
-                    </div>
-                    <div
-                      class="text-muted"
-                      style="font-size:.8rem"
-                    >
-                      L'agent doit être actif et avoir collecté les données réseau
-                    </div>
+                  <td colspan="7">
+                    <EmptyState
+                      title="Aucun port détecté"
+                      subtitle="L'agent doit être actif et avoir collecté les données réseau"
+                    />
                   </td>
                 </tr>
               </tbody>
@@ -524,7 +512,8 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { IconRefresh } from '@tabler/icons-vue'
+import { IconPlus, IconRefresh } from '@tabler/icons-vue'
+import EmptyState from '../EmptyState.vue'
 
 interface NetworkService {
   id: string

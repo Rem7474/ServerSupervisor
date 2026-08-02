@@ -84,7 +84,7 @@
             <div class="d-flex align-items-center gap-2 mb-3">
               <IconClock
                 :size="14"
-                class="setupSecondsLeft < 120 ? 'text-danger' : 'text-secondary'"
+                :class="setupSecondsLeft < 120 ? 'text-danger' : 'text-secondary'"
               />
               <span
                 class="small fw-semibold"
@@ -122,7 +122,7 @@
                   <code class="small">{{ setup.secret }}</code>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-light py-0"
+                    class="btn btn-sm btn-ghost-secondary py-0"
                     title="Copier"
                     @click="copySecret"
                   >
@@ -163,7 +163,7 @@
               <pre class="bg-dark text-light rounded p-2 small">{{ setup.backup_codes.join('\n') }}</pre>
               <button
                 type="button"
-                class="btn btn-outline-light btn-sm"
+                class="btn btn-outline-secondary btn-sm"
                 @click="copyBackupCodes"
               >
                 {{ copiedBackup ? 'Copié ✓' : 'Copier les codes' }}
@@ -226,6 +226,130 @@
       </div>
     </div>
 
+    <!-- Passkeys / clés de sécurité -->
+    <div
+      v-if="webauthnSupported"
+      class="card mb-4"
+      style="max-width: 640px;"
+    >
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">
+          <IconKey
+            :size="18"
+            class="icon me-2"
+          />
+          Clés de sécurité / Passkeys
+        </h3>
+        <button
+          v-if="!addingPasskey"
+          type="button"
+          class="btn btn-sm btn-outline-primary"
+          @click="startAddPasskey"
+        >
+          + Ajouter une clé
+        </button>
+      </div>
+      <div class="card-body">
+        <p class="text-secondary small mb-3">
+          Utilisez une clé de sécurité physique (YubiKey…) ou la biométrie de votre appareil (Touch ID, Windows Hello…)
+          comme facteur d'authentification supplémentaire, en plus ou à la place du code TOTP.
+        </p>
+
+        <div
+          v-if="webauthnLoading && !webauthnCredentials.length"
+          class="text-secondary small"
+        >
+          Chargement…
+        </div>
+
+        <table
+          v-else-if="webauthnCredentials.length"
+          class="table table-vcenter mb-3"
+        >
+          <tbody>
+            <tr
+              v-for="cred in webauthnCredentials"
+              :key="cred.id"
+            >
+              <td>
+                <IconKey
+                  :size="16"
+                  class="icon me-2 text-secondary"
+                />
+                {{ cred.name || 'Clé de sécurité' }}
+              </td>
+              <td class="text-secondary small">
+                Ajoutée le {{ formatExactDate(cred.created_at) }}
+                <span v-if="cred.last_used_at"> · dernière utilisation {{ formatRelativeTime(cred.last_used_at) }}</span>
+              </td>
+              <td class="text-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-danger"
+                  @click="deletePasskey(cred)"
+                >
+                  Supprimer
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p
+          v-else-if="!addingPasskey"
+          class="text-secondary small mb-0"
+        >
+          Aucune clé de sécurité enregistrée.
+        </p>
+
+        <div
+          v-if="addingPasskey"
+          class="border rounded p-3"
+        >
+          <label class="form-label">Nom de la clé (facultatif)</label>
+          <input
+            v-model="newPasskeyName"
+            type="text"
+            class="form-control mb-3"
+            placeholder="Ex. YubiKey bureau, MacBook Touch ID…"
+            :disabled="registeringPasskey"
+            @keyup.enter="registerPasskey"
+          >
+          <button
+            type="button"
+            class="btn btn-success"
+            :disabled="registeringPasskey"
+            @click="registerPasskey"
+          >
+            {{ registeringPasskey ? 'Vérification…' : 'Enregistrer cette clé' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary ms-2"
+            :disabled="registeringPasskey"
+            @click="cancelAddPasskey"
+          >
+            Annuler
+          </button>
+        </div>
+
+        <div
+          v-if="webauthnError"
+          class="alert alert-danger mt-3 mb-0"
+          role="alert"
+        >
+          {{ webauthnError }}
+        </div>
+        <div
+          v-if="webauthnSuccess"
+          class="alert alert-success mt-3 mb-0"
+          role="alert"
+        >
+          {{ webauthnSuccess }}
+        </div>
+      </div>
+    </div>
+
     <!-- Sessions actives -->
     <div
       class="card"
@@ -258,62 +382,10 @@
           Connexions récentes associées à votre compte. Le bouton ci-dessus déconnecte tous les autres appareils immédiatement.
         </p>
       </div>
-      <div class="table-responsive">
-        <table class="table table-vcenter card-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>IP</th>
-              <th>Navigateur</th>
-              <th>OS</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="sessionsLoading">
-              <td
-                colspan="5"
-                class="text-center text-secondary py-3"
-              >
-                Chargement...
-              </td>
-            </tr>
-            <tr v-else-if="!loginEvents.length">
-              <td
-                colspan="5"
-                class="text-center text-secondary py-3"
-              >
-                Aucune connexion enregistrée
-              </td>
-            </tr>
-            <tr
-              v-for="ev in loginEvents"
-              :key="ev.id"
-            >
-              <td class="text-secondary small">
-                {{ formatDateTime(ev.created_at) }}
-              </td>
-              <td class="text-secondary small font-monospace">
-                {{ ev.ip_address }}
-              </td>
-              <td class="text-secondary small">
-                {{ parseUA(ev.user_agent).browser }}
-              </td>
-              <td class="text-secondary small">
-                {{ parseUA(ev.user_agent).os }}
-              </td>
-              <td>
-                <span
-                  class="badge"
-                  :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
-                >
-                  {{ ev.success ? 'Succès' : 'Échec' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <ConnectionsTable
+        :events="loginEvents"
+        :loading="sessionsLoading"
+      />
 
       <div
         v-if="revokeError"
@@ -342,8 +414,12 @@
 </template>
 
 <script setup lang="ts">
-import { IconClock, IconCopy, IconDeviceDesktop, IconX } from '@tabler/icons-vue'
+import { IconClock, IconCopy, IconDeviceDesktop, IconKey, IconX } from '@tabler/icons-vue'
+import ConnectionsTable from '../components/common/ConnectionsTable.vue'
 import { useAccountSecurity } from '../composables/useAccountSecurity'
+import { useDateFormatter } from '../composables/useDateFormatter'
+
+const { formatExactDate, formatRelativeTime } = useDateFormatter()
 
 const {
   auth,
@@ -366,13 +442,23 @@ const {
   revokeLoading,
   revokeError,
   revokeSuccess,
-  formatDateTime,
   startSetup,
   verifySetup,
   disableMFA,
   revokeOtherSessions,
   copySecret,
   copyBackupCodes,
-  parseUA,
+  webauthnSupported,
+  webauthnCredentials,
+  webauthnLoading,
+  webauthnError,
+  webauthnSuccess,
+  addingPasskey,
+  newPasskeyName,
+  registeringPasskey,
+  startAddPasskey,
+  cancelAddPasskey,
+  registerPasskey,
+  deletePasskey,
 } = useAccountSecurity()
 </script>

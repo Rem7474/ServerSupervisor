@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Tâches planifiées"
+      :interval-sec="TASKS_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header mb-3">
       <div class="d-flex align-items-center justify-content-between gap-3">
         <div>
@@ -26,17 +32,6 @@
           >
             + Nouvelle tâche
           </button>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm"
-            @click="loadTasks"
-          >
-            <IconRefresh
-              :size="16"
-              class="icon icon-sm"
-            />
-            Actualiser
-          </button>
         </div>
       </div>
     </div>
@@ -44,7 +39,7 @@
     <DataToolbar
       searchable
       :search="filterText"
-      search-placeholder="Rechercher une tâche..."
+      search-placeholder="Rechercher une tâche…"
       @update:search="filterText = $event"
     >
       <template #right>
@@ -95,6 +90,9 @@
             <option value="custom">
               custom
             </option>
+            <option value="restic">
+              restic
+            </option>
           </select>
           <select
             v-model="filterStatus"
@@ -130,29 +128,24 @@
     <div class="card">
       <div
         v-if="loading"
-        class="card-body text-center py-5"
+        class="card-body"
       >
-        <span class="spinner-border text-primary" />
+        <LoadingSkeleton variant="table" />
       </div>
       <div
         v-else-if="!filteredTasks.length"
-        class="card-body text-center py-5"
+        class="card-body"
       >
-        <IconClock
-          :size="40"
-          class="icon mb-3 text-muted"
-          :stroke-width="1.5"
+        <EmptyState
+          :icon="IconClock"
+          :icon-size="40"
+          title="Aucune tâche trouvée"
+          :subtitle="tasks.length ? 'Modifiez vos filtres.' : canManage ? 'Cliquez sur « Nouvelle tâche » pour commencer.' : 'Aucune tâche configurée.'"
         />
-        <h3 class="mb-1">
-          Aucune tâche trouvée
-        </h3>
-        <p class="text-secondary mb-0">
-          {{ tasks.length ? 'Modifiez vos filtres.' : canManage ? 'Cliquez sur « Nouvelle tâche » pour commencer.' : 'Aucune tâche configurée.' }}
-        </p>
       </div>
       <div
         v-else
-        class="table-responsive"
+        class="table-responsive scroll-table"
       >
         <table class="table table-vcenter table-hover card-table mb-0">
           <thead>
@@ -191,7 +184,12 @@
                 Module / Action
               </th>
               <th class="d-none d-md-table-cell">
-                Planification
+                <SortableHeader
+                  label="Planification"
+                  :active="sortKey === 'next_run_at'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('next_run_at')"
+                />
               </th>
               <th class="d-none d-md-table-cell">
                 <SortableHeader
@@ -209,7 +207,7 @@
             <tr
               v-for="task in filteredTasks"
               :key="task.id"
-              :class="{ 'table-active': selectedIds.has(task.id) }"
+              :class="{ 'table-active': selectedIds.has(task.id), 'opacity-60': !task.enabled }"
             >
               <td v-if="canManage">
                 <label class="form-check mb-0">
@@ -265,7 +263,7 @@
                   v-if="task.last_run_status"
                   :class="statusBadge(task.last_run_status)"
                 >
-                  {{ task.last_run_status }}
+                  {{ commandStatusLabel(task.last_run_status) }}
                   <span
                     v-if="task.last_run_at"
                     class="ms-1 text-muted small"
@@ -284,7 +282,7 @@
                 <span
                   v-else-if="!canManage"
                   class="badge"
-                  :class="task.enabled ? 'bg-success-lt' : 'bg-secondary-lt'"
+                  :class="task.enabled ? 'bg-green-lt' : 'bg-secondary-lt'"
                 >
                   {{ task.enabled ? 'Oui' : 'Non' }}
                 </span>
@@ -300,7 +298,7 @@
                 <div class="d-flex gap-1 justify-content-end">
                   <button
                     type="button"
-                    class="btn btn-sm btn-outline-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Historique d'exécutions"
                     @click="openHistory(task)"
                   >
@@ -312,7 +310,7 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-outline-primary"
+                    class="btn btn-sm btn-ghost-primary"
                     :disabled="runningId === task.id"
                     @click="runNow(task)"
                   >
@@ -325,7 +323,7 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-outline-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Modifier"
                     @click="openEdit(task)"
                   >
@@ -337,7 +335,7 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-outline-danger"
+                    class="btn btn-icon btn-sm btn-ghost-danger"
                     title="Supprimer"
                     @click="confirmDelete(task)"
                   >
@@ -393,449 +391,380 @@
     </BulkActionBar>
 
     <!-- Create task modal -->
-    <div
-      v-if="createModalOpen"
-      class="modal modal-blur show d-block"
-      tabindex="-1"
-      style="background:rgba(0,0,0,.5);z-index:1050"
-      @click.self="createModalOpen = false"
-    >
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              Nouvelle tâche planifiée
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="createModalOpen = false"
-            />
-          </div>
-          <form @submit.prevent="saveCreate">
-            <div class="modal-body">
-              <div
-                v-if="createError"
-                class="alert alert-danger py-2 mb-3"
-              >
-                {{ createError }}
-              </div>
-              <div class="row g-3">
-                <div class="col-12">
-                  <label class="form-label required">Hôte</label>
-                  <select
-                    v-model="createForm.host_id"
-                    class="form-select"
-                    required
-                  >
-                    <option value="">
-                      Sélectionner un hôte...
-                    </option>
-                    <option
-                      v-for="h in hostsStore.hosts"
-                      :key="h.id"
-                      :value="h.id"
-                    >
-                      {{ h.name || h.hostname || h.ip_address }}
-                    </option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label required">Nom</label>
-                  <input
-                    v-model="createForm.name"
-                    type="text"
-                    class="form-control"
-                    placeholder="Ex: Mise à jour quotidienne"
-                    required
-                  >
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label required">Module</label>
-                  <select
-                    v-model="createForm.module"
-                    class="form-select"
-                    required
-                    @change="onModuleChange"
-                  >
-                    <option value="apt">
-                      apt
-                    </option>
-                    <option value="docker">
-                      docker
-                    </option>
-                    <option value="systemd">
-                      systemd
-                    </option>
-                    <option value="journal">
-                      journal
-                    </option>
-                    <option value="processes">
-                      processes
-                    </option>
-                    <option value="custom">
-                      custom
-                    </option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label required">Action</label>
-                  <select
-                    v-if="moduleActions[createForm.module]"
-                    v-model="createForm.action"
-                    class="form-select"
-                    required
-                  >
-                    <option
-                      v-for="a in moduleActions[createForm.module]"
-                      :key="a"
-                      :value="a"
-                    >
-                      {{ a }}
-                    </option>
-                  </select>
-                  <input
-                    v-else
-                    v-model="createForm.action"
-                    type="text"
-                    class="form-control"
-                    required
-                  >
-                </div>
+    <template v-if="createModalOpen">
+      <div
+        ref="createModalRef"
+        class="modal modal-blur fade show d-block"
+        tabindex="-1"
+        @click.self="createModalOpen = false"
+      >
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                Nouvelle tâche planifiée
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                @click="createModalOpen = false"
+              />
+            </div>
+            <form @submit.prevent="saveCreate">
+              <div class="modal-body">
                 <div
-                  v-if="targetLabel(createForm.module)"
-                  class="col-12"
+                  v-if="createError"
+                  class="alert alert-danger py-2 mb-3"
                 >
-                  <label class="form-label">{{ targetLabel(createForm.module) }}</label>
-                  <input
-                    v-model="createForm.target"
-                    type="text"
-                    class="form-control"
-                    :placeholder="targetPlaceholder(createForm.module)"
-                  >
+                  {{ createError }}
                 </div>
-                <div class="col-12">
-                  <label class="form-label">
-                    Planification (cron)
-                    <span class="text-muted ms-1 small">— laisser vide pour manuel uniquement</span>
-                  </label>
-                  <input
-                    v-model="createForm.cron_expression"
-                    type="text"
-                    class="form-control font-monospace"
-                    placeholder="ex: 0 3 * * *"
-                  >
-                  <div
-                    v-if="createForm.cron_expression"
-                    class="form-hint"
-                  >
-                    <span v-if="createCronDesc">{{ createCronDesc }}</span>
-                    <span
-                      v-if="createNextRun"
-                      :class="createCronDesc ? 'ms-2 text-primary' : 'text-primary'"
-                    >→ prochain : {{ formatDate(createNextRun?.toISOString()) }}</span>
-                    <span
-                      v-else-if="!createCronDesc"
-                      class="text-warning"
-                    >Expression non reconnue</span>
-                  </div>
-                  <div class="mt-2 d-flex flex-wrap gap-2">
-                    <button
-                      v-for="preset in cronPresets"
-                      :key="preset.value"
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary"
-                      @click="createForm.cron_expression = preset.value"
-                    >
-                      {{ preset.label }}
-                    </button>
-                  </div>
-                </div>
-                <div class="col-12">
-                  <label class="form-check">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label required">Nom</label>
                     <input
-                      v-model="createForm.enabled"
-                      type="checkbox"
-                      class="form-check-input"
-                      :disabled="!createForm.cron_expression"
+                      v-model="createForm.name"
+                      type="text"
+                      class="form-control"
+                      placeholder="Ex: Mise à jour quotidienne"
+                      required
                     >
-                    <span class="form-check-label">Activée (planifiée automatiquement)</span>
-                  </label>
+                  </div>
+                  <div class="col-12">
+                    <DispatchStepEditor
+                      v-model:host-id="createForm.host_id"
+                      v-model:module="createForm.module"
+                      v-model:action="createForm.action"
+                      v-model:target="createForm.target"
+                      v-model:cron-expression="createForm.cron_expression"
+                      :actions-for-module="scheduledTaskActionsForModule"
+                      :target-config="scheduledTaskTargetConfig"
+                      :modules="scheduledTaskModules"
+                      :show-cron="!createManualOnly"
+                    />
+                  </div>
+                  <div class="col-12">
+                    <label class="form-check form-switch">
+                      <input
+                        v-model="createManualOnly"
+                        type="checkbox"
+                        class="form-check-input"
+                      >
+                      <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
+                    </label>
+                  </div>
+                  <div
+                    v-if="!createManualOnly && createNextRun"
+                    class="col-12"
+                  >
+                    <div class="form-hint text-primary">
+                      → prochain : {{ formatDate(createNextRun?.toISOString()) }}
+                    </div>
+                  </div>
+                  <div
+                    v-if="!createManualOnly"
+                    class="col-12"
+                  >
+                    <label class="form-check">
+                      <input
+                        v-model="createForm.enabled"
+                        type="checkbox"
+                        class="form-check-input"
+                      >
+                      <span class="form-check-label">Activée (planifiée automatiquement)</span>
+                    </label>
+                  </div>
                 </div>
+              </div>
+              <div class="modal-footer">
+                <button
+                  type="button"
+                  class="btn link-secondary"
+                  :disabled="createSaving"
+                  @click="createModalOpen = false"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  :disabled="createSaving || !createForm.host_id"
+                >
+                  <span
+                    v-if="createSaving"
+                    class="spinner-border spinner-border-sm me-1"
+                  />
+                  Créer la tâche
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="modal-backdrop fade show" />
+    </template>
+
+    <!-- Edit task modal -->
+    <template v-if="editTask">
+      <div
+        ref="editModalRef"
+        class="modal modal-blur fade show d-block"
+        tabindex="-1"
+        @click.self="editTask = null"
+      >
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                Modifier la tâche
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                @click="editTask = null"
+              />
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Nom</label>
+                <input
+                  v-model="editForm.name"
+                  type="text"
+                  class="form-control"
+                >
+              </div>
+              <div class="mb-3 form-check form-switch">
+                <input
+                  id="editManualOnly"
+                  v-model="editManualOnly"
+                  type="checkbox"
+                  class="form-check-input"
+                >
+                <label
+                  class="form-check-label"
+                  for="editManualOnly"
+                >Exécution manuelle uniquement (pas de planification automatique)</label>
+              </div>
+              <div
+                v-if="!editManualOnly"
+                class="mb-3"
+              >
+                <label class="form-label">Planification</label>
+                <CronBuilder v-model="editForm.cron_expression" />
+                <div
+                  v-if="editNextRun"
+                  class="form-hint text-primary"
+                >
+                  → prochain : {{ formatDate(editNextRun?.toISOString()) }}
+                </div>
+              </div>
+              <div
+                v-if="!editManualOnly"
+                class="mb-3 form-check"
+              >
+                <input
+                  id="editEnabled"
+                  v-model="editForm.enabled"
+                  type="checkbox"
+                  class="form-check-input"
+                >
+                <label
+                  class="form-check-label"
+                  for="editEnabled"
+                >Activée</label>
+              </div>
+              <div
+                v-if="editError"
+                class="alert alert-danger py-2"
+              >
+                {{ editError }}
               </div>
             </div>
             <div class="modal-footer">
               <button
                 type="button"
-                class="btn link-secondary"
-                :disabled="createSaving"
-                @click="createModalOpen = false"
+                class="btn btn-secondary"
+                @click="editTask = null"
               >
                 Annuler
               </button>
               <button
-                type="submit"
+                type="button"
                 class="btn btn-primary"
-                :disabled="createSaving || !createForm.host_id"
+                :disabled="editSaving"
+                @click="saveEdit"
               >
                 <span
-                  v-if="createSaving"
+                  v-if="editSaving"
                   class="spinner-border spinner-border-sm me-1"
                 />
-                Créer la tâche
+                Enregistrer
               </button>
             </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- Edit task modal -->
-    <div
-      v-if="editTask"
-      class="modal modal-blur show d-block"
-      tabindex="-1"
-      style="background:rgba(0,0,0,.5);z-index:1050"
-      @click.self="editTask = null"
-    >
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              Modifier la tâche
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="editTask = null"
-            />
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">Nom</label>
-              <input
-                v-model="editForm.name"
-                type="text"
-                class="form-control"
-              >
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Expression cron</label>
-              <input
-                v-model="editForm.cron_expression"
-                type="text"
-                class="form-control font-monospace"
-                placeholder="ex: 0 3 * * *"
-              >
-              <div
-                v-if="editForm.cron_expression"
-                class="form-hint"
-              >
-                <span v-if="editCronDesc">{{ editCronDesc }}</span>
-                <span
-                  v-if="editNextRun"
-                  :class="editCronDesc ? 'ms-2 text-primary' : 'text-primary'"
-                >→ prochain : {{ formatDate(editNextRun?.toISOString()) }}</span>
-                <span
-                  v-else-if="!editCronDesc"
-                  class="text-warning"
-                >Expression non reconnue</span>
-              </div>
-            </div>
-            <div class="mb-3 form-check">
-              <input
-                id="editEnabled"
-                v-model="editForm.enabled"
-                type="checkbox"
-                class="form-check-input"
-                :disabled="isManualOnly(editTask)"
-              >
-              <label
-                class="form-check-label"
-                for="editEnabled"
-              >Activée</label>
-            </div>
-            <div
-              v-if="editError"
-              class="alert alert-danger py-2"
-            >
-              {{ editError }}
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              @click="editTask = null"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              :disabled="editSaving"
-              @click="saveEdit"
-            >
-              <span
-                v-if="editSaving"
-                class="spinner-border spinner-border-sm me-1"
-              />
-              Enregistrer
-            </button>
           </div>
         </div>
       </div>
-    </div>
+      <div class="modal-backdrop fade show" />
+    </template>
 
     <!-- Execution history modal -->
-    <div
-      v-if="historyTask"
-      class="modal modal-blur show d-block"
-      tabindex="-1"
-      style="background:rgba(0,0,0,.5);z-index:1050"
-      @click.self="historyTask = null"
-    >
-      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-header">
-            <div>
-              <h5 class="modal-title mb-0">
-                Historique d'exécutions
-              </h5>
-              <div class="text-muted small mt-1">
-                <span class="badge bg-blue-lt me-1">{{ historyTask.module }}</span>
-                {{ historyTask.name }}
-                <span class="text-muted ms-1">— {{ historyTask.host_name }}</span>
+    <template v-if="historyTask">
+      <div
+        ref="historyModalRef"
+        class="modal modal-blur fade show d-block"
+        tabindex="-1"
+        @click.self="historyTask = null"
+      >
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <div>
+                <h5 class="modal-title mb-0">
+                  Historique d'exécutions
+                </h5>
+                <div class="text-muted small mt-1">
+                  <span class="badge bg-blue-lt me-1">{{ historyTask.module }}</span>
+                  {{ historyTask.name }}
+                  <span class="text-muted ms-1">— {{ historyTask.host_name }}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="btn-close"
+                @click="historyTask = null"
+              />
+            </div>
+            <div class="modal-body p-0">
+              <div v-if="historyLoading">
+                <LoadingSkeleton variant="table" />
+              </div>
+              <div
+                v-else-if="historyError"
+                class="alert alert-danger m-3"
+              >
+                {{ historyError }}
+              </div>
+              <div
+                v-else-if="!executions.length"
+                class="text-center py-5 text-muted"
+              >
+                Aucune exécution enregistrée pour cette tâche.
+              </div>
+              <div v-else>
+                <table class="table table-vcenter table-hover mb-0">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Statut</th>
+                      <th>Durée</th>
+                      <th>Déclenché par</th>
+                      <th>Sortie</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="ex in executions"
+                      :key="ex.id"
+                      :class="expandedId === ex.id ? 'table-active' : ''"
+                    >
+                      <td class="text-nowrap">
+                        {{ formatDate(ex.created_at) }}
+                      </td>
+                      <td>
+                        <span :class="statusBadge(ex.status)">{{ commandStatusLabel(ex.status) }}</span>
+                      </td>
+                      <td class="text-nowrap">
+                        <span v-if="ex.ended_at && ex.started_at">{{ durationSec(ex.started_at, ex.ended_at) }}s</span>
+                        <span
+                          v-else
+                          class="text-muted"
+                        >—</span>
+                      </td>
+                      <td>{{ ex.triggered_by || '—' }}</td>
+                      <td style="max-width:400px">
+                        <div
+                          v-if="!ex.output"
+                          class="text-muted small"
+                        >
+                          —
+                        </div>
+                        <template v-else>
+                          <div
+                            v-if="expandedId !== ex.id"
+                            class="d-flex align-items-center gap-2"
+                          >
+                            <span
+                              class="text-truncate small font-monospace"
+                              style="max-width:300px"
+                            >{{ firstLine(ex.output) }}</span>
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
+                              @click="expandedId = ex.id"
+                            >
+                              Voir tout
+                            </button>
+                          </div>
+                          <div v-else>
+                            <pre
+                              class="mb-1 small"
+                              style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"
+                            >{{ ex.output }}</pre>
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-ghost-secondary"
+                              @click="expandedId = null"
+                            >
+                              Réduire
+                            </button>
+                          </div>
+                        </template>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
-            <button
-              type="button"
-              class="btn-close"
-              @click="historyTask = null"
-            />
-          </div>
-          <div class="modal-body p-0">
-            <div
-              v-if="historyLoading"
-              class="text-center py-5"
-            >
-              <span class="spinner-border text-primary" />
+            <div class="modal-footer">
+              <span class="text-muted small me-auto">{{ executions.length }} exécution{{ executions.length !== 1 ? 's' : '' }} (20 dernières)</span>
+              <button
+                type="button"
+                class="btn btn-secondary"
+                @click="historyTask = null"
+              >
+                Fermer
+              </button>
             </div>
-            <div
-              v-else-if="historyError"
-              class="alert alert-danger m-3"
-            >
-              {{ historyError }}
-            </div>
-            <div
-              v-else-if="!executions.length"
-              class="text-center py-5 text-muted"
-            >
-              Aucune exécution enregistrée pour cette tâche.
-            </div>
-            <div v-else>
-              <table class="table table-vcenter table-hover mb-0">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Statut</th>
-                    <th>Durée</th>
-                    <th>Déclenché par</th>
-                    <th>Sortie</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="ex in executions"
-                    :key="ex.id"
-                    :class="expandedId === ex.id ? 'table-active' : ''"
-                  >
-                    <td class="text-nowrap">
-                      {{ formatDate(ex.created_at) }}
-                    </td>
-                    <td>
-                      <span :class="statusBadge(ex.status)">{{ ex.status }}</span>
-                    </td>
-                    <td class="text-nowrap">
-                      <span v-if="ex.ended_at && ex.started_at">{{ durationSec(ex.started_at, ex.ended_at) }}s</span>
-                      <span
-                        v-else
-                        class="text-muted"
-                      >—</span>
-                    </td>
-                    <td>{{ ex.triggered_by || '—' }}</td>
-                    <td style="max-width:400px">
-                      <div
-                        v-if="!ex.output"
-                        class="text-muted small"
-                      >
-                        —
-                      </div>
-                      <template v-else>
-                        <div
-                          v-if="expandedId !== ex.id"
-                          class="d-flex align-items-center gap-2"
-                        >
-                          <span
-                            class="text-truncate small font-monospace"
-                            style="max-width:300px"
-                          >{{ firstLine(ex.output) }}</span>
-                          <button
-                            type="button"
-                            class="btn btn-xs btn-ghost-secondary ms-auto flex-shrink-0"
-                            @click="expandedId = ex.id"
-                          >
-                            Voir tout
-                          </button>
-                        </div>
-                        <div v-else>
-                          <pre
-                            class="mb-1 small"
-                            style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"
-                          >{{ ex.output }}</pre>
-                          <button
-                            type="button"
-                            class="btn btn-xs btn-ghost-secondary"
-                            @click="expandedId = null"
-                          >
-                            Réduire
-                          </button>
-                        </div>
-                      </template>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <span class="text-muted small me-auto">{{ executions.length }} exécution{{ executions.length !== 1 ? 's' : '' }} (20 dernières)</span>
-            <button
-              type="button"
-              class="btn btn-secondary"
-              @click="historyTask = null"
-            >
-              Fermer
-            </button>
           </div>
         </div>
       </div>
-    </div>
+      <div class="modal-backdrop fade show" />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IconClock, IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue'
+import { ref } from 'vue'
+import { IconClock, IconPencil, IconTrash } from '@tabler/icons-vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
+import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import CronBuilder from '../components/CronBuilder.vue'
+import DispatchStepEditor from '../components/DispatchStepEditor.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
+import { DISPATCH_MODULES } from '../utils/dispatchStep'
+import type { DispatchOption } from '../utils/dispatchStep'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
+import { useModalChrome } from '../composables/useModalChrome'
 
 const {
-  hostsStore,
   tasks,
   loading,
   error,
+  autoRefresh,
+  lastUpdatedAt,
+  TASKS_REFRESH_SEC,
   runningId,
   filterText,
   filterHost,
@@ -847,6 +776,7 @@ const {
   bulkLoading,
   editTask,
   editForm,
+  editManualOnly,
   editSaving,
   editError,
   historyTask,
@@ -856,14 +786,12 @@ const {
   expandedId,
   createModalOpen,
   createForm,
+  createManualOnly,
   createSaving,
   createError,
   canManage,
   moduleActions,
-  cronPresets,
-  createCronDesc,
   createNextRun,
-  editCronDesc,
   editNextRun,
   hostList,
   filteredTasks,
@@ -875,11 +803,11 @@ const {
   toggleSort,
   targetLabel,
   targetPlaceholder,
-  onModuleChange,
   openCreate,
   saveCreate,
   formatDate,
   statusBadge,
+  commandStatusLabel,
   durationSec,
   firstLine,
   isManualOnly,
@@ -888,7 +816,6 @@ const {
   saveEdit,
   confirmDelete,
   openHistory,
-  loadTasks,
   toggleTask,
   runNow,
   handleBulkEnable,
@@ -896,6 +823,37 @@ const {
   handleBulkDelete,
   handleBulkRun,
 } = useGlobalScheduledTasks()
+
+const createModalRef = ref<HTMLElement | null>(null)
+const editModalRef = ref<HTMLElement | null>(null)
+const historyModalRef = ref<HTMLElement | null>(null)
+useModalChrome(createModalRef, () => createModalOpen.value, { onClose: () => { createModalOpen.value = false } })
+useModalChrome(editModalRef, () => !!editTask.value, { onClose: () => { editTask.value = null } })
+useModalChrome(historyModalRef, () => !!historyTask.value, { onClose: () => { historyTask.value = null } })
+
+// moduleActions/targetLabel/targetPlaceholder are advisory only here (the
+// scheduled-task backend validates the module but not the action string —
+// see root CLAUDE.md), unlike DispatchStepEditor's other caller (Runbooks),
+// so these adapt them to the shared editor's shape rather than the editor
+// enforcing one universal whitelist.
+function scheduledTaskActionsForModule(module: string): DispatchOption[] {
+  return (moduleActions[module] || []).map((a) => ({ value: a, label: a }))
+}
+
+function scheduledTaskTargetConfig(module: string): { label: string; placeholder?: string } | null {
+  const label = targetLabel(module)
+  return label ? { label, placeholder: targetPlaceholder(module) } : null
+}
+
+// Scheduled tasks are the only DispatchStepEditor caller whose backend scope
+// exceeds DISPATCH_MODULES (validModules in scheduledtask.Service) — restic
+// isn't allowed for runbook steps or alert-rule command triggers, so it stays
+// out of the shared list and is added only here (see DispatchStepEditor's
+// `modules` prop doc).
+const scheduledTaskModules: DispatchOption[] = [
+  ...DISPATCH_MODULES,
+  { value: 'restic', label: 'Restic (backup)' },
+]
 </script>
 
 <style scoped>

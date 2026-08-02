@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="show"
+    ref="modalRef"
     class="timeline-drawer-backdrop"
     @click.self="$emit('close')"
   >
@@ -57,7 +58,7 @@
             </template>
             <span
               v-else
-              class="badge bg-success-lt text-success align-self-center"
+              class="badge bg-green-lt text-green align-self-center"
             >
               IP bloquée par CrowdSec
             </span>
@@ -73,13 +74,10 @@
       </div>
 
       <div class="card-body p-0 timeline-body">
-        <div
+        <LoadingSkeleton
           v-if="loading"
-          class="text-center py-4 text-secondary"
-        >
-          <span class="spinner-border spinner-border-sm me-2" />
-          Chargement chronologie...
-        </div>
+          variant="list"
+        />
         <div
           v-else-if="!timeline.length"
           class="text-center py-4 text-secondary"
@@ -259,7 +257,7 @@
                         <span v-if="r.blocked">
                           <strong>Blocage:</strong>
                           <span
-                            class="badge bg-success-lt text-success ms-1"
+                            class="badge bg-green-lt text-green ms-1"
                             :title="r.blocked_reason || '-'"
                           >
                             {{ r.blocked_source || 'crowdsec' }}
@@ -291,6 +289,8 @@
 import { ref } from 'vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useIpTimeline } from '../../composables/useIpTimeline'
+import { useModalChrome } from '../../composables/useModalChrome'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import type { WebLogIPTimelineRow } from '../../types/security'
 
 const props = defineProps({
@@ -306,6 +306,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'ban'])
+
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => props.show, { onClose: () => emit('close') })
 
 const dialog = useConfirmDialog()
 const banDuration = ref('4h')
@@ -351,7 +354,7 @@ async function handleBanClick() {
   justify-content: center;
   align-items: center;
   padding: 0.75rem;
-  z-index: 1060;
+  z-index: var(--z-index-modal-overlay);
 }
 
 .timeline-modal {

@@ -57,3 +57,20 @@ crowdsec_alerts_password: ""
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false
+
+# Restic backup supervision. Only paths and feature flags — never put
+# restic/Swift/SMTP credentials here; they stay in resticconf on disk
+# (restic_conf_path), which the agent reads locally but never sends to the
+# server.
+collect_restic: false
+restic_bin: "/home/user/restic-backups/restic"
+restic_conf_path: "/home/user/restic-backups/resticconf"
+restic_run_script_path: "/home/user/restic-backups/run_backup.sh"
+restic_status_file_path: "/home/user/restic-backups/backup-status.json"
+restic_enable_progress: true
+restic_progress_fps: 0.1
+
+# How long a run_backup command may stay silent (no progress chunk) before
+# the agent kills it. Not an absolute run duration cap — a backup that keeps
+# progressing (large dataset) can run far longer than this.
+restic_backup_idle_timeout_minutes: 20

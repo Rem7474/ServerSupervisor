@@ -41,7 +41,7 @@
               v-model="searchQuery"
               type="text"
               class="form-control"
-              placeholder="Rechercher une règle, un hôte, une source..."
+              placeholder="Rechercher une règle, un hôte, une source…"
             >
             <button
               v-if="searchQuery"
@@ -108,17 +108,6 @@
             Tout marquer lu
           </button>
           <button
-            type="button"
-            class="btn btn-sm btn-ghost-secondary"
-            @click="$emit('refresh')"
-          >
-            <IconRefresh
-              :size="16"
-              class="icon me-1"
-            />
-            Actualiser
-          </button>
-          <button
             v-if="hasActiveFilters"
             class="btn btn-sm btn-outline-secondary"
             type="button"
@@ -135,15 +124,9 @@
 
     <div
       v-if="loading"
-      class="card-body text-center py-5"
+      class="card-body"
     >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
-      <div class="mt-2 text-muted">
-        Chargement...
-      </div>
+      <LoadingSkeleton variant="list" />
     </div>
     <div
       v-else-if="error"
@@ -153,45 +136,29 @@
     </div>
     <div
       v-else-if="incidents.length === 0"
-      class="card-body text-center py-5 text-muted"
+      class="card-body"
     >
-      <IconBell
-        :size="48"
-        class="icon icon-lg mb-3"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconBell"
+        title="Aucune notification enregistrée"
+        subtitle="Les alertes et les notifications du release tracker apparaîtront ici"
       />
-      <div>Aucune notification enregistrée</div>
-      <div class="text-muted small mt-1">
-        Les alertes et les notifications du release tracker apparaîtront ici
-      </div>
     </div>
     <div
       v-else-if="filteredIncidents.length === 0"
-      class="card-body text-center py-5 text-muted"
+      class="card-body"
     >
-      <IconBell
-        :size="48"
-        class="icon icon-lg mb-3"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconBell"
+        title="Aucune notification ne correspond à cette recherche."
+        subtitle="Essayez un autre mot-clé ou réinitialisez les filtres."
+        :cta-label="hasActiveFilters ? 'Réinitialiser' : ''"
+        @cta="resetFilters"
       />
-      <div class="fw-semibold text-body">
-        Aucune notification ne correspond à cette recherche.
-      </div>
-      <div class="text-muted small mt-1">
-        Essayez un autre mot-clé ou réinitialisez les filtres.
-      </div>
-      <button
-        v-if="hasActiveFilters"
-        class="btn btn-sm btn-outline-secondary mt-3"
-        type="button"
-        @click="resetFilters"
-      >
-        Réinitialiser
-      </button>
     </div>
     <div
       v-else
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table class="table table-vcenter card-table">
         <thead>
@@ -262,13 +229,13 @@
                   style="max-width: 220px;"
                   :title="item.rule_name"
                 >
-                  {{ item.rule_name || defaultNotificationTitle(item) }}
+                  {{ notificationTitle(item) }}
                 </div>
                 <div
                   v-if="item.metric"
                   class="text-muted small"
                 >
-                  {{ incidentMetricLabel(item.metric) }}
+                  {{ metricLabel(item.metric) }}
                 </div>
               </td>
               <td>
@@ -299,13 +266,13 @@
                   </div>
                 </template>
                 <template v-else>
-                  <code>{{ incidentFormatValue(item.value, item.metric, item.value_label) }}</code>
+                  <code>{{ formatIncidentValue({ value: item.value, metric: item.metric, value_label: item.value_label }) }}</code>
                   <div
                     v-if="!isCompleted(item) && item.current_value != null"
                     class="text-muted small mt-1"
                   >
                     Actuel :
-                    <span class="fw-medium">{{ incidentFormatValue(item.current_value, item.metric, item.value_label) }}</span>
+                    <span class="fw-medium">{{ formatIncidentValue({ value: item.current_value, metric: item.metric, value_label: item.value_label }) }}</span>
                     <span
                       v-if="resolveHint(item)"
                       class="ms-1"
@@ -316,7 +283,7 @@
                     class="text-muted small mt-1"
                   >
                     Remédiation :
-                    <span :class="commandStatusBadgeClass(item.command_status)">{{ commandStatusLabel(item.command_status) }}</span>
+                    <span :class="getExecutionStateClass(item.command_status)">{{ commandStatusLabel(item.command_status) }}</span>
                   </div>
                 </template>
               </td>
@@ -324,7 +291,10 @@
                 {{ formatDate(item.triggered_at) }}
               </td>
               <td class="text-muted small">
-                <span v-if="item.resolved_at">{{ formatDate(item.resolved_at) }}</span>
+                <template v-if="item.resolved_at">
+                  {{ formatDate(item.resolved_at) }}
+                  <span v-if="!isTrackerType(item)">({{ incidentDuration(item) }})</span>
+                </template>
                 <span
                   v-else
                   class="text-secondary"
@@ -334,7 +304,7 @@
                 <button
                   v-if="isAdmin && !isCompleted(item) && item.id"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   :disabled="resolvingId === item.id"
                   title="Clôturer manuellement"
                   @click="manualResolve(item)"
@@ -357,93 +327,46 @@
 
     <div
       v-if="totalPages > 1"
-      class="card-footer d-flex align-items-center"
+      class="card-footer d-flex align-items-center justify-content-between"
     >
       <p class="m-0 text-muted">
         Page {{ currentPage }} / {{ totalPages }}
       </p>
-      <ul class="pagination m-0 ms-auto">
-        <li
-          class="page-item"
-          :class="{ disabled: currentPage === 1 }"
-        >
-          <button
-            type="button"
-            class="page-link"
-            @click="currentPage--"
-          >
-            <IconChevronLeft
-              :size="16"
-              class="icon"
-            />
-          </button>
-        </li>
-        <li
-          v-for="page in visiblePages"
-          :key="page"
-          class="page-item"
-          :class="{ active: page === currentPage, disabled: page === '…' }"
-        >
-          <button
-            type="button"
-            class="page-link"
-            @click="typeof page === 'number' && (currentPage = page)"
-          >
-            {{ page }}
-          </button>
-        </li>
-        <li
-          class="page-item"
-          :class="{ disabled: currentPage === totalPages }"
-        >
-          <button
-            type="button"
-            class="page-link"
-            @click="currentPage++"
-          >
-            <IconChevronRight
-              :size="16"
-              class="icon"
-            />
-          </button>
-        </li>
-      </ul>
+      <PaginationNav
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @select="currentPage = $event"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconBell, IconCheck, IconChevronLeft, IconChevronRight, IconRefresh, IconSearch, IconX } from '@tabler/icons-vue'
+import { IconBell, IconCheck, IconSearch, IconX } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import BadgePill from '../common/BadgePill.vue'
-import { getAlertMetricMeta } from '../../utils/alertMetrics'
-import { resolveIncidentHostRoute } from '../../utils/incidentRouting'
+import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
+import PaginationNav from '../PaginationNav.vue'
+import { addToast } from '../../composables/useGlobalToast'
+import { getApiErrorMessage } from '../../api/client'
+import { getExecutionStateClass } from '../../utils/statusClasses'
+import {
+  formatIncidentValue,
+  incidentDuration,
+  isTrackerType,
+  metricLabel,
+  notificationResolved as isCompleted,
+  notificationRoute,
+  notificationTitle,
+  resolvableIncidentId,
+  resolveHint,
+  trackerStatusLabel,
+} from '../../utils/incidentFormat'
+import type { NotificationItem } from '../../types/generated'
 
-interface Incident {
-  id?: string | number
-  type?: string
-  severity?: string
-  rule_name?: string
-  host_id?: string
-  host_name?: string
-  source_label?: string
-  link_host_id?: string
-  value_label?: string
-  command_id?: string
-  command_status?: string
-  metric?: string
-  status?: string
-  version?: string
-  value?: number | string
-  current_value?: number | null
-  clear_threshold?: number | null
-  operator?: string
-  triggered_at?: string
-  resolved_at?: string | null
-  tracker_id?: string | number
-  [key: string]: unknown
-}
+type Incident = NotificationItem
 
 interface AnnotatedIncident extends Incident {
   _isOld: boolean
@@ -472,12 +395,14 @@ const props = withDefaults(defineProps<{
   error?: string
   activeIncidentCount?: number
   isAdmin?: boolean
+  initialSearch?: string
 }>(), {
   incidents: () => [],
   loading: false,
   error: '',
   activeIncidentCount: 0,
   isAdmin: false,
+  initialSearch: '',
 })
 
 const emit = defineEmits<{
@@ -486,7 +411,10 @@ const emit = defineEmits<{
 
 const filterType = ref('all')
 const filterStatus = ref('all')
-const searchQuery = ref('')
+// Seeded from the caller (e.g. HostDetailView's "?host=" deep link) so
+// arriving from a specific host's incidents lands pre-filtered instead of on
+// the full undifferentiated list.
+const searchQuery = ref(props.initialSearch)
 const currentPage = ref(1)
 const markingRead = ref(false)
 const resolvingId = ref<string | number | null>(null)
@@ -560,21 +488,6 @@ const paginatedIncidents = computed(() => {
   return annotatedIncidents.value.slice(start, start + PAGE_SIZE)
 })
 
-const visiblePages = computed<(number | string)[]>(() => {
-  const total = totalPages.value
-  const cur = currentPage.value
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: (number | string)[] = []
-  if (cur <= 4) {
-    pages.push(1, 2, 3, 4, 5, '…', total)
-  } else if (cur >= total - 3) {
-    pages.push(1, '…', total - 4, total - 3, total - 2, total - 1, total)
-  } else {
-    pages.push(1, '…', cur - 1, cur, cur + 1, '…', total)
-  }
-  return pages
-})
-
 function setTypeFilter(value: string): void {
   filterType.value = value
   currentPage.value = 1
@@ -606,96 +519,31 @@ async function markAllRead() {
 }
 
 async function manualResolve(incident: Incident) {
-  if (!incident.id || resolvingId.value) return
+  const id = resolvableIncidentId(incident)
+  if (!id || resolvingId.value) return
   resolvingId.value = incident.id
   try {
-    await apiClient.resolveAlertIncident(incident.id)
+    await apiClient.resolveAlertIncident(id)
+    addToast('Incident résolu', 'success')
     emit('refresh')
+  } catch (err: unknown) {
+    addToast(getApiErrorMessage(err, 'Impossible de résoudre'), 'error')
   } finally {
     resolvingId.value = null
   }
 }
 
-function notificationRoute(incident: Incident): string {
-  if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
-    if (incident?.tracker_id) return `/release-trackers/${encodeURIComponent(String(incident.tracker_id))}`
-    return '/git-webhooks?tab=trackers'
-  }
-  return resolveIncidentHostRoute(incident?.host_id, incident?.metric, incident?.link_host_id)
-}
-
-// commandStatusLabel/commandStatusBadgeClass describe the remote_commands row
-// a rule's command_trigger dispatched when this incident fired (see
-// item.command_status, joined server-side from remote_commands.status).
+// Describes the remote_commands row a rule's command_trigger dispatched when
+// this incident fired (item.command_status, joined server-side from
+// remote_commands.status) — adjectival wording ("réussie"/"échouée") to
+// agree with "Remédiation :" above it, not the standalone noun forms
+// commandStatusLabel in utils/commandStatus.ts uses elsewhere.
 function commandStatusLabel(status: string | undefined): string {
   if (status === 'pending') return 'en attente'
   if (status === 'running') return 'en cours'
   if (status === 'completed') return 'réussie'
   if (status === 'failed') return 'échouée'
   return status || 'inconnue'
-}
-
-function commandStatusBadgeClass(status: string | undefined): string {
-  if (status === 'completed') return 'badge bg-green-lt text-green'
-  if (status === 'failed') return 'badge bg-danger-lt text-danger'
-  if (status === 'running') return 'badge bg-info-lt text-info'
-  return 'badge bg-warning-lt text-warning'
-}
-
-function trackerStatusLabel(status: string | undefined): string {
-  if (status === 'pending' || status === 'running') return 'Détection en cours'
-  if (status === 'completed' || status === 'success') return 'Exécution réussie'
-  if (status === 'failed' || status === 'error') return 'Exécution échouée'
-  return status || 'État inconnu'
-}
-
-function isCompleted(incident: Incident): boolean {
-  if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
-    return !!incident?.resolved_at || ['completed', 'success', 'failed', 'error'].includes((incident?.status || '').toLowerCase())
-  }
-  return !!incident?.resolved_at
-}
-
-function incidentMetricLabel(metric: string | undefined): string {
-  const meta = getAlertMetricMeta(metric || '')
-  return meta?.label || metric || '-'
-}
-
-function defaultNotificationTitle(incident: Incident): string {
-  if (incident?.type === 'release_tracker_detected') return 'Nouvelle version détectée'
-  if (incident?.type === 'release_tracker_execution') return 'Exécution de tracker'
-  return incident?.metric ? incidentMetricLabel(incident.metric) : 'Notification'
-}
-
-function incidentFormatValue(value: number | string | undefined, metric: string | undefined, valueLabel?: string): string {
-  if (metric === 'release_tracker') return '-'
-  if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
-  if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
-  if (metric === 'docker_container_state') {
-    if (valueLabel) return valueLabel
-    const n = Number(value)
-    if (n < 0.5) return 'running'
-    if (n < 1.5) return 'dégradé'
-    return 'critique'
-  }
-  if (metric === 'docker_compose_degraded_services') {
-    const n = Number(value)
-    return n === 1 ? '1 service dégradé' : `${n} services dégradés`
-  }
-  const unit = getAlertMetricMeta(metric || '').unit
-  return `${Number(value).toFixed(2)}${unit}`
-}
-
-// resolveHint describes the threshold the live value must cross for the alert
-// to resolve, e.g. "repasse OK ≤ 70°C" for a ">" rule.
-function resolveHint(incident: Incident): string {
-  if (incident.clear_threshold == null) return ''
-  const formatted = incidentFormatValue(incident.clear_threshold, incident.metric)
-  const op = incident.operator || ''
-  // A ">"/">=" rule resolves when the value drops to/below the clear threshold.
-  if (op === '>' || op === '>=') return `repasse OK ≤ ${formatted}`
-  if (op === '<' || op === '<=') return `repasse OK ≥ ${formatted}`
-  return `seuil de résolution ${formatted}`
 }
 
 function formatDate(dateStr: string | undefined | null): string {

@@ -33,12 +33,10 @@
             automatique à chaque nouvelle image).
           </p>
 
-          <div
+          <LoadingSkeleton
             v-if="loading"
-            class="text-center py-4"
-          >
-            <div class="spinner-border text-primary" />
-          </div>
+            variant="list"
+          />
 
           <div
             v-else-if="!containers.length"
@@ -91,7 +89,7 @@
               </div>
             </div>
 
-            <div class="table-responsive">
+            <div class="table-responsive containers-scroll">
               <table class="table table-sm table-vcenter">
                 <thead>
                   <tr>
@@ -169,7 +167,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import api from '../../api'
-import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
+import { useModalChrome } from '../../composables/useModalChrome'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 interface Container {
   host_id: string
@@ -197,7 +196,7 @@ const emit = defineEmits<{
 }>()
 
 const modalRef = ref<HTMLElement | null>(null)
-useModalFocusTrap(modalRef)
+useModalChrome(modalRef, () => props.visible, { onClose: close })
 
 const loading = ref(false)
 const saving = ref(false)
@@ -297,3 +296,15 @@ function close(): void {
   emit('close')
 }
 </script>
+
+<style scoped>
+/* The scroll container here is .modal-body (via .modal-dialog-scrollable),
+   not this table — so pin the header to that ancestor's scroll instead of
+   giving the table its own nested max-height/overflow. */
+.containers-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tblr-bg-surface);
+}
+</style>

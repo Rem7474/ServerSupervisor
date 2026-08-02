@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/serversupervisor/server/internal/apperr"
@@ -73,6 +74,18 @@ func (f *fakeRepo) GetAllLoginEvents(context.Context, int, int) ([]models.LoginE
 }
 func (f *fakeRepo) CountLoginEvents(context.Context) (int64, error) { return 0, nil }
 
+func (f *fakeRepo) CreateWebAuthnCredential(context.Context, int64, string, webauthn.Credential) (*models.WebAuthnCredential, error) {
+	return nil, nil
+}
+func (f *fakeRepo) ListWebAuthnCredentials(context.Context, int64) ([]models.WebAuthnCredential, error) {
+	return nil, nil
+}
+func (f *fakeRepo) DeleteWebAuthnCredential(context.Context, string, int64) error { return nil }
+func (f *fakeRepo) CountWebAuthnCredentials(context.Context, int64) (int, error)  { return 0, nil }
+func (f *fakeRepo) UpdateWebAuthnCredentialUsage(context.Context, []byte, webauthn.Credential) error {
+	return nil
+}
+
 func userWithPassword(t *testing.T, password string) *models.User {
 	t.Helper()
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -118,15 +131,15 @@ func TestAuthenticate_RequiresMFA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
-	if !requireMFA {
-		t.Error("expected requireMFA=true when MFA enabled and no code supplied")
+	if requireMFA == nil || !requireMFA.TOTP {
+		t.Error("expected a TOTP MFA requirement when MFA enabled and no code supplied")
 	}
 }
 
 func TestAuthenticate_Success(t *testing.T) {
 	repo := &fakeRepo{user: userWithPassword(t, "correct")}
 	user, requireMFA, err := newSvc(repo).Authenticate(context.Background(), "alice", "correct", "", "1.2.3.4", "ua")
-	if err != nil || requireMFA || user == nil {
+	if err != nil || requireMFA != nil || user == nil {
 		t.Fatalf("expected success, got user=%v mfa=%v err=%v", user, requireMFA, err)
 	}
 	if len(repo.loginEvents) != 1 || !repo.loginEvents[0] {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 // Auto-unmount after each test so the view's onUnmounted clears its polling
 // timers and no late-resolving async touches a torn-down component.
@@ -69,6 +70,9 @@ const mountOpts = {
 describe('ProxmoxNodeView (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // ProxmoxNodeGuestsTab (mounted for the vms/lxc tabs) calls useAuthStore()
+    // for its admin-only guest power-action buttons.
+    setActivePinia(createPinia())
   })
 
   it('fetches the node on mount', async () => {
@@ -84,7 +88,7 @@ describe('ProxmoxNodeView (characterization)', () => {
 
     const text = wrapper.text()
     expect(text).toContain('pve1')
-    for (const label of ['VMs', 'LXC', 'Stockage', 'Disques', 'Tâches', 'Mises à jour', 'Services', 'Sécurité']) {
+    for (const label of ['VMs', 'LXC', 'Stockage', 'Disques', 'Tâches', 'Mises à jour', 'Services', 'Journaux sécurité']) {
       expect(text).toContain(label)
     }
   })

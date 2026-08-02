@@ -60,3 +60,14 @@ func (h *NetworkHandler) GetTopologySnapshot(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, snapshot)
 }
+
+// GetIPInventory returns the live, non-persisted Proxmox guest IPs + NPM
+// domain mappings shown on the Network page's cards view.
+func (h *NetworkHandler) GetIPInventory(c *gin.Context) {
+	inventory, err := h.svc.IPInventory(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, inventory)
+}

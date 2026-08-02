@@ -7,10 +7,16 @@ import { ref, computed, onMounted, watch } from 'vue'
 import apiClient from '../api'
 import { useWebSocket } from './useWebSocket'
 import type { WSNetworkSnapshot } from '../types/ws'
+import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../types/network'
+import type { NetworkGuestNode, NetworkService } from '../components/network/buildNetworkElements'
 
 export function useNetwork() {
   const hosts = ref<any[]>([])
   const containers = ref<any[]>([])
+  const proxmoxGuestIPs = ref<NetworkProxmoxGuestIP[]>([])
+  const npmEntries = ref<NetworkNPMEntry[]>([])
+  const ipInventoryLoading = ref(false)
+  const ipInventoryError = ref(false)
   const viewMode = ref(localStorage.getItem('networkViewMode') || 'graph')
   const networkTab = ref('topology')
   const rootNodeName = ref('Infrastructure')
@@ -199,6 +205,43 @@ export function useNetwork() {
     return [...networkServices.value, ...linkedServices]
   })
 
+  // ─── Proxmox guest nodes (no agent) auto-detected via NPM correlation ─────
+  // The topology graph's nodes otherwise come only from agent-reporting Hosts
+  // (see fetchSnapshot below) — a domain routed to a Proxmox VM/CT with no
+  // agent had no node to attach to. Restricted to guests that actually have
+  // an NPM-matched entry (rather than every known guest) so the graph stays
+  // focused on what's relevant here instead of duplicating the full Proxmox
+  // inventory already available on its own page.
+  const guestNodes = computed<NetworkGuestNode[]>(() => {
+    const seen = new Map<string, NetworkGuestNode>()
+    for (const entry of npmEntries.value) {
+      if (entry.matched_type !== 'proxmox_guest' || !entry.matched_id || seen.has(entry.matched_id)) continue
+      const guest = proxmoxGuestIPs.value.find((g) => g.guest_id === entry.matched_id)
+      seen.set(entry.matched_id, {
+        id: entry.matched_id,
+        label: entry.matched_name || guest?.name || entry.matched_id,
+        sublabel: guest ? [guest.node, guest.ip_addresses?.[0]].filter(Boolean).join(' · ') : '',
+        status: guest?.status,
+      })
+    }
+    return Array.from(seen.values())
+  })
+
+  const guestServices = computed<NetworkService[]>(() =>
+    npmEntries.value
+      .filter((n) => n.matched_type === 'proxmox_guest' && n.matched_id)
+      .map((n) => ({
+        id: `npm-${n.proxy_host_id}`,
+        guestId: n.matched_id,
+        name: (n.domain_names || []).join(', ') || n.forward_host,
+        domain: (n.domain_names || [])[0] || '',
+        path: '/',
+        internalPort: n.forward_port,
+        linkToProxy: true,
+        tags: 'npm-auto',
+      }))
+  )
+
   const graphHosts = computed<any[]>(() => {
     const portsByHost = new Map<string, Map<string, any>>()
     for (const container of containers.value) {
@@ -244,8 +287,9 @@ export function useNetwork() {
   })
 
   const filteredServices = computed(() => {
-    if (!filterInternetOnly.value) return combinedServices.value
-    return combinedServices.value.filter((s: any) => s.exposedToInternet)
+    const all = [...combinedServices.value, ...guestServices.value]
+    if (!filterInternetOnly.value) return all
+    return all.filter((s: any) => s.exposedToInternet)
   })
 
   const totalPorts = computed(() => graphHosts.value.reduce((sum, host: any) => sum + (host.ports?.length || 0), 0))
@@ -310,6 +354,21 @@ export function useNetwork() {
     }
   }
 
+  // ─── IP inventory (Proxmox guests + NPM domains, live/non-persisted) ──────
+  async function fetchIPInventory(): Promise<void> {
+    ipInventoryLoading.value = true
+    ipInventoryError.value = false
+    try {
+      const res = await apiClient.getIPInventory()
+      proxmoxGuestIPs.value = res.data?.proxmox_guests || []
+      npmEntries.value = res.data?.npm_hosts || []
+    } catch {
+      ipInventoryError.value = true
+    } finally {
+      ipInventoryLoading.value = false
+    }
+  }
+
   // ─── WebSocket ────────────────────────────────────────────────────────────
   const { wsStatus, wsError, retryCount, reconnect } = useWebSocket<WSNetworkSnapshot>('/api/v1/ws/network', (payload) => {
     if (payload.type !== 'network') return
@@ -346,11 +405,18 @@ export function useNetwork() {
   onMounted(async () => {
     await loadTopologyConfig()
     await fetchSnapshot()
+    // Fire-and-forget: live Proxmox calls can be slow, must not delay the
+    // hosts/containers snapshot above.
+    void fetchIPInventory()
   })
 
   return {
     hosts,
     containers,
+    proxmoxGuestIPs,
+    npmEntries,
+    ipInventoryLoading,
+    ipInventoryError,
     viewMode,
     networkTab,
     rootNodeName,
@@ -375,6 +441,7 @@ export function useNetwork() {
     discoveredPortsByHost,
     hostPortOverrides,
     combinedServices,
+    guestNodes,
     filteredGraphHosts,
     filteredServices,
     totalPorts,

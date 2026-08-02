@@ -23,6 +23,8 @@ func (s *Service) AgentCapabilities() []models.AlertMetricCapability {
 		{Metric: "status_offline", Label: "Hote hors ligne", Unit: "", Icon: "\U0001f50c", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
 		{Metric: "disk_smart_status", Label: "SMART disque", Unit: "", Icon: "\U0001f6e1", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
 		{Metric: "disk_temperature", Label: "Temp. disque", Unit: "°C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		{Metric: "restic_backup_age_hours", Label: "Ancienneté backup Restic", Unit: "h", Icon: "\U0001f4be", BadgeClass: "bg-lime-lt text-lime", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
+		{Metric: "restic_repo_size_bytes", Label: "Taille dépôt Restic", Unit: " o", Icon: "\U0001f5c4", BadgeClass: "bg-lime-lt text-lime", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
 	}
 }
 
@@ -131,9 +133,11 @@ func filterMetricsByCollectors(all []models.AlertMetricCapability, collectors ma
 		"heartbeat_timeout": true, "status_offline": true,
 	}
 	requiresCollector := map[string]string{
-		"cpu_temperature":   "cpu_temp",
-		"disk_smart_status": "smart",
-		"disk_temperature":  "smart",
+		"cpu_temperature":         "cpu_temp",
+		"disk_smart_status":       "smart",
+		"disk_temperature":        "smart",
+		"restic_backup_age_hours": "restic",
+		"restic_repo_size_bytes":  "restic",
 	}
 	var filtered []models.AlertMetricCapability
 	for _, metric := range all {

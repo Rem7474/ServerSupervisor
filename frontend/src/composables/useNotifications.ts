@@ -1,32 +1,21 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
 import { useWebSocket } from './useWebSocket'
-import { resolveIncidentHostRoute } from '../utils/incidentRouting'
+import { addToast } from './useGlobalToast'
+import { getApiErrorMessage } from '../api/client'
+import {
+  isUnread as sharedIsUnread,
+  metricUnit,
+  notificationResolved,
+  notificationRoute,
+  notificationTitle,
+  resolvableIncidentId,
+  trackerStatusLabel,
+} from '../utils/incidentFormat'
+import type { NotificationItem } from '../types/generated'
 import type { WSNotificationMessage } from '../types/ws'
 
-export interface NotificationItem {
-  id: string | number
-  type?: string
-  triggered_at?: string
-  status?: string
-  resolved_at?: string | null
-  rule_name?: string
-  tracker_id?: string | number
-  tracker_type?: string
-  tracker_name?: string
-  version?: string
-  release_name?: string
-  host_id?: string
-  host_name?: string
-  link_host_id?: string
-  value_label?: string
-  metric?: string
-  value?: number
-  browser_notify?: boolean
-  webhook_id?: string | number
-  webhook_name?: string
-}
-
+export type { NotificationItem }
 
 // Module-level shared state: useNotifications() is called from more than one
 // place (NotificationBell, always mounted in App.vue's navbar, plus any view
@@ -56,49 +45,31 @@ export function onNotificationsMessage(listener: RawMessageListener): () => void
 }
 
 export function useNotifications() {
+  const resolvingId = ref<string | null>(null)
+
   const unreadCount = computed(() =>
-    notifications.value.filter((n) =>
-      !readAtRef.value || new Date(n.triggered_at ?? 0) > new Date(readAtRef.value)
-    ).length
+    notifications.value.filter((n) => sharedIsUnread(n, readAtRef.value)).length
   )
 
   function isUnread(item: NotificationItem): boolean {
-    return !readAtRef.value || new Date(item.triggered_at ?? 0) > new Date(readAtRef.value)
+    return sharedIsUnread(item, readAtRef.value)
   }
 
-  function metricUnit(metric?: string): string {
-    if (!metric) return ''
-    if (['cpu', 'memory', 'disk'].includes(metric)) return '%'
-    return ''
-  }
-
-  function trackerStatusLabel(status?: string): string {
-    if (status === 'pending' || status === 'running') return 'Détection en cours'
-    if (status === 'completed' || status === 'success') return 'Exécution réussie'
-    if (status === 'failed' || status === 'error') return 'Exécution échouée'
-    return status || 'État inconnu'
-  }
-
-  function notificationResolved(item?: NotificationItem): boolean {
-    if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
-      return !!item?.resolved_at || ['completed', 'success', 'failed', 'error'].includes((item?.status || '').toLowerCase())
+  async function resolveIncident(item: NotificationItem): Promise<void> {
+    const id = resolvableIncidentId(item)
+    if (!id || resolvingId.value) return
+    resolvingId.value = id
+    try {
+      await apiClient.resolveAlertIncident(id)
+      notifications.value = notifications.value.map((n) =>
+        n.id === item.id ? { ...n, resolved_at: new Date().toISOString() } : n
+      )
+      addToast('Incident résolu', 'success')
+    } catch (err: unknown) {
+      addToast(getApiErrorMessage(err, 'Impossible de résoudre'), 'error')
+    } finally {
+      resolvingId.value = null
     }
-    return !!item?.resolved_at
-  }
-
-  function notificationTitle(item?: NotificationItem): string {
-    if (!item) return 'Notification'
-    if (item.type === 'release_tracker_detected') return item.rule_name || 'Nouvelle release detectee'
-    if (item.type === 'release_tracker_execution') return item.rule_name || 'Execution release tracker'
-    return item.rule_name || 'Alerte'
-  }
-
-  function notificationRoute(item?: NotificationItem): string {
-    if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
-      if (item?.tracker_id) return `/release-trackers/${encodeURIComponent(String(item.tracker_id))}`
-      return '/git-webhooks?tab=trackers'
-    }
-    return resolveIncidentHostRoute(item?.host_id, item?.metric, item?.link_host_id)
   }
 
   async function markAllRead(): Promise<void> {
@@ -272,8 +243,10 @@ export function useNotifications() {
     loading,
     readAtRef,
     unreadCount,
+    resolvingId,
     fetchNotifications,
     markAllRead,
+    resolveIncident,
     isUnread,
     metricUnit,
     trackerStatusLabel,

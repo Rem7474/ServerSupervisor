@@ -120,7 +120,7 @@
                 </div>
                 <button
                   type="button"
-                  class="btn btn-outline-light"
+                  class="btn btn-outline-secondary"
                   @click="copyRotatedKey"
                 >
                   {{ rotateCopiedKey ? 'Copie' : 'Copier' }}
@@ -132,7 +132,7 @@
                 </div>
                 <button
                   type="button"
-                  class="btn btn-outline-light btn-sm"
+                  class="btn btn-outline-secondary btn-sm"
                   @click="copyRotatedInstallCmd"
                 >
                   {{ rotateCopiedInstallCmd ? 'Copie' : 'Copier' }}
@@ -145,7 +145,7 @@
                 </div>
                 <button
                   type="button"
-                  class="btn btn-outline-light btn-sm"
+                  class="btn btn-outline-secondary btn-sm"
                   @click="copyRotatedConfig"
                 >
                   {{ rotateCopiedConfig ? 'Copie' : 'Copier la config' }}

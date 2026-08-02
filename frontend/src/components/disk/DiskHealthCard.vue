@@ -16,19 +16,14 @@
     </div>
     <div
       v-else-if="health.length === 0"
-      class="card-body text-center text-muted py-5"
+      class="card-body"
     >
-      <IconClock
-        :size="36"
-        class="mb-2 icon icon-md icon-responsive-lg"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconClock"
+        :icon-size="36"
+        title="Aucune donnée SMART disponible"
+        subtitle="Vérifie que l'agent collecte SMART et que smartmontools est installé."
       />
-      <div class="small fw-medium">
-        Aucune donnée SMART disponible
-      </div>
-      <div class="mt-1 opacity-75 small">
-        Vérifie que l'agent collecte SMART et que smartmontools est installé.
-      </div>
     </div>
     <div
       v-else
@@ -55,7 +50,7 @@
               </div>
             </div>
             <BadgePill
-              :tone="getStatusBadgeClass(disk.smart_status)"
+              :tone="smartStatusTone(disk.smart_status)"
               :text="disk.smart_status"
               compact
             />
@@ -171,8 +166,10 @@
 import { onMounted } from 'vue'
 import { IconClock } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import BadgePill from '../common/BadgePill.vue'
 import { useDiskHealth, type DiskHealth } from '../../composables/useDiskHealth'
+import { smartStatusTone } from '../../utils/diskHealth'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -187,18 +184,6 @@ onMounted(async () => {
   if (props.initialHealth) return
   await load()
 })
-
-type Tone = 'success' | 'danger' | 'warning' | 'secondary'
-
-function getStatusBadgeClass(status: string): Tone {
-  switch (status) {
-    case 'PASSED': return 'success'
-    case 'FAILED': return 'danger'
-    case 'UNKNOWN': return 'warning'
-    case 'NOT_AVAILABLE': return 'secondary'
-    default: return 'secondary'
-  }
-}
 
 function getCardClass(status: string): string {
   switch (status) {

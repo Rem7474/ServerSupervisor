@@ -16,3 +16,21 @@ export interface IPTimelineResponse {
   count: number
   requests: WebLogIPTimelineRow[]
 }
+
+/** Optional query params for GET /security/web-logs/domain/:domain beyond
+ * domain+period — status/method/path/ip narrow every aggregate the endpoint
+ * returns (KPIs, top paths/clients, the requests page), sort/dir/page/limit
+ * only affect the requests page (see DomainDetailsFilter in
+ * server/internal/database/db_web_logs_detail.go). */
+export interface DomainDetailsParams {
+  hostId?: string
+  source?: string
+  page?: number
+  limit?: number
+  status?: '' | '2xx' | '3xx' | '4xx' | '5xx' | 'blocked' | 'suspicious'
+  method?: string
+  path?: string
+  ip?: string
+  sort?: 'time' | 'status' | 'bytes'
+  dir?: 'asc' | 'desc'
+}

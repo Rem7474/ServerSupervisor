@@ -42,91 +42,48 @@
       Erreur de chargement des règles : {{ fetchError }}
     </div>
 
-    <ul class="nav nav-tabs mb-4">
-      <li class="nav-item">
-        <a
-          class="nav-link"
-          :class="{ active: alertsTab === 'rules' }"
-          href="#"
-          @click.prevent="alertsTab = 'rules'"
-        >
-          Règles
-          <span class="badge bg-azure-lt text-azure ms-1">{{ rules.length }}</span>
-        </a>
-      </li>
-      <li class="nav-item">
-        <a
-          class="nav-link"
-          :class="{ active: alertsTab === 'releases' }"
-          href="#"
-          @click.prevent="onClickReleases"
-        >
-          Suivi de versions
-          <span
-            v-if="trackers.length > 0"
-            class="badge bg-azure-lt text-azure ms-1"
-          >{{ trackers.length }}</span>
-        </a>
-      </li>
-      <li class="nav-item">
-        <a
-          class="nav-link"
-          :class="{ active: alertsTab === 'incidents' }"
-          href="#"
-          @click.prevent="onClickIncidents"
-        >
-          Historique notifications
-          <span
-            v-if="activeIncidentCount > 0"
-            class="badge bg-red-lt text-red ms-1"
-          >{{ activeIncidentCount }}</span>
-        </a>
-      </li>
-    </ul>
-
-    <div
-      v-if="isTabMounted('rules')"
-      v-show="alertsTab === 'rules'"
+    <EntityTabShell
+      :model-value="alertsTab"
+      :tabs="alertsTabs"
+      nav-margin-class="mb-4"
+      @update:model-value="onTabClick"
     >
-      <AlertRuleList
-        :rules="(rules as any)"
-        :hosts="(hosts as any)"
-        :loading="loading"
-        :fetched="fetched"
-        :error="saveError"
-        :is-admin="auth.isAdmin"
-        :format-date="(formatDate as any)"
-        @add="startAddAlert"
-        @edit="(startEditAlert as any)"
-        @toggle="(toggleEnabled as any)"
-        @delete="(deleteAlert as any)"
-      />
-    </div>
+      <template #rules>
+        <AlertRuleList
+          :rules="(rules as any)"
+          :hosts="(hosts as any)"
+          :loading="loading"
+          :fetched="fetched"
+          :error="saveError"
+          :is-admin="auth.isAdmin"
+          :format-date="(formatDate as any)"
+          @add="startAddAlert"
+          @edit="(startEditAlert as any)"
+          @toggle="(toggleEnabled as any)"
+          @delete="(deleteAlert as any)"
+        />
+      </template>
 
-    <div
-      v-if="isTabMounted('releases')"
-      v-show="alertsTab === 'releases'"
-    >
-      <AlertReleaseSummary
-        :trackers="(trackers as any)"
-        :loading="trackersLoading"
-        :error="trackersError"
-      />
-    </div>
+      <template #releases>
+        <AlertReleaseSummary
+          :trackers="(trackers as any)"
+          :loading="trackersLoading"
+          :error="trackersError"
+        />
+      </template>
 
-    <div
-      v-if="isTabMounted('incidents')"
-      v-show="alertsTab === 'incidents'"
-    >
-      <AlertIncidentList
-        :incidents="(incidents as any)"
-        :loading="incidentsLoading"
-        :error="incidentsError"
-        :active-incident-count="activeIncidentCount"
-        :is-admin="auth.isAdmin"
-        @refresh="loadIncidents"
-      />
-    </div>
+      <template #incidents>
+        <AlertIncidentList
+          :incidents="(incidents as any)"
+          :loading="incidentsLoading"
+          :error="incidentsError"
+          :active-incident-count="activeIncidentCount"
+          :is-admin="auth.isAdmin"
+          :initial-search="hostFilterFromQuery"
+          @refresh="loadIncidents"
+        />
+      </template>
+    </EntityTabShell>
 
     <ErrorBoundary title="Erreur lors du chargement du formulaire de règle d'alerte">
       <AlertRuleModal
@@ -146,13 +103,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
 import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
+import EntityTabShell from '../components/EntityTabShell.vue'
+import type { EntityTab } from '../components/EntityTabShell.vue'
 import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
 import { onNotificationsMessage } from '../composables/useNotifications'
@@ -203,20 +162,41 @@ const {
   onWebSocketAlert,
 } = useAlertsPage()
 
-const mountedTabs = ref(new Set<string>(['rules']))
+// `?host=` (set by HostDetailView's incident deep links) seeds the incidents
+// tab's search box so arriving from a specific host lands pre-filtered
+// instead of on the full fleet-wide list. Read once at mount, not reactively,
+// so clearing the search box afterwards doesn't get stomped back by the
+// still-present query param.
+const hostFilterFromQuery = typeof route.query.host === 'string' ? route.query.host : ''
 
-function isTabMounted(t: string): boolean {
-  return mountedTabs.value.has(t)
-}
+const alertsTabs = computed<EntityTab[]>(() => [
+  {
+    key: 'rules',
+    label: 'Règles',
+    badges: [{ value: rules.value.length, badgeClass: 'badge bg-azure-lt text-azure ms-1' }],
+    lazy: true,
+  },
+  {
+    key: 'releases',
+    label: 'Suivi de versions',
+    badges: trackers.value.length > 0 ? [{ value: trackers.value.length, badgeClass: 'badge bg-azure-lt text-azure ms-1' }] : [],
+    lazy: true,
+  },
+  {
+    key: 'incidents',
+    label: 'Historique notifications',
+    badges: activeIncidentCount.value > 0 ? [{ value: activeIncidentCount.value, badgeClass: 'badge bg-red-lt text-red ms-1' }] : [],
+    lazy: true,
+  },
+])
 
-function onClickReleases(): void {
-  mountedTabs.value.add('releases')
-  switchToTrackers()
-}
-
-function onClickIncidents(): void {
-  mountedTabs.value.add('incidents')
-  switchToIncidents()
+// 'releases'/'incidents' each own the actual tab switch (alertsTab.value=...)
+// as part of their lazy-load-on-first-visit logic; 'rules' has no such
+// loader, so it's a plain assignment.
+function onTabClick(key: string): void {
+  if (key === 'releases') { switchToTrackers(); return }
+  if (key === 'incidents') { switchToIncidents(); return }
+  alertsTab.value = key
 }
 
 let incidentsPollTimer: ReturnType<typeof setInterval> | null = null
@@ -228,12 +208,16 @@ watch(alertsTab, (tab) => {
 onMounted(async () => {
   await init()
 
-  if (route.query.tab === 'incidents') {
-    mountedTabs.value.add('incidents')
-    await switchToIncidents()
+  // Default landing tab is the active-incidents triage view, not rule
+  // configuration — an ops opening /alerts wants to see what's actually
+  // firing right now. `?tab=rules`/`?tab=releases` (used by deep links, e.g.
+  // the command palette's alert-rule search results) are honored explicitly.
+  if (route.query.tab === 'rules') {
+    // stays on the 'rules' default from useAlertsPage()
   } else if (route.query.tab === 'releases') {
-    mountedTabs.value.add('releases')
     await switchToTrackers()
+  } else {
+    await switchToIncidents()
   }
 
   incidentsPollTimer = setInterval(loadIncidents, 300_000)

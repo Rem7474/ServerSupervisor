@@ -48,12 +48,33 @@ func (db *DB) GetIPTimeline(ctx context.Context, ip string, since time.Time, hos
 	return out, nil
 }
 
-// GetDomainDetails aggregates per-domain statistics (top paths, top clients,
-// recent requests) for the domain drawer.
-func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Time, hostID string, source string, limit int) (map[string]any, error) {
-	if limit <= 0 || limit > 1000 {
-		limit = 300
-	}
+// DomainDetailsFilter narrows GetDomainDetails' scope. Status/Method/Path/IP
+// apply to every query it runs (the KPI aggregate, top paths, top clients and
+// the recent-requests page all share one WHERE) — clicking a "top path" row
+// to scope the whole drawer down to just that path, for example, is meant to
+// recompute the KPIs/top-clients for that path too, not just filter the
+// requests table under it. Sort/Dir only affect the recent-requests page; the
+// top-N lists stay fixed at their own hits-ranked LIMIT 30.
+type DomainDetailsFilter struct {
+	Status string // "" | "2xx" | "3xx" | "4xx" | "5xx" | "blocked" | "suspicious"
+	Method string
+	Path   string
+	IP     string
+	Sort   string // "time" (default) | "status" | "bytes"
+	Dir    string // "desc" (default) | "asc"
+}
+
+// domainDetailsSortColumns whitelists Sort → real column, so it's never
+// interpolated into SQL from unvalidated user input.
+var domainDetailsSortColumns = map[string]string{
+	"time":   "captured_at",
+	"status": "status",
+	"bytes":  "bytes",
+}
+
+// buildDomainDetailsWhere builds the shared WHERE clause + args for
+// GetDomainDetails' four queries.
+func buildDomainDetailsWhere(domain string, since time.Time, hostID, source string, filter DomainDetailsFilter) (string, []any) {
 	args := []any{since, domain}
 	where := "captured_at >= $1 AND COALESCE(NULLIF(domain,''), '(unknown)') = $2"
 	if hostID != "" {
@@ -64,6 +85,48 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 		args = append(args, source)
 		where += fmt.Sprintf(" AND source = $%d", len(args))
 	}
+	if filter.Method != "" {
+		args = append(args, filter.Method)
+		where += fmt.Sprintf(" AND method = $%d", len(args))
+	}
+	if filter.Path != "" {
+		args = append(args, filter.Path)
+		where += fmt.Sprintf(" AND path = $%d", len(args))
+	}
+	if filter.IP != "" {
+		args = append(args, filter.IP)
+		where += fmt.Sprintf(" AND ip = $%d", len(args))
+	}
+	switch filter.Status {
+	case "2xx":
+		where += " AND status BETWEEN 200 AND 299"
+	case "3xx":
+		where += " AND status BETWEEN 300 AND 399"
+	case "4xx":
+		where += " AND status BETWEEN 400 AND 499"
+	case "5xx":
+		where += " AND status >= 500"
+	case "blocked":
+		where += " AND blocked = TRUE"
+	case "suspicious":
+		where += " AND suspicious = TRUE"
+	}
+	return where, args
+}
+
+// GetDomainDetails aggregates per-domain statistics (top paths, top clients,
+// recent requests) for the domain drawer. hits (always computed from the same
+// filtered WHERE as the requests page) doubles as that page's pagination
+// total — filter/sort/limit/offset are consistent with each other, so there's
+// no separate COUNT query to keep in sync.
+func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Time, hostID string, source string, filter DomainDetailsFilter, limit, offset int) (map[string]any, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 300
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	where, args := buildDomainDetailsWhere(domain, since, hostID, source, filter)
 
 	out := map[string]any{}
 	var hits int64
@@ -84,6 +147,7 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 		return nil, err
 	}
 	out["hits"] = hits
+	out["total"] = hits // pagination total for the requests page — same filtered WHERE
 	out["bytes"] = bytes
 	out["status_2xx"] = status2xx
 	out["status_3xx"] = status3xx
@@ -114,8 +178,12 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 	}
 	out["top_paths"] = paths
 
+	// MAX(host_id) picks an arbitrary-but-stable collector host when a
+	// (rare) multi-host domain window mixes IDs — good enough to seed a
+	// ban dispatch target for the "Bloquer" action, which the caller can
+	// still override via its own host filter same as everywhere else.
 	ipRows, err := db.conn.QueryContext(ctx,
-		fmt.Sprintf(`SELECT ip, COUNT(*) AS hits,
+		fmt.Sprintf(`SELECT ip, COUNT(*) AS hits, MAX(host_id) AS host_id,
 		MAX(CASE WHEN blocked = TRUE THEN blocked_source END) AS blocked_source,
 		MAX(CASE WHEN blocked = TRUE THEN blocked_reason END) AS blocked_reason,
 		MAX(CASE WHEN blocked = TRUE THEN blocked_at END) AS blocked_at,
@@ -134,17 +202,17 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 	defer func() { _ = ipRows.Close() }()
 	ipClients := make([]map[string]any, 0)
 	for ipRows.Next() {
-		var ip string
+		var ip, hostID string
 		var hits int64
 		var blockedSource sql.NullString
 		var blockedReason sql.NullString
 		var blockedAt sql.NullTime
 		var blockedUntil sql.NullTime
 		var isBlocked int
-		if err := ipRows.Scan(&ip, &hits, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked); err != nil {
+		if err := ipRows.Scan(&ip, &hits, &hostID, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked); err != nil {
 			return nil, err
 		}
-		clientData := map[string]any{"ip": ip, "hits": hits}
+		clientData := map[string]any{"ip": ip, "hits": hits, "host_id": hostID}
 		if isBlocked == 1 {
 			clientData["blocked"] = true
 			if blockedSource.Valid {
@@ -164,14 +232,23 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 	}
 	out["top_clients"] = ipClients
 
-	args = append(args, limit)
+	sortColumn := domainDetailsSortColumns[filter.Sort]
+	if sortColumn == "" {
+		sortColumn = "captured_at"
+	}
+	sortDir := "DESC"
+	if filter.Dir == "asc" {
+		sortDir = "ASC"
+	}
+
+	reqArgs := append(append([]any{}, args...), limit, offset)
 	reqRows, err := db.conn.QueryContext(ctx,
-		fmt.Sprintf(`SELECT captured_at, host_id, source, ip, method, path, status, bytes, COALESCE(user_agent,''), COALESCE(category,''), blocked, COALESCE(blocked_source,''), COALESCE(blocked_reason,''), blocked_at, blocked_until
+		fmt.Sprintf(`SELECT captured_at, host_id, source, ip, method, path, status, bytes, COALESCE(user_agent,''), COALESCE(category,''), blocked, COALESCE(blocked_source,''), COALESCE(blocked_reason,''), blocked_at, blocked_until, suspicious
 		FROM web_log_requests
 		WHERE %s
-		ORDER BY captured_at DESC
-		LIMIT $%d`, where, len(args)),
-		args...,
+		ORDER BY %s %s
+		LIMIT $%d OFFSET $%d`, where, sortColumn, sortDir, len(reqArgs)-1, len(reqArgs)),
+		reqArgs...,
 	)
 	if err != nil {
 		return nil, err
@@ -183,10 +260,10 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 		var rowHostID, rowSource, ip, method, path, userAgent, category string
 		var status int
 		var bytes int64
-		var blocked bool
+		var blocked, suspicious bool
 		var blockedSource, blockedReason string
 		var blockedAt, blockedUntil sql.NullTime
-		if err := reqRows.Scan(&capturedAt, &rowHostID, &rowSource, &ip, &method, &path, &status, &bytes, &userAgent, &category, &blocked, &blockedSource, &blockedReason, &blockedAt, &blockedUntil); err != nil {
+		if err := reqRows.Scan(&capturedAt, &rowHostID, &rowSource, &ip, &method, &path, &status, &bytes, &userAgent, &category, &blocked, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &suspicious); err != nil {
 			return nil, err
 		}
 		reqData := map[string]any{
@@ -200,6 +277,7 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 			"bytes":      bytes,
 			"user_agent": userAgent,
 			"category":   category,
+			"suspicious": suspicious,
 		}
 		if blocked {
 			reqData["blocked"] = true

@@ -81,9 +81,46 @@
           </div>
         </div>
       </div>
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm h-100">
+          <div class="card-body">
+            <div class="subheader">
+              CPU cluster (moy.)
+            </div>
+            <div
+              class="h1 mt-2 mb-0"
+              :class="cpuTextColor(clusterResources.avgCpu)"
+            >
+              {{ (clusterResources.avgCpu * 100).toFixed(1) }}%
+            </div>
+            <div class="text-muted small">
+              sur {{ clusterResources.onlineCount }} nœud{{ clusterResources.onlineCount > 1 ? 's' : '' }} en ligne
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm h-100">
+          <div class="card-body">
+            <div class="subheader">
+              RAM cluster
+            </div>
+            <div
+              class="h1 mt-2 mb-0"
+              :class="ramTextColor(clusterResources.memUsed, clusterResources.memTotal)"
+            >
+              {{ formatBytes(clusterResources.memUsed) }}
+            </div>
+            <div class="text-muted small">
+              sur {{ formatBytes(clusterResources.memTotal) }}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Cluster health signals (only shown when there are issues) -->
+    <!-- Cluster health signals (only shown when there are issues) — each card
+         filters the node table below to the nodes behind that signal. -->
     <div
       v-if="hasHealthAlerts"
       class="row row-cards mb-4"
@@ -92,7 +129,14 @@
         v-if="(summary.nodes_down ?? 0) > 0"
         class="col-6 col-lg-3"
       >
-        <div class="card card-sm h-100 border-danger">
+        <div
+          class="card card-sm h-100 border-danger cursor-pointer"
+          role="button"
+          tabindex="0"
+          :class="{ 'health-card-active': healthFilterLabel === 'Nœuds hors ligne' }"
+          @click="toggleHealthFilter(summary.nodes_down_ids, 'Nœuds hors ligne')"
+          @keydown.enter.prevent="toggleHealthFilter(summary.nodes_down_ids, 'Nœuds hors ligne')"
+        >
           <div class="card-body">
             <div class="subheader text-danger">
               Nœuds hors ligne
@@ -107,7 +151,14 @@
         v-if="(summary.storage_near_full ?? 0) > 0"
         class="col-6 col-lg-3"
       >
-        <div class="card card-sm h-100 border-warning">
+        <div
+          class="card card-sm h-100 border-warning cursor-pointer"
+          role="button"
+          tabindex="0"
+          :class="{ 'health-card-active': healthFilterLabel === 'Stockages > 80 %' }"
+          @click="toggleHealthFilter(summary.storage_near_full_node_ids, 'Stockages > 80 %')"
+          @keydown.enter.prevent="toggleHealthFilter(summary.storage_near_full_node_ids, 'Stockages > 80 %')"
+        >
           <div class="card-body">
             <div class="subheader text-warning">
               Stockages &gt; 80 %
@@ -122,7 +173,14 @@
         v-if="(summary.storage_offline ?? 0) > 0"
         class="col-6 col-lg-3"
       >
-        <div class="card card-sm h-100 border-danger">
+        <div
+          class="card card-sm h-100 border-danger cursor-pointer"
+          role="button"
+          tabindex="0"
+          :class="{ 'health-card-active': healthFilterLabel === 'Stockages inactifs' }"
+          @click="toggleHealthFilter(summary.storage_offline_node_ids, 'Stockages inactifs')"
+          @keydown.enter.prevent="toggleHealthFilter(summary.storage_offline_node_ids, 'Stockages inactifs')"
+        >
           <div class="card-body">
             <div class="subheader text-danger">
               Stockages inactifs
@@ -137,7 +195,14 @@
         v-if="(summary.recent_failed_tasks ?? 0) > 0"
         class="col-6 col-lg-3"
       >
-        <div class="card card-sm h-100 border-warning">
+        <div
+          class="card card-sm h-100 border-warning cursor-pointer"
+          role="button"
+          tabindex="0"
+          :class="{ 'health-card-active': healthFilterLabel === 'Tâches échouées (24 h)' }"
+          @click="toggleHealthFilter(summary.failed_task_node_ids, 'Tâches échouées (24 h)')"
+          @keydown.enter.prevent="toggleHealthFilter(summary.failed_task_node_ids, 'Tâches échouées (24 h)')"
+        >
           <div class="card-body">
             <div class="subheader text-warning">
               Tâches échouées (24 h)
@@ -163,9 +228,23 @@
       class="card"
     >
       <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-        <h3 class="card-title mb-0">
-          Nœuds Proxmox
-        </h3>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h3 class="card-title mb-0">
+            Nœuds Proxmox
+          </h3>
+          <span
+            v-if="healthFilterLabel"
+            class="badge bg-azure-lt text-azure d-flex align-items-center gap-1"
+          >
+            Filtré : {{ healthFilterLabel }}
+            <button
+              type="button"
+              class="btn-close ms-1"
+              aria-label="Retirer le filtre"
+              @click="clearHealthFilter"
+            />
+          </span>
+        </div>
         <div class="d-flex gap-2 proxmox-toolbar-controls">
           <select
             v-model="filterConnection"
@@ -191,13 +270,13 @@
             @click="load"
           >
             <IconRefresh
-              :size="2"
+              :size="16"
               class="icon icon-sm"
             />
           </button>
         </div>
       </div>
-      <div class="table-responsive">
+      <div class="table-responsive scroll-table">
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
@@ -269,36 +348,34 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Skeleton rows while loading -->
-            <template v-if="loading">
-              <tr
-                v-for="i in 3"
-                :key="`sk-${i}`"
-              >
-                <td><div class="skeleton-text w-75" /></td>
-                <td><div class="skeleton-text w-50" /></td>
-                <td><div class="skeleton-text w-25" /></td>
-                <td><div class="skeleton-text w-25" /></td>
-                <td><div class="skeleton-text" /></td>
-                <td><div class="skeleton-text" /></td>
-                <td><div class="skeleton-text w-50" /></td>
-                <td><div class="skeleton-text w-75" /></td>
-                <td />
-              </tr>
-            </template>
-            <tr v-else-if="sortedNodes.length === 0">
+            <tr v-if="loading">
               <td
                 colspan="9"
-                class="text-center text-muted py-4"
+                class="py-2"
               >
-                Aucun nœud Proxmox trouvé.
-                <router-link
-                  v-if="auth.isAdmin"
-                  to="/settings"
-                  class="ms-1"
-                >
-                  Configurer une connexion
-                </router-link>
+                <LoadingSkeleton
+                  variant="table"
+                  :lines="3"
+                />
+              </td>
+            </tr>
+            <tr v-else-if="sortedNodes.length === 0 && healthFilterLabel">
+              <td colspan="9">
+                <EmptyState
+                  title="Aucun nœud ne correspond au filtre"
+                  :subtitle="`« ${healthFilterLabel} » (peut-être déjà résolu)`"
+                  cta-label="Retirer le filtre"
+                  @cta="clearHealthFilter"
+                />
+              </td>
+            </tr>
+            <tr v-else-if="sortedNodes.length === 0">
+              <td colspan="9">
+                <EmptyState
+                  title="Aucun nœud Proxmox trouvé."
+                  :cta-label="auth.isAdmin ? 'Configurer une connexion' : ''"
+                  cta-to="/settings"
+                />
               </td>
             </tr>
             <tr
@@ -409,6 +486,8 @@ import { IconRefresh } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useProxmox } from '../composables/useProxmox'
 import type { ProxmoxNode } from '../types/proxmox'
 
@@ -428,8 +507,20 @@ const {
   sortedNodes,
   toggleNodeSort,
   hasHealthAlerts,
+  clusterResources,
+  healthFilterLabel,
+  filterByHealthIds,
+  clearHealthFilter,
   load,
 } = useProxmox()
+
+function toggleHealthFilter(ids: string[] | undefined, label: string): void {
+  if (healthFilterLabel.value === label) {
+    clearHealthFilter()
+    return
+  }
+  filterByHealthIds(ids, label)
+}
 
 function memPct(node: ProxmoxNode): string | number {
   if (!node.mem_total) return 0
@@ -450,6 +541,20 @@ function ramColor(used: number, total: number): string {
   return 'bg-success'
 }
 
+function cpuTextColor(usage: number): string {
+  if (usage > 0.85) return 'text-danger'
+  if (usage > 0.6) return 'text-warning'
+  return 'text-success'
+}
+
+function ramTextColor(used: number, total: number): string {
+  if (!total) return 'text-secondary'
+  const pct = used / total
+  if (pct > 0.85) return 'text-danger'
+  if (pct > 0.6) return 'text-warning'
+  return 'text-success'
+}
+
 function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
   const units = ['B', 'Ko', 'Mo', 'Go', 'To']
@@ -466,6 +571,14 @@ function formatDate(iso: string | undefined): string {
 </script>
 
 <style scoped>
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.health-card-active {
+  box-shadow: 0 0 0 2px var(--tblr-primary);
+}
+
 @media (max-width: 768px) {
   .proxmox-toolbar-controls {
     width: 100%;

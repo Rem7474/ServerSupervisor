@@ -1,5 +1,5 @@
 <template>
-  <div class="table-responsive">
+  <div class="table-responsive scroll-table">
     <table class="table table-vcenter card-table">
       <thead>
         <tr>
@@ -57,11 +57,8 @@
       <tbody>
         <template v-if="!tasks.length">
           <tr>
-            <td
-              colspan="7"
-              class="text-center text-muted py-4"
-            >
-              Aucune tâche récente pour ce nœud.
+            <td colspan="7">
+              <EmptyState title="Aucune tâche récente pour ce nœud." />
             </td>
           </tr>
         </template>
@@ -94,7 +91,7 @@
           <td>
             <button
               type="button"
-              class="btn btn-sm btn-ghost-secondary"
+              class="btn btn-icon btn-sm btn-ghost-secondary"
               title="Voir les logs"
               @click="emit('view-logs', { upid: t.upid, action: t.task_type, label: t.object_id })"
             >
@@ -114,7 +111,9 @@
 import { computed, ref } from 'vue'
 import { IconList } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
+import EmptyState from '../EmptyState.vue'
 import type { ProxmoxTask } from '../../types/proxmox'
+import { compareValues } from '../../utils/sort'
 
 const props = defineProps<{
   tasks: ProxmoxTask[]
@@ -135,19 +134,6 @@ function toggleSort(key: string) {
   }
   sortKey.value = key
   sortDir.value = 'asc'
-}
-
-function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc' = 'asc'): number {
-  const dir = direction === 'asc' ? 1 : -1
-  if (a == null && b == null) return 0
-  if (a == null) return 1 * dir
-  if (b == null) return -1 * dir
-  if (typeof a === 'string' || typeof b === 'string') {
-    return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' }) * dir
-  }
-  if (a < b) return -1 * dir
-  if (a > b) return 1 * dir
-  return 0
 }
 
 function taskDurationSeconds(task: ProxmoxTask): number | null {
@@ -203,8 +189,8 @@ function taskStatusLabel(t: ProxmoxTask): string {
 
 function taskStatusBadgeClass(t: ProxmoxTask): string {
   if (t.status === 'running') return 'bg-blue-lt text-blue'
-  if (t.exit_status === 'OK' || t.status === 'OK') return 'bg-success-lt text-success'
-  if (t.exit_status) return 'bg-danger-lt text-danger'
+  if (t.exit_status === 'OK' || t.status === 'OK') return 'bg-green-lt text-green'
+  if (t.exit_status) return 'bg-red-lt text-red'
   return 'bg-secondary-lt text-secondary'
 }
 </script>

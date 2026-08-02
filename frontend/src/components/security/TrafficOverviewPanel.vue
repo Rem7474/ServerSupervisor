@@ -1,33 +1,6 @@
 <template>
   <div>
-    <div
-      v-if="showInitialLoading"
-      class="traffic-page-skeleton"
-    >
-      <div class="traffic-topbar mb-3">
-        <div class="traffic-topbar-skeleton-left">
-          <span class="traffic-topbar-skeleton-dot" />
-          <span class="traffic-topbar-skeleton-line traffic-topbar-skeleton-line-title" />
-          <span class="traffic-topbar-skeleton-pill traffic-topbar-skeleton-pill-wide" />
-          <span class="traffic-topbar-skeleton-line traffic-topbar-skeleton-line-meta" />
-        </div>
-        <div class="traffic-topbar-skeleton-right">
-          <span
-            v-for="n in 4"
-            :key="n"
-            class="traffic-topbar-skeleton-pill"
-            :class="n === 1 ? 'traffic-topbar-skeleton-pill-active' : ''"
-          />
-        </div>
-      </div>
-
-      <div class="page-header mb-4">
-        <LoadingSkeleton
-          variant="card"
-          :lines="3"
-        />
-      </div>
-
+    <div v-if="showInitialLoading">
       <LoadingSkeleton
         variant="card"
         :lines="2"
@@ -100,16 +73,12 @@
     </div>
 
     <div v-else>
-      <div class="traffic-topbar mb-3">
-        <div class="d-flex align-items-center gap-2">
-          <span
-            class="live-dot"
-            :class="{ paused: !autoRefresh }"
-          />
-          <span class="fw-semibold">Stats web</span>
-          <span class="badge bg-green-lt text-green">{{ autoRefresh ? `Auto (${REFRESH_INTERVAL_MS / 1000}s)` : 'Pause' }}</span>
-          <span class="text-secondary small">dernière MAJ {{ lastUpdatedLabel }}</span>
-        </div>
+      <PageRefreshBar
+        v-model="autoRefresh"
+        label="Stats web"
+        :interval-sec="REFRESH_INTERVAL_MS / 1000"
+        :last-updated-at="lastUpdatedAt"
+      >
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="small text-secondary">Période :</span>
           <button
@@ -123,143 +92,17 @@
             {{ p.label }}
           </button>
         </div>
-      </div>
+      </PageRefreshBar>
 
-      <div class="page-header mb-4">
-        <div class="page-pretitle">
-          <router-link
-            to="/"
-            class="text-decoration-none"
-          >
-            Dashboard
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <span>Stats web</span>
-        </div>
-        <h2 class="page-title">
-          Stats web
-        </h2>
-        <div class="text-secondary">
-          Trafic HTTP, erreurs, endpoints, géographie des clients et actualisation automatique
-        </div>
-      </div>
-
-      <div class="card mb-4">
-        <div class="card-body d-flex flex-wrap gap-2 align-items-end traffic-filters">
-          <div class="traffic-filter-field">
-            <label class="form-label mb-1">Source</label>
-            <div class="input-group input-group-sm">
-              <select
-                v-model="source"
-                class="form-select form-select-sm"
-                :disabled="loading"
-                style="min-width: 9rem;"
-              >
-                <option value="">
-                  Toutes
-                </option>
-                <option value="npm">
-                  npm
-                </option>
-                <option value="nginx">
-                  nginx
-                </option>
-                <option value="apache">
-                  apache
-                </option>
-                <option value="caddy">
-                  caddy
-                </option>
-              </select>
-              <span
-                v-if="loading"
-                class="input-group-text px-2"
-              >
-                <span
-                  class="spinner-border"
-                  style="width:.75rem;height:.75rem;border-width:2px"
-                />
-              </span>
-              <span
-                v-else-if="sourceHasNoData"
-                class="input-group-text px-2 text-warning"
-                title="Aucune donnée pour cette source sur la période sélectionnée"
-              >
-                <IconAlertTriangle :size="14" />
-              </span>
-            </div>
-          </div>
-
-          <div class="traffic-filter-field">
-            <label class="form-label mb-1">Hôte</label>
-            <select
-              v-model="hostId"
-              class="form-select form-select-sm"
-              :disabled="loading"
-              style="min-width: 12rem;"
-            >
-              <option value="">
-                Tous les hôtes
-              </option>
-              <option
-                v-for="h in hostsStore.hosts"
-                :key="h.id"
-                :value="h.id"
-              >
-                {{ h.name || h.hostname || h.ip_address }}
-              </option>
-            </select>
-          </div>
-
-          <div class="form-check form-switch mb-1 ms-1">
-            <input
-              id="auto-refresh"
-              v-model="autoRefresh"
-              class="form-check-input"
-              type="checkbox"
-            >
-            <label
-              class="form-check-label small"
-              for="auto-refresh"
-            >Rafraîchissement auto</label>
-          </div>
-
-          <button
-            type="button"
-            class="btn btn-primary btn-sm traffic-refresh-btn"
-            :disabled="loading"
-            @click="loadAll(true)"
-          >
-            <span
-              v-if="loading"
-              class="spinner-border spinner-border-sm me-1"
-            />
-            Rafraîchir
-          </button>
-
-          <div class="traffic-filter-field ms-auto">
-            <label class="form-label mb-1">Rechercher un domaine ou une IP</label>
-            <div class="input-group input-group-sm">
-              <input
-                v-model="searchTerm"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="exemple.com ou 1.2.3.4"
-                style="min-width: 16rem;"
-                @keyup.enter="handleSearch"
-              >
-              <button
-                type="button"
-                class="btn btn-outline-secondary btn-sm"
-                :disabled="!searchTerm.trim()"
-                @click="handleSearch"
-              >
-                Voir les requêtes
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <TrafficThreatsFilterBar
+        v-model:source="source"
+        v-model:host-id="hostId"
+        v-model:search-term="searchTerm"
+        :loading="loading"
+        :source-has-no-data="sourceHasNoData"
+        @refresh="loadAll(true)"
+        @search="handleSearch"
+      />
 
       <TrafficKpiCards
         :traffic="traffic"
@@ -334,11 +177,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!topEndpoints.length">
-                    <td
-                      colspan="4"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucun endpoint sur la période.
+                    <td colspan="4">
+                      <EmptyState title="Aucun endpoint sur la période." />
                     </td>
                   </tr>
                   <tr
@@ -383,11 +223,13 @@
               >
                 Aucune IP suspecte.
               </div>
-              <div
+              <button
                 v-for="ip in topThreatIPs.slice(0, 10)"
                 v-else
                 :key="ip.ip"
-                class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
+                type="button"
+                class="btn clickable-row d-flex justify-content-between align-items-center px-3 py-2 border-bottom w-100 rounded-0 text-start"
+                @click="openIP(ip.ip)"
               >
                 <div>
                   <div class="font-monospace small">
@@ -398,15 +240,15 @@
                   </div>
                 </div>
                 <span class="badge bg-red-lt text-red">{{ numberFormat(ip.hits || 0) }}</span>
-              </div>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="row row-cards mb-4">
+      <div class="row row-cards mb-4 align-items-start">
         <div class="col-xl-8">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
                 Carte mondiale des IP clientes
@@ -419,14 +261,14 @@
         </div>
 
         <div class="col-xl-4">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
                 Pays les plus actifs
               </h3>
-              <span class="small text-secondary">{{ numberFormat(topClientIPs.length) }} IPs</span>
+              <span class="small text-secondary">{{ numberFormat(countryDistribution.length) }} pays</span>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
@@ -439,11 +281,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!countryDistribution.length">
-                    <td
-                      colspan="3"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucune donnée pays.
+                    <td colspan="3">
+                      <EmptyState title="Aucune donnée pays." />
                     </td>
                   </tr>
                   <tr
@@ -472,7 +311,7 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Top domaines cibles (proxy)
+                Répartition du trafic par domaine
               </h3>
             </div>
             <div class="card-body">
@@ -486,20 +325,16 @@
                 <div
                   v-for="h in topProxyHosts.slice(0, 8)"
                   :key="h.vhost || h.host_id || h.host_name"
-                  class="mb-2"
+                  class="mb-2 rounded p-1"
+                  :class="{ 'clickable-row': h.vhost }"
+                  :tabindex="h.vhost ? 0 : undefined"
+                  :role="h.vhost ? 'button' : undefined"
+                  @click="h.vhost && openDomain(h.vhost)"
+                  @keydown.enter="h.vhost && openDomain(h.vhost)"
+                  @keydown.space.prevent="h.vhost && openDomain(h.vhost)"
                 >
                   <div class="d-flex justify-content-between small mb-1">
-                    <router-link
-                      v-if="h.host_id"
-                      :to="`/hosts/${h.host_id}`"
-                      class="font-monospace text-decoration-none"
-                    >
-                      {{ h.vhost || h.host_name || h.host_id }}
-                    </router-link>
-                    <span
-                      v-else
-                      class="font-monospace"
-                    >{{ h.vhost || h.host_name || '(unknown)' }}</span>
+                    <span class="font-monospace">{{ h.vhost || h.host_name || '(unknown)' }}</span>
                     <span>{{ numberFormat(h.hits || 0) }}</span>
                   </div>
                   <div
@@ -538,21 +373,23 @@
                     <th class="text-end">
                       5xx
                     </th>
-                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="!topDomains.length">
-                    <td
-                      colspan="5"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucune donnée de trafic.
+                    <td colspan="4">
+                      <EmptyState title="Aucune donnée de trafic." />
                     </td>
                   </tr>
                   <tr
                     v-for="item in topDomains.slice(0, 10)"
                     :key="item.domain"
+                    :class="{ 'clickable-row': item.domain }"
+                    :tabindex="item.domain ? 0 : undefined"
+                    :role="item.domain ? 'button' : undefined"
+                    @click="item.domain && openDomain(item.domain)"
+                    @keydown.enter="item.domain && openDomain(item.domain)"
+                    @keydown.space.prevent="item.domain && openDomain(item.domain)"
                   >
                     <td class="font-monospace small">
                       {{ item.domain || '(unknown)' }}
@@ -565,15 +402,6 @@
                     </td>
                     <td class="text-end text-red">
                       {{ numberFormat(item.errors_5xx || 0) }}
-                    </td>
-                    <td class="text-end">
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-primary"
-                        @click="openDomain(item.domain)"
-                      >
-                        Détails
-                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -605,11 +433,8 @@
             </thead>
             <tbody>
               <tr v-if="!liveRequests.length">
-                <td
-                  colspan="7"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucune requête récente.
+                <td colspan="7">
+                  <EmptyState title="Aucune requête récente." />
                 </td>
               </tr>
               <tr
@@ -620,7 +445,13 @@
                   {{ formatDate(r.timestamp) }}
                 </td>
                 <td class="font-monospace small">
-                  {{ r.ip }}
+                  <button
+                    type="button"
+                    class="btn btn-link btn-sm p-0 font-monospace text-decoration-none"
+                    @click="openIP(r.ip)"
+                  >
+                    {{ r.ip }}
+                  </button>
                 </td>
                 <td class="small">
                   <router-link
@@ -656,12 +487,25 @@
       </div>
 
       <DomainDetailsModal
-        :show="showDomainModal"
-        :domain="selectedDomain"
-        :loading="domainLoading"
-        :details="domainDetails"
-        :period="period"
-        @close="closeDomainModal"
+        :show="domainModal.show.value"
+        :domain="domainModal.domain.value"
+        :loading="domainModal.loading.value"
+        :error="domainModal.error.value"
+        :details="domainModal.details.value"
+        :period="domainModal.period.value"
+        :filters="domainModal.filters"
+        :sort-key="domainModal.sortKey.value"
+        :sort-dir="domainModal.sortDir.value"
+        :page="domainModal.page.value"
+        :total-pages="domainModal.totalPages.value"
+        :has-active-filters="domainModal.hasActiveFilters.value"
+        :block-state="domainModal.blockState"
+        @close="domainModal.close"
+        @update-filter="domainModal.setFilter($event.key, $event.value)"
+        @clear-filters="domainModal.clearFilters"
+        @toggle-sort="domainModal.toggleSort"
+        @update:page="domainModal.setPage"
+        @block-ip="domainModal.blockIP($event.ip, $event.hostId)"
       />
 
       <IPTimelineModal
@@ -677,18 +521,19 @@
 </template>
 
 <script setup lang="ts">
-import { IconAlertTriangle } from '@tabler/icons-vue'
-import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import TrafficKpiCards from '../components/security/TrafficKpiCards.vue'
-import TrafficWorldMap from '../components/security/TrafficWorldMap.vue'
-import TrafficRequestsChart from '../components/security/TrafficRequestsChart.vue'
-import TrafficStatusChart from '../components/security/TrafficStatusChart.vue'
-import { useTraffic } from '../composables/useTraffic'
-import DomainDetailsModal from '../components/security/DomainDetailsModal.vue'
-import IPTimelineModal from '../components/security/IPTimelineModal.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
+import PageRefreshBar from '../PageRefreshBar.vue'
+import EmptyState from '../EmptyState.vue'
+import TrafficThreatsFilterBar from './TrafficThreatsFilterBar.vue'
+import TrafficKpiCards from './TrafficKpiCards.vue'
+import TrafficWorldMap from './TrafficWorldMap.vue'
+import TrafficRequestsChart from './TrafficRequestsChart.vue'
+import TrafficStatusChart from './TrafficStatusChart.vue'
+import { useTraffic } from '../../composables/useTraffic'
+import DomainDetailsModal from './DomainDetailsModal.vue'
+import IPTimelineModal from './IPTimelineModal.vue'
 
 const {
-  hostsStore,
   periodOptions,
   REFRESH_INTERVAL_MS,
   period,
@@ -699,10 +544,8 @@ const {
   compare,
   timeseries,
   liveRequests,
-  showDomainModal,
-  selectedDomain,
-  domainLoading,
-  domainDetails,
+  lastUpdatedAt,
+  domainModal,
   showIPModal,
   selectedIP,
   ipTimelineLoading,
@@ -715,11 +558,9 @@ const {
   topProxyHosts,
   topEndpoints,
   topThreatIPs,
-  topClientIPs,
   countryDistribution,
   statusDistribution,
   showInitialLoading,
-  lastUpdatedLabel,
   sourceHasNoData,
   numberFormat,
   formatBytes,
@@ -729,101 +570,16 @@ const {
   setPeriod,
   loadAll,
   openDomain,
-  closeDomainModal,
+  openIP,
   closeIPModal,
   handleSearch,
 } = useTraffic()
 </script>
 
 <style scoped>
-.traffic-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--ss-status-online);
-  animation: pulse 1.6s infinite;
-}
-
-.live-dot.paused {
-  animation: none;
-  background: var(--tblr-secondary);
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
-.traffic-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1060;
-  padding: 1rem;
-}
-
-.traffic-modal {
-  width: min(1200px, 96vw);
-  max-height: 92vh;
-  overflow: auto;
-}
-
-@media (max-width: 992px) {
-  .traffic-filters {
-    align-items: stretch !important;
-  }
-
-  .traffic-filter-field {
-    flex: 1 1 220px;
-  }
-
-  .traffic-filter-field .form-select,
-  .traffic-filter-field .form-control {
-    min-width: 0 !important;
-    width: 100%;
-  }
-
-  .traffic-refresh-btn {
-    width: 100%;
-  }
-}
-
 @media (max-width: 768px) {
-  .traffic-modal-backdrop {
-    padding: 0;
-  }
-
-  .traffic-modal {
-    width: 100vw;
-    max-height: 100dvh;
-    height: 100dvh;
-    border-radius: 0;
-  }
-
-  .traffic-modal-body {
-    padding: 0.75rem;
-  }
-
   .endpoint-path,
-  .live-path,
-  .domain-path,
-  .domain-ua {
+  .live-path {
     max-width: 12rem !important;
   }
 }
@@ -831,69 +587,6 @@ const {
 /* Chart placeholder positioning */
 .chart-body {
   position: relative;
-}
-
-.traffic-page-skeleton .traffic-topbar-skeleton-left,
-.traffic-page-skeleton .traffic-topbar-skeleton-right {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.traffic-page-skeleton .traffic-topbar-skeleton-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.traffic-page-skeleton .traffic-topbar-skeleton-right {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.traffic-topbar-skeleton-dot,
-.traffic-topbar-skeleton-line,
-.traffic-topbar-skeleton-pill {
-  background: linear-gradient(90deg, rgba(203, 213, 225, 0.2) 25%, rgba(203, 213, 225, 0.5) 50%, rgba(203, 213, 225, 0.2) 75%);
-  background-size: 220% 100%;
-  animation: loading-skeleton-wave 1.4s ease infinite;
-}
-
-.traffic-topbar-skeleton-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.traffic-topbar-skeleton-line {
-  height: 0.8rem;
-  border-radius: 999px;
-}
-
-.traffic-topbar-skeleton-line-title {
-  width: 110px;
-}
-
-.traffic-topbar-skeleton-line-meta {
-  width: 120px;
-}
-
-.traffic-topbar-skeleton-pill {
-  width: 88px;
-  height: 2rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.traffic-topbar-skeleton-pill-wide {
-  width: 82px;
-}
-
-.traffic-topbar-skeleton-pill-active {
-  width: 96px;
 }
 
 .skeleton-fade-enter-active,
@@ -906,4 +599,3 @@ const {
   opacity: 0;
 }
 </style>
-

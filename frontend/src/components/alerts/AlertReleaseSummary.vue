@@ -18,15 +18,9 @@
 
     <div
       v-if="loading"
-      class="card-body text-center py-5"
+      class="card-body"
     >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
-      <div class="mt-2 text-muted">
-        Chargement...
-      </div>
+      <LoadingSkeleton variant="table" />
     </div>
 
     <div
@@ -38,25 +32,19 @@
 
     <div
       v-else-if="trackers.length === 0"
-      class="card-body text-center py-5 text-muted"
+      class="card-body"
     >
-      <IconActivity
-        :size="48"
-        class="icon icon-lg mb-3 d-block mx-auto opacity-50"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconActivity"
+        title="Aucun tracker configuré"
+        cta-label="Créer un tracker"
+        cta-to="/git-webhooks"
       />
-      <div>Aucun tracker configuré</div>
-      <router-link
-        to="/git-webhooks"
-        class="btn btn-sm btn-primary mt-3"
-      >
-        Créer un tracker
-      </router-link>
     </div>
 
     <div
       v-else
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table class="table table-vcenter card-table">
         <thead>
@@ -181,6 +169,8 @@
 <script setup lang="ts">
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { IconActivity, IconAlertTriangle, IconChevronRight, IconCopy } from '@tabler/icons-vue'
+import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 interface TrackerExecution {
   status: string

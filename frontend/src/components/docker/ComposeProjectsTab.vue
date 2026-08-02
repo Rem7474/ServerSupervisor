@@ -3,7 +3,7 @@
   <DataToolbar
     searchable
     :search="composeSearchInput"
-    search-placeholder="Rechercher un projet..."
+    search-placeholder="Rechercher un projet…"
     @update:search="composeSearchInput = $event"
   >
     <template #bottom>
@@ -49,7 +49,7 @@
     v-if="filteredComposeProjects.length > 0"
     class="card"
   >
-    <div class="table-responsive">
+    <div class="table-responsive scroll-table">
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
@@ -140,7 +140,7 @@
                     v-if="getComposeStatus(p) === 'stopped'"
                     type="button"
                     :disabled="!!actionLoading[p.name]"
-                    class="btn btn-sm btn-success"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     title="Start (up -d)"
                     aria-label="Démarrer le projet"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_up', workingDir: p.working_dir || '' })"
@@ -149,7 +149,8 @@
                       v-if="actionLoading[p.name] === 'compose_up'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconPlayerPlay v-else
+                    <IconPlayerPlay
+                      v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -158,7 +159,7 @@
                     <button
                       type="button"
                       :disabled="!!actionLoading[p.name]"
-                      class="btn btn-sm btn-outline-danger"
+                      class="btn btn-icon btn-sm btn-ghost-danger"
                       title="Stop (down)"
                       aria-label="Arrêter le projet"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_down', workingDir: p.working_dir || '' })"
@@ -176,7 +177,7 @@
                     <button
                       type="button"
                       :disabled="!!actionLoading[p.name]"
-                      class="btn btn-sm btn-outline-warning"
+                      class="btn btn-icon btn-sm btn-ghost-warning"
                       title="Redémarrer"
                       aria-label="Redémarrer le projet"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_restart', workingDir: p.working_dir || '' })"
@@ -185,7 +186,8 @@
                         v-if="actionLoading[p.name] === 'compose_restart'"
                         class="spinner-border spinner-border-sm"
                       />
-                      <IconRefresh v-else
+                      <IconRefresh
+                        v-else
                         :size="16"
                         class="icon icon-sm"
                       />
@@ -194,7 +196,7 @@
                   <button
                     type="button"
                     :disabled="!!actionLoading[p.name]"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Voir les logs"
                     aria-label="Voir les logs du projet"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_logs', workingDir: p.working_dir || '' })"
@@ -203,7 +205,8 @@
                       v-if="actionLoading[p.name] === 'compose_logs'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconList v-else
+                    <IconList
+                      v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -211,7 +214,7 @@
                 </template>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Config"
                   @click="selectedProject = p"
                 >
@@ -255,8 +258,8 @@
   <!-- Modal projet compose (raw config) -->
   <div
     v-if="selectedProject"
-    class="modal modal-blur fade show"
-    style="display: block;"
+    ref="modalRef"
+    class="modal modal-blur fade show d-block"
     @click.self="selectedProject = null"
   >
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -368,6 +371,7 @@ import { IconFile, IconList, IconPlayerPlay, IconRefresh, IconPlayerStop } from 
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
 import { getApiErrorMessage } from '../../api/client'
+import { useModalChrome } from '../../composables/useModalChrome'
 
 interface ComposeProject {
   id: string | number
@@ -427,6 +431,8 @@ watch(composeSearchInput, (val) => {
 const composeHostFilter = ref('')
 const composeStateFilter = ref('')
 const selectedProject = ref<ComposeProject | null>(null)
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => !!selectedProject.value, { onClose: () => { selectedProject.value = null } })
 const copied = ref(false)
 const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')

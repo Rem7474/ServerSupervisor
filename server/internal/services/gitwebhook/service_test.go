@@ -76,6 +76,27 @@ func TestHelpers(t *testing.T) {
 	}
 }
 
+func TestNewExecution_KeepsSmallPayloadIntact(t *testing.T) {
+	body := []byte(`{"ref":"refs/heads/main"}`)
+	p := &parsedGitPayload{RepoName: "acme/app", Branch: "main"}
+	exec := newExecution("wh-1", "github", p, "pending", body)
+	if exec.RawPayload != string(body) {
+		t.Errorf("expected raw payload preserved untouched, got %q", exec.RawPayload)
+	}
+}
+
+func TestNewExecution_TruncatesOversizedPayload(t *testing.T) {
+	big := make([]byte, maxStoredPayloadBytes+100)
+	for i := range big {
+		big[i] = 'a'
+	}
+	p := &parsedGitPayload{RepoName: "acme/app", Branch: "main"}
+	exec := newExecution("wh-1", "github", p, "pending", big)
+	if len(exec.RawPayload) != maxStoredPayloadBytes {
+		t.Errorf("expected raw payload truncated to %d bytes, got %d", maxStoredPayloadBytes, len(exec.RawPayload))
+	}
+}
+
 // ===== service with a fake repo/dispatcher =====
 
 type fakeRepo struct {

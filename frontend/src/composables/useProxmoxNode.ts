@@ -7,24 +7,19 @@ import { ref, computed, shallowRef, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
+import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
 
 export function useProxmoxNode() {
   const route = useRoute()
   const router = useRouter()
+  const guestActions = useProxmoxGuestActions()
   const node = ref<any>(null)
   const loading = ref(true)
   const error = ref('')
   const tab = ref('vms')
   watch(tab, (t) => {
     router.replace({ query: { ...route.query, tab: t } })
-    mountedTabs.value.add(t)
   })
-
-  const mountedTabs = ref(new Set<string>(['vms']))
-
-  function isTabMounted(t: string): boolean {
-    return mountedTabs.value.has(t)
-  }
 
   const guestLinks = ref<Record<string, any>>({})
   const linkMsg = ref('')
@@ -70,8 +65,10 @@ export function useProxmoxNode() {
 
   const liveStatus = ref<any>(null)
   const liveStatusLoading = ref(false)
-  const liveStatusTime = ref('')
+  const lastUpdatedAt = ref<Date | null>(null)
   const liveStatusError = ref('')
+  const autoRefresh = ref(true)
+  const LIVE_STATUS_REFRESH_SEC = 60
 
   // RRD charts
   const rrdTimeframe = ref('hour')
@@ -108,15 +105,48 @@ export function useProxmoxNode() {
     finally { guestNetworksLoading.value = false }
   }
 
+  // NPM domains routing to each guest's own IP(s), keyed by vmid — same
+  // lazy/load-once-per-mount pattern as guestNetworks above.
+  const guestExposure = ref<Record<string, any>>({})
+  const guestExposureLoading = ref(false)
+
+  async function loadGuestExposure(): Promise<void> {
+    if (guestExposureLoading.value || Object.keys(guestExposure.value).length > 0) return
+    guestExposureLoading.value = true
+    try {
+      const res = await api.getProxmoxNodeGuestExposure(String(route.params.id))
+      guestExposure.value = res.data ?? {}
+    } catch { /* non-bloquant */ }
+    finally { guestExposureLoading.value = false }
+  }
+
   // services
   const services = ref<any[]>([])
   const servicesLoading = ref(false)
   const servicesError = ref('')
   const svcActionMsg = ref('')
   const svcActionOk = ref(false)
+  const svcActionLoading = ref<Record<string, string | null>>({})
 
   const vms = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'vm') ?? [])
   const lxcs = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'lxc') ?? [])
+
+  // Re-fetches only the guest statuses after a start/shutdown/reboot — a full
+  // load() also re-triggers sensor/live-status/RRD/peer-node fetches and
+  // flips loading back to true (full-page skeleton), which is overkill for
+  // "did this one guest's status change".
+  async function refreshGuests(): Promise<void> {
+    try {
+      const res = await api.getProxmoxNode(String(route.params.id))
+      if (node.value) node.value.guests = res.data?.guests ?? node.value.guests
+    } catch {
+      // best-effort; the next manual/periodic refresh will retry
+    }
+  }
+
+  async function handleGuestAction(guest: any, action: GuestPowerAction): Promise<void> {
+    await guestActions.performGuestAction(guest, action, refreshGuests)
+  }
   const failedTaskCount = computed(() =>
     (node.value?.tasks ?? []).filter((t: any) => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
   )
@@ -128,7 +158,6 @@ export function useProxmoxNode() {
       const validTabs = ['vms', 'lxc', 'storage', 'disks', 'tasks', 'updates', 'services', 'security']
       if (validTabs.includes(requestedTab)) {
         tab.value = requestedTab
-        mountedTabs.value.add(requestedTab)
       }
       const res = await api.getProxmoxNode(String(route.params.id))
       node.value = res.data
@@ -341,8 +370,11 @@ export function useProxmoxNode() {
     }
   }
 
+  // Guests linked to a ServerSupervisor host already get their domain/IP
+  // correlation for free from that host's own Exposition tab (same IP, same
+  // GetHostExposure query) — land there directly instead of the overview tab.
   function goToHost(link: any): void {
-    if (link?.host_id) router.push(`/hosts/${link.host_id}`)
+    if (link?.host_id) router.push(`/hosts/${link.host_id}?tab=exposition`)
   }
 
   function showMsg(msg: string, ok: boolean): void {
@@ -445,7 +477,7 @@ export function useProxmoxNode() {
     try {
       const res = await api.getProxmoxNodeStatus(String(route.params.id))
       liveStatus.value = res.data
-      liveStatusTime.value = new Date().toLocaleTimeString('fr-FR')
+      lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { error?: string }; status?: number } }
       liveStatusError.value = ax.response?.data?.error || `Erreur ${ax.response?.status ?? ''} — vérifiez la connectivité au nœud.`
@@ -532,6 +564,7 @@ export function useProxmoxNode() {
 
   async function svcAction(name: string, action: string): Promise<void> {
     svcActionMsg.value = ''
+    svcActionLoading.value[name] = action
     try {
       const res = await api.proxmoxNodeServiceAction(String(route.params.id), name, action)
       const upid = res.data?.upid
@@ -542,6 +575,8 @@ export function useProxmoxNode() {
     } catch (e: unknown) {
       svcActionMsg.value = getApiErrorMessage(e, `Erreur lors de ${action} ${name}.`)
       svcActionOk.value = false
+    } finally {
+      svcActionLoading.value[name] = null
     }
     setTimeout(() => { svcActionMsg.value = '' }, 6000)
   }
@@ -593,7 +628,7 @@ export function useProxmoxNode() {
 
   onMounted(() => {
     load()
-    liveStatusTimer = setInterval(loadLiveStatus, 60_000)
+    liveStatusTimer = setInterval(() => { if (autoRefresh.value) loadLiveStatus() }, LIVE_STATUS_REFRESH_SEC * 1000)
   })
   onUnmounted(() => {
     stopPolling()
@@ -605,7 +640,6 @@ export function useProxmoxNode() {
     loading,
     error,
     tab,
-    isTabMounted,
     guestLinks,
     linkMsg,
     linkMsgOk,
@@ -635,8 +669,10 @@ export function useProxmoxNode() {
     submitMigration,
     liveStatus,
     liveStatusLoading,
-    liveStatusTime,
+    lastUpdatedAt,
     liveStatusError,
+    autoRefresh,
+    LIVE_STATUS_REFRESH_SEC,
     rrdTimeframe,
     rrdCpuChart,
     rrdRamChart,
@@ -653,11 +689,15 @@ export function useProxmoxNode() {
     guestNetworks,
     guestNetworksLoading,
     loadGuestNetworks,
+    guestExposure,
+    guestExposureLoading,
+    loadGuestExposure,
     services,
     servicesLoading,
     servicesError,
     svcActionMsg,
     svcActionOk,
+    svcActionLoading,
     loadServices,
     svcAction,
     vms,
@@ -666,5 +706,7 @@ export function useProxmoxNode() {
     confirmGuestLink,
     ignoreGuestLink,
     goToHost,
+    guestActionLoading: guestActions.actionLoading,
+    handleGuestAction,
   }
 }

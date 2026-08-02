@@ -101,11 +101,8 @@
         </thead>
         <tbody>
           <tr v-if="credentials.length === 0">
-            <td
-              colspan="4"
-              class="text-center text-muted py-4"
-            >
-              Aucun identifiant de registre configuré.
+            <td colspan="4">
+              <EmptyState title="Aucun identifiant de registre configuré." />
             </td>
           </tr>
           <tr
@@ -128,7 +125,7 @@
               <div class="d-flex gap-1 justify-content-end">
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-secondary"
+                  class="btn btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="openEditForm(cred)"
                 >
@@ -136,7 +133,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="remove(cred)"
                 >
@@ -162,6 +159,10 @@
 import { ref, onMounted } from 'vue'
 import api from '../../api/index'
 import { getApiErrorMessage } from '../../api/client'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import EmptyState from '../EmptyState.vue'
+
+const { confirm } = useConfirmDialog()
 
 interface Credential {
   id: string
@@ -268,7 +269,12 @@ async function save(): Promise<void> {
 }
 
 async function remove(cred: Credential): Promise<void> {
-  if (!confirm(`Supprimer l'identifiant « ${cred.name} » ? Les trackers qui l'utilisent repasseront en accès public.`)) return
+  const confirmed = await confirm({
+    title: "Supprimer l'identifiant ?",
+    message: `Supprimer l'identifiant « ${cred.name} » ? Les trackers qui l'utilisent repasseront en accès public.`,
+    variant: 'danger',
+  })
+  if (!confirmed) return
   try {
     await api.deleteRegistryCredential(cred.id)
     await load()

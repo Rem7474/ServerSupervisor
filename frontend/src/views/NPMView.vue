@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="NPM"
+      :interval-sec="NPM_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header mb-4">
       <div class="page-pretitle">
         <router-link
@@ -16,31 +22,43 @@
       </h2>
     </div>
 
+    <div
+      v-if="expiringCerts.length"
+      class="alert mb-3"
+      :class="expiringCerts.some((c) => c.ssl_days_remaining <= 7) ? 'alert-danger' : 'alert-warning'"
+    >
+      <div class="fw-medium mb-1">
+        <IconLock
+          :size="16"
+          class="icon me-1"
+        />
+        {{ expiringCerts.length }} certificat{{ expiringCerts.length > 1 ? 's' : '' }} expirant sous 30 jours
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <router-link
+          v-for="c in expiringCerts"
+          :key="c.id"
+          :to="`/monitoring/host/${c.id}`"
+          class="badge text-decoration-none"
+          :class="sslBadge(c.ssl_days_remaining)"
+        >
+          {{ c.domain_names[0] }} — {{ c.ssl_days_remaining }}j
+        </router-link>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title mb-0">
           Tous les proxy hosts
         </h3>
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary"
-          :disabled="loading"
-          @click="load"
-        >
-          <IconRefresh
-            :size="2"
-            class="icon icon-sm me-1"
-          />
-          Actualiser
-        </button>
       </div>
 
       <div
         v-if="loading"
-        class="card-body text-center text-muted py-5"
+        class="card-body"
       >
-        <div class="spinner-border spinner-border-sm me-2" />
-        Chargement…
+        <LoadingSkeleton variant="table" />
       </div>
 
       <div
@@ -65,46 +83,93 @@
 
       <div
         v-else
-        class="table-responsive"
+        class="table-responsive scroll-table"
       >
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Connexion</th>
-              <th>Domaine</th>
-              <th>Forward</th>
+              <th>
+                <SortableHeader
+                  label="Connexion"
+                  :active="sortKey === 'connection_name'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('connection_name')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Domaine"
+                  :active="sortKey === 'domain'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('domain')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Forward"
+                  :active="sortKey === 'forward'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('forward')"
+                />
+              </th>
               <th
                 class="text-center"
                 title="Activer/désactiver le proxy host dans NPM"
               >
-                Actif NPM
-              </th>
-              <th
-                class="text-center"
-                title="Activer/désactiver tout le monitoring (uptime + SSL)"
-              >
-                Monitoring
-              </th>
-              <th class="text-center">
-                Uptime
+                <SortableHeader
+                  label="Actif NPM"
+                  :active="sortKey === 'npm_enabled'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('npm_enabled')"
+                />
               </th>
               <th class="text-center">
-                SSL
+                <SortableHeader
+                  label="Uptime"
+                  :active="sortKey === 'uptime_status'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('uptime_status')"
+                />
+              </th>
+              <th class="text-center">
+                <SortableHeader
+                  label="SSL"
+                  :active="sortKey === 'ssl_days_remaining'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('ssl_days_remaining')"
+                />
               </th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="h in hosts"
+              v-for="h in sortedHosts"
               :key="h.id"
-              :class="{ 'opacity-60': !h.npm_enabled }"
+              :class="{ 'opacity-60': !h.npm_enabled, 'table-warning': needsAttention(h) }"
             >
               <td class="text-muted small">
                 {{ h.connection_name }}
               </td>
               <td>
-                <div class="fw-medium">
-                  {{ h.domain_names[0] }}
+                <div class="d-flex align-items-center gap-1">
+                  <IconAlertTriangle
+                    v-if="needsAttention(h)"
+                    :size="14"
+                    class="text-warning flex-shrink-0"
+                    title="Proxy host actif dans NPM mais sans sonde uptime — une panne ne serait pas détectée."
+                  />
+                  <router-link
+                    v-if="h.uptime_probe_id || h.ssl_certificate_id"
+                    :to="`/monitoring/host/${h.id}`"
+                    class="fw-medium text-decoration-none"
+                    title="Voir le suivi uptime + SSL de ce proxy host"
+                  >
+                    {{ h.domain_names[0] }}
+                  </router-link>
+                  <span
+                    v-else
+                    class="fw-medium"
+                  >{{ h.domain_names[0] }}</span>
                 </div>
                 <div
                   v-if="h.domain_names.length > 1"
@@ -135,20 +200,6 @@
                 </label>
               </td>
 
-              <!-- Master monitoring toggle -->
-              <td class="text-center">
-                <label class="form-check form-switch mb-0 d-inline-flex justify-content-center">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    :checked="h.monitoring_enabled"
-                    :disabled="toggling[h.id] || !h.npm_enabled"
-                    :title="!h.npm_enabled ? 'Activez le host dans NPM d\'abord' : ''"
-                    @change="toggle(h, 'monitoring_enabled', ($event.target as HTMLInputElement).checked)"
-                  >
-                </label>
-              </td>
-
               <!-- Uptime sub-toggle + badge -->
               <td class="text-center">
                 <div class="d-flex flex-column align-items-center gap-1">
@@ -163,7 +214,7 @@
                   </label>
                   <router-link
                     v-if="h.uptime_probe_id && h.uptime_status"
-                    :to="`/monitoring/probes/${h.uptime_probe_id}`"
+                    :to="`/monitoring/host/${h.id}`"
                     class="badge small text-decoration-none"
                     :class="uptimeBadge(h.uptime_status)"
                     title="Voir la sonde uptime"
@@ -197,7 +248,7 @@
                   </label>
                   <router-link
                     v-if="h.ssl_certificate_id && h.ssl_days_remaining !== null && h.ssl_days_remaining !== undefined"
-                    :to="`/monitoring/ssl/${h.ssl_certificate_id}`"
+                    :to="`/monitoring/host/${h.id}`"
                     class="badge small text-decoration-none"
                     :class="sslBadge(h.ssl_days_remaining)"
                     title="Voir le certificat SSL"
@@ -232,30 +283,50 @@
 </template>
 
 <script setup lang="ts">
-import { IconRefresh } from '@tabler/icons-vue'
+import { computed } from 'vue'
+import { IconLock, IconAlertTriangle } from '@tabler/icons-vue'
+import SortableHeader from '../components/common/SortableHeader.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useNPM } from '../composables/useNPM'
 
 const {
   hosts,
+  sortedHosts,
+  sortKey,
+  sortDir,
   loading,
   loadError,
   actionError,
   toggling,
   togglingNPM,
-  load,
+  autoRefresh,
+  lastUpdatedAt,
+  NPM_REFRESH_SEC,
   toggleNPM,
   toggle,
+  toggleSort,
+  needsAttention,
 } = useNPM()
 
+// Surfaces certificates about to expire in a banner instead of requiring a
+// full table scan — sorted most-urgent first.
+const expiringCerts = computed(() =>
+  hosts.value
+    .filter((h): h is typeof h & { ssl_days_remaining: number } =>
+      !!h.ssl_certificate_id && h.ssl_days_remaining != null && h.ssl_days_remaining <= 30)
+    .sort((a, b) => a.ssl_days_remaining - b.ssl_days_remaining)
+)
+
 function uptimeBadge(status: string): string {
-  if (status === 'up') return 'bg-success-lt text-success'
-  if (status === 'down') return 'bg-danger-lt text-danger'
+  if (status === 'up') return 'bg-green-lt text-green'
+  if (status === 'down') return 'bg-red-lt text-red'
   return 'bg-secondary-lt text-secondary'
 }
 
 function sslBadge(days: number): string {
-  if (days <= 7) return 'bg-danger-lt text-danger'
-  if (days <= 30) return 'bg-warning-lt text-warning'
-  return 'bg-success-lt text-success'
+  if (days <= 7) return 'bg-red-lt text-red'
+  if (days <= 30) return 'bg-yellow-lt text-yellow'
+  return 'bg-green-lt text-green'
 }
 </script>

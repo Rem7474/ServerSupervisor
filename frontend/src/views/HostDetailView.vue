@@ -109,6 +109,19 @@
           />
           <span class="fw-medium">{{ proxmoxLink.guest_name || `VMID ${proxmoxLink.vmid}` }}</span>
           <span class="text-muted small">({{ proxmoxLink.guest_type?.toUpperCase() }} · {{ proxmoxLink.node_name }})</span>
+          <!-- This panel only has the link's own metadata (status, metrics
+               source) — no running/stopped state, so power actions can't
+               live here without a second API call. Send to the guest's own
+               page instead, which already has them (start/shutdown/reboot,
+               auto-refresh, full metrics). -->
+          <router-link
+            :to="`/proxmox/guests/${proxmoxLink.guest_id}`"
+            class="text-decoration-none small d-inline-flex align-items-center gap-1"
+            title="Voir le guest Proxmox (démarrer/arrêter, métriques détaillées)"
+          >
+            Voir le guest
+            <IconExternalLink :size="14" />
+          </router-link>
         </div>
 
         <!-- Status badge + suggestion actions -->
@@ -169,13 +182,13 @@
           </select>
           <button
             type="button"
-            class="btn btn-sm btn-outline-danger"
+            class="btn btn-icon btn-sm btn-outline-danger"
             :disabled="linkSaving"
             title="Supprimer le lien"
             @click="deleteLink"
           >
             <IconTrash
-              :size="2"
+              :size="16"
               class="icon icon-sm"
             />
           </button>
@@ -202,11 +215,11 @@
     >
       <button
         type="button"
-        class="btn btn-sm btn-outline-orange"
+        class="btn btn-sm btn-outline-warning"
         @click="openLinkForm"
       >
         <IconLink
-          :size="2"
+          :size="16"
           class="icon icon-sm me-1"
         />
         Lier à Proxmox
@@ -282,207 +295,345 @@
           @updated="host = ($event as any)"
         />
 
-        <HostDetailTabs
+        <EntityTabShell
           v-model="activeTab"
-          :can-run-apt="canRunApt"
-          :containers-count="containers.length"
-          :pending-packages="aptStatus?.pending_packages || 0"
-          :security-updates="aptStatus?.security_updates || 0"
-          :commands-count="cmdHistory.length"
-          :tasks-count="tasksCount"
-        />
-
-        <div v-show="activeTab === 'metrics'">
-          <div
-            v-if="host && host.status !== 'online'"
-            class="alert alert-warning mb-3"
-          >
-            <IconAlertCircle
-              :size="16"
-              class="icon me-2"
-            />
-            Agent hors ligne — les données affichées peuvent être obsolètes ou indisponibles.
-          </div>
-          <HostMetricsPanel
-            :host-id="hostId"
-            :metrics="effectiveMetrics"
-            :metrics-source="effectiveMetricsSource"
-            :proxmox-guest-id="proxmoxLink?.guest_id ?? null"
-            :refresh-tick="metricsUpdatedAt"
-          />
-          <DiskMetricsCard
-            :host-id="hostId"
-            :initial-metrics="(diskMetrics as any)"
-            class="mb-4"
-          />
-          <DiskHistoryChart
-            :host-id="hostId"
-            :mounts="(diskMetrics?.map((d: any) => d.mount_point) ?? [])"
-            :refresh-tick="metricsUpdatedAt"
-            class="mb-4"
-          />
-          <DiskHealthCard
-            v-if="hasLocalSmart || !isProxmoxLinked"
-            :host-id="hostId"
-            :initial-health="(diskHealth as any)"
-            class="mb-4"
-          />
-          <ProxmoxHostDiskHealthCard
-            v-else
-            :host-id="hostId"
-            :node-name="proxmoxLink?.node_name ?? null"
-            class="mb-4"
-          />
-        </div>
-
-        <div v-show="activeTab === 'docker'">
-          <HostDockerTab
-            :containers="(containers as any)"
-            :version-comparisons="(versionComparisons as any)"
-          />
-        </div>
-
-        <div v-show="activeTab === 'apt'">
-          <HostAptTab
-            :apt-status="aptStatus"
-            :can-run-apt="canRunApt"
-            :apt-cmd-loading="aptCmdLoading"
-            :uu-status="uuStatus"
-            :uu-runs="(uuRuns as any)"
-            :uu-form="(uuForm as any)"
-            :uu-loading="uuLoading"
-            @run-apt-command="sendAptCmd"
-            @uu-install="handleUUInstall"
-            @uu-configure="handleUUConfigure"
-            @uu-run-now="handleUURunNow"
-            @uu-log="(openUULog as any)"
-          />
-        </div>
-
-        <div v-show="activeTab === 'commandes'">
-          <HostCommandsTab
-            :commands="(cmdHistory as any)"
-            @watch-command="(openCommand as any)"
-          />
-        </div>
-
-        <div v-show="activeTab === 'exposition'">
-          <HostExposureTab :host-id="hostId" />
-        </div>
-
-        <div v-show="activeTab === 'systeme'">
-          <HostSystemTab
-            v-if="canRunApt"
-            :host-id="hostId"
-            :can-run-apt="canRunApt"
-            @open-command="openCommand"
-            @history-changed="loadCmdHistoryRefresh"
-          />
-        </div>
-
-        <div v-show="activeTab === 'processus'">
-          <HostProcessesPanel
-            v-if="canRunApt"
-            :host-id="hostId"
-            :can-run="canRunApt"
-            @history-changed="loadCmdHistoryRefresh"
-          />
-        </div>
-
-        <div v-show="activeTab === 'planifiees'">
-          <HostTasksTab
-            :host-id="hostId"
-            :can-run-apt="canRunApt"
-            :active="activeTab === 'planifiees'"
-            @open-command="openCommand"
-            @tasks-count="tasksCount = $event"
-            @history-changed="loadCmdHistoryRefresh"
-          />
-        </div>
-
-        <div v-show="activeTab === 'timeline'">
-          <HostTimelineTab :host-id="hostId" />
-        </div>
-
-        <!-- Security tab: Per-host permissions (admin only) -->
-        <div v-show="activeTab === 'securite'">
-          <div
-            v-if="auth.isAdmin"
-            class="card"
-          >
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <h3 class="card-title mb-0 d-flex align-items-center gap-2">
-                <IconLock
-                  :size="16"
-                  class="icon icon-sm text-warning"
-                />
-                Permissions par hôte
-              </h3>
-              <span class="badge badge-sm bg-danger text-white">Admin only</span>
+          :tabs="hostTabs"
+        >
+          <template #overview>
+            <div class="row row-cards mb-3">
+              <div class="col-6 col-lg-3">
+                <div class="card card-sm h-100">
+                  <div class="card-body">
+                    <div class="subheader">
+                      APT
+                    </div>
+                    <div
+                      class="h2 mb-0 mt-1"
+                      :class="(aptStatus?.security_updates || 0) > 0 ? 'text-danger' : (aptStatus?.pending_packages || 0) > 0 ? 'text-warning' : 'text-success'"
+                    >
+                      {{ aptStatus?.pending_packages || 0 }}
+                    </div>
+                    <div class="text-secondary small">
+                      {{ aptStatus?.security_updates || 0 }} sécurité
+                      <a
+                        href="#"
+                        class="ms-1"
+                        @click.prevent="activeTab = 'apt'"
+                      >voir</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="card card-sm h-100">
+                  <div class="card-body">
+                    <div class="subheader">
+                      Conteneurs Docker
+                    </div>
+                    <div class="h2 mb-0 mt-1">
+                      {{ dockerRunningCount }} / {{ containers.length }}
+                    </div>
+                    <div class="text-secondary small">
+                      en cours
+                      <a
+                        href="#"
+                        class="ms-1"
+                        @click.prevent="activeTab = 'docker'"
+                      >voir</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="card card-sm h-100">
+                  <div class="card-body">
+                    <div class="subheader">
+                      Tâches planifiées
+                    </div>
+                    <div class="h2 mb-0 mt-1">
+                      {{ tasksCount }}
+                    </div>
+                    <div class="text-secondary small">
+                      <a
+                        href="#"
+                        @click.prevent="activeTab = 'planifiees'"
+                      >voir</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="card card-sm h-100">
+                  <div class="card-body">
+                    <div class="subheader">
+                      Commandes récentes
+                    </div>
+                    <div class="h2 mb-0 mt-1">
+                      {{ cmdHistory.length }}
+                    </div>
+                    <div class="text-secondary small">
+                      <a
+                        href="#"
+                        @click.prevent="activeTab = 'commandes'"
+                      >voir</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="card-body p-0">
-              <div
-                v-if="permLoading"
-                class="text-center py-3"
-              >
-                <span class="spinner-border spinner-border-sm" />
+
+            <div class="card mb-3">
+              <div class="card-header d-flex align-items-center justify-content-between">
+                <h3 class="card-title mb-0">
+                  <IconAlertTriangle
+                    :size="18"
+                    class="icon me-1"
+                  />
+                  Alertes actives sur cet hôte
+                </h3>
+                <router-link
+                  to="/alerts?tab=incidents"
+                  class="btn btn-sm btn-outline-secondary"
+                >
+                  Toutes les alertes
+                </router-link>
               </div>
               <div
-                v-else-if="!hostPerms.length"
-                class="text-center py-3 text-muted small"
+                v-if="incidentsLoading"
+                class="card-body"
               >
-                Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
+                <LoadingSkeleton variant="list" />
               </div>
-              <table
+              <div
+                v-else-if="!hostActiveIncidents.length"
+                class="card-body text-center text-secondary py-4"
+              >
+                Aucune alerte active sur cet hôte.
+              </div>
+              <div
                 v-else
-                class="table table-vcenter mb-0"
+                class="list-group list-group-flush"
               >
-                <thead>
-                  <tr>
-                    <th>Utilisateur</th>
-                    <th>Niveau</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="p in hostPerms"
-                    :key="p.username"
-                  >
-                    <td>{{ p.username }}</td>
-                    <td>
-                      <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
-                        {{ p.level }}
-                      </span>
-                    </td>
-                    <td class="text-end">
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-ghost-danger"
-                        title="Révoquer"
-                        @click="revokePermission(p.username)"
-                      >
-                        <IconX
-                          :size="16"
-                          class="icon icon-sm"
-                        />
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                <router-link
+                  v-for="item in hostActiveIncidents"
+                  :key="item.id"
+                  :to="hostAlertsLink"
+                  class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+                >
+                  <span
+                    class="badge"
+                    :class="item.severity === 'crit' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow'"
+                  >{{ item.severity }}</span>
+                  <span class="flex-grow-1">{{ item.rule_name || item.metric }}</span>
+                  <RelativeTime :date="item.triggered_at || ''" />
+                </router-link>
+              </div>
             </div>
-            <div class="card-footer d-flex justify-content-end">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-primary"
-                @click="openAddPermission"
-              >
-                + Ajouter
-              </button>
+          </template>
+
+          <template #metrics>
+            <div
+              v-if="host && host.status !== 'online'"
+              class="alert alert-warning mb-3"
+            >
+              <IconAlertCircle
+                :size="16"
+                class="icon me-2"
+              />
+              Agent hors ligne — les données affichées peuvent être obsolètes ou indisponibles.
             </div>
-          </div>
-        </div>
+            <HostMetricsPanel
+              :host-id="hostId"
+              :metrics="effectiveMetrics"
+              :metrics-source="effectiveMetricsSource"
+              :proxmox-guest-id="proxmoxLink?.guest_id ?? null"
+              :refresh-tick="metricsUpdatedAt"
+            />
+            <DiskMetricsCard
+              :host-id="hostId"
+              :initial-metrics="(diskMetrics as any)"
+              class="mb-4"
+            />
+            <DiskHistoryChart
+              :host-id="hostId"
+              :mounts="(diskMetrics?.map((d: any) => d.mount_point) ?? [])"
+              :refresh-tick="metricsUpdatedAt"
+              class="mb-4"
+            />
+            <DiskHealthCard
+              v-if="hasLocalSmart || !isProxmoxLinked"
+              :host-id="hostId"
+              :initial-health="(diskHealth as any)"
+              class="mb-4"
+            />
+            <ProxmoxHostDiskHealthCard
+              v-else
+              :host-id="hostId"
+              :node-name="proxmoxLink?.node_name ?? null"
+              class="mb-4"
+            />
+          </template>
+
+          <template #docker>
+            <HostDockerTab
+              :host-id="hostId"
+              :containers="(containers as any)"
+              :version-comparisons="(versionComparisons as any)"
+              :can-run="canRunApt"
+              @open-command="openCommand"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
+
+          <template #apt>
+            <HostAptTab
+              :apt-status="aptStatus"
+              :can-run-apt="canRunApt"
+              :apt-cmd-loading="aptCmdLoading"
+              :uu-status="uuStatus"
+              :uu-runs="(uuRuns as any)"
+              :uu-form="(uuForm as any)"
+              :uu-loading="uuLoading"
+              @run-apt-command="sendAptCmd"
+              @uu-install="handleUUInstall"
+              @uu-configure="handleUUConfigure"
+              @uu-run-now="handleUURunNow"
+              @uu-log="(openUULog as any)"
+            />
+          </template>
+
+          <template #backup>
+            <HostBackupTab
+              :host-id="hostId"
+              :can-run="canRunApt"
+            />
+          </template>
+
+          <template #commandes>
+            <HostCommandsTab
+              :commands="(cmdHistory as any)"
+              @watch-command="(openCommand as any)"
+            />
+          </template>
+
+          <template #exposition>
+            <HostExposureTab
+              :host-id="hostId"
+              @loaded="exposureDomainCount = $event"
+            />
+          </template>
+
+          <template #systeme>
+            <HostSystemTab
+              v-if="canRunApt"
+              :host-id="hostId"
+              :can-run-apt="canRunApt"
+              @open-command="openCommand"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
+
+          <template #processus>
+            <HostProcessesPanel
+              v-if="canRunApt"
+              :host-id="hostId"
+              :can-run="canRunApt"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
+
+          <template #planifiees>
+            <HostTasksTab
+              :host-id="hostId"
+              :can-run-apt="canRunApt"
+              :active="activeTab === 'planifiees'"
+              @open-command="openCommand"
+              @tasks-count="tasksCount = $event"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
+
+          <template #timeline>
+            <HostTimelineTab :host-id="hostId" />
+          </template>
+
+          <!-- Security tab: Per-host permissions (admin only) -->
+          <template #securite>
+            <div
+              v-if="auth.isAdmin"
+              class="card"
+            >
+              <div class="card-header d-flex align-items-center justify-content-between">
+                <h3 class="card-title mb-0 d-flex align-items-center gap-2">
+                  <IconLock
+                    :size="16"
+                    class="icon icon-sm text-warning"
+                  />
+                  Permissions par hôte
+                </h3>
+                <span class="badge badge-sm bg-red text-white">Admin only</span>
+              </div>
+              <div class="card-body p-0">
+                <div v-if="permLoading">
+                  <LoadingSkeleton variant="table" />
+                </div>
+                <div
+                  v-else-if="!hostPerms.length"
+                  class="text-center py-3 text-muted small"
+                >
+                  Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
+                </div>
+                <table
+                  v-else
+                  class="table table-vcenter mb-0"
+                >
+                  <thead>
+                    <tr>
+                      <th>Utilisateur</th>
+                      <th>Niveau</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="p in hostPerms"
+                      :key="p.username"
+                    >
+                      <td>{{ p.username }}</td>
+                      <td>
+                        <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
+                          {{ p.level }}
+                        </span>
+                      </td>
+                      <td class="text-end">
+                        <button
+                          type="button"
+                          class="btn btn-icon btn-sm btn-ghost-danger"
+                          title="Révoquer"
+                          @click="revokePermission(p.username)"
+                        >
+                          <IconX
+                            :size="16"
+                            class="icon icon-sm"
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="card-footer d-flex justify-content-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  @click="openAddPermission"
+                >
+                  + Ajouter
+                </button>
+              </div>
+            </div>
+          </template>
+        </EntityTabShell>
       </div>
 
       <CommandLogPanel
@@ -501,10 +652,10 @@
     <!-- Add permission modal -->
     <div
       v-if="addPermModal"
-      class="modal modal-blur show d-block modal-permissions-overlay"
+      ref="permModalRef"
+      class="modal modal-blur fade show d-block modal-permissions-overlay"
       tabindex="-1"
       @click.self="addPermModal = false"
-      @keydown.escape.stop="addPermModal = false"
     >
       <div
         class="modal-dialog modal-dialog-centered modal-permissions-dialog"
@@ -588,9 +739,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle } from '@tabler/icons-vue'
+import { computed, ref } from 'vue'
+import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
+import { useModalChrome } from '../composables/useModalChrome'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'
 import DiskHealthCard from '../components/disk/DiskHealthCard.vue'
@@ -600,8 +752,10 @@ import HostMetricsPanel from '../components/host/HostMetricsPanel.vue'
 import HostProcessesPanel from '../components/host/HostProcessesPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import HostAptTab from '../components/host/HostAptTab.vue'
+import HostBackupTab from '../components/host/HostBackupTab.vue'
 import HostCommandsTab from '../components/host/HostCommandsTab.vue'
-import HostDetailTabs from '../components/host/HostDetailTabs.vue'
+import EntityTabShell from '../components/EntityTabShell.vue'
+import type { EntityTab } from '../components/EntityTabShell.vue'
 import HostDockerTab from '../components/host/HostDockerTab.vue'
 import HostEditForm from '../components/host/HostEditForm.vue'
 import HostExposureTab from '../components/host/HostExposureTab.vue'
@@ -631,6 +785,8 @@ const {
   diskHealth,
   proxmoxLink,
   linkSaving,
+  hostActiveIncidents,
+  incidentsLoading,
   effectiveMetrics,
   effectiveMetricsSource,
   showLinkForm,
@@ -682,11 +838,94 @@ const {
   openUULog,
 } = useHostDetail()
 
+const permModalRef = ref<HTMLElement | null>(null)
+useModalChrome(permModalRef, () => addPermModal.value, { onClose: () => { addPermModal.value = false } })
+
 // Local SMART is unreadable inside an LXC/VM. When the host has no local disk
 // health but is linked to Proxmox, we surface the hosting node's disk health
 // instead of an empty SMART card.
+const dockerRunningCount = computed(() =>
+  containers.value.filter((c) => c.state === 'running').length
+)
+
 const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
 const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
+
+// Fed by HostExposureTab's @loaded emit — the tab mounts eagerly (Host's
+// tabs use v-show, not lazy), so this is already populated before the user
+// ever clicks "Exposition".
+const exposureDomainCount = ref(0)
+
+// Incidents' `host_name` is `hosts.name` (see db_notifications.go), so this
+// pre-fills AlertIncidentList's search box to this host instead of landing on
+// the undifferentiated full incidents list.
+const hostAlertsLink = computed(() => ({
+  path: '/alerts',
+  query: { tab: 'incidents', host: host.value?.name || host.value?.hostname || '' },
+}))
+
+const hostTabs = computed<EntityTab[]>(() => {
+  const securityUpdates = aptStatus.value?.security_updates || 0
+  const pendingPackages = aptStatus.value?.pending_packages || 0
+
+  const tabs: EntityTab[] = [
+    {
+      key: 'overview',
+      label: "Vue d'ensemble",
+      badges: hostActiveIncidents.value.length
+        ? [{ value: hostActiveIncidents.value.length, badgeClass: 'badge bg-red-lt text-red ms-1' }]
+        : [],
+    },
+    { key: 'metrics', label: 'Métriques' },
+    {
+      key: 'docker',
+      label: 'Docker',
+      badges: containers.value.length ? [{ value: containers.value.length, badgeClass: 'badge bg-blue-lt text-blue ms-1' }] : [],
+    },
+    {
+      key: 'apt',
+      label: 'APT',
+      badges: securityUpdates > 0
+        ? [{ value: securityUpdates, badgeClass: 'badge bg-red-lt text-red ms-1' }]
+        : pendingPackages > 0
+          ? [{ value: pendingPackages, badgeClass: 'badge bg-yellow-lt text-yellow ms-1' }]
+          : [],
+    },
+    { key: 'backup', label: 'Sauvegardes' },
+    {
+      key: 'commandes',
+      label: 'Commandes',
+      badges: cmdHistory.value.length ? [{ value: cmdHistory.value.length, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
+    },
+    {
+      key: 'exposition',
+      label: 'Exposition',
+      badges: exposureDomainCount.value > 0
+        ? [{ value: exposureDomainCount.value, badgeClass: 'badge bg-azure-lt text-azure ms-1' }]
+        : [],
+    },
+  ]
+
+  if (canRunApt.value) {
+    tabs.push(
+      { key: 'systeme', label: 'Systeme' },
+      { key: 'processus', label: 'Processus' }
+    )
+  }
+
+  // Labeled "Permissions" (not "Sécurité") to avoid colliding with
+  // ProxmoxNodeView's "Journaux sécurité" tab — same word, unrelated content
+  // (per-host RBAC here vs. PVE syslog auth-failure search there).
+  tabs.push({ key: 'securite', label: 'Permissions' })
+  tabs.push({
+    key: 'planifiees',
+    label: 'Tâches planifiées',
+    badges: tasksCount.value ? [{ value: tasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
+  })
+  tabs.push({ key: 'timeline', label: 'Timeline' })
+
+  return tabs
+})
 </script>
 
 <style scoped>

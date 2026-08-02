@@ -17,12 +17,9 @@
 
     <div
       v-if="loading"
-      class="card-body text-center py-5"
+      class="card-body"
     >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
+      <LoadingSkeleton variant="table" />
     </div>
     <div
       v-else-if="executions.length === 0"
@@ -88,7 +85,7 @@
                 <span
                   class="badge"
                   :class="execStatusBadge(execution.status)"
-                >{{ execution.status }}</span>
+                >{{ commandStatusLabel(execution.status) }}</span>
                 <router-link
                   v-if="execution.alerts_after_count"
                   to="/alerts?tab=incidents"
@@ -102,7 +99,7 @@
                 <button
                   v-if="execution.command_id && logsMode === 'inline'"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                   @click="$emit('open-logs', execution.command_id)"
                 >
@@ -157,13 +154,13 @@
                 <span
                   class="badge"
                   :class="execStatusBadge(execution.status)"
-                >{{ execution.status }}</span>
+                >{{ commandStatusLabel(execution.status) }}</span>
               </td>
               <td>
                 <button
                   v-if="execution.command_id && logsMode === 'inline'"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                   @click="$emit('open-logs', execution.command_id)"
                 >
@@ -181,6 +178,15 @@
                   v-else
                   class="text-muted"
                 >—</span>
+                <button
+                  v-if="execution.raw_payload"
+                  type="button"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
+                  title="Voir le payload reçu"
+                  @click="$emit('open-payload', execution.raw_payload)"
+                >
+                  <IconBraces :size="14" />
+                </button>
               </td>
             </template>
           </tr>
@@ -205,10 +211,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconFileText, IconRefresh } from '@tabler/icons-vue'
+import { IconBraces, IconFileText, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { usePagination } from '../../composables/usePagination'
+import { commandStatusLabel } from '../../utils/commandStatus'
+import { execBadgeColor } from '../../utils/statusClasses'
 
 interface Execution {
   id?: string | number
@@ -227,6 +236,7 @@ interface Execution {
   command_id?: string
   status?: string
   alerts_after_count?: number
+  raw_payload?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -261,16 +271,10 @@ const {
 defineEmits<{
   (e: 'refresh'): void
   (e: 'open-logs', commandId: string): void
+  (e: 'open-payload', rawPayload: string): void
 }>()
 
 function execStatusBadge(status: string | undefined): string {
-  const map: Record<string, string> = {
-    pending: 'bg-yellow-lt text-yellow',
-    running: 'bg-blue-lt text-blue',
-    completed: 'bg-success-lt text-success',
-    failed: 'bg-danger-lt text-danger',
-    skipped: 'bg-secondary-lt text-secondary',
-  }
-  return map[status || ''] || 'bg-secondary-lt text-secondary'
+  return execBadgeColor(status)
 }
 </script>

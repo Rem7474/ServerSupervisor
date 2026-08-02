@@ -93,12 +93,31 @@
               </div>
               <span
                 v-if="notificationResolved(item)"
-                class="badge bg-success-lt text-success flex-shrink-0 notification-state-badge"
+                class="badge bg-green-lt text-green flex-shrink-0 notification-state-badge"
               >Termine</span>
-              <span
+              <div
                 v-else
-                class="badge bg-red-lt text-red flex-shrink-0 notification-state-badge"
-              >Actif</span>
+                class="d-flex align-items-center gap-1 flex-shrink-0"
+              >
+                <span class="badge bg-red-lt text-red notification-state-badge">Actif</span>
+                <button
+                  v-if="auth.isAdmin && item.type === 'alert_incident'"
+                  type="button"
+                  class="btn btn-icon btn-sm btn-outline-success py-0 px-1 notification-resolve-btn"
+                  title="Résoudre"
+                  :disabled="resolvingId === item.id"
+                  @click.stop="resolveIncident(item)"
+                >
+                  <span
+                    v-if="resolvingId === item.id"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconCheck
+                    v-else
+                    :size="14"
+                  />
+                </button>
+              </div>
             </div>
             <div class="d-flex align-items-center justify-content-between text-secondary notification-meta">
               <router-link
@@ -150,10 +169,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { IconBell, IconServer } from '@tabler/icons-vue'
+import { IconBell, IconCheck, IconServer } from '@tabler/icons-vue'
 import RelativeTime from './RelativeTime.vue'
+import { useAuthStore } from '../stores/auth'
 import { useNotifications } from '../composables/useNotifications'
 
+const auth = useAuthStore()
 const bellRef = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
 
@@ -161,8 +182,10 @@ const {
   notifications,
   loading,
   unreadCount,
+  resolvingId,
   fetchNotifications,
   markAllRead,
+  resolveIncident,
   isUnread,
   metricUnit,
   trackerStatusLabel,

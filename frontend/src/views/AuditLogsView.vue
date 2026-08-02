@@ -19,16 +19,6 @@
           Historique des actions, connexions et commandes
         </div>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <button
-          type="button"
-          class="btn btn-outline-secondary"
-          :disabled="connexionsLoading || cmdsLoading"
-          @click="refresh"
-        >
-          Actualiser
-        </button>
-      </div>
     </div>
 
     <!-- Tab navigation -->
@@ -70,7 +60,7 @@
         <DataToolbar
           searchable
           :search="cmdSearch"
-          search-placeholder="Rechercher hôte, commande, utilisateur..."
+          search-placeholder="Rechercher hôte, commande, utilisateur…"
           @update:search="onSearchUpdate"
         >
           <template #bottom>
@@ -132,7 +122,7 @@
         </DataToolbar>
 
         <div class="card">
-          <div class="table-responsive">
+          <div class="table-responsive scroll-table">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
@@ -201,11 +191,8 @@
                   </td>
                 </tr>
                 <tr v-else-if="!sortedCmds.length">
-                  <td
-                    colspan="8"
-                    class="text-center text-secondary py-4"
-                  >
-                    Aucune commande enregistrée
+                  <td colspan="8">
+                    <EmptyState title="Aucune commande enregistrée" />
                   </td>
                 </tr>
                 <tr
@@ -239,10 +226,10 @@
                   <td class="text-secondary small">
                     {{ formatDuration(cmd.started_at, cmd.ended_at) }}
                   </td>
-                  <td>
+                  <td class="text-end">
                     <button
                       type="button"
-                      class="btn btn-sm btn-ghost-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
                       title="Voir les logs"
                       @click="openLogViewer(cmd)"
@@ -251,6 +238,19 @@
                         :size="16"
                         class="icon icon-sm"
                       />
+                    </button>
+                    <button
+                      v-if="cmd.status === 'pending' || cmd.status === 'running'"
+                      type="button"
+                      class="btn btn-sm btn-outline-danger ms-1"
+                      :disabled="cancellingId === cmd.id"
+                      @click="cancelCmd(cmd.id)"
+                    >
+                      <span
+                        v-if="cancellingId === cmd.id"
+                        class="spinner-border spinner-border-sm me-1"
+                      />
+                      Annuler
                     </button>
                   </td>
                 </tr>
@@ -300,69 +300,11 @@
             Toutes les connexions
           </h3>
         </div>
-        <div class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Date / Heure</th>
-                <th>Utilisateur</th>
-                <th>IP</th>
-                <th>Navigateur</th>
-                <th>OS</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="connexionsLoading">
-                <td
-                  colspan="6"
-                  class="py-2"
-                >
-                  <LoadingSkeleton
-                    variant="table"
-                    :lines="4"
-                  />
-                </td>
-              </tr>
-              <tr v-else-if="!connexions.length">
-                <td
-                  colspan="6"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucune connexion enregistrée
-                </td>
-              </tr>
-              <tr
-                v-for="ev in connexions"
-                :key="ev.id"
-              >
-                <td class="text-secondary small">
-                  {{ formatDate(ev.created_at) }}
-                </td>
-                <td class="fw-semibold">
-                  {{ ev.username }}
-                </td>
-                <td class="text-secondary small font-monospace">
-                  {{ ev.ip_address }}
-                </td>
-                <td class="text-secondary small">
-                  {{ parseUA(ev.user_agent).browser }}
-                </td>
-                <td class="text-secondary small">
-                  {{ parseUA(ev.user_agent).os }}
-                </td>
-                <td>
-                  <span
-                    class="badge"
-                    :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
-                  >
-                    {{ ev.success ? 'Succès' : 'Échec' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <ConnectionsTable
+          :events="connexions"
+          :loading="connexionsLoading"
+          show-username
+        />
         <div class="card-footer d-flex align-items-center justify-content-between">
           <div class="text-secondary small">
             Page {{ connexionsPage }} / {{ totalConnexionsPages }}
@@ -384,10 +326,12 @@ import { useDateFormatter } from '../composables/useDateFormatter'
 import { useAuditLogs } from '../composables/useAuditLogs'
 import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
+import EmptyState from '../components/EmptyState.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import AuditSecurityPanel from '../components/security/AuditSecurityPanel.vue'
+import ConnectionsTable from '../components/common/ConnectionsTable.vue'
 
 const { formatLocaleDateTime: formatDate } = useDateFormatter()
 
@@ -397,7 +341,6 @@ const {
   activeTab,
   switchToCommandes,
   switchToConnexions,
-  refresh,
   cmdsPage,
   cmdsTotal,
   cmdsLoading,
@@ -415,6 +358,8 @@ const {
   showLogViewer,
   openLogViewer,
   closeLogViewer,
+  cancellingId,
+  cancelCmd,
   selectCmdsPage,
   connexions,
   connexionsPage,
@@ -434,6 +379,5 @@ const {
   cmdLabel,
   formatDuration,
   statusClass,
-  parseUA,
 } = useAuditLogs()
 </script>

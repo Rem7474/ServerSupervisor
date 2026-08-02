@@ -59,7 +59,7 @@ const lastUpdatedLabel = computed(() => {
   height: 8px;
   flex-shrink: 0;
   border-radius: 999px;
-  background: var(--ss-status-online, #22c55e);
+  background: var(--ss-status-online, #2fb344);
   animation: pulse-dot 1.6s infinite;
 }
 

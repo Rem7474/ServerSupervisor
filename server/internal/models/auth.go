@@ -23,6 +23,15 @@ type TOTPSecretResponse struct {
 	BackupCodes []string `json:"backup_codes"` // 10 single-use backup codes
 }
 
+// MFARequirement describes which second factors are available for a user who
+// still needs to complete an MFA step at login — the frontend uses this to
+// decide whether to show the TOTP code field, a "use your security key"
+// button, or both.
+type MFARequirement struct {
+	TOTP     bool `json:"totp"`
+	WebAuthn bool `json:"webauthn"`
+}
+
 // ========== RBAC & Permissions ==========
 
 const (

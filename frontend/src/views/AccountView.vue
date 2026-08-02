@@ -65,18 +65,12 @@
         </button>
       </li>
       <li class="nav-item">
-        <button
-          type="button"
+        <router-link
+          to="/account/security"
           class="nav-link"
-          :class="{ active: activeTab === 'connexions' }"
-          @click="switchToConnexions"
         >
           Connexions
-          <span
-            v-if="loginEvents.length"
-            class="badge bg-secondary-lt text-secondary ms-1"
-          >{{ loginEvents.length }}</span>
-        </button>
+        </router-link>
       </li>
     </ul>
 
@@ -349,11 +343,8 @@
                   </td>
                 </tr>
                 <tr v-else-if="!myCommands.length">
-                  <td
-                    colspan="7"
-                    class="text-center text-secondary py-3"
-                  >
-                    Aucune activité récente
+                  <td colspan="7">
+                    <EmptyState title="Aucune activité récente" />
                   </td>
                 </tr>
                 <tr
@@ -374,14 +365,14 @@
                   </td>
                   <td><span :class="moduleClass(cmd.module)">{{ moduleLabel(cmd.module) }}</span></td>
                   <td><code class="small">{{ cmdLabel(cmd) }}</code></td>
-                  <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
+                  <td><span :class="statusClass(cmd.status)">{{ commandStatusLabel(cmd.status) }}</span></td>
                   <td class="text-secondary small">
                     {{ formatDuration(cmd.started_at, cmd.ended_at) }}
                   </td>
                   <td>
                     <button
                       type="button"
-                      class="btn btn-sm btn-ghost-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
                       title="Voir les logs"
                       @click="openLogViewer(cmd)"
@@ -406,87 +397,14 @@
         @open="showConsole = true"
       />
     </div>
-
-    <!-- ── Onglet Connexions ── -->
-    <div v-show="activeTab === 'connexions'">
-      <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h3 class="card-title mb-0">
-            <IconLogout
-              :size="20"
-              class="icon me-2"
-            />
-            Activité de connexion
-          </h3>
-          <span
-            v-if="loginEvents.length"
-            class="badge bg-secondary-lt text-secondary"
-          >{{ loginEvents.length }}</span>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Date / Heure</th>
-                <th>IP</th>
-                <th>Navigateur</th>
-                <th>OS</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="loginEventsLoading">
-                <td
-                  colspan="5"
-                  class="text-center text-secondary py-3"
-                >
-                  Chargement...
-                </td>
-              </tr>
-              <tr v-else-if="!loginEvents.length">
-                <td
-                  colspan="5"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucune connexion enregistrée
-                </td>
-              </tr>
-              <tr
-                v-for="ev in loginEvents"
-                :key="ev.id"
-              >
-                <td class="text-secondary small">
-                  {{ formatDateTime(ev.created_at) }}
-                </td>
-                <td class="text-secondary small font-monospace">
-                  {{ ev.ip_address }}
-                </td>
-                <td class="text-secondary small">
-                  {{ parseUA(ev.user_agent).browser }}
-                </td>
-                <td class="text-secondary small">
-                  {{ parseUA(ev.user_agent).os }}
-                </td>
-                <td>
-                  <span
-                    class="badge"
-                    :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
-                  >
-                    {{ ev.success ? 'Succès' : 'Échec' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock, IconLogout } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
+import EmptyState from '../components/EmptyState.vue'
+import { commandStatusLabel } from '../utils/commandStatus'
 import { useAccount } from '../composables/useAccount'
 
 const {
@@ -503,8 +421,6 @@ const {
   pwStrengthMeta,
   cmdsLoading,
   myCommands,
-  loginEvents,
-  loginEventsLoading,
   selectedCmd,
   roleBadgeClass,
   roleLabel,
@@ -515,12 +431,10 @@ const {
   statusClass,
   moduleLabel,
   moduleClass,
-  parseUA,
   openLogViewer,
   closeLogViewer,
   resetPwForm,
   submitChangePassword,
   switchToHistorique,
-  switchToConnexions,
 } = useAccount()
 </script>

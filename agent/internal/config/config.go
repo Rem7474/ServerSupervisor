@@ -37,6 +37,19 @@ type Config struct {
 	CrowdSecAlertsMachineID    string `yaml:"crowdsec_alerts_machine_id"`
 	CrowdSecAlertsPassword     string `yaml:"crowdsec_alerts_password"`
 
+	// Restic backup supervision. Only paths and feature flags live here —
+	// credentials (repository password, storage backend keys) stay in the
+	// resticconf file on disk (ResticConfPath) and are never read into this
+	// struct or sent to the server.
+	CollectRestic                  bool    `yaml:"collect_restic"`
+	ResticBin                      string  `yaml:"restic_bin"`
+	ResticConfPath                 string  `yaml:"restic_conf_path"`
+	ResticRunScriptPath            string  `yaml:"restic_run_script_path"`
+	ResticStatusFilePath           string  `yaml:"restic_status_file_path"`
+	ResticEnableProgress           bool    `yaml:"restic_enable_progress"`
+	ResticProgressFPS              float64 `yaml:"restic_progress_fps"`
+	ResticBackupIdleTimeoutMinutes int     `yaml:"restic_backup_idle_timeout_minutes"`
+
 	// Low-latency command push: an optional, additive WebSocket connection the
 	// agent opens to the server purely to be nudged to poll immediately when a
 	// command is dispatched, instead of waiting out report_interval. Disabling
@@ -192,6 +205,34 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_CROWDSEC_ALERTS_PASSWORD"); env != "" {
 		cfg.CrowdSecAlertsPassword = strings.TrimSpace(env)
 	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_RESTIC"); env != "" {
+		cfg.CollectRestic = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_RESTIC_BIN"); env != "" {
+		cfg.ResticBin = strings.TrimSpace(env)
+	}
+	if env := os.Getenv("SUPERVISOR_RESTIC_CONF_PATH"); env != "" {
+		cfg.ResticConfPath = strings.TrimSpace(env)
+	}
+	if env := os.Getenv("SUPERVISOR_RESTIC_RUN_SCRIPT_PATH"); env != "" {
+		cfg.ResticRunScriptPath = strings.TrimSpace(env)
+	}
+	if env := os.Getenv("SUPERVISOR_RESTIC_STATUS_FILE_PATH"); env != "" {
+		cfg.ResticStatusFilePath = strings.TrimSpace(env)
+	}
+	if env := os.Getenv("SUPERVISOR_RESTIC_ENABLE_PROGRESS"); env != "" {
+		cfg.ResticEnableProgress = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_RESTIC_PROGRESS_FPS"); env != "" {
+		if f, err := strconv.ParseFloat(env, 64); err == nil && f > 0 {
+			cfg.ResticProgressFPS = f
+		}
+	}
+	if env := os.Getenv("SUPERVISOR_RESTIC_BACKUP_IDLE_TIMEOUT_MINUTES"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			cfg.ResticBackupIdleTimeoutMinutes = n
+		}
+	}
 
 	if cfg.APIKey == "" {
 		return nil, fmt.Errorf("api_key is required (set in config or SUPERVISOR_API_KEY env var)")
@@ -216,18 +257,22 @@ func defaultConfig() *Config {
 			"/var/log/httpd/access_log",
 			"/data/logs/proxy-host-*_access.log",
 		},
-		WebLogsTailLines:           5000,
-		WebLogsTopN:                10,
-		WebLogsRequestsLimit:       200,
-		WebLogsCursorFile:          "/var/lib/serversupervisor/web_logs_cursor.json",
-		CollectCrowdSecCorrelation: false,
-		CrowdSecConnectionString:   "http://localhost:8080",
-		CrowdSecAPIKey:             "",
-		CrowdSecAlertsMachineID:    "",
-		CrowdSecAlertsPassword:     "",
-		DisableWSPush:              false,
-		LogLevel:                   "info",
-		LogFormat:                  "text",
+		WebLogsTailLines:               5000,
+		WebLogsTopN:                    10,
+		WebLogsRequestsLimit:           200,
+		WebLogsCursorFile:              "/var/lib/serversupervisor/web_logs_cursor.json",
+		CollectCrowdSecCorrelation:     false,
+		CrowdSecConnectionString:       "http://localhost:8080",
+		CrowdSecAPIKey:                 "",
+		CrowdSecAlertsMachineID:        "",
+		CrowdSecAlertsPassword:         "",
+		DisableWSPush:                  false,
+		LogLevel:                       "info",
+		LogFormat:                      "text",
+		CollectRestic:                  false,
+		ResticEnableProgress:           true,
+		ResticProgressFPS:              0.1,
+		ResticBackupIdleTimeoutMinutes: 20,
 	}
 }
 
@@ -309,6 +354,21 @@ crowdsec_api_key: ""
 # Fill with machine_id/password from /etc/crowdsec/local_api_credentials.yaml
 crowdsec_alerts_machine_id: ""
 crowdsec_alerts_password: ""
+
+# Restic backup supervision. Only paths/flags — never put restic/Swift/SMTP
+# credentials here; they stay in resticconf on disk (restic_conf_path).
+collect_restic: false
+restic_bin: "/usr/local/bin/restic"
+restic_conf_path: "/home/user/restic-backups/resticconf"
+restic_run_script_path: "/home/user/restic-backups/run_backup.sh"
+restic_status_file_path: "/home/user/restic-backups/backup-status.json"
+restic_enable_progress: true
+restic_progress_fps: 0.1
+
+# How long a run_backup command may stay silent (no progress chunk) before
+# the agent kills it. Not an absolute run duration cap — a backup that keeps
+# progressing can run far longer than this.
+restic_backup_idle_timeout_minutes: 20
 `
 
 	if strings.TrimSpace(serverURL) != "" {

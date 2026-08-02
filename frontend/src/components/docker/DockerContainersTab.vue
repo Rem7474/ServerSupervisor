@@ -3,7 +3,7 @@
   <DataToolbar
     searchable
     :search="searchInput"
-    search-placeholder="Rechercher un conteneur..."
+    search-placeholder="Rechercher un conteneur…"
     @update:search="searchInput = $event"
   >
     <template #bottom>
@@ -211,7 +211,7 @@
               </div>
             </td>
             <td>
-              <span :class="stateClass(c.state)">{{ c.state }}</span>
+              <span :class="stateClass(c.state)">{{ stateLabel(c.state) }}</span>
             </td>
             <td class="small">
               <DockerPortBadges
@@ -241,7 +241,7 @@
                     v-if="['exited', 'dead', 'created', 'paused'].includes(c.state)"
                     type="button"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-success"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     title="Démarrer"
                     aria-label="Démarrer le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'start', container: c })"
@@ -250,7 +250,8 @@
                       v-if="actionLoading[c.name] === 'start'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconPlayerPlay v-else
+                    <IconPlayerPlay
+                      v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -259,7 +260,7 @@
                     v-if="c.state === 'running'"
                     type="button"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-outline-danger"
+                    class="btn btn-icon btn-sm btn-ghost-danger"
                     title="Arrêter"
                     aria-label="Arrêter le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'stop', container: c })"
@@ -278,7 +279,7 @@
                     v-if="c.state === 'running'"
                     type="button"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-outline-warning"
+                    class="btn btn-icon btn-sm btn-ghost-warning"
                     title="Redémarrer"
                     aria-label="Redémarrer le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'restart', container: c })"
@@ -287,7 +288,8 @@
                       v-if="actionLoading[c.name] === 'restart'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconRefresh v-else
+                    <IconRefresh
+                      v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -295,7 +297,7 @@
                   <button
                     type="button"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Voir les logs"
                     aria-label="Voir les logs du conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'logs', container: c })"
@@ -304,7 +306,8 @@
                       v-if="actionLoading[c.name] === 'logs'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconList v-else
+                    <IconList
+                      v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -312,7 +315,7 @@
                 </template>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Inspecter"
                   aria-label="Inspecter le conteneur"
                   @click="inspectTarget = c; inspectTab = 'env'"
@@ -325,7 +328,7 @@
                 <button
                   v-if="containerVersion(c)?.tracker_id"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Voir le suivi de version"
                   aria-label="Voir le suivi de version"
                   @click="openTracker(containerVersion(c)?.tracker_id)"
@@ -339,7 +342,7 @@
                   v-if="containerVersion(c)?.tracker_id"
                   type="button"
                   :disabled="isTrackerRunDisabled(containerVersion(c))"
-                  class="btn btn-sm btn-ghost-primary"
+                  class="btn btn-icon btn-sm btn-ghost-primary"
                   :title="trackerRunTooltip(containerVersion(c))"
                   aria-label="Déclencher le tracker"
                   @click="runTracker(containerVersion(c), c)"
@@ -348,14 +351,15 @@
                     v-if="trackerRunLoading[containerVersion(c)?.tracker_id || '']"
                     class="spinner-border spinner-border-sm"
                   />
-                  <IconPlayerPlay v-else
+                  <IconPlayerPlay
+                    v-else
                     :size="16"
                     class="icon icon-sm"
                   />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Suivre les mises à jour de cette image"
                   aria-label="Créer un tracker de mise à jour"
                   @click="trackImage(c)"
@@ -448,8 +452,8 @@
   <!-- Modal conteneur (labels/compose info) -->
   <div
     v-if="selectedContainer"
-    class="modal modal-blur fade show"
-    style="display: block;"
+    ref="containerModalRef"
+    class="modal modal-blur fade show d-block"
     @click.self="selectedContainer = null"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -529,8 +533,8 @@
   <!-- Modal Inspection (env vars / volumes / networks) -->
   <div
     v-if="inspectTarget"
-    class="modal modal-blur fade show"
-    style="display: block;"
+    ref="inspectModalRef"
+    class="modal modal-blur fade show d-block"
     @click.self="inspectTarget = null"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -545,7 +549,7 @@
               <span
                 class="ms-2"
                 :class="stateClass(inspectTarget.state)"
-              >{{ inspectTarget.state }}</span>
+              >{{ stateLabel(inspectTarget.state) }}</span>
             </div>
           </div>
           <button
@@ -722,6 +726,7 @@ import DockerPortBadges from '../common/DockerPortBadges.vue'
 import EmptyState from '../EmptyState.vue'
 import PaginationNav from '../PaginationNav.vue'
 import BulkActionBar from '../BulkActionBar.vue'
+import { useModalChrome } from '../../composables/useModalChrome'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 import { usePagination } from '../../composables/usePagination'
 import { getApiErrorMessage } from '../../api/client'
@@ -799,12 +804,21 @@ function toggleSelected(id: string, checked: boolean): void {
   selectedIds.value = next
 }
 
+// Scoped to the current page, matching the checkbox's own aria-label
+// ("...affichés") — selecting "all" used to silently span every page of the
+// current filter, which made a bulk stop/restart much wider than what the
+// screen showed.
 const allVisibleSelected = computed(() =>
-  sortedContainers.value.length > 0 && sortedContainers.value.every((c) => selectedIds.value.has(c.id))
+  pagedContainers.value.length > 0 && pagedContainers.value.every((c) => selectedIds.value.has(c.id))
 )
 
 function toggleSelectAll(checked: boolean): void {
-  selectedIds.value = checked ? new Set(sortedContainers.value.map((c) => c.id)) : new Set()
+  const next = new Set(selectedIds.value)
+  for (const c of pagedContainers.value) {
+    if (checked) next.add(c.id)
+    else next.delete(c.id)
+  }
+  selectedIds.value = next
 }
 
 function emitBulkAction(action: string): void {
@@ -842,6 +856,10 @@ const sortDir = ref<'asc' | 'desc'>('asc')
 const inspectTarget = ref<Container | null>(null)
 const inspectTab = ref('env')
 const selectedContainer = ref<Container | null>(null)
+const containerModalRef = ref<HTMLElement | null>(null)
+const inspectModalRef = ref<HTMLElement | null>(null)
+useModalChrome(containerModalRef, () => !!selectedContainer.value, { onClose: () => { selectedContainer.value = null } })
+useModalChrome(inspectModalRef, () => !!inspectTarget.value, { onClose: () => { inspectTarget.value = null } })
 const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')
 
@@ -883,6 +901,36 @@ function isComposeServiceRedundant(container: Container): boolean {
 
 function isComposeContainer(container: Container): boolean {
   return !!container.labels?.['com.docker.compose.project']
+}
+
+const STATE_LABELS: Record<string, string> = {
+  running: 'En cours',
+  restarting: 'Redémarrage',
+  paused: 'En pause',
+  created: 'Créé',
+  exited: 'Arrêté',
+  dead: 'Mort',
+  removing: 'Suppression',
+}
+
+function stateLabel(state: string | undefined): string {
+  return STATE_LABELS[state || ''] || state || ''
+}
+
+// Groups states by operational severity rather than sorting alphabetically
+// (which interleaved "created"/"dead"/"exited" with no meaningful order).
+const STATE_RANK: Record<string, number> = {
+  running: 0,
+  restarting: 1,
+  paused: 1,
+  created: 2,
+  exited: 3,
+  dead: 4,
+  removing: 4,
+}
+
+function stateRank(state: string | undefined): number {
+  return STATE_RANK[state || ''] ?? 5
 }
 
 function stateClass(state: string | undefined): string {
@@ -968,6 +1016,10 @@ const sortedContainers = computed(() => {
   const dir = sortDir.value === 'asc' ? 1 : -1
   const sorted = [...filteredContainers.value]
   sorted.sort((a, b) => {
+    if (sortBy.value === 'state') {
+      return (stateRank(a.state) - stateRank(b.state)) * dir
+    }
+
     let av: unknown = a[sortBy.value]
     let bv: unknown = b[sortBy.value]
 

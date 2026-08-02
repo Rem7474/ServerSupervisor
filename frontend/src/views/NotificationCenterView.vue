@@ -73,6 +73,24 @@
           {{ f.label }}
         </button>
       </div>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        :title="groupByHost ? 'Afficher en liste chronologique' : 'Regrouper par hôte'"
+        @click="toggleGroupByHost"
+      >
+        <IconStack2
+          v-if="!groupByHost"
+          :size="14"
+          class="icon me-1"
+        />
+        <IconList
+          v-else
+          :size="14"
+          class="icon me-1"
+        />
+        {{ groupByHost ? 'Vue chronologique' : 'Regrouper par hôte' }}
+      </button>
     </div>
 
     <div
@@ -85,10 +103,9 @@
     <div class="card">
       <div
         v-if="loading && items.length === 0"
-        class="card-body text-center text-muted py-5"
+        class="card-body"
       >
-        <div class="spinner-border mb-2" />
-        <div>Chargement…</div>
+        <LoadingSkeleton variant="list" />
       </div>
 
       <div
@@ -98,90 +115,61 @@
         Aucune notification.
       </div>
 
+      <!-- Grouped by host -->
+      <div v-else-if="groupByHost">
+        <div
+          v-for="group in groupedItems"
+          :key="group.key"
+          class="border-bottom"
+        >
+          <button
+            type="button"
+            class="btn btn-link text-decoration-none w-100 d-flex align-items-center gap-2 px-3 py-2 text-start"
+            @click="toggleHostGroup(group.key)"
+          >
+            <IconChevronRight
+              :size="16"
+              class="icon transition-transform"
+              :class="{ 'rotate-90': !isHostCollapsed(group.key) }"
+            />
+            <span class="fw-medium text-body">{{ group.hostName }}</span>
+            <span class="badge bg-secondary-lt text-secondary">{{ group.items.length }}</span>
+            <span
+              v-if="group.unreadCount > 0"
+              class="badge bg-red-lt text-red"
+            >{{ group.unreadCount }} non lue{{ group.unreadCount > 1 ? 's' : '' }}</span>
+          </button>
+          <div
+            v-if="!isHostCollapsed(group.key)"
+            class="list-group list-group-flush"
+          >
+            <NotificationListItem
+              v-for="item in group.items"
+              :key="item.id"
+              :item="item"
+              :unread="isUnread(item)"
+              :is-admin="auth.isAdmin"
+              :resolving="resolvingId === item.id"
+              @resolve="resolveIncident"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Flat chronological list -->
       <div
         v-else
         class="list-group list-group-flush"
       >
-        <div
+        <NotificationListItem
           v-for="item in items"
           :key="item.id"
-          class="list-group-item list-group-item-action px-3 py-3"
-          :class="{ 'notification-unread': isUnread(item) }"
-        >
-          <div class="d-flex gap-3 align-items-start">
-            <!-- Icon -->
-            <div class="flex-shrink-0">
-              <span
-                class="avatar avatar-sm rounded"
-                :class="iconBg(item)"
-              >
-                <IconCode
-                  v-if="isTrackerType(item)"
-                  :size="16"
-                  class="icon"
-                />
-                <IconAlertTriangle
-                  v-else
-                  :size="16"
-                  class="icon"
-                />
-              </span>
-            </div>
-
-            <!-- Content -->
-            <div class="flex-grow-1 min-w-0">
-              <div class="d-flex align-items-start justify-content-between gap-2">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <span class="fw-medium">{{ notificationTitle(item) }}</span>
-                  <span
-                    v-if="item.severity"
-                    class="badge"
-                    :class="severityBadge(item.severity)"
-                  >{{ item.severity }}</span>
-                  <span
-                    class="badge"
-                    :class="resolvedBadge(item)"
-                  >{{ notificationResolved(item) ? 'Résolu' : 'Actif' }}</span>
-                </div>
-                <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                  <button
-                    v-if="auth.isAdmin && item.type === 'alert_incident' && !notificationResolved(item)"
-                    type="button"
-                    class="btn btn-sm btn-outline-success py-0 px-2"
-                    :disabled="resolvingId === item.id"
-                    @click.stop="resolveIncident(item)"
-                  >
-                    <span
-                      v-if="resolvingId === item.id"
-                      class="spinner-border spinner-border-sm me-1"
-                    />
-                    Résoudre
-                  </button>
-                  <span class="text-muted small">
-                    <RelativeTime :date="item.triggered_at || ''" />
-                  </span>
-                </div>
-              </div>
-
-              <div class="text-muted small mt-1">
-                <router-link
-                  v-if="item.host_name"
-                  :to="notificationRoute(item)"
-                  class="text-secondary text-decoration-none"
-                >
-                  {{ item.host_name }}
-                </router-link>
-                <span v-else>—</span>
-                <template v-if="isTrackerType(item) && item.version">
-                  &nbsp;— version <code>{{ item.version }}</code>
-                </template>
-                <template v-else-if="item.value !== undefined">
-                  &nbsp;— valeur : <code>{{ item.value?.toFixed(2) }}{{ metricUnit(item.metric) }}</code>
-                </template>
-              </div>
-            </div>
-          </div>
-        </div>
+          :item="item"
+          :unread="isUnread(item)"
+          :is-admin="auth.isAdmin"
+          :resolving="resolvingId === item.id"
+          @resolve="resolveIncident"
+        />
       </div>
 
       <div
@@ -202,8 +190,9 @@
 </template>
 
 <script setup lang="ts">
-import { IconCode, IconAlertTriangle } from '@tabler/icons-vue'
-import RelativeTime from '../components/RelativeTime.vue'
+import { IconChevronRight, IconList, IconStack2 } from '@tabler/icons-vue'
+import NotificationListItem from '../components/NotificationListItem.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationCenter } from '../composables/useNotificationCenter'
 
@@ -223,15 +212,12 @@ const {
   typeFilter,
   statusFilter,
   unreadCount,
+  groupByHost,
+  toggleGroupByHost,
+  groupedItems,
+  isHostCollapsed,
+  toggleHostGroup,
   isUnread,
-  isTrackerType,
-  notificationTitle,
-  notificationResolved,
-  notificationRoute,
-  metricUnit,
-  iconBg,
-  severityBadge,
-  resolvedBadge,
   resolveIncident,
   loadMore,
   handleMarkRead,
@@ -239,7 +225,10 @@ const {
 </script>
 
 <style scoped>
-.notification-unread {
-  background: rgba(var(--tblr-azure-rgb), 0.04);
+.transition-transform {
+  transition: transform 0.15s ease;
+}
+.rotate-90 {
+  transform: rotate(90deg);
 }
 </style>

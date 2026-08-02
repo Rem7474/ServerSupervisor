@@ -33,9 +33,58 @@ func (db *DB) GetProxmoxSummary(ctx context.Context) (models.ProxmoxSummary, err
 		}
 	}
 
-	err := db.conn.QueryRowContext(ctx, `SELECT COALESCE(SUM(total),0), COALESCE(SUM(used),0) FROM proxmox_storages`).
-		Scan(&s.StorageTotal, &s.StorageUsed)
-	return s, err
+	if err := db.conn.QueryRowContext(ctx, `SELECT COALESCE(SUM(total),0), COALESCE(SUM(used),0) FROM proxmox_storages`).
+		Scan(&s.StorageTotal, &s.StorageUsed); err != nil {
+		return s, err
+	}
+
+	idQueries := []struct {
+		dest *[]string
+		q    string
+	}{
+		{&s.NodesDownIDs, `SELECT id FROM proxmox_nodes WHERE status != 'online'`},
+		{&s.StorageNearFullNodeIDs, `
+			SELECT DISTINCT n.id FROM proxmox_nodes n
+			JOIN proxmox_storages st ON st.connection_id = n.connection_id AND st.node_name = n.node_name
+			WHERE st.total > 0 AND (st.used::float / st.total::float) > 0.80`},
+		{&s.StorageOfflineNodeIDs, `
+			SELECT DISTINCT n.id FROM proxmox_nodes n
+			JOIN proxmox_storages st ON st.connection_id = n.connection_id AND st.node_name = n.node_name
+			WHERE st.active = FALSE OR st.enabled = FALSE`},
+		{&s.FailedTaskNodeIDs, `
+			SELECT DISTINCT n.id FROM proxmox_nodes n
+			JOIN proxmox_tasks t ON t.connection_id = n.connection_id AND t.node_name = n.node_name
+			WHERE t.status='stopped' AND t.exit_status != '' AND t.exit_status != 'OK'
+			  AND t.start_time >= NOW() - INTERVAL '24 hours'`},
+	}
+	for _, q := range idQueries {
+		ids, err := db.queryStringSlice(ctx, q.q)
+		if err != nil {
+			return s, err
+		}
+		*q.dest = ids
+	}
+
+	return s, nil
+}
+
+// queryStringSlice runs a single-column query and collects the results into a slice.
+func (db *DB) queryStringSlice(ctx context.Context, query string, args ...interface{}) ([]string, error) {
+	rows, err := db.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }
 
 // GetMaxProxmoxStorageUsagePercent returns the max used/total ratio (0-100) across all active Proxmox storages.

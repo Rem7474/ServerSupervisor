@@ -150,6 +150,20 @@ type WSWebhookExecutionMessage struct {
 	Notification WSWebhookNotification `json:"notification"`
 }
 
+// WSBackupNotification is the nested payload of a "backup_run" message.
+type WSBackupNotification struct {
+	HostID      string    `json:"host_id"`
+	Status      string    `json:"status"`
+	TriggeredAt time.Time `json:"triggered_at"`
+}
+
+// WSBackupRunMessage is pushed when a restic run_backup command fails
+// (type "backup_run").
+type WSBackupRunMessage struct {
+	Type         string               `json:"type"`
+	Notification WSBackupNotification `json:"notification"`
+}
+
 // WSReleaseTrackerNotification is the nested payload of release-tracker messages.
 // version/release_url/release_name/label are populated only for
 // "release_tracker_detected".

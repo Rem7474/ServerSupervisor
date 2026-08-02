@@ -13,18 +13,11 @@
       {{ error }}
     </div>
 
-    <!-- Spinner : en cours de chargement OU pas encore chargé une première fois -->
     <div
       v-if="loading || !fetched"
-      class="card-body text-center py-5"
+      class="card-body"
     >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
-      <div class="mt-2">
-        Chargement...
-      </div>
+      <LoadingSkeleton variant="table" />
     </div>
 
     <div
@@ -41,17 +34,38 @@
 
     <div
       v-else
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
             <th>État</th>
-            <th>Nom</th>
+            <th>
+              <SortableHeader
+                label="Nom"
+                :active="sortKey === 'name'"
+                :direction="sortDir"
+                @toggle="toggleSort('name')"
+              />
+            </th>
             <th>Source / Hôte</th>
-            <th>Métrique</th>
+            <th>
+              <SortableHeader
+                label="Métrique"
+                :active="sortKey === 'metric'"
+                :direction="sortDir"
+                @toggle="toggleSort('metric')"
+              />
+            </th>
             <th>Condition</th>
-            <th>Durée</th>
+            <th>
+              <SortableHeader
+                label="Durée"
+                :active="sortKey === 'duration_seconds'"
+                :direction="sortDir"
+                @toggle="toggleSort('duration_seconds')"
+              />
+            </th>
             <th>Canaux</th>
             <th class="w-1">
               Actions
@@ -60,8 +74,9 @@
         </thead>
         <tbody>
           <tr
-            v-for="rule in rules"
+            v-for="rule in sortedRules"
             :key="rule.id"
+            :class="{ 'opacity-60': !rule.enabled }"
           >
             <td>
               <label
@@ -167,7 +182,7 @@
               >
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="$emit('edit', rule)"
                 >
@@ -178,7 +193,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-danger"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="$emit('delete', rule)"
                 >
@@ -197,7 +212,10 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
+import SortableHeader from '../common/SortableHeader.vue'
 import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import { formatDurationSecs } from '../../utils/formatters'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
@@ -293,6 +311,31 @@ defineEmits<{
   (e: 'toggle', rule: AlertRule): void
   (e: 'delete', rule: AlertRule): void
 }>()
+
+type SortKey = 'name' | 'metric' | 'duration_seconds'
+const sortKey = ref<SortKey>('name')
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+function toggleSort(key: SortKey): void {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortKey.value = key
+  sortDir.value = 'asc'
+}
+
+const sortedRules = computed(() => {
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return [...props.rules].sort((a, b) => {
+    if (sortKey.value === 'duration_seconds') {
+      return ((a.duration_seconds ?? 0) - (b.duration_seconds ?? 0)) * dir
+    }
+    const av = sortKey.value === 'metric' ? getMetricLabel(a.metric) : (a.name || '')
+    const bv = sortKey.value === 'metric' ? getMetricLabel(b.metric) : (b.name || '')
+    return av.toLowerCase().localeCompare(bv.toLowerCase()) * dir
+  })
+})
 
 function getHostName(hostId: string | undefined): string | undefined {
   return hostId

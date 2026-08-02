@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/serversupervisor/server/internal/apperr"
+	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/threatdetect"
@@ -29,7 +30,7 @@ func (fakeRepo) GetWebLogsKPIWindow(context.Context, time.Time, time.Time, strin
 func (fakeRepo) GetIPTimeline(context.Context, string, time.Time, string, int) ([]models.WebLogIPTimelineRow, error) {
 	return nil, nil
 }
-func (fakeRepo) GetDomainDetails(context.Context, string, time.Time, string, string, int) (map[string]any, error) {
+func (fakeRepo) GetDomainDetails(context.Context, string, time.Time, string, string, database.DomainDetailsFilter, int, int) (map[string]any, error) {
 	return nil, nil
 }
 func (fakeRepo) GetWebLogsTimeseries(context.Context, time.Time, string, string, string) ([]map[string]any, error) {

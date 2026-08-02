@@ -60,7 +60,7 @@
               </div>
             </div>
             <BadgePill
-              :tone="getStatusBadgeClass(disk.health)"
+              :tone="smartStatusTone(disk.health)"
               :text="disk.health"
               compact
             />
@@ -104,6 +104,7 @@ import BadgePill from '../common/BadgePill.vue'
 import EmptyState from '../EmptyState.vue'
 import { IconDisc } from '@tabler/icons-vue'
 import { useProxmoxHostDisks } from '../../composables/useProxmoxHostDisks'
+import { smartStatusTone } from '../../utils/diskHealth'
 
 const props = defineProps<{
   hostId: string
@@ -124,17 +125,6 @@ function formatBytes(bytes: number): string {
     i++
   }
   return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${units[i]}`
-}
-
-type Tone = 'success' | 'danger' | 'warning' | 'secondary'
-
-function getStatusBadgeClass(status: string): Tone {
-  switch (status) {
-    case 'PASSED': return 'success'
-    case 'FAILED': return 'danger'
-    case 'UNKNOWN': return 'warning'
-    default: return 'secondary'
-  }
 }
 
 function getCardClass(status: string): string {

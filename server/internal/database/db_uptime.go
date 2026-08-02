@@ -36,11 +36,13 @@ func (db *DB) CreateUptimeProbe(ctx context.Context, p models.UptimeProbe) (*mod
 
 func (db *DB) ListUptimeProbes(ctx context.Context) ([]models.UptimeProbe, error) {
 	rows, err := db.conn.QueryContext(ctx,
-		`SELECT id, name, type, target, interval_sec, timeout_sec, expected_status, expected_body_regex,
-		        follow_redirects, verify_tls, enabled, last_status, last_latency_ms, last_status_code,
-		        last_error, last_checked_at, consecutive_failures, created_at, updated_at
-		 FROM uptime_probes
-		 ORDER BY name ASC`)
+		`SELECT p.id, p.name, p.type, p.target, p.interval_sec, p.timeout_sec, p.expected_status, p.expected_body_regex,
+		        p.follow_redirects, p.verify_tls, p.enabled, p.last_status, p.last_latency_ms, p.last_status_code,
+		        p.last_error, p.last_checked_at, p.consecutive_failures, p.created_at, p.updated_at,
+		        n.id, COALESCE(n.domain_names[1], '')
+		 FROM uptime_probes p
+		 LEFT JOIN npm_proxy_hosts n ON n.uptime_probe_id = p.id
+		 ORDER BY p.name ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -54,6 +56,7 @@ func (db *DB) ListUptimeProbes(ctx context.Context) ([]models.UptimeProbe, error
 			&p.ExpectedStatus, &p.ExpectedBodyRegex, &p.FollowRedirects, &p.VerifyTLS, &p.Enabled,
 			&p.LastStatus, &p.LastLatencyMs, &p.LastStatusCode, &p.LastError, &p.LastCheckedAt,
 			&p.ConsecutiveFailures, &p.CreatedAt, &p.UpdatedAt,
+			&p.NPMProxyHostID, &p.NPMProxyHostDomain,
 		); err != nil {
 			return nil, err
 		}

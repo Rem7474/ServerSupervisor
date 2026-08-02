@@ -294,6 +294,7 @@
                   :root-label="rootNodeName"
                   :root-ip="rootNodeIp"
                   :services="filteredServices"
+                  :guests="guestNodes"
                   :host-port-overrides="hostPortOverrides"
                   :authelia-label="autheliaLabel"
                   :authelia-ip="autheliaIp"
@@ -334,6 +335,9 @@
           <NetworkPortList
             :hosts="hosts"
             :containers="containers"
+            :proxmox-guests="proxmoxGuestIPs"
+            :npm-entries="npmEntries"
+            :ip-inventory-loading="ipInventoryLoading"
           />
         </div>
       </div>
@@ -355,6 +359,9 @@ import { useNetwork } from '../composables/useNetwork'
 const {
   hosts,
   containers,
+  proxmoxGuestIPs,
+  npmEntries,
+  ipInventoryLoading,
   viewMode,
   networkTab,
   rootNodeName,
@@ -379,6 +386,7 @@ const {
   discoveredPortsByHost,
   hostPortOverrides,
   combinedServices,
+  guestNodes,
   filteredGraphHosts,
   filteredServices,
   totalPorts,

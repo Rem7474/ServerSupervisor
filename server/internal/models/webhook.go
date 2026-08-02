@@ -72,4 +72,8 @@ type GitWebhookExecution struct {
 	Status        string     `json:"status"`
 	TriggeredAt   time.Time  `json:"triggered_at"`
 	CompletedAt   *time.Time `json:"completed_at,omitempty"`
+	// RawPayload is the provider's raw JSON delivery body, truncated to a
+	// bounded size (see gitwebhook.maxStoredPayloadBytes) — kept for debugging
+	// "why didn't this trigger", not as an unbounded audit log.
+	RawPayload string `json:"raw_payload,omitempty"`
 }

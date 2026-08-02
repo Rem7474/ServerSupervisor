@@ -20,14 +20,39 @@ export function useProxmox() {
   const nodeSortKey = ref<string>('node_name')
   const nodeSortDir = ref<'asc' | 'desc'>('asc')
 
+  // Drill-down from a ProxmoxSummary health card (nodes_down_ids, etc.) — an
+  // empty array (not null) means "the signal is active but matched zero of
+  // the currently loaded nodes," which the table should say explicitly
+  // rather than silently showing everything.
+  const healthFilterIds = ref<string[] | null>(null)
+  const healthFilterLabel = ref('')
+
+  function filterByHealthIds(ids: string[] | undefined, label: string): void {
+    healthFilterIds.value = ids ?? []
+    healthFilterLabel.value = label
+  }
+
+  function clearHealthFilter(): void {
+    healthFilterIds.value = null
+    healthFilterLabel.value = ''
+  }
+
+  // Base for the cluster-wide CPU/RAM KPI cards, which must stay whole-cluster
+  // even while the node table below is drilled down to a health signal.
   const filteredNodes = computed(() =>
     filterConnection.value
       ? nodes.value.filter((n) => n.connection_id === filterConnection.value)
       : nodes.value
   )
 
+  const tableNodes = computed(() => {
+    if (healthFilterIds.value === null) return filteredNodes.value
+    const ids = new Set(healthFilterIds.value)
+    return filteredNodes.value.filter((n) => ids.has(n.id))
+  })
+
   const sortedNodes = computed(() => {
-    const list = [...filteredNodes.value]
+    const list = [...tableNodes.value]
     const dir = nodeSortDir.value === 'asc' ? 1 : -1
     list.sort((a, b) => {
       let aVal: number | string
@@ -53,6 +78,21 @@ export function useProxmox() {
       return 0
     })
     return list
+  })
+
+  // Cluster-wide CPU/RAM, computed client-side from the same per-node figures
+  // already fetched for the table — the backend summary only aggregates
+  // storage today. CPU is a plain average across online nodes (not weighted
+  // by core count, which isn't exposed per node); RAM is a true sum since
+  // mem_used/mem_total are both in bytes.
+  const clusterResources = computed(() => {
+    const online = filteredNodes.value.filter((n) => n.status === 'online')
+    const memUsed = online.reduce((sum, n) => sum + (n.mem_used || 0), 0)
+    const memTotal = online.reduce((sum, n) => sum + (n.mem_total || 0), 0)
+    const avgCpu = online.length
+      ? online.reduce((sum, n) => sum + (n.cpu_usage || 0), 0) / online.length
+      : 0
+    return { memUsed, memTotal, avgCpu, onlineCount: online.length }
   })
 
   function toggleNodeSort(key: string): void {
@@ -129,6 +169,11 @@ export function useProxmox() {
     sortedNodes,
     toggleNodeSort,
     hasHealthAlerts,
+    clusterResources,
+    healthFilterIds,
+    healthFilterLabel,
+    filterByHealthIds,
+    clearHealthFilter,
     load,
   }
 }

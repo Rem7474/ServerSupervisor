@@ -21,7 +21,7 @@
           >{{ webhook.provider }}</span>
           <span
             v-if="webhook && !webhook.enabled"
-            class="badge bg-secondary"
+            class="badge bg-secondary-lt text-secondary"
           >Désactivé</span>
         </h2>
       </div>
@@ -34,15 +34,11 @@
       {{ error }}
     </div>
 
-    <div
+    <LoadingSkeleton
       v-if="loading"
-      class="text-center py-5"
-    >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
-    </div>
+      variant="card"
+      :lines="6"
+    />
 
     <div
       v-else-if="webhook"
@@ -181,6 +177,7 @@
           logs-mode="inline"
           @refresh="loadExecutions"
           @open-logs="openExecutionLogs"
+          @open-payload="selectedPayload = $event"
         />
 
         <div class="mt-3">
@@ -206,16 +203,26 @@
       @close="closeEdit"
       @submit="saveEdit"
     />
+
+    <PayloadViewerModal
+      :payload="selectedPayload"
+      @close="selectedPayload = null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
+import PayloadViewerModal from '../components/webhooks/PayloadViewerModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useGitWebhookDetail } from '../composables/useGitWebhookDetail'
+
+const selectedPayload = ref<string | null>(null)
 
 const {
   id,

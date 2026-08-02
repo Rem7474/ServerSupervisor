@@ -307,7 +307,7 @@
           <div class="fw-semibold small mb-2">
             Historique des upgrades automatiques
           </div>
-          <div class="table-responsive">
+          <div class="table-responsive scroll-table">
             <table class="table table-sm table-vcenter">
               <thead>
                 <tr>
@@ -347,7 +347,7 @@
                   <td>
                     <button
                       type="button"
-                      class="btn btn-sm btn-ghost-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       title="Voir les logs"
                       :disabled="!run.log_snippet"
                       @click="$emit('uu-log', run)"

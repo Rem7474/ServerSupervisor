@@ -194,7 +194,7 @@ func TestDiskHealth_SMARTRoundTrip(t *testing.T) {
 	}
 
 	in := []models.DiskHealth{{
-		HostID: hostID, Device: "/dev/nvme0n1", Model: "TestSSD", SerialNumber: "SN1",
+		HostID: hostID, CollectedAt: time.Now(), Device: "/dev/nvme0n1", Model: "TestSSD", SerialNumber: "SN1",
 		SmartStatus: "PASSED", Temperature: 35, PowerOnHours: 1000, PowerCycles: 42,
 		ReallocSectors: 0, PendingSectors: 0, UncorrectableSectors: 7, PercentageUsed: 12,
 	}}

@@ -1,15 +1,24 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import apiClient, { getApiErrorMessage } from '../api'
 import { addToast } from './useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
+import { useDomainDetails } from './useDomainDetails'
 import type { WebLogIPTimelineRow } from '../types/security'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
 
 export function useBot() {
-  const period = ref('24h')
+  // period/source/hostId persist in the URL (?period=&source=&host_id=) so a
+  // refresh or a shared link keeps the filter instead of always resetting to
+  // "24h, all sources, all hosts" — same ?tab= idea HostDetailView already
+  // uses, applied to this page's filter bar instead of a tab.
+  const route = useRoute()
+  const router = useRouter()
+
+  const period = ref(typeof route.query.period === 'string' ? route.query.period : '24h')
   const periodOptions = [
     { value: '1h', label: '1h' },
     { value: '24h', label: '24h' },
@@ -18,8 +27,12 @@ export function useBot() {
   ]
   const hostsStore = useHostsStore()
 
-  const source = ref('')
-  const hostId = ref('')
+  const source = ref(typeof route.query.source === 'string' ? route.query.source : '')
+  const hostId = ref(typeof route.query.host_id === 'string' ? route.query.host_id : '')
+
+  watch([period, source, hostId], ([p, s, h]) => {
+    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined } })
+  })
 
   const loading = ref(false)
   const summary = ref<AnyRecord>({ threats: {} })
@@ -35,16 +48,17 @@ export function useBot() {
   const timelineHostId = ref('')
   const timeline = ref<WebLogIPTimelineRow[]>([])
 
-  const showDomainModal = ref(false)
-  const selectedDomain = ref('')
-  const domainLoading = ref(false)
-  const domainDetails = ref<AnyRecord>({})
+  const domainModal = useDomainDetails()
   const searchTerm = ref('')
 
   const threats = computed(() => summary.value.threats || {})
   const topPaths = computed(() => threats.value.top_paths || [])
   const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || [])
   const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
+  const countryDistribution = computed(() => {
+    const rows = threats.value.country_distribution || []
+    return [...rows].sort((a: AnyRecord, b: AnyRecord) => (Number(b?.hits) || 0) - (Number(a?.hits) || 0))
+  })
   const unblockedIPs = ref(new Set<string>())
   const rowState = ref<Record<string, 'loading' | 'error'>>({})
   const optimisticBans = ref<AnyRecord[]>([])
@@ -156,7 +170,7 @@ export function useBot() {
   async function loadThreats() {
     loading.value = true
     try {
-      // BotView reads only `threats`; request the threats-only scope so the server
+      // Threats mode reads only `threats`; request the threats-only scope so the server
       // skips the heavy (unindexed) traffic aggregates + geolocation that would
       // otherwise time the request out on long windows.
       const res = await apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined, 'threats')
@@ -213,26 +227,9 @@ export function useBot() {
   // hosts.id (see fillWebLogsThreats server-side) — this opens the matching
   // domain's request breakdown instead of trying to route to /hosts/:id,
   // which 404s/500s since that string was never a real host.
-  async function openDomain(domain: string) {
+  function openDomain(domain: string) {
     if (!domain) return
-    selectedDomain.value = domain
-    showDomainModal.value = true
-    domainLoading.value = true
-    try {
-      const res = await apiClient.getDomainDetails(domain, period.value, hostId.value || undefined, source.value || undefined, 300)
-      domainDetails.value = res.data?.details || {}
-    } catch (err) {
-      console.error('Failed to load domain details', err)
-      domainDetails.value = {}
-    } finally {
-      domainLoading.value = false
-    }
-  }
-
-  function closeDomainModal() {
-    showDomainModal.value = false
-    selectedDomain.value = ''
-    domainDetails.value = {}
+    domainModal.open(domain, { period: period.value, hostId: hostId.value || undefined, source: source.value || undefined })
   }
 
   // Free-text search: routes to the domain or IP detail view depending on
@@ -342,15 +339,13 @@ export function useBot() {
     banState,
     selectedIP,
     timeline,
-    showDomainModal,
-    selectedDomain,
-    domainLoading,
-    domainDetails,
+    domainModal,
     searchTerm,
     threats,
     topPaths,
     mostTargetedHosts,
     ipHostMatrix,
+    countryDistribution,
     rowState,
     crowdSecIPs,
     crowdSecTotal,
@@ -367,7 +362,6 @@ export function useBot() {
     openTimeline,
     closeTimeline,
     openDomain,
-    closeDomainModal,
     handleSearch,
     handleBanFromModal,
     unblockCrowdSecEntry,

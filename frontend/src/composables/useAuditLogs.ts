@@ -3,7 +3,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from './useConfirmDialog'
 import apiClient from '../api'
+import { addToast } from './useGlobalToast'
+import { getApiErrorMessage } from '../api/client'
 import { useStatusBadge } from './useStatusBadge'
+import { commandStatusLabel } from '../utils/commandStatus'
+import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useCommandStream } from './useCommandStream'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
 import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
@@ -92,6 +96,7 @@ export function useAuditLogs() {
 
   const selectedCmd = ref<RemoteCommand | null>(null)
   const showLogViewer = ref(false)
+  const cancellingId = ref<string | null>(null)
   let auditPollTimer: ReturnType<typeof setInterval> | null = null
 
   const { openCommandStream, closeStream } = useCommandStream()
@@ -121,33 +126,8 @@ export function useAuditLogs() {
     Math.max(1, Math.ceil(connexionsTotal.value / connexionsLimit))
   )
 
-  // ── Module display helpers ────────────────────────────────────────────────────
-  const MODULE_META: Record<string, { label: string; cls: string }> = {
-    apt:       { label: 'APT',        cls: 'badge bg-azure-lt text-azure' },
-    docker:    { label: 'Docker',     cls: 'badge bg-blue-lt text-blue' },
-    systemd:   { label: 'Systemd',    cls: 'badge bg-green-lt text-green' },
-    journal:   { label: 'Journal',    cls: 'badge bg-purple-lt text-purple' },
-    processes: { label: 'Processus',  cls: 'badge bg-orange-lt text-orange' },
-    custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
-  }
-
-  const STATUS_LABELS: Record<string, string> = {
-    pending:   'En attente',
-    running:   'En cours',
-    completed: 'Terminé',
-    failed:    'Échoué',
-  }
-
-  function moduleLabel(module: string): string {
-    return MODULE_META[module]?.label ?? module
-  }
-
-  function moduleClass(module: string): string {
-    return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary'
-  }
-
   function statusLabel(status: string): string {
-    return STATUS_LABELS[status] ?? status
+    return commandStatusLabel(status)
   }
 
   function cmdLabel(cmd: RemoteCommand): string {
@@ -167,21 +147,6 @@ export function useAuditLogs() {
   function statusClass(status: string | undefined): string {
     return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
   }
-
-  function parseUA(ua: string | undefined): { browser: string; os: string } {
-    if (!ua) return { browser: '—', os: '—' }
-    const browser = ua.includes('Firefox/') ? 'Firefox'
-      : ua.includes('Edg/') ? 'Edge'
-      : ua.includes('Chrome/') ? 'Chrome'
-      : ua.includes('Safari/') ? 'Safari' : 'Other'
-    const os = ua.includes('Windows') ? 'Windows'
-      : ua.includes('Mac OS X') ? 'macOS'
-      : ua.includes('Android') ? 'Android'
-      : (ua.includes('iPhone') || ua.includes('iPad')) ? 'iOS'
-      : ua.includes('Linux') ? 'Linux' : 'Other'
-    return { browser, os }
-  }
-
 
   function openLogViewer(cmd: RemoteCommand): void {
     if (selectedCmd.value?.id === cmd.id) {
@@ -336,16 +301,6 @@ export function useAuditLogs() {
     if (!connexionsLoaded.value) await fetchConnexions()
   }
 
-  function refresh(): void {
-    if (activeTab.value === 'commandes') {
-      cmdsLoaded.value = false
-      fetchCmds()
-    } else {
-      connexionsLoaded.value = false
-      fetchConnexions()
-    }
-  }
-
   // ── Pagination ────────────────────────────────────────────────────────────────
   function selectCmdsPage(page: number): void {
     if (page === cmdsPage.value) return
@@ -366,6 +321,19 @@ export function useAuditLogs() {
       const res = await apiClient.getSecuritySummary(hours)
       security.value = res.data || { stats: null, blocked_ips: [], top_failed_ips: [] }
     } catch { /* keep stale data */ }
+  }
+
+  async function cancelCmd(id: string): Promise<void> {
+    cancellingId.value = id
+    try {
+      await apiClient.cancelCommand(id)
+      cmds.value = cmds.value.map((c) => (c.id === id ? { ...c, status: 'cancelled' } : c))
+      addToast('Commande annulée', 'success')
+    } catch (err: unknown) {
+      addToast(getApiErrorMessage(err, 'Impossible d\'annuler'), 'error')
+    } finally {
+      cancellingId.value = null
+    }
   }
 
   async function unblockIP(ip: string): Promise<void> {
@@ -427,7 +395,6 @@ export function useAuditLogs() {
     activeTab,
     switchToCommandes,
     switchToConnexions,
-    refresh,
     cmds,
     cmdsPage,
     cmdsTotal,
@@ -446,6 +413,8 @@ export function useAuditLogs() {
     showLogViewer,
     openLogViewer,
     closeLogViewer,
+    cancellingId,
+    cancelCmd,
     selectCmdsPage,
     connexions,
     connexionsPage,
@@ -466,6 +435,5 @@ export function useAuditLogs() {
     cmdLabel,
     formatDuration,
     statusClass,
-    parseUA,
   }
 }

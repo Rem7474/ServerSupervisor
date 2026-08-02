@@ -362,6 +362,7 @@ var validAlertMetrics = map[string]bool{
 	"proxmox_auth_failures_recent":    true,
 	"proxmox_disk_failed_count":       true, "proxmox_disk_min_wearout_percent": true,
 	"docker_container_state": true, "docker_compose_degraded_services": true,
+	"restic_backup_age_hours": true, "restic_repo_size_bytes": true,
 }
 
 func validateAlertRuleMetricOperator(metric, operator string) error {

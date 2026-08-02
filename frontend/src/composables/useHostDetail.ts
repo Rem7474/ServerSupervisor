@@ -48,7 +48,7 @@ export function useHostDetail() {
   const canRunApt = computed(() => auth.canManage)
 
   const activeTab = ref<string>(
-    typeof route.query.tab === 'string' ? route.query.tab : 'metrics'
+    typeof route.query.tab === 'string' ? route.query.tab : 'overview'
   )
 
   watch(activeTab, (tab) => {
@@ -77,6 +77,27 @@ export function useHostDetail() {
 
   const proxmoxLink = ref<AnyRecord | null>(null)
   const linkSaving = ref(false)
+
+  // Overview tab: this host's own active incidents, so a link arriving here
+  // (from an alert email/ntfy push, or just browsing) doesn't have to guess
+  // "why am I here" — AlertsView links back the same way via
+  // AlertIncidentList's notificationRoute(). No dedicated host filter exists
+  // on GET /notifications, so this filters client-side over a bounded fetch.
+  const hostActiveIncidents = ref<AnyRecord[]>([])
+  const incidentsLoading = ref(false)
+
+  async function loadHostIncidents(): Promise<void> {
+    incidentsLoading.value = true
+    try {
+      const res = await apiClient.getNotifications({ status: 'active', limit: 100 })
+      const all = (res.data?.notifications || []) as AnyRecord[]
+      hostActiveIncidents.value = all.filter((n) => asString(n.host_id) === hostId)
+    } catch {
+      hostActiveIncidents.value = []
+    } finally {
+      incidentsLoading.value = false
+    }
+  }
 
   const effectiveMetrics = computed(() => {
     const m = metrics.value
@@ -588,6 +609,7 @@ export function useHostDetail() {
     loadProxmoxLink()
     loadHostPerms()
     loadUUData()
+    loadHostIncidents()
   })
 
   return {
@@ -609,6 +631,8 @@ export function useHostDetail() {
     diskHealth,
     proxmoxLink,
     linkSaving,
+    hostActiveIncidents,
+    incidentsLoading,
     effectiveMetrics,
     effectiveMetricsSource,
     showLinkForm,

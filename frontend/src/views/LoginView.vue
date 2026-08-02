@@ -49,8 +49,12 @@
               v-if="needsMFA"
               class="mb-3"
             >
-              <label class="form-label">Code TOTP</label>
+              <label
+                v-if="mfaMethods?.totp"
+                class="form-label"
+              >Code TOTP</label>
               <input
+                v-if="mfaMethods?.totp"
                 ref="totpInput"
                 v-model="totpCode"
                 type="text"
@@ -58,11 +62,32 @@
                 placeholder="123456"
                 inputmode="numeric"
                 maxlength="6"
+                autocomplete="one-time-code"
                 required
               >
-              <div class="text-secondary small mt-1">
+              <div
+                v-if="mfaMethods?.totp"
+                class="text-secondary small mt-1"
+              >
                 Entrez le code de votre application d'authentification.
               </div>
+
+              <div
+                v-if="mfaMethods?.totp && mfaMethods?.webauthn"
+                class="text-secondary small text-center my-2"
+              >
+                ou
+              </div>
+
+              <button
+                v-if="mfaMethods?.webauthn && webauthnAvailable"
+                type="button"
+                class="btn btn-outline-primary w-100"
+                :disabled="webauthnLoading"
+                @click="loginWithWebAuthn"
+              >
+                {{ webauthnLoading ? 'Vérification...' : 'Utiliser une clé de sécurité / passkey' }}
+              </button>
             </div>
           </Transition>
 
@@ -74,7 +99,10 @@
             {{ error }}
           </div>
 
-          <div class="form-footer">
+          <div
+            v-if="!needsMFA || mfaMethods?.totp"
+            class="form-footer"
+          >
             <button
               type="submit"
               class="btn btn-primary w-100"
@@ -101,7 +129,11 @@ const {
   needsMFA,
   totpCode,
   totpFocusRequest,
+  mfaMethods,
+  webauthnAvailable,
+  webauthnLoading,
   handleLogin,
+  loginWithWebAuthn,
 } = useLogin()
 
 const usernameInput = ref<HTMLInputElement | null>(null)

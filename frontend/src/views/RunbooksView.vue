@@ -66,7 +66,7 @@
       </div>
       <div
         v-else
-        class="table-responsive"
+        class="table-responsive scroll-table"
       >
         <table class="table table-vcenter card-table">
           <thead>
@@ -104,7 +104,7 @@
                 <div class="btn-group">
                   <button
                     type="button"
-                    class="btn btn-sm btn-primary"
+                    class="btn btn-icon btn-sm btn-primary"
                     title="Lancer"
                     :disabled="runningIds.has(rb.id)"
                     @click="handleRun(rb)"
@@ -121,7 +121,7 @@
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Historique"
                     @click="openHistory(rb)"
                   >
@@ -132,7 +132,7 @@
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Modifier"
                     @click="startEdit(rb)"
                   >
@@ -143,7 +143,7 @@
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-danger"
+                    class="btn btn-icon btn-sm btn-ghost-danger"
                     title="Supprimer"
                     @click="handleDelete(rb)"
                   >
@@ -163,6 +163,7 @@
     <!-- Create/edit modal -->
     <div
       v-if="showModal"
+      ref="editModalRef"
       class="modal modal-blur fade show d-block"
       tabindex="-1"
     >
@@ -214,66 +215,15 @@
                 <div class="col-auto pt-2 fw-bold text-muted">
                   {{ index + 1 }}
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label form-label-sm">Hôte</label>
-                  <select
-                    v-model="step.host_id"
-                    class="form-select form-select-sm"
-                  >
-                    <option value="">
-                      Sélectionner...
-                    </option>
-                    <option
-                      v-for="host in hostsStore.hosts"
-                      :key="host.id"
-                      :value="host.id"
-                    >
-                      {{ host.name || host.hostname }}
-                    </option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label form-label-sm">Module</label>
-                  <select
-                    v-model="step.module"
-                    class="form-select form-select-sm"
-                    @change="onModuleChange(step)"
-                  >
-                    <option
-                      v-for="m in RUNBOOK_MODULES"
-                      :key="m.value"
-                      :value="m.value"
-                    >
-                      {{ m.label }}
-                    </option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label form-label-sm">Action</label>
-                  <select
-                    v-model="step.action"
-                    class="form-select form-select-sm"
-                  >
-                    <option
-                      v-for="a in actionsForModule(step.module)"
-                      :key="a.value"
-                      :value="a.value"
-                    >
-                      {{ a.label }}
-                    </option>
-                  </select>
-                </div>
-                <div
-                  v-if="moduleRequiresTarget(step.module)"
-                  class="col-md-2"
-                >
-                  <label class="form-label form-label-sm">Cible</label>
-                  <input
-                    v-model="step.target"
-                    type="text"
-                    class="form-control form-control-sm"
-                    :placeholder="step.module === 'custom' ? 'id de la tâche' : 'nom du service'"
-                  >
+                <div class="col">
+                  <DispatchStepEditor
+                    v-model:host-id="step.host_id"
+                    v-model:module="step.module"
+                    v-model:action="step.action"
+                    v-model:target="step.target"
+                    :actions-for-module="actionsForModule"
+                    :target-config="runbookTargetConfig"
+                  />
                 </div>
                 <div class="col-auto">
                   <button
@@ -339,6 +289,7 @@
     <!-- History modal -->
     <div
       v-if="historyRunbook"
+      ref="historyModalRef"
       class="modal modal-blur fade show d-block"
       tabindex="-1"
     >
@@ -355,11 +306,8 @@
             />
           </div>
           <div class="modal-body">
-            <div
-              v-if="executionsLoading"
-              class="text-center py-4"
-            >
-              <div class="spinner-border text-primary" />
+            <div v-if="executionsLoading">
+              <LoadingSkeleton variant="table" />
             </div>
             <div
               v-else-if="executions.length === 0"
@@ -369,7 +317,7 @@
             </div>
             <div
               v-else
-              class="table-responsive"
+              class="table-responsive scroll-table"
             >
               <table class="table table-sm table-vcenter">
                 <thead>
@@ -386,8 +334,12 @@
                     :key="exec.id"
                   >
                     <tr
-                      class="cursor-pointer"
+                      class="clickable-row"
+                      role="button"
+                      tabindex="0"
                       @click="selectExecution(exec)"
+                      @keydown.enter="selectExecution(exec)"
+                      @keydown.space.prevent="selectExecution(exec)"
                     >
                       <td>
                         <span
@@ -415,6 +367,7 @@
                               <th>Hôte</th>
                               <th>Action</th>
                               <th>État</th>
+                              <th />
                             </tr>
                           </thead>
                           <tbody>
@@ -430,11 +383,26 @@
                                   v-if="s.status"
                                   class="badge"
                                   :class="executionBadgeClass(s.status)"
-                                >{{ executionStatusLabel(s.status) }}</span>
+                                >{{ executionStatusLabel(s.status) }}
+                                  <span
+                                    v-if="s.status === 'running' || s.status === 'pending'"
+                                    class="spinner-border spinner-border-sm ms-1"
+                                  /></span>
                                 <span
                                   v-else
                                   class="text-muted small"
                                 >en attente</span>
+                              </td>
+                              <td>
+                                <button
+                                  v-if="s.command_id"
+                                  type="button"
+                                  class="btn btn-sm btn-ghost-secondary"
+                                  title="Voir les logs de cette étape"
+                                  @click="openStepLogs(s)"
+                                >
+                                  <IconFileText :size="16" />
+                                </button>
                               </td>
                             </tr>
                           </tbody>
@@ -444,6 +412,21 @@
                   </template>
                 </tbody>
               </table>
+            </div>
+
+            <div
+              v-if="showStepLogPanel"
+              class="mt-3"
+              style="height: 320px;"
+            >
+              <CommandLogPanel
+                :command="selectedStepCommand"
+                :show="showStepLogPanel"
+                title="Logs de l'étape"
+                empty-text="Aucune étape sélectionnée"
+                @close="closeStepLogs"
+                @open="showStepLogPanel = true"
+              />
             </div>
           </div>
           <div class="modal-footer">
@@ -466,14 +449,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, watch } from 'vue'
-import { IconHistory, IconPencil, IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { IconFileText, IconHistory, IconPencil, IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import DispatchStepEditor from '../components/DispatchStepEditor.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import {
-  useRunbooks, RUNBOOK_MODULES, actionsForModule, moduleRequiresTarget, emptyStep,
+  useRunbooks, actionsForModule, moduleRequiresTarget, emptyStep,
 } from '../composables/useRunbooks'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { useModalChrome } from '../composables/useModalChrome'
 import type { Runbook, RunbookStepCreate } from '../types/generated'
 
 const {
@@ -482,7 +468,13 @@ const {
   historyRunbook, executions, executionsLoading, selectedExecution, runningIds,
   loadRunbooks, startAdd, startEdit, closeModal, saveRunbook, deleteRunbook, runRunbook,
   openHistory, closeHistory, selectExecution,
+  selectedStepCommand, showStepLogPanel, openStepLogs, closeStepLogs,
 } = useRunbooks()
+
+const editModalRef = ref<HTMLElement | null>(null)
+const historyModalRef = ref<HTMLElement | null>(null)
+useModalChrome(editModalRef, () => showModal.value, { onClose: closeModal })
+useModalChrome(historyModalRef, () => !!historyRunbook.value, { onClose: closeHistory })
 
 const dialog = useConfirmDialog()
 
@@ -512,10 +504,9 @@ const canSave = computed(() =>
   form.steps.every((s) => s.host_id && s.module && s.action)
 )
 
-function onModuleChange(step: RunbookStepCreate): void {
-  const actions = actionsForModule(step.module)
-  step.action = actions[0]?.value || ''
-  step.target = ''
+function runbookTargetConfig(module: string): { label: string; placeholder?: string } | null {
+  if (!moduleRequiresTarget(module)) return null
+  return { label: 'Cible', placeholder: module === 'custom' ? 'id de la tâche' : 'nom du service' }
 }
 
 async function handleSave(): Promise<void> {

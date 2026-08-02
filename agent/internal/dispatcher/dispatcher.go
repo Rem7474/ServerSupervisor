@@ -22,6 +22,24 @@ import (
 // the goroutine indefinitely.
 const maxCmdDuration = 45 * time.Minute
 
+// resticBackupMaxDuration is a last-resort safety ceiling for a restic
+// run_backup command only. A large backup can legitimately run far longer
+// than maxCmdDuration as long as it keeps progressing — the real cutoff for
+// that case is the idle-timeout watchdog inside
+// collector.RunResticBackupWithProgress (ResticBackupIdleTimeoutMinutes),
+// which kills the subprocess on inactivity long before this ceiling is ever
+// reached. Every other module keeps the maxCmdDuration behavior unchanged.
+const resticBackupMaxDuration = 24 * time.Hour
+
+// cmdTimeout returns the absolute ctx deadline for one command. Only
+// module=restic action=run_backup gets an exception from maxCmdDuration.
+func cmdTimeout(cmd sender.PendingCommand) time.Duration {
+	if cmd.Module == "restic" && cmd.Action == "run_backup" {
+		return resticBackupMaxDuration
+	}
+	return maxCmdDuration
+}
+
 // UpdaterFunc starts a detached self-update helper process. Injected from the
 // main package so the dispatcher does not need the HTTP/binary-install logic.
 type UpdaterFunc func(s *sender.Sender, cmd sender.PendingCommand, cfgPath string) error
@@ -83,9 +101,9 @@ func (d *Dispatcher) Process(s *sender.Sender, commands []sender.PendingCommand)
 // execute is the per-command entry point: it builds a bounded ctx and hands
 // the command off to the registered module handler.
 func (d *Dispatcher) execute(s *sender.Sender, cmd sender.PendingCommand) {
-	// Background parent so commands survive agent shutdown; maxCmdDuration guards
+	// Background parent so commands survive agent shutdown; cmdTimeout guards
 	// against stuck subprocesses that would otherwise hold the goroutine forever.
-	ctx, cancel := context.WithTimeout(context.Background(), maxCmdDuration)
+	ctx, cancel := context.WithTimeout(context.Background(), cmdTimeout(cmd))
 	defer cancel()
 
 	slog.Info("processing command", "command_id", cmd.ID, "module", cmd.Module, "action", cmd.Action, "target", cmd.Target)

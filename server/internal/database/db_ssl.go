@@ -44,11 +44,13 @@ func (db *DB) CreateSSLCertificate(ctx context.Context, c models.SSLCertificate)
 
 func (db *DB) ListSSLCertificates(ctx context.Context) ([]models.SSLCertificate, error) {
 	rows, err := db.conn.QueryContext(ctx,
-		`SELECT id, name, host, port, server_name, enabled, last_checked_at,
-		        valid_from, valid_to, issuer, subject, serial_number, dns_names,
-		        last_error, created_at, updated_at
-		 FROM ssl_certificates
-		 ORDER BY name ASC`)
+		`SELECT c.id, c.name, c.host, c.port, c.server_name, c.enabled, c.last_checked_at,
+		        c.valid_from, c.valid_to, c.issuer, c.subject, c.serial_number, c.dns_names,
+		        c.last_error, c.created_at, c.updated_at,
+		        n.id, COALESCE(n.domain_names[1], '')
+		 FROM ssl_certificates c
+		 LEFT JOIN npm_proxy_hosts n ON n.ssl_certificate_id = c.id
+		 ORDER BY c.name ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +63,7 @@ func (db *DB) ListSSLCertificates(ctx context.Context) ([]models.SSLCertificate,
 			&c.ID, &c.Name, &c.Host, &c.Port, &c.ServerName, &c.Enabled, &c.LastCheckedAt,
 			&c.ValidFrom, &c.ValidTo, &c.Issuer, &c.Subject, &c.SerialNumber, pq.Array(&c.DNSNames),
 			&c.LastError, &c.CreatedAt, &c.UpdatedAt,
+			&c.NPMProxyHostID, &c.NPMProxyHostDomain,
 		); err != nil {
 			return nil, err
 		}

@@ -66,6 +66,16 @@ body {
   --z-index-tooltip: 1080;
   --z-index-modal-backdrop: 1040;
   --z-index-modal: 1050;
+  /* Above --z-index-modal: the two full-screen "drawer" overlays
+     (DomainDetailsModal/IPTimelineModal — Tabler .card in a flexbox
+     overlay, not .modal/.modal-dialog) render themselves at this
+     level so they can sit above the page's own content. */
+  --z-index-modal-overlay: 1060;
+  /* Above --z-index-modal-overlay: ConfirmDialog is a global singleton
+     (rendered once in App.vue) that can be opened from inside any other
+     modal or drawer (e.g. the CrowdSec-ban confirm from IPTimelineModal)
+     — it must always render on top of whatever opened it, not behind it. */
+  --z-index-modal-top: 1065;
   --z-index-sticky: 20;
 
   /* ── Design tokens (ss-* prefix) ──────────────────────────────────────
@@ -188,6 +198,50 @@ button:focus-visible {
   box-shadow: 0 0 0 3px rgba(123, 157, 248, 0.3);
 }
 
+/* Tabler bug workaround: icon-only buttons collapse to a couple of px wide.
+ * Root cause (verified against @tabler/core/dist/css/tabler.css): .btn-sm
+ * and .btn-xl redefine --tblr-btn-line-height as a *unitless* number (valid
+ * for the CSS `line-height` property, which accepts bare multipliers), but
+ * .btn's own min-width/min-height also reuse that same variable inside a
+ * calc() that otherwise adds lengths — mixing a unitless number into that
+ * calc() makes the whole expression invalid, so the browser drops
+ * min-width/min-height entirely for those two size variants (confirmed via
+ * a headless-browser measurement, not just reading the source). Icon-only
+ * buttons (.btn-icon) have no text to size themselves around and rely on
+ * exactly that floor; without it, they shrink to whatever their zeroed
+ * horizontal padding plus a negative icon margin computes to (also close to
+ * zero — that trick assumes the icon renders at exactly
+ * --tblr-btn-icon-size, which text-content-less buttons have no other size
+ * driver to confirm). Net effect: a `.btn-icon.btn-sm` button measures ~2px
+ * wide while its SVG (still full-size) visibly overflows outside it.
+ * Fixed by sizing icon-only buttons off real, unconditionally-valid padding
+ * instead of a min-width/height calc() that can silently go invalid: pad
+ * .btn-icon symmetrically (like its own top/bottom padding, so it comes out
+ * square) and drop the icon's negative margin, letting .btn's existing
+ * flexbox centering (display: inline-flex; align-items/justify-content:
+ * center) place the icon — same visual result for buttons that already
+ * worked (.btn-icon without .btn-sm/.btn-xl), a real fix for the ones that
+ * didn't.
+ *
+ * Selectors are deliberately `.btn.btn-icon` / `.btn.btn-icon .icon` (one
+ * class more specific than Tabler's own `.btn-icon` / `.btn-icon .icon`),
+ * not just source order: Vite emits @tabler/core's CSS as its own
+ * `vendor-tabler-*.css` chunk, and that chunk's <link> ends up injected
+ * *after* this app's own bundled CSS in the built index.html — so a
+ * same-specificity override here would actually lose to Tabler's original
+ * rule in production despite appearing later in this file. Every element
+ * this targets already carries both `.btn` and `.btn-icon` (see any
+ * `class="btn btn-icon btn-sm ..."` usage), so this doesn't narrow what it
+ * matches — it only guarantees it wins regardless of chunk load order. */
+.btn.btn-icon {
+  padding-left: var(--tblr-btn-padding-y);
+  padding-right: var(--tblr-btn-padding-y);
+}
+
+.btn.btn-icon .icon {
+  margin: 0;
+}
+
 /* ── Avatar utilities ── */
 .avatar-64 {
   width: 64px;
@@ -265,6 +319,32 @@ button:focus-visible {
   font-size: 0.875rem;
 }
 
+/* Browser autofill (login username/password, saved host IPs, remembered
+ * search terms, ...) forces its own light background via UA styling that
+ * `background-color` alone can't override — only -webkit-text-fill-color +
+ * a same-color inset box-shadow can. Without this, autofilled fields on this
+ * dark-only theme (no toggle — see index.html's data-bs-theme="dark") render
+ * light input text (Tabler's --tblr-body-color) on the browser's forced
+ * light autofill background: invisible text, worst on the login form since
+ * every field there is `autocomplete`-tagged. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--tblr-body-color, #e5e7eb);
+  -webkit-box-shadow: 0 0 0 1000px var(--tblr-bg-surface, #1f2937) inset;
+  box-shadow: 0 0 0 1000px var(--tblr-bg-surface, #1f2937) inset;
+  caret-color: var(--tblr-body-color, #e5e7eb);
+  /* Delays the browser's own transition-based repaint of the autofill
+     background so ours wins instead of flashing light then dark. */
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 /* ── Form validation ── */
 .is-invalid {
   border-color: #e74c3c !important;
@@ -316,9 +396,58 @@ button:focus-visible {
   z-index: var(--z-index-modal);
 }
 
+/* ConfirmDialog is a global singleton that can be triggered from inside
+   another modal/drawer — see --z-index-modal-top above. */
+.modal-confirm-backdrop {
+  z-index: var(--z-index-modal-top);
+}
+
+.modal.modal-confirm {
+  z-index: calc(var(--z-index-modal-top) + 1);
+}
+
 .sticky-top,
 .sticky-bottom {
   z-index: var(--z-index-sticky);
+}
+
+/* Bounds a long table to its own scroll area with the header pinned inside
+   it, so scrolling a long list doesn't scroll the column headers out of
+   view. Apply alongside .table-responsive (which only handles horizontal
+   overflow on its own). */
+.scroll-table {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.scroll-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tblr-bg-surface);
+}
+
+/* Shared "this whole row opens a detail view" affordance — one hover/focus
+   color used everywhere a full row (or a full-width row-shaped button, e.g.
+   Traffic's "Top IPs suspectes" list) is clickable, so the interaction reads
+   the same across Threats/Traffic instead of each table inventing its own.
+   The .btn variant needs the extra class for specificity: Tabler's own
+   .btn:hover sets background-color too, and (per the btn-icon fix above)
+   its CSS ships in a separate chunk loaded after app CSS in production, so
+   equal-specificity selectors aren't safe to rely on beating it. */
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover,
+.btn.clickable-row:hover {
+  background-color: var(--tblr-bg-surface-secondary);
+}
+
+.clickable-row:focus-visible,
+.btn.clickable-row:focus-visible {
+  outline: 2px solid var(--tblr-primary);
+  outline-offset: -2px;
 }
 
 /* ── Responsive icons ── */
@@ -373,21 +502,6 @@ button:focus-visible {
 /* ── Min-width utilities ── */
 .min-w-160 {
   min-width: 160px;
-}
-
-/* ── Shared skeleton shimmer (used inline in tables, ProxmoxView, etc.) ── */
-.skeleton-text {
-  display: block;
-  height: 0.8rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(203,213,225,.2) 25%, rgba(203,213,225,.5) 50%, rgba(203,213,225,.2) 75%);
-  background-size: 220% 100%;
-  animation: loading-skeleton-wave 1.4s ease infinite;
-}
-
-@keyframes loading-skeleton-wave {
-  0%   { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
 }
 
 /* Inline code styling: make inline <code> look like lightweight pills and respect dark mode */

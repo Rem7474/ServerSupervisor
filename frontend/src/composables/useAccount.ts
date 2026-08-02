@@ -5,7 +5,7 @@ import { formatDateLong as formatDate, formatDateTime } from '../utils/formatter
 import { useCommandStream } from './useCommandStream'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
-import type { RemoteCommand, LoginEvent } from '../types/generated'
+import type { RemoteCommand } from '../types/generated'
 import { useStatusBadge } from './useStatusBadge'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 
@@ -84,17 +84,13 @@ export function useAccount() {
     allCommands.value.filter((c: CommandRow) => c.triggered_by === auth.username).slice(0, 50)
   )
 
-  const loginEvents = ref<LoginEvent[]>([])
-  const loginEventsLoading = ref(false)
-  const loginEventsLoaded = ref(false)
-
   const selectedCmd = ref<CommandRow | null>(null)
 
   const { openCommandStream, closeStream } = useCommandStream()
   const { getStatusBadgeClass } = useStatusBadge()
 
   const roleBadgeClass = computed(() => {
-    const map: Record<string, string> = { admin: 'bg-danger-lt text-danger', operator: 'bg-warning-lt text-warning', viewer: 'bg-secondary-lt text-secondary' }
+    const map: Record<string, string> = { admin: 'bg-red-lt text-red', operator: 'bg-yellow-lt text-yellow', viewer: 'bg-secondary-lt text-secondary' }
     return map[profile.value?.role ?? ""] || 'bg-secondary-lt text-secondary'
   })
 
@@ -117,20 +113,6 @@ export function useAccount() {
 
   function statusClass(status: string | undefined): string {
     return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
-  }
-
-  function parseUA(ua: string | undefined): { browser: string; os: string } {
-    if (!ua) return { browser: '—', os: '—' }
-    const browser = ua.includes('Firefox/') ? 'Firefox'
-      : ua.includes('Edg/') ? 'Edge'
-      : ua.includes('Chrome/') ? 'Chrome'
-      : ua.includes('Safari/') ? 'Safari' : 'Other'
-    const os = ua.includes('Windows') ? 'Windows'
-      : ua.includes('Mac OS X') ? 'macOS'
-      : ua.includes('Android') ? 'Android'
-      : (ua.includes('iPhone') || ua.includes('iPad')) ? 'iOS'
-      : ua.includes('Linux') ? 'Linux' : 'Other'
-    return { browser, os }
   }
 
   function openLogViewer(cmd: CommandRow): void {
@@ -217,25 +199,6 @@ export function useAccount() {
     if (!allCommands.value.length && !cmdsLoading.value) loadMyCommands()
   }
 
-  async function loadLoginEvents(): Promise<void> {
-    loginEventsLoading.value = true
-    try {
-      const res = await apiClient.getLoginEvents(signal)
-      loginEvents.value = res.data?.events || []
-      loginEventsLoaded.value = true
-    } catch (e) {
-      if (isApiAbort(e)) return
-      loginEvents.value = []
-    } finally {
-      loginEventsLoading.value = false
-    }
-  }
-
-  function switchToConnexions() {
-    activeTab.value = 'connexions'
-    if (!loginEventsLoaded.value) loadLoginEvents()
-  }
-
   onMounted(() => {
     loadProfile()
     loadMyCommands()
@@ -258,8 +221,6 @@ export function useAccount() {
     allCommands,
     cmdsLoading,
     myCommands,
-    loginEvents,
-    loginEventsLoading,
     selectedCmd,
     roleBadgeClass,
     roleLabel,
@@ -270,12 +231,10 @@ export function useAccount() {
     statusClass,
     moduleLabel,
     moduleClass,
-    parseUA,
     openLogViewer,
     closeLogViewer,
     resetPwForm,
     submitChangePassword,
     switchToHistorique,
-    switchToConnexions,
   }
 }

@@ -27,7 +27,7 @@
           </template>
           <span
             v-if="tracker && !tracker.enabled"
-            class="badge bg-secondary"
+            class="badge bg-secondary-lt text-secondary"
           >Désactivé</span>
           <span
             v-if="tracker && cooldownActive"
@@ -45,15 +45,11 @@
       {{ error }}
     </div>
 
-    <div
+    <LoadingSkeleton
       v-if="loading"
-      class="text-center py-5"
-    >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
-    </div>
+      variant="card"
+      :lines="6"
+    />
 
     <div
       v-else-if="tracker"
@@ -194,6 +190,7 @@
 
 <script setup lang="ts">
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import TrackerConfigCard from '../components/webhooks/TrackerConfigCard.vue'

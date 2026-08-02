@@ -1,124 +1,128 @@
 <template>
-  <div
-    v-if="host"
-    class="modal modal-blur show d-block modal-overlay"
-    tabindex="-1"
-    @click.self="$emit('close')"
-  >
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <div>
-            <h5 class="modal-title">
-              Planifier une commande APT
-            </h5>
-            <div class="text-muted small mt-1">
-              {{ hostLabel }}
+  <template v-if="host">
+    <div
+      ref="modalRef"
+      class="modal modal-blur fade show d-block"
+      tabindex="-1"
+      @click.self="$emit('close')"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title">
+                Planifier une commande APT
+              </h5>
+              <div class="text-muted small mt-1">
+                {{ hostLabel }}
+              </div>
             </div>
+            <button
+              type="button"
+              class="btn-close"
+              @click="$emit('close')"
+            />
           </div>
-          <button
-            type="button"
-            class="btn-close"
-            @click="$emit('close')"
-          />
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Nom de la tâche</label>
-            <input
-              v-model="form.name"
-              type="text"
-              class="form-control"
-              placeholder="ex: apt upgrade hebdo"
-            >
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Commande</label>
-            <select
-              v-model="form.action"
-              class="form-select"
-            >
-              <option value="update">
-                apt update
-              </option>
-              <option value="upgrade">
-                apt upgrade
-              </option>
-              <option value="dist-upgrade">
-                apt dist-upgrade
-              </option>
-            </select>
-          </div>
-          <div class="mb-3">
-            <label class="form-check form-switch">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Nom de la tâche</label>
               <input
-                v-model="form.manualOnly"
+                v-model="form.name"
+                type="text"
+                class="form-control"
+                placeholder="ex: apt upgrade hebdo"
+              >
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Commande</label>
+              <select
+                v-model="form.action"
+                class="form-select"
+              >
+                <option value="update">
+                  apt update
+                </option>
+                <option value="upgrade">
+                  apt upgrade
+                </option>
+                <option value="dist-upgrade">
+                  apt dist-upgrade
+                </option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-check form-switch">
+                <input
+                  v-model="form.manualOnly"
+                  type="checkbox"
+                  class="form-check-input"
+                >
+                <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
+              </label>
+            </div>
+            <div
+              v-if="!form.manualOnly"
+              class="mb-3"
+            >
+              <CronBuilder v-model="form.cron_expression" />
+            </div>
+            <div
+              v-if="!form.manualOnly"
+              class="form-check form-switch mb-2"
+            >
+              <input
+                id="schedEnabled"
+                v-model="form.enabled"
                 type="checkbox"
                 class="form-check-input"
               >
-              <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
-            </label>
-          </div>
-          <div
-            v-if="!form.manualOnly"
-            class="mb-3"
-          >
-            <CronBuilder v-model="form.cron_expression" />
-          </div>
-          <div
-            v-if="!form.manualOnly"
-            class="form-check form-switch mb-2"
-          >
-            <input
-              id="schedEnabled"
-              v-model="form.enabled"
-              type="checkbox"
-              class="form-check-input"
+              <label
+                class="form-check-label"
+                for="schedEnabled"
+              >Activée</label>
+            </div>
+            <div
+              v-if="form.error"
+              class="alert alert-danger py-2"
             >
-            <label
-              class="form-check-label"
-              for="schedEnabled"
-            >Activée</label>
+              {{ form.error }}
+            </div>
           </div>
-          <div
-            v-if="form.error"
-            class="alert alert-danger py-2"
-          >
-            {{ form.error }}
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              @click="$emit('close')"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              :disabled="form.saving"
+              @click="saveSchedule"
+            >
+              <span
+                v-if="form.saving"
+                class="spinner-border spinner-border-sm me-1"
+              />
+              Créer la tâche
+            </button>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            @click="$emit('close')"
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
-            class="btn btn-primary"
-            :disabled="form.saving"
-            @click="saveSchedule"
-          >
-            <span
-              v-if="form.saving"
-              class="spinner-border spinner-border-sm me-1"
-            />
-            Créer la tâche
-          </button>
         </div>
       </div>
     </div>
-  </div>
+    <div class="modal-backdrop fade show" />
+  </template>
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch } from 'vue'
+import { reactive, computed, ref, watch } from 'vue'
 import apiClient from '../../api'
 import CronBuilder from '../CronBuilder.vue'
 import { MANUAL_SENTINEL } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
+import { useModalChrome } from '../../composables/useModalChrome'
 
 const props = defineProps<{
   host: { id: string; name?: string; hostname?: string } | null
@@ -128,6 +132,9 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'created'): void
 }>()
+
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => !!props.host, { onClose: () => emit('close') })
 
 const form = reactive({
   name: '',
@@ -183,7 +190,3 @@ async function saveSchedule(): Promise<void> {
   }
 }
 </script>
-
-<style scoped>
-.modal-overlay { background: rgba(0, 0, 0, .5); z-index: 1050; }
-</style>

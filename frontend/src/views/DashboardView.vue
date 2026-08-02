@@ -37,64 +37,9 @@
       @dismiss-stale-alert="dataStaleAlert = false"
     />
 
-    <!-- ─── Bannières d'alerte ───────────────────────────────────────────────── -->
-
+    <!-- ─── Points d'attention (CVE + Proxmox + Attention, un seul bandeau) ─── -->
     <div
-      v-if="cveSummary && ((cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0)"
-      class="alert alert-danger mb-3 d-flex align-items-center gap-3"
-    >
-      <IconAlertTriangle
-        :size="24"
-        class="icon icon-lg icon-responsive-lg flex-shrink-0"
-      />
-      <div class="flex-grow-1">
-        <div class="fw-semibold">
-          Vulnérabilités critiques détectées
-        </div>
-        <div class="text-secondary small">
-          <span class="badge bg-red-lt text-red me-1">CRITICAL</span>
-          {{ cveSummary.critical_count || 0 }} CVE
-          <span v-if="(cveSummary.hosts_with_critical || 0) > 0"> sur {{ cveSummary.hosts_with_critical || 0 }} hôte{{ pluralize(cveSummary.hosts_with_critical) }}</span>
-        </div>
-      </div>
-      <router-link
-        to="/apt"
-        class="btn btn-sm btn-danger"
-      >
-        Voir les mises à jour
-      </router-link>
-    </div>
-
-    <div
-      v-if="proxmoxSummary && ((proxmoxSummary.nodes_down ?? 0) > 0 || (proxmoxSummary.recent_failed_tasks ?? 0) > 0 || (proxmoxSummary.storage_near_full ?? 0) > 0 || (proxmoxSummary.storage_offline ?? 0) > 0)"
-      class="alert alert-warning mb-3 d-flex align-items-center gap-3"
-    >
-      <IconAlertTriangle
-        :size="24"
-        class="icon icon-lg icon-responsive-lg flex-shrink-0"
-      />
-      <div class="flex-grow-1">
-        <div class="fw-semibold">
-          Alertes Proxmox
-        </div>
-        <div class="text-secondary small d-flex flex-wrap gap-2">
-          <span v-if="(proxmoxSummary.nodes_down ?? 0) > 0">{{ proxmoxSummary.nodes_down }} nœud{{ pluralize(proxmoxSummary.nodes_down) }} hors ligne</span>
-          <span v-if="(proxmoxSummary.storage_near_full ?? 0) > 0">{{ proxmoxSummary.storage_near_full }} stockage{{ pluralize(proxmoxSummary.storage_near_full) }} presque plein{{ pluralize(proxmoxSummary.storage_near_full) }}</span>
-          <span v-if="(proxmoxSummary.storage_offline ?? 0) > 0">{{ proxmoxSummary.storage_offline }} stockage{{ pluralize(proxmoxSummary.storage_offline) }} hors ligne</span>
-          <span v-if="(proxmoxSummary.recent_failed_tasks ?? 0) > 0">{{ proxmoxSummary.recent_failed_tasks }} tâche{{ pluralize(proxmoxSummary.recent_failed_tasks) }} échouée{{ pluralize(proxmoxSummary.recent_failed_tasks) }} (24h)</span>
-        </div>
-      </div>
-      <router-link
-        to="/proxmox"
-        class="btn btn-sm btn-warning"
-      >
-        Voir Proxmox
-      </router-link>
-    </div>
-
-    <!-- ─── Attention requise ────────────────────────────────────────────────── -->
-    <div
-      v-if="attentionItems.length > 0"
+      v-if="!loading && bannerItems.length > 0"
       class="card mb-3"
     >
       <div class="card-header">
@@ -103,20 +48,27 @@
             :size="18"
             class="icon me-1"
           />
-          Attention requise
+          Points d'attention
         </h3>
       </div>
       <div class="list-group list-group-flush">
         <router-link
-          v-for="item in attentionItems"
+          v-for="item in bannerItems"
           :key="item.key"
           :to="item.to"
           class="list-group-item list-group-item-action d-flex align-items-center gap-2"
         >
           <span
+            v-if="item.count"
             class="badge"
-            :class="item.severity === 'warning' ? 'bg-yellow-lt text-yellow' : 'bg-azure-lt text-azure'"
+            :class="bannerBadgeClass(item.severity)"
           >{{ item.count }}</span>
+          <IconAlertTriangle
+            v-else
+            :size="16"
+            class="icon flex-shrink-0"
+            :class="bannerIconClass(item.severity)"
+          />
           <span class="flex-grow-1">{{ item.label }}</span>
           <IconChevronRight
             :size="16"
@@ -124,6 +76,18 @@
           />
         </router-link>
       </div>
+    </div>
+
+    <!-- ─── État explicite quand rien ne nécessite d'attention ──────────────── -->
+    <div
+      v-else-if="!loading && hosts.length > 0"
+      class="alert alert-success d-flex align-items-center gap-2 mb-3"
+    >
+      <IconCircleCheck
+        :size="20"
+        class="icon flex-shrink-0"
+      />
+      <span>Tout est opérationnel — aucune alerte, mise à jour de sécurité ou anomalie Proxmox en attente.</span>
     </div>
 
     <!-- ─── KPIs ─────────────────────────────────────────────────────────────── -->
@@ -148,77 +112,6 @@
       :nodes="(proxmoxNodes as any)"
     />
 
-    <!-- ─── Graphiques de tendance ───────────────────────────────────────────── -->
-    <div class="card mb-4">
-      <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-        <div>
-          <h3 class="card-title">
-            Tendance CPU / RAM
-          </h3>
-          <div class="text-secondary small">
-            <template v-if="hasProxmox">
-              <div
-                class="summary-source-switch"
-                role="group"
-                aria-label="Source des métriques du graphe"
-              >
-                <button
-                  v-for="src in chartSources"
-                  :key="src.key"
-                  type="button"
-                  :class="chartSource === src.key ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-secondary'"
-                  :aria-pressed="chartSource === src.key"
-                  @click="chartSource = src.key; fetchSummary()"
-                >
-                  {{ src.label }}
-                </button>
-              </div>
-            </template>
-            <template v-else>
-              Moyenne sur tous les hôtes
-            </template>
-          </div>
-        </div>
-        <div class="btn-group btn-group-sm">
-          <button
-            v-for="h in [1, 6, 24, 168, 720]"
-            :key="h"
-            type="button"
-            :class="summaryHours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-            @click="changeSummaryRange(h)"
-          >
-            {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
-          </button>
-        </div>
-      </div>
-      <div
-        ref="chartContainerRef"
-        class="card-body summary-chart-body"
-      >
-        <div
-          v-if="summaryLoading || !chartVisible"
-          class="h-100 d-flex align-items-center justify-content-center"
-        >
-          <div
-            class="spinner-border text-secondary"
-            role="status"
-          />
-        </div>
-        <Line
-          v-else-if="summaryChartData"
-          :data="(summaryChartData as any)"
-          :options="(summaryChartOptions as any)"
-          class="h-100"
-        />
-        <div
-          v-else
-          class="h-100 d-flex align-items-center justify-content-center text-secondary"
-        >
-          Aucune donnée
-        </div>
-      </div>
-    </div>
-
     <!-- ─── Recherche / filtre ───────────────────────────────────────────────── -->
     <div class="card mb-4">
       <div class="card-body">
@@ -233,7 +126,7 @@
               v-model="searchQuery"
               type="text"
               class="form-control"
-              placeholder="Rechercher un hôte..."
+              placeholder="Rechercher un hôte…"
             >
           </div>
           <div class="col-12 col-md-4 col-lg-2">
@@ -285,18 +178,6 @@
               </option>
             </select>
           </div>
-          <div
-            v-if="canRunApt"
-            class="col-12 col-md-auto d-flex align-items-end"
-          >
-            <button
-              type="button"
-              class="btn btn-outline-secondary btn-sm"
-              @click="selectAllFiltered"
-            >
-              Tout sélectionner
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -307,7 +188,17 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th class="host-selection-col" />
+              <th class="host-selection-col">
+                <label class="form-check mb-0">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="allVisibleHostsSelected"
+                    aria-label="Sélectionner tous les hôtes affichés"
+                    @change="toggleSelectAllVisibleHosts(($event.target as HTMLInputElement).checked)"
+                  >
+                </label>
+              </th>
               <th>
                 <SortableHeader
                   label="Nom"
@@ -494,11 +385,8 @@
                 </td>
               </tr>
               <tr v-if="hosts.length > 0 && sortedHosts.length === 0">
-                <td
-                  colspan="10"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucun hôte ne correspond à votre recherche.
+                <td colspan="10">
+                  <EmptyState title="Aucun hôte ne correspond à votre recherche." />
                 </td>
               </tr>
             </template>
@@ -540,6 +428,91 @@
       </div>
     </div>
 
+    <!-- ─── Graphique de tendance (collapsible, replié par défaut) ──────────── -->
+    <div class="card mb-4">
+      <div
+        class="card-header dashboard-chart-header clickable-row"
+        role="button"
+        tabindex="0"
+        :aria-expanded="chartOpen"
+        aria-controls="dashboard-trend-chart-panel"
+        @click="chartOpen = !chartOpen"
+        @keydown.enter.prevent="chartOpen = !chartOpen"
+        @keydown.space.prevent="chartOpen = !chartOpen"
+      >
+        <h3 class="card-title mb-0">
+          Tendance CPU / RAM
+          <IconChevronDown
+            :size="16"
+            class="ms-auto chart-chevron"
+            :class="{ 'is-open': chartOpen }"
+          />
+        </h3>
+      </div>
+      <div
+        v-show="chartOpen"
+        id="dashboard-trend-chart-panel"
+      >
+        <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 border-bottom">
+          <div class="text-secondary small">
+            <template v-if="hasProxmox">
+              <div
+                class="summary-source-switch"
+                role="group"
+                aria-label="Source des métriques du graphe"
+              >
+                <button
+                  v-for="src in chartSources"
+                  :key="src.key"
+                  type="button"
+                  :class="chartSource === src.key ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-secondary'"
+                  :aria-pressed="chartSource === src.key"
+                  @click="chartSource = src.key; fetchSummary()"
+                >
+                  {{ src.label }}
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              Moyenne sur tous les hôtes
+            </template>
+          </div>
+          <div class="btn-group btn-group-sm">
+            <button
+              v-for="h in [1, 6, 24, 168, 720]"
+              :key="h"
+              type="button"
+              :class="summaryHours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+              @click="changeSummaryRange(h)"
+            >
+              {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
+            </button>
+          </div>
+        </div>
+        <div
+          ref="chartContainerRef"
+          class="card-body summary-chart-body"
+        >
+          <LoadingSkeleton
+            v-if="summaryLoading || !chartVisible"
+            variant="chart"
+          />
+          <Line
+            v-else-if="summaryChartData"
+            :data="(summaryChartData as any)"
+            :options="(summaryChartOptions as any)"
+            class="h-100"
+          />
+          <div
+            v-else
+            class="h-100 d-flex align-items-center justify-content-center text-secondary"
+          >
+            Aucune donnée
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ─── Versions Docker (collapsible) ───────────────────────────────────── -->
     <DashboardDockerVersions :versions="(versionComparisons as any)" />
 
@@ -576,7 +549,7 @@
         apt upgrade
         <span
           v-if="selectedCount > 5"
-          class="badge bg-danger-lt text-danger ms-1"
+          class="badge bg-red-lt text-red ms-1"
         >DANGER</span>
       </button>
     </BulkActionBar>
@@ -594,7 +567,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { IconAlertTriangle, IconPlus, IconListCheck, IconChevronRight } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconPlus, IconListCheck, IconChevronRight, IconChevronDown, IconCircleCheck } from '@tabler/icons-vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { isNeverConnectedHost } from '../utils/hosts'
@@ -648,7 +621,6 @@ const {
   summaryChartOptions,
   fetchSummary,
   changeSummaryRange,
-  selectAllFiltered,
   clearSelection,
   sendBulkApt,
   formatUptime,
@@ -658,6 +630,77 @@ const {
 } = useDashboard()
 
 const { items: attentionItems } = useAttentionCenter()
+
+interface BannerItem {
+  key: string
+  label: string
+  to: string
+  severity: 'danger' | 'warning' | 'info'
+  count?: number
+}
+
+// Merges the CVE banner, the Proxmox health banner and the Attention items
+// into one condensed list — three stacked blocks before this, now one card.
+const bannerItems = computed<BannerItem[]>(() => {
+  const list: BannerItem[] = []
+
+  const critical = cveSummary.value?.critical_count || 0
+  const hostsWithCritical = cveSummary.value?.hosts_with_critical || 0
+  if (critical > 0 || hostsWithCritical > 0) {
+    list.push({
+      key: 'cve',
+      label: `${critical} CVE critique${pluralize(critical)}${hostsWithCritical > 0 ? ` sur ${hostsWithCritical} hôte${pluralize(hostsWithCritical)}` : ''}`,
+      to: '/apt',
+      severity: 'danger',
+      count: critical || undefined,
+    })
+  }
+
+  const nodesDown = proxmoxSummary.value?.nodes_down ?? 0
+  const storageNearFull = proxmoxSummary.value?.storage_near_full ?? 0
+  const storageOffline = proxmoxSummary.value?.storage_offline ?? 0
+  const failedTasks = proxmoxSummary.value?.recent_failed_tasks ?? 0
+  if (nodesDown > 0 || storageNearFull > 0 || storageOffline > 0 || failedTasks > 0) {
+    const parts: string[] = []
+    if (nodesDown > 0) parts.push(`${nodesDown} nœud${pluralize(nodesDown)} hors ligne`)
+    if (storageNearFull > 0) parts.push(`${storageNearFull} stockage${pluralize(storageNearFull)} presque plein${pluralize(storageNearFull)}`)
+    if (storageOffline > 0) parts.push(`${storageOffline} stockage${pluralize(storageOffline)} hors ligne`)
+    if (failedTasks > 0) parts.push(`${failedTasks} tâche${pluralize(failedTasks)} échouée${pluralize(failedTasks)} (24h)`)
+    list.push({
+      key: 'proxmox-health',
+      label: parts.join(' · '),
+      to: '/proxmox',
+      severity: 'warning',
+    })
+  }
+
+  for (const item of attentionItems.value) {
+    list.push({ key: item.key, label: item.label, to: item.to, severity: item.severity as BannerItem['severity'], count: item.count })
+  }
+
+  // Defensive sort: today CVE is always pushed first (the only "danger"
+  // source) and attentionItems is info/warning-only, so insertion order
+  // happens to already be severity-ordered — but nothing enforces that
+  // invariant here. Sorting explicitly means a future "danger"-severity
+  // attention item still surfaces above a "warning" one instead of silently
+  // landing wherever it was pushed.
+  const severityRank: Record<BannerItem['severity'], number> = { danger: 0, warning: 1, info: 2 }
+  return list.sort((a, b) => severityRank[a.severity] - severityRank[b.severity])
+})
+
+function bannerBadgeClass(severity: BannerItem['severity']): string {
+  if (severity === 'danger') return 'bg-red-lt text-red'
+  if (severity === 'warning') return 'bg-yellow-lt text-yellow'
+  return 'bg-azure-lt text-azure'
+}
+
+function bannerIconClass(severity: BannerItem['severity']): string {
+  if (severity === 'danger') return 'text-red'
+  if (severity === 'warning') return 'text-yellow'
+  return 'text-azure'
+}
+
+const chartOpen = ref(false)
 
 const proxmoxLinkByHostId = computed<Record<string, DashboardProxmoxLinkRecord>>(() => {
   const map: Record<string, DashboardProxmoxLinkRecord> = {}
@@ -689,6 +732,21 @@ const paginatedHosts = computed(() => {
 
 function setHostPage(page: number): void {
   currentHostPage.value = page
+}
+
+// Scoped to the current page, like Docker's equivalent header checkbox —
+// selecting "all" shouldn't silently span every page of the current filter.
+const allVisibleHostsSelected = computed(() =>
+  paginatedHosts.value.length > 0 && paginatedHosts.value.every((h) => selectedHostIds.value.includes(h.id))
+)
+
+function toggleSelectAllVisibleHosts(checked: boolean): void {
+  const next = new Set(selectedHostIds.value)
+  for (const h of paginatedHosts.value) {
+    if (checked) next.add(h.id)
+    else next.delete(h.id)
+  }
+  selectedHostIds.value = Array.from(next)
 }
 
 function toggleSort(key: string): void {
@@ -744,6 +802,15 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.chart-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.chart-chevron.is-open {
+  transform: rotate(180deg);
+}
+
 .summary-source-switch {
   display: inline-flex;
   gap: 0.5rem;

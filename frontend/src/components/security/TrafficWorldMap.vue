@@ -1,10 +1,27 @@
 <template>
-  <svg
-    ref="worldMapSvg"
-    class="world-map"
-    role="img"
-    aria-label="Carte mondiale du trafic par pays"
-  />
+  <div
+    ref="worldMapWrap"
+    class="world-map-wrap"
+  >
+    <svg
+      ref="worldMapSvg"
+      class="world-map"
+      role="img"
+      aria-label="Carte mondiale du trafic par pays"
+    />
+    <div
+      v-if="tooltip"
+      class="world-map-tooltip"
+      :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }"
+    >
+      <div class="fw-bold">
+        {{ tooltip.country }}
+      </div>
+      <div class="text-secondary small">
+        {{ numberFormat(tooltip.hits) }} hits
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -21,6 +38,8 @@ type AnyRecord = Record<string, any>
 const props = defineProps<{ countryDistribution: AnyRecord[] }>()
 
 const worldMapSvg = ref<SVGSVGElement | null>(null)
+const worldMapWrap = ref<HTMLDivElement | null>(null)
+const tooltip = ref<{ x: number; y: number; country: string; hits: number } | null>(null)
 let resizeHandler: (() => void) | null = null
 
 function numberFormat(v: number): string {
@@ -50,6 +69,16 @@ function mapCountryKey(name: string): string {
     uae: 'unitedarabemirates',
   }
   return aliases[key] || key
+}
+
+function updateTooltip(event: MouseEvent, country: string, hits: number): void {
+  const wrap = worldMapWrap.value
+  if (!wrap) return
+  const rect = wrap.getBoundingClientRect()
+  // Clamp so the tooltip never runs off the right/bottom edge of the card.
+  const x = Math.min(event.clientX - rect.left + 14, rect.width - 160)
+  const y = Math.max(event.clientY - rect.top - 12, 0)
+  tooltip.value = { x, y, country, hits }
 }
 
 async function renderWorldMap() {
@@ -97,15 +126,31 @@ async function renderWorldMap() {
     .attr('stroke', '#ffffff')
     .attr('stroke-width', 0.6)
 
+  // aria-label (not a <title>) so screen readers still get per-country
+  // context without also triggering the browser's native hover tooltip —
+  // that stacked visually with the custom one below.
+  countries.attr('aria-label', (d: AnyRecord) => {
+    const country = String(d?.properties?.name || 'Unknown')
+    const key = mapCountryKey(country)
+    const hits = countryHits.get(key) || 0
+    return `${country}: ${numberFormat(hits)} hits`
+  })
+
   countries
-    .selectAll('title')
-    .data((d: any) => [d])
-    .join('title')
-    .text((d: AnyRecord) => {
+    .on('mouseenter', function (this: SVGPathElement, event: MouseEvent, d: AnyRecord) {
+      select(this).raise().classed('country-hover', true)
       const country = String(d?.properties?.name || 'Unknown')
       const key = mapCountryKey(country)
-      const hits = countryHits.get(key) || 0
-      return `${country}: ${numberFormat(hits)} hits`
+      updateTooltip(event, country, countryHits.get(key) || 0)
+    })
+    .on('mousemove', function (event: MouseEvent, d: AnyRecord) {
+      const country = String(d?.properties?.name || 'Unknown')
+      const key = mapCountryKey(country)
+      updateTooltip(event, country, countryHits.get(key) || 0)
+    })
+    .on('mouseleave', function (this: SVGPathElement) {
+      select(this).classed('country-hover', false)
+      tooltip.value = null
     })
 }
 
@@ -131,10 +176,37 @@ watch(
 </script>
 
 <style scoped>
+.world-map-wrap {
+  position: relative;
+}
+
 .world-map {
   width: 100%;
   height: 340px;
   display: block;
+}
+
+.world-map :deep(.country) {
+  transition: filter 0.1s ease-in-out, stroke-width 0.1s ease-in-out;
+}
+
+.world-map :deep(.country-hover) {
+  cursor: pointer;
+  filter: brightness(1.25);
+  stroke: var(--tblr-body-color);
+  stroke-width: 1.4;
+}
+
+.world-map-tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: var(--tblr-bg-surface);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  box-shadow: var(--tblr-box-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.2));
+  white-space: nowrap;
 }
 
 @media (max-width: 992px) {

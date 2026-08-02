@@ -1,7 +1,7 @@
 <template>
   <div class="card">
     <div
-      class="card-header dashboard-docker-header"
+      class="card-header dashboard-docker-header clickable-row"
       role="button"
       tabindex="0"
       :aria-expanded="isOpen"
@@ -34,7 +34,7 @@
     <div
       v-show="isOpen"
       :id="panelId"
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table class="table table-vcenter card-table">
         <thead>
@@ -144,14 +144,13 @@
             </td>
           </tr>
           <tr v-if="versions.length === 0">
-            <td
-              colspan="8"
-              class="text-center text-secondary py-4"
-            >
-              Aucun suivi de version configuré. Ajoutez des release trackers dans
-              <router-link to="/git-webhooks">
-                Git / Automatisation
-              </router-link>.
+            <td colspan="8">
+              <EmptyState
+                title="Aucun suivi de version configuré."
+                subtitle="Ajoutez des release trackers pour surveiller vos images Docker."
+                cta-label="Git / Automatisation"
+                cta-to="/git-webhooks"
+              />
             </td>
           </tr>
         </tbody>
@@ -178,6 +177,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import { IconChevronDown } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import { useAuthStore } from '../../stores/auth'
+import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 
 interface DockerVersion {
@@ -275,10 +275,6 @@ async function runTracker(v: DockerVersion): Promise<void> {
 </script>
 
 <style scoped>
-.dashboard-docker-header {
-  cursor: pointer;
-}
-
 .docker-chevron {
   flex-shrink: 0;
   transition: transform 0.2s;

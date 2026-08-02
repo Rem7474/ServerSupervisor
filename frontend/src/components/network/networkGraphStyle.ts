@@ -53,6 +53,28 @@ export function getNetworkGraphStyle(): cytoscape.CytoscapeOptions['style'] {
       },
     },
     {
+      // Proxmox VM/LXC guest with no ServerSupervisor agent — same compound
+      // shape as node[type="host"] (padded parent for its service children),
+      // amber border to visually distinguish "not a real Host record" at a
+      // glance rather than looking like a misconfigured host.
+      selector: 'node[type="proxmox_guest"]',
+      style: {
+        'background-color': 'rgba(15,23,42,0.42)',
+        'border-color': 'rgba(245,158,11,0.55)',
+        'border-width': 1.5,
+        'border-style': 'dashed',
+        'label': 'data(label)',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'text-valign': 'top',
+        'text-halign': 'center',
+        'text-margin-y': '6px',
+        'padding': '22px',
+        'shape': 'roundrectangle',
+        'color': '#fcd34d',
+      },
+    },
+    {
       selector: 'node[type="service"]',
       style: {
         'background-color': 'rgba(15,23,42,0.88)',

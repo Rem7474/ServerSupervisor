@@ -33,6 +33,28 @@
           <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
           <span>{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
         </span>
+        <span
+          v-if="activeCommand"
+          class="badge bg-blue-lt text-blue d-inline-flex align-items-center gap-1 flex-shrink-0"
+        >
+          <span
+            class="spinner-border spinner-border-sm"
+            role="status"
+          />
+          apt {{ activeCommand.action }} — {{ statusLabel(activeCommand.status) }}
+        </span>
+        <button
+          v-if="activeCommand"
+          type="button"
+          class="btn btn-icon btn-sm btn-ghost-secondary flex-shrink-0"
+          title="Voir les logs en direct"
+          @click="$emit('watch-command', activeCommand)"
+        >
+          <IconList
+            :size="16"
+            class="icon icon-sm"
+          />
+        </button>
         <div
           v-if="canRunApt"
           class="d-flex gap-1 flex-shrink-0"
@@ -80,7 +102,7 @@
           </div>
           <button
             type="button"
-            class="btn btn-sm btn-outline-secondary"
+            class="btn btn-icon btn-sm btn-outline-secondary"
             title="Planifier une commande APT"
             @click="$emit('schedule')"
           >
@@ -96,7 +118,7 @@
         >Mode lecture seule</span>
         <button
           type="button"
-          class="btn btn-sm btn-ghost-secondary flex-shrink-0"
+          class="btn btn-icon btn-sm btn-ghost-secondary flex-shrink-0"
           :title="expanded ? 'Réduire' : 'Développer'"
           @click="$emit('update:expanded', !expanded)"
         >
@@ -266,7 +288,7 @@
               >· {{ cmd.triggered_by }}</span>
               <button
                 type="button"
-                class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
+                class="btn btn-icon btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
                 title="Voir les logs"
                 @click="$emit('watch-command', cmd)"
               >
@@ -334,7 +356,10 @@ const { getStatusBadgeClass } = useStatusBadge()
 const PKG_PREVIEW_COUNT = 15
 const pkgShowAll = ref(false)
 
-const isCmdLoading = computed(() => !!props.cmdLoading)
+const activeCommand = computed(() =>
+  props.history?.find((cmd) => cmd.status === 'pending' || cmd.status === 'running')
+)
+const isCmdLoading = computed(() => !!props.cmdLoading || !!activeCommand.value)
 
 function parseJsonArray<T = unknown>(value: unknown): T[] {
   if (!value) return []

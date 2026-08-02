@@ -1,13 +1,22 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import api from '../api'
+import { npmApi } from '../api/npm'
 import type { UptimeProbe } from '../types/uptime'
-import type { SSLCertificate } from '../types/ssl'
 import { useConfirmDialog } from './useConfirmDialog'
-import dayjs from '../utils/dayjs'
 import { usePagination } from './usePagination'
 
 type Probe = UptimeProbe
-type SSLCert = SSLCertificate
+
+interface HeartbeatTick {
+  id: string | number
+  checked_at: string
+  success: boolean
+}
+
+// How many recent ticks the compact per-row heartbeat bar shows — smaller
+// than the single-probe detail page's HEARTBEAT_BAR_SIZE (50) since this
+// renders once per row in a list instead of as the page's own focal point.
+const ROW_HEARTBEAT_SIZE = 20
 
 interface ProbeForm {
   id: string
@@ -23,29 +32,20 @@ interface ProbeForm {
   enabled: boolean
 }
 
-interface CertForm {
-  id: string
-  name: string
-  host: string
-  port: number
-  server_name: string
-  enabled: boolean
-}
-
 const REFRESH_SEC = 30
 const PAGE_SIZE = 25
 
-export function useMonitoring() {
+export function useUptimeProbes() {
   const dialog = useConfirmDialog()
 
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
   const error = ref('')
 
-  // ── Uptime ────────────────────────────────────────────────────────────────────
   const probes = ref<Probe[]>([])
   const loadingProbes = ref(false)
   const probeStats = ref<Record<string, { uptime_percent: number }>>({})
+  const probeHistory = ref<Record<string, HeartbeatTick[]>>({})
   const checkingProbeId = ref('')
 
   const downCount = computed(() => probes.value.filter((p) => p.last_status === 'down').length)
@@ -61,11 +61,6 @@ export function useMonitoring() {
     }
   }
 
-  function probeSortIcon(col: ProbeCol): string {
-    if (probeSort.value.col !== col) return '⇅'
-    return probeSort.value.dir === 'asc' ? '▲' : '▼'
-  }
-
   const sortedProbes = computed(() => {
     const arr = [...probes.value]
     const { col, dir } = probeSort.value
@@ -74,7 +69,17 @@ export function useMonitoring() {
       switch (col) {
         case 'name': return m * a.name.localeCompare(b.name)
         case 'status': {
-          const rank = (p: Probe) => p.last_status === 'down' ? 0 : p.last_status === 'up' ? 1 : 2
+          // A disabled probe keeps whatever last_status it had when it was
+          // still being checked — without a dedicated bucket it stays mixed
+          // in with currently-down, actively-monitored probes even though
+          // it's no longer being checked at all. Sorted last, since it's not
+          // actionable the way a real outage is.
+          const rank = (p: Probe) => {
+            if (!p.enabled) return 3
+            if (p.last_status === 'down') return 0
+            if (p.last_status === 'up') return 1
+            return 2
+          }
           return m * (rank(a) - rank(b))
         }
         case 'uptime': {
@@ -123,7 +128,9 @@ export function useMonitoring() {
       const { data } = await api.getUptimeProbes()
       probes.value = data?.probes || []
       lastUpdatedAt.value = new Date()
+      error.value = ''
       fetchAllProbeStats()
+      fetchAllProbeHistory()
     } catch (e: unknown) {
       error.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
         || (e as { message?: string })?.message || 'Impossible de charger les sondes'
@@ -143,6 +150,23 @@ export function useMonitoring() {
       }
     }
     probeStats.value = map
+  }
+
+  // Powers the compact per-row heartbeat bar on the merged Monitoring
+  // overview (see useMonitoringOverview.ts) — one extra request per probe,
+  // same fan-out pattern fetchAllProbeStats already uses.
+  async function fetchAllProbeHistory(): Promise<void> {
+    const results = await Promise.allSettled(
+      probes.value.map((p) => api.getUptimeHistory(p.id, ROW_HEARTBEAT_SIZE).then((r) => ({ id: p.id, data: r.data })))
+    )
+    const map: Record<string, HeartbeatTick[]> = {}
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        // API returns newest-first; reverse so the bar reads left(oldest)-to-right(now).
+        map[r.value.id] = [...(r.value.data?.results || [])].reverse()
+      }
+    }
+    probeHistory.value = map
   }
 
   async function checkProbeNow(p: Probe): Promise<void> {
@@ -210,74 +234,31 @@ export function useMonitoring() {
   }
 
   async function confirmDeleteProbe(p: Probe): Promise<void> {
+    // p.npm_proxy_host_id is only ever set when an NPM proxy host's
+    // monitoring toggle created this probe — the FK is ON DELETE SET NULL,
+    // not RESTRICT. Deleting the probe alone would leave that toggle showing
+    // "enabled" with nothing behind it, so this also flips the NPM-side flag
+    // off first — one action does both instead of leaving a second manual
+    // step in NPM.
     const ok = await dialog.confirm({
       title: 'Supprimer la sonde ?',
-      message: `Cette action supprimera "${p.name}" et tout son historique.`,
+      message: p.npm_proxy_host_id
+        ? `"${p.name}" est gérée par le proxy host NPM "${p.npm_proxy_host_domain}". La supprimer désactivera aussi le suivi uptime de ce proxy host dans NPM.`
+        : `Cette action supprimera "${p.name}" et tout son historique.`,
       okLabel: 'Supprimer',
       destructive: true,
     })
     if (!ok) return
     try {
+      if (p.npm_proxy_host_id) {
+        await npmApi.updateProxyHost(p.npm_proxy_host_id, { uptime_monitoring_enabled: false })
+      }
       await api.deleteUptimeProbe(p.id)
       await fetchProbes()
     } catch (e: unknown) {
       error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
     }
   }
-
-  // ── SSL ───────────────────────────────────────────────────────────────────────
-  const certs = ref<SSLCert[]>([])
-  const loadingCerts = ref(false)
-  const checkingCertId = ref('')
-
-  const expiringCount = computed(() => certs.value.filter((c) => {
-    const d = c.days_remaining
-    return d != null && d <= 30
-  }).length)
-
-  type CertCol = 'name' | 'expiration' | 'days' | 'last_checked'
-  const certSort = ref<{ col: CertCol; dir: 'asc' | 'desc' }>({ col: 'days', dir: 'asc' })
-
-  function toggleCertSort(col: CertCol): void {
-    if (certSort.value.col === col) {
-      certSort.value = { col, dir: certSort.value.dir === 'asc' ? 'desc' : 'asc' }
-    } else {
-      certSort.value = { col, dir: 'asc' }
-    }
-  }
-
-  function certSortIcon(col: CertCol): string {
-    if (certSort.value.col !== col) return '⇅'
-    return certSort.value.dir === 'asc' ? '▲' : '▼'
-  }
-
-  const sortedCerts = computed(() => {
-    const arr = [...certs.value]
-    const { col, dir } = certSort.value
-    const m = dir === 'asc' ? 1 : -1
-    arr.sort((a, b) => {
-      switch (col) {
-        case 'name': return m * a.name.localeCompare(b.name)
-        case 'days': {
-          const da = a.days_remaining ?? Infinity
-          const db = b.days_remaining ?? Infinity
-          return m * (da - db)
-        }
-        case 'expiration': {
-          const ta = a.valid_to ? new Date(a.valid_to).getTime() : Infinity
-          const tb = b.valid_to ? new Date(b.valid_to).getTime() : Infinity
-          return m * (ta - tb)
-        }
-        case 'last_checked': {
-          const ta = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0
-          const tb = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0
-          return m * (ta - tb)
-        }
-      }
-      return 0
-    })
-    return arr
-  })
 
   const {
     currentPage: probePage,
@@ -287,140 +268,12 @@ export function useMonitoring() {
     setPage: setProbesPage,
   } = usePagination({ items: sortedProbes, pageSize: PAGE_SIZE })
 
-  const {
-    currentPage: certPage,
-    totalPages: certTotalPages,
-    pagedItems: pagedCerts,
-    resetPage: resetCertPage,
-    setPage: setCertPage,
-  } = usePagination({ items: sortedCerts, pageSize: PAGE_SIZE })
-
   watch(probeSort, resetProbePage, { deep: true })
-  watch(certSort, resetCertPage, { deep: true })
 
-  function formatDate(ts: string | undefined | null): string {
-    return ts ? dayjs(ts).format('YYYY-MM-DD') : '—'
-  }
-
-  function shortIssuer(s: string | undefined): string {
-    if (!s) return ''
-    const cn = /CN=([^,]+)/.exec(s)
-    return cn ? cn[1] : s.split(',')[0]
-  }
-
-  function daysLabel(d: number | null | undefined): string {
-    if (d == null) return 'Inconnu'
-    if (d < 0) return `Expiré (${Math.abs(d)}j)`
-    return `${d}j`
-  }
-
-  function daysBadge(d: number | null | undefined): string {
-    if (d == null) return 'bg-secondary-lt text-secondary'
-    if (d < 0) return 'bg-red text-white'
-    if (d <= 7) return 'bg-red-lt text-red'
-    if (d <= 30) return 'bg-yellow-lt text-yellow'
-    return 'bg-green-lt text-green'
-  }
-
-  async function fetchCerts(): Promise<void> {
-    loadingCerts.value = true
-    try {
-      const { data } = await api.getSSLCertificates()
-      certs.value = data?.certificates || []
-      lastUpdatedAt.value = new Date()
-    } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Impossible de charger les certificats'
-    } finally {
-      loadingCerts.value = false
-    }
-  }
-
-  async function checkCertNow(c: SSLCert): Promise<void> {
-    checkingCertId.value = c.id
-    try {
-      await api.checkSSLCertificateNow(c.id)
-      await fetchCerts()
-    } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
-    } finally {
-      checkingCertId.value = ''
-    }
-  }
-
-  // cert form
-  const certModalOpen = ref(false)
-  const savingCert = ref(false)
-  const certFormError = ref('')
-  const certForm = ref<CertForm>(emptyCertForm())
-
-  function emptyCertForm(): CertForm {
-    return { id: '', name: '', host: '', port: 443, server_name: '', enabled: true }
-  }
-
-  function openCreateCert(): void {
-    certForm.value = emptyCertForm()
-    certFormError.value = ''
-    certModalOpen.value = true
-  }
-
-  function openEditCert(c: SSLCert): void {
-    certForm.value = { id: c.id, name: c.name, host: c.host, port: c.port,
-      server_name: c.server_name || '', enabled: c.enabled }
-    certFormError.value = ''
-    certModalOpen.value = true
-  }
-
-  function closeCertModal(): void {
-    certModalOpen.value = false
-    savingCert.value = false
-  }
-
-  async function saveCert(): Promise<void> {
-    savingCert.value = true
-    certFormError.value = ''
-    try {
-      const { id: _id, ...body } = certForm.value
-      if (certForm.value.id) {
-        await api.updateSSLCertificate(certForm.value.id, body)
-      } else {
-        await api.createSSLCertificate(body)
-      }
-      closeCertModal()
-      await fetchCerts()
-    } catch (e: unknown) {
-      certFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Erreur lors de l\'enregistrement'
-    } finally {
-      savingCert.value = false
-    }
-  }
-
-  async function confirmDeleteCert(c: SSLCert): Promise<void> {
-    const ok = await dialog.confirm({
-      title: 'Supprimer le certificat ?',
-      message: `Cette action supprimera "${c.name}" du suivi.`,
-      okLabel: 'Supprimer',
-      destructive: true,
-    })
-    if (!ok) return
-    try {
-      await api.deleteSSLCertificate(c.id)
-      await fetchCerts()
-    } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
-    }
-  }
-
-  // ── lifecycle ─────────────────────────────────────────────────────────────────
   let refreshTimer: ReturnType<typeof setInterval> | undefined
-
-  function refreshAll() {
-    fetchProbes()
-    fetchCerts()
-  }
-
   onMounted(() => {
-    refreshAll()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) refreshAll() }, REFRESH_SEC * 1000)
+    fetchProbes()
+    refreshTimer = setInterval(() => { if (autoRefresh.value) fetchProbes() }, REFRESH_SEC * 1000)
   })
   onUnmounted(() => {
     if (refreshTimer) clearInterval(refreshTimer)
@@ -432,15 +285,14 @@ export function useMonitoring() {
     autoRefresh,
     lastUpdatedAt,
     error,
-
-    // uptime
     probes,
     loadingProbes,
     probeStats,
+    probeHistory,
     checkingProbeId,
     downCount,
+    probeSort,
     toggleProbeSort,
-    probeSortIcon,
     pagedProbes,
     probeBadge,
     probeStatusLabel,
@@ -458,31 +310,5 @@ export function useMonitoring() {
     probePage,
     probeTotalPages,
     setProbesPage,
-
-    // ssl
-    certs,
-    loadingCerts,
-    checkingCertId,
-    expiringCount,
-    toggleCertSort,
-    certSortIcon,
-    pagedCerts,
-    formatDate,
-    shortIssuer,
-    daysLabel,
-    daysBadge,
-    checkCertNow,
-    certModalOpen,
-    savingCert,
-    certFormError,
-    certForm,
-    openCreateCert,
-    openEditCert,
-    closeCertModal,
-    saveCert,
-    confirmDeleteCert,
-    certPage,
-    certTotalPages,
-    setCertPage,
   }
 }

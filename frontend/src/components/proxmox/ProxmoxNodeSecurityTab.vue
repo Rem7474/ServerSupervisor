@@ -50,13 +50,13 @@
     </div>
     <div
       v-if="loading"
-      class="card-body text-muted small"
+      class="card-body"
     >
-      <span class="spinner-border spinner-border-sm me-1" />Chargement des événements de sécurité…
+      <LoadingSkeleton variant="table" />
     </div>
     <div
       v-else-if="events.length"
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table class="table table-vcenter card-table">
         <thead>
@@ -108,6 +108,7 @@ import { ref, watch } from 'vue'
 import api from '../../api'
 import { getApiErrorMessage } from '../../api/client'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { IconShieldCheck } from '@tabler/icons-vue'
 
 type SyslogItem = Record<string, any>
@@ -232,10 +233,10 @@ function formatSyslogTime(item: SyslogItem): string {
 
 function syslogLevelBadgeClass(item: SyslogItem): string {
   const raw = String(item?.parsedLevel || item?.pri || item?.level || '').toLowerCase()
-  if (raw.includes('critical') || raw.includes('fatal') || raw.includes('panic')) return 'bg-danger-lt text-danger'
-  if (raw.includes('error') || raw.includes('err')) return 'bg-danger-lt text-danger'
+  if (raw.includes('critical') || raw.includes('fatal') || raw.includes('panic')) return 'bg-red-lt text-red'
+  if (raw.includes('error') || raw.includes('err')) return 'bg-red-lt text-red'
   if (raw.includes('warning') || raw.includes('warn')) return 'bg-orange-lt text-orange'
-  if (raw.includes('success') || raw.includes('ok')) return 'bg-success-lt text-success'
+  if (raw.includes('success') || raw.includes('ok')) return 'bg-green-lt text-green'
   if (raw.includes('info') || raw.includes('notice')) return 'bg-azure-lt text-azure'
   return 'bg-secondary-lt text-secondary'
 }
