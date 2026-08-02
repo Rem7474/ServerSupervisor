@@ -57,6 +57,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		diskHealth       []collector.DiskHealth
 		uuData           *collector.UnattendedUpgradesStatus
 		webLogs          *collector.WebLogReport
+		resticStatus     *collector.ResticStatus
 	)
 
 	var wg sync.WaitGroup
@@ -164,6 +165,19 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		}()
 	}
 
+	if r.cfg.CollectRestic {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			status, err := collector.CollectResticStatus(ctx, r.cfg)
+			if err != nil {
+				slog.Warn("restic status collection skipped", "err", err)
+				return
+			}
+			resticStatus = status
+		}()
+	}
+
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -193,6 +207,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		WebLogs: r.cfg.CollectWebLogs,
 		Systemd: true,
 		Journal: true,
+		Restic:  r.cfg.CollectRestic,
 	}
 
 	report := &sender.Report{
@@ -208,6 +223,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		DiskHealth:         diskHealth,
 		CustomTasks:        customTasksList,
 		TasksConfigYAML:    config.LoadTasksConfigRaw(),
+		Restic:             resticStatus,
 		Timestamp:          time.Now(),
 	}
 	trimWebLogsForReportSize(report, r.cfg.MaxReportBodyBytes)

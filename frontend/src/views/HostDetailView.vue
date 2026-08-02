@@ -502,6 +502,13 @@
             />
           </template>
 
+          <template #backup>
+            <HostBackupTab
+              :host-id="hostId"
+              :can-run="canRunApt"
+            />
+          </template>
+
           <template #commandes>
             <HostCommandsTab
               :commands="(cmdHistory as any)"
@@ -745,6 +752,7 @@ import HostMetricsPanel from '../components/host/HostMetricsPanel.vue'
 import HostProcessesPanel from '../components/host/HostProcessesPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import HostAptTab from '../components/host/HostAptTab.vue'
+import HostBackupTab from '../components/host/HostBackupTab.vue'
 import HostCommandsTab from '../components/host/HostCommandsTab.vue'
 import EntityTabShell from '../components/EntityTabShell.vue'
 import type { EntityTab } from '../components/EntityTabShell.vue'
@@ -883,6 +891,7 @@ const hostTabs = computed<EntityTab[]>(() => {
           ? [{ value: pendingPackages, badgeClass: 'badge bg-yellow-lt text-yellow ms-1' }]
           : [],
     },
+    { key: 'backup', label: 'Sauvegardes' },
     {
       key: 'commandes',
       label: 'Commandes',

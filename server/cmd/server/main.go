@@ -19,6 +19,7 @@ import (
 	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/poller"
 	"github.com/serversupervisor/server/internal/scheduler"
+	backupsvc "github.com/serversupervisor/server/internal/services/backup"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -125,6 +126,10 @@ func main() {
 	bg.Add(background.NewWebLogsRetentionJob(db, cfg))
 	bg.Add(background.NewUptimeWorkerJob(db))
 	bg.Add(background.NewSSLWorkerJob(db))
+	// Separate Service instance from the one wired into the router/completion
+	// listener — CheckStalledRuns only needs repo+notify, no HTTP-facing state.
+	backupStallSvc := backupsvc.NewService(db, dispatcher, cfg, notifHub, pushSvc)
+	bg.Add(background.NewBackupStallJob(backupStallSvc, 360))
 	bg.Start(rootCtx)
 	defer bg.Stop()
 

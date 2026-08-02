@@ -90,6 +90,9 @@
             <option value="custom">
               custom
             </option>
+            <option value="restic">
+              restic
+            </option>
           </select>
           <select
             v-model="filterStatus"
@@ -435,6 +438,7 @@
                       v-model:cron-expression="createForm.cron_expression"
                       :actions-for-module="scheduledTaskActionsForModule"
                       :target-config="scheduledTaskTargetConfig"
+                      :modules="scheduledTaskModules"
                       :show-cron="!createManualOnly"
                     />
                   </div>
@@ -749,6 +753,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DispatchStepEditor from '../components/DispatchStepEditor.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import { DISPATCH_MODULES } from '../utils/dispatchStep'
 import type { DispatchOption } from '../utils/dispatchStep'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 import { useModalChrome } from '../composables/useModalChrome'
@@ -839,6 +844,16 @@ function scheduledTaskTargetConfig(module: string): { label: string; placeholder
   const label = targetLabel(module)
   return label ? { label, placeholder: targetPlaceholder(module) } : null
 }
+
+// Scheduled tasks are the only DispatchStepEditor caller whose backend scope
+// exceeds DISPATCH_MODULES (validModules in scheduledtask.Service) — restic
+// isn't allowed for runbook steps or alert-rule command triggers, so it stays
+// out of the shared list and is added only here (see DispatchStepEditor's
+// `modules` prop doc).
+const scheduledTaskModules: DispatchOption[] = [
+  ...DISPATCH_MODULES,
+  { value: 'restic', label: 'Restic (backup)' },
+]
 </script>
 
 <style scoped>

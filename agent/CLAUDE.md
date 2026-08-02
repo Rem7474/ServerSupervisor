@@ -10,8 +10,8 @@ Custom task commands run as argv arrays via `exec.CommandContext`, never through
 
 ## Dispatcher & concurrency
 
-- `internal/dispatcher/dispatcher.go`: one mutex serializes every `apt` command (dpkg doesn't support concurrent invocations); a 4-slot semaphore bounds everything else; every command has a 45-minute absolute timeout.
-- `internal/dispatcher/registry.go`: module → handler map. Current modules: `docker`, `compose`, `apt`, `agent`, `systemd`, `processes`, `custom`, `crowdsec`, `journal` — one `handler_<module>.go` per module. A new module needs both a registry entry and a `handler_<module>.go` (`handler_custom.go` is a reasonably minimal one to copy from).
+- `internal/dispatcher/dispatcher.go`: one mutex serializes every `apt` command (dpkg doesn't support concurrent invocations); a 4-slot semaphore bounds everything else; every command has a 45-minute absolute timeout (`maxCmdDuration`), with one deliberate exception: `module=restic action=run_backup` gets a 24h safety ceiling instead (`resticBackupMaxDuration`, see `cmdTimeout`), because a large backup can legitimately run far longer than 45 minutes as long as it keeps progressing. The real cutoff for a stuck restic backup is an idle-timeout watchdog inside `collector.RunResticBackupWithProgress` (shared with apt's `runCommandWithStreaming`/`aptCommandIdleTimeout` pattern), not a fixed duration — don't copy the 24h exception to another module without the same idle-watchdog justification.
+- `internal/dispatcher/registry.go`: module → handler map. Current modules: `docker`, `compose`, `apt`, `agent`, `systemd`, `processes`, `custom`, `crowdsec`, `journal`, `restic` — one `handler_<module>.go` per module. A new module needs both a registry entry and a `handler_<module>.go` (`handler_custom.go` is a reasonably minimal one to copy from).
 
 ## Collection must stay bounded
 

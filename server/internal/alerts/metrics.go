@@ -177,6 +177,29 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 			degraded = 0
 		}
 		return float64(degraded), true
+	case "restic_backup_age_hours":
+		// Hours since the last *successful* backup — prefers the richer
+		// ServerSupervisor-dispatched history (backup_runs), falls back to the
+		// agent's periodic passive snapshot (restic_status) for hosts whose
+		// backups aren't dispatched by ServerSupervisor at all.
+		var lastSuccess time.Time
+		if run, err := db.GetLatestSuccessfulBackupRunByHost(ctx, host.ID); err == nil && run.FinishedAt != nil {
+			lastSuccess = *run.FinishedAt
+		} else if status, err := db.GetResticStatus(ctx, host.ID); err == nil && status.LastStatus == "ok" && status.LastRunAt != nil {
+			lastSuccess = *status.LastRunAt
+		}
+		if lastSuccess.IsZero() {
+			return 0, false
+		}
+		return now.Sub(lastSuccess).Hours(), true
+	case "restic_repo_size_bytes":
+		if run, err := db.GetLatestBackupRunByHost(ctx, host.ID); err == nil && run.RepoSizeBytes != nil {
+			return float64(*run.RepoSizeBytes), true
+		}
+		if status, err := db.GetResticStatus(ctx, host.ID); err == nil && status.RepoSizeBytes != nil {
+			return float64(*status.RepoSizeBytes), true
+		}
+		return 0, false
 	case "uptime_down_count":
 		// Global: how many enabled uptime probes are currently DOWN.
 		n, err := db.CountDownProbes(ctx)

@@ -25,6 +25,7 @@ type fakeRepo struct {
 	updatedCmdStatus   string
 	touchedAptActions  []string
 	upsertedApt        *models.AptStatus
+	upsertedRestic     *models.ResticStatus
 	updatedSchedStatus string
 	createdCompleted   bool
 	createdAuditAction string
@@ -103,6 +104,10 @@ func (f *fakeRepo) UpdateScheduledTaskStatus(_ context.Context, _, status string
 }
 func (f *fakeRepo) UpsertAptStatus(_ context.Context, status *models.AptStatus) error {
 	f.upsertedApt = status
+	return nil
+}
+func (f *fakeRepo) UpsertResticStatus(_ context.Context, _ string, status *models.ResticStatus) error {
+	f.upsertedRestic = status
 	return nil
 }
 func (f *fakeRepo) GetRecentCommandsByHost(context.Context, string, int) ([]models.RemoteCommand, error) {

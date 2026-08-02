@@ -61,6 +61,7 @@ func NewService(repo Repository, sched Scheduler, dispatcher Dispatcher) *Servic
 var validModules = map[string]bool{
 	"apt": true, "docker": true, "systemd": true,
 	"journal": true, "processes": true, "custom": true,
+	"restic": true,
 }
 
 // validate checks the request and normalizes its payload. Returns apperr.Validation
