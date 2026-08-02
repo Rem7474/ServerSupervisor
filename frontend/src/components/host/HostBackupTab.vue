@@ -141,35 +141,15 @@
 
       <!-- Aide à la configuration -->
       <div class="mt-3">
-        <button
-          type="button"
+        <a
+          :href="configDocURL"
+          target="_blank"
+          rel="noopener noreferrer"
           class="btn btn-sm btn-ghost-secondary"
-          @click="showConfigHelp = !showConfigHelp"
         >
-          {{ showConfigHelp ? 'Masquer' : 'Aide à la configuration' }}
-        </button>
-        <div
-          v-if="showConfigHelp"
-          class="card card-sm mt-2"
-        >
-          <div class="card-body small">
-            <p class="mb-2">
-              Dans <code>agent.yaml</code> de l'hôte (jamais de credential ici — ils restent dans <code>resticconf</code> sur la machine) :
-            </p>
-            <pre class="bg-dark text-white p-2 rounded">collect_restic: true
-restic_bin: "/usr/local/bin/restic"
-restic_conf_path: "/home/user/restic-backups/resticconf"
-restic_run_script_path: "/home/user/restic-backups/run_backup.sh"
-restic_status_file_path: "/home/user/restic-backups/backup-status.json"</pre>
-            <p class="mb-0">
-              Pour programmer un backup récurrent, utilisez
-              <router-link :to="{ path: '/scheduled-tasks', query: { host: hostId } }">
-                Tâches planifiées
-              </router-link>
-              avec le module <code>restic</code> et l'action <code>run_backup</code>.
-            </p>
-          </div>
-        </div>
+          <IconExternalLink :size="14" />
+          Aide à la configuration
+        </a>
       </div>
 
       <!-- Historique -->
@@ -238,10 +218,13 @@ restic_status_file_path: "/home/user/restic-backups/backup-status.json"</pre>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
+import { IconExternalLink } from '@tabler/icons-vue'
 import dayjs from '../../utils/dayjs'
 import EmptyState from '../EmptyState.vue'
 import { useBackup } from '../../composables/useBackup'
+
+const configDocURL = 'https://github.com/Rem7474/ServerSupervisor/blob/main/docs/backup-restic.md'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -261,8 +244,6 @@ const {
   handleRunBackup,
   stopWatchingLiveBackup,
 } = useBackup(props.hostId)
-
-const showConfigHelp = ref(false)
 
 const latestRun = computed(() => backupStatus.value?.latest_run || null)
 const passiveState = computed(() => backupStatus.value?.passive_state || null)
