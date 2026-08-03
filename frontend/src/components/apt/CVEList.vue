@@ -255,15 +255,15 @@ function severityClass(severity: string | undefined): string {
   display: grid;
   grid-template-columns: minmax(140px, 220px) 1fr;
   align-items: stretch;
-  border: 1px solid var(--tblr-border-color, #e6e7e9);
+  border: 1px solid var(--tblr-border-color);
   border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .cve-group-package {
-  background: var(--tblr-bg-surface-secondary, #f8fafc);
+  background: var(--tblr-bg-surface-secondary);
   padding: 0.625rem 0.75rem;
-  border-right: 1px solid var(--tblr-border-color, #e6e7e9);
+  border-right: 1px solid var(--tblr-border-color);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -304,7 +304,7 @@ function severityClass(severity: string | undefined): string {
 
   .cve-group-package {
     border-right: 0;
-    border-bottom: 1px solid var(--tblr-border-color, #e6e7e9);
+    border-bottom: 1px solid var(--tblr-border-color);
   }
 }
 </style>

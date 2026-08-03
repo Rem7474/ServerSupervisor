@@ -3,6 +3,7 @@ import pluginVue from 'eslint-plugin-vue'
 import pluginTypeScript from '@typescript-eslint/eslint-plugin'
 import parserTypeScript from '@typescript-eslint/parser'
 import vueParser from 'vue-eslint-parser'
+import pluginLocal from './eslint-rules/design-system.js'
 
 export default [
   {
@@ -92,6 +93,21 @@ export default [
       'vue/multi-word-component-names': 'off',
       'vue/no-unused-components': 'warn',
       'vue/no-mutating-props': 'off',
+    },
+  },
+  {
+    // The mechanically-checkable subset of frontend/CLAUDE.md's "Design
+    // system" section — see the note at the top of that section for what
+    // this catches and what stays review-only. No allowlist needed: every
+    // known violation of these specific patterns was already fixed when
+    // the rule was introduced.
+    files: ['**/*.{ts,tsx,vue}'],
+    plugins: {
+      local: pluginLocal,
+    },
+    rules: {
+      'local/no-forbidden-tabler-class': 'error',
+      'local/no-native-confirm': 'error',
     },
   },
   {

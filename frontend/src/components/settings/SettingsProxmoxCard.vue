@@ -108,7 +108,7 @@
         </button>
         <button
           type="button"
-          class="btn btn-outline-info ms-2"
+          class="btn btn-outline-secondary ms-2"
           :disabled="testing"
           @click="testForm"
         >
@@ -198,7 +198,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-icon btn-sm btn-ghost-info"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Tester"
                   @click="testById(inst)"
                 >

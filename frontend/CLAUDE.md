@@ -40,6 +40,8 @@ Four stores, each with a `stores/*.spec.ts` — update the matching spec when yo
 
 Distilled from a cross-page UI/UX consistency audit ([UIUX-AUDIT-2026.md](../UIUX-AUDIT-2026.md)) and the decisions made while remediating it. Tabler is the underlying library (dark-only theme, `data-bs-theme="dark"` fixed in `index.html`) but several of its class names have converged on more than one spelling across this codebase over time — the rules below are the one spelling to use in new code.
 
+Two of these rules are enforced mechanically, not just by review — `npm run lint` (an `eslint.config.js` `no-restricted-syntax` block) blocks the specific class strings called out below (`btn-xs`, `btn-outline-light`/`btn-ghost-light`, `btn-outline-orange`/`btn-ghost-orange`, `btn-info`/`btn-outline-info`/`btn-ghost-info`) plus a native `window.confirm`/`window.alert` call, and `npm run lint:css` (`stylelint`, config in `.stylelintrc.js`) blocks a hardcoded hex color anywhere in a `<style>` block in favor of the `--tblr-*`/`--ss-*` tokens below — both run in CI (`ci-frontend.yml`) and fail the build. Everything else on this page (table/modal/form conventions, the semantic-vs-raw-palette *naming* distinction, icon sizing) is still review-only: a lint rule can catch `bg-red-lt` used as a literal string, but not "this raw hex/class choice happens to encode a state" vs. "...encodes a neutral category," which is a judgment call. New, well-justified exceptions are added to `.stylelintrc.js`'s `overrides` (e.g. `NetworkGraph.vue`'s cytoscape dataviz legend, which is categorical, not app-chrome state) rather than disabling the rule inline.
+
 ### Buttons
 
 | Role | Classes | Notes |

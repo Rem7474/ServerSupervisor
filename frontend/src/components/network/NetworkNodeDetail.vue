@@ -523,7 +523,7 @@ function copyUrl(url: string): void {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
-  color: #475569;
+  color: var(--ss-text-subtle-on-dark);
   margin-bottom: 8px;
 }
 

@@ -666,10 +666,10 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
 
 .step-chip {
   align-items: center;
-  background: var(--tblr-bg-surface, #f3f6fa);
-  border: 1px solid var(--tblr-border-color, #dbe3ec);
+  background: var(--tblr-bg-surface);
+  border: 1px solid var(--tblr-border-color);
   border-radius: 0.6rem;
-  color: var(--tblr-body-color, #4c5b6b);
+  color: var(--tblr-body-color);
   display: flex;
   font-weight: 600;
   gap: 0.5rem;
@@ -692,7 +692,7 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
 
 .step-chip-index {
   background: rgba(255, 255, 255, 0.75);
-  color: #1f2d3d;
+  color: var(--tblr-dark);
   border-radius: 999px;
   display: inline-flex;
   font-size: 0.85rem;
@@ -712,17 +712,20 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
 [data-bs-theme='dark'] .step-chip.active {
   background: rgba(33, 118, 210, 0.28);
   border-color: var(--ss-accent-blue);
-  color: #d2e6ff;
+  color: var(--ss-accent-blue-text);
 }
 
 [data-bs-theme='dark'] .step-chip.done {
   background: rgba(56, 142, 99, 0.24);
   border-color: var(--ss-success-border);
-  color: #c7f2da;
+  color: var(--ss-success-text);
 }
 
 [data-bs-theme='dark'] .step-chip-index {
   background: rgba(255, 255, 255, 0.16);
+  /* stylelint-disable-next-line color-no-hex -- no existing --ss-* token
+     matches this pale-blue index-badge text; a one-off exception rather
+     than introducing a new token for a single use site. */
   color: #d6e4fb;
 }
 

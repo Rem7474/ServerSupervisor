@@ -400,7 +400,7 @@ async function handleBanClick() {
   top: 0;
   z-index: 1;
   backdrop-filter: blur(3px);
-  background: linear-gradient(180deg, var(--tblr-bg-surface-secondary, #f8fafc) 0%, var(--tblr-bg-surface, #ffffff) 100%);
+  background: linear-gradient(180deg, var(--tblr-bg-surface-secondary) 0%, var(--tblr-bg-surface) 100%);
 }
 
 .timeline-interval-row {
@@ -463,7 +463,7 @@ async function handleBanClick() {
   border: 1px solid var(--tblr-border-color);
   border-radius: 0.5rem;
   padding: 0.45rem 0.6rem;
-  background: var(--tblr-bg-surface-secondary, #f8fafc);
+  background: var(--tblr-bg-surface-secondary);
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -502,7 +502,7 @@ async function handleBanClick() {
   z-index: 1;
   border: 1px solid transparent;
   border-radius: 0.5rem;
-  background: var(--tblr-bg-surface-secondary, #f8fafc);
+  background: var(--tblr-bg-surface-secondary);
   color: inherit;
   min-width: 64px;
   display: flex;
@@ -522,7 +522,7 @@ async function handleBanClick() {
 .timeline-frieze-dot {
   display: inline-block;
   border-radius: 999px;
-  background: var(--tblr-bg-surface, #ffffff);
+  background: var(--tblr-bg-surface);
   width: 14px;
   height: 14px;
   border: 3px solid var(--tblr-primary);
@@ -569,7 +569,7 @@ async function handleBanClick() {
 }
 
 .timeline-group {
-  background: var(--tblr-bg-surface, #ffffff);
+  background: var(--tblr-bg-surface);
 }
 
 .timeline-group-header {
@@ -578,7 +578,7 @@ async function handleBanClick() {
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-  background: var(--tblr-bg-surface-secondary, #f8fafc);
+  background: var(--tblr-bg-surface-secondary);
   border-bottom: 1px solid var(--tblr-border-color);
 }
 
@@ -605,7 +605,7 @@ async function handleBanClick() {
   border: 1px solid var(--tblr-border-color);
   border-radius: 0.6rem;
   padding: 0.5rem;
-  background: var(--tblr-bg-surface, #ffffff);
+  background: var(--tblr-bg-surface);
 }
 
 .timeline-status-group-header {
@@ -626,7 +626,7 @@ async function handleBanClick() {
   border: 1px solid var(--tblr-border-color);
   border-radius: 0.6rem;
   padding: 0.55rem 0.65rem;
-  background: var(--tblr-bg-surface, #ffffff);
+  background: var(--tblr-bg-surface);
 }
 
 .timeline-event-topline {

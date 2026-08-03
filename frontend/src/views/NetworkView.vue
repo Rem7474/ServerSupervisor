@@ -81,7 +81,7 @@
               Trafic réseau
               <span
                 class="ms-1"
-                style="cursor:help; color:#64748b;"
+                style="cursor:help; color:var(--ss-text-subtle-on-dark);"
                 title="Delta calculé entre les deux dernières mises à jour WebSocket. Les deltas négatifs (reset de compteur après redémarrage agent) sont ignorés."
               >
                 <IconInfoCircle :size="12" />

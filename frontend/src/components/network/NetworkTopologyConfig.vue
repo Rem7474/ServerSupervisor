@@ -798,7 +798,7 @@ function removeServiceRow(serviceId: string): void {
 
 .network-config-item .form-label {
   font-size: 12px;
-  color: #cbd5f5;
+  color: var(--ss-text-on-dark);
 }
 
 .network-config-item input:not([type="checkbox"]):not([type="radio"]) {

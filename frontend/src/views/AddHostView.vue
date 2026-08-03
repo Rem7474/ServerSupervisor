@@ -302,7 +302,7 @@ const {
 
 .host-success-install {
   border-left: 3px solid rgba(56, 189, 248, 0.6);
-  color: #7dd3fc;
+  color: var(--ss-accent-blue-text);
 }
 
 .agent-connection-status {
@@ -318,13 +318,13 @@ const {
 .agent-waiting {
   background: rgba(99, 102, 241, 0.1);
   border: 1px solid rgba(99, 102, 241, 0.3);
-  color: #a5b4fc;
+  color: var(--ss-accent-blue-text);
 }
 
 .agent-connected {
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid rgba(34, 197, 94, 0.35);
-  color: #86efac;
+  color: var(--ss-success-text);
 }
 
 @media (max-width: 991px) {

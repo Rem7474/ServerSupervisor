@@ -99,7 +99,7 @@
         </button>
         <button
           type="button"
-          class="btn btn-outline-info ms-2"
+          class="btn btn-outline-secondary ms-2"
           :disabled="testing"
           @click="testForm"
         >
@@ -189,7 +189,7 @@
                 <!-- Refresh -->
                 <button
                   type="button"
-                  class="btn btn-icon btn-sm btn-ghost-info"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Rafraîchir maintenant"
                   @click="refreshNow(conn)"
                 >
