@@ -100,7 +100,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="credentials.length === 0">
+          <tr v-if="loading && !credentials.length">
+            <td colspan="4">
+              <LoadingSkeleton variant="table" />
+            </td>
+          </tr>
+          <tr v-else-if="credentials.length === 0">
             <td colspan="4">
               <EmptyState title="Aucun identifiant de registre configuré." />
             </td>
@@ -161,6 +166,7 @@ import api from '../../api/index'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 const { confirm } = useConfirmDialog()
 
@@ -185,6 +191,7 @@ withDefaults(defineProps<{
 })
 
 const credentials = ref<Credential[]>([])
+const loading = ref(false)
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
@@ -203,11 +210,14 @@ const emptyForm = (): CredentialForm => ({
 const form = ref<CredentialForm>(emptyForm())
 
 async function load(): Promise<void> {
+  loading.value = true
   try {
     const res = await api.getRegistryCredentials()
     credentials.value = Array.isArray(res.data?.credentials) ? res.data.credentials : []
   } catch {
     // silently ignore
+  } finally {
+    loading.value = false
   }
 }
 

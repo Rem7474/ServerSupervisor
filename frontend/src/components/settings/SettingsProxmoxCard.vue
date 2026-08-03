@@ -137,7 +137,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="instances.length === 0">
+          <tr v-if="loading && !instances.length">
+            <td colspan="8">
+              <LoadingSkeleton variant="table" />
+            </td>
+          </tr>
+          <tr v-else-if="instances.length === 0">
             <td colspan="8">
               <EmptyState title="Aucune connexion Proxmox configurée." />
             </td>
@@ -253,6 +258,7 @@ import type { ProxmoxConnection } from '../../types/proxmox'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 const { confirm } = useConfirmDialog()
 
@@ -276,6 +282,7 @@ withDefaults(defineProps<{
 })
 
 const instances = ref<ProxmoxInstance[]>([])
+const loading = ref(false)
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
@@ -298,11 +305,14 @@ const emptyForm = (): ProxmoxForm => ({
 const form = ref<ProxmoxForm>(emptyForm())
 
 async function load(): Promise<void> {
+  loading.value = true
   try {
     const res = await api.getProxmoxInstances()
     instances.value = res.data
   } catch {
     // silently ignore
+  } finally {
+    loading.value = false
   }
 }
 

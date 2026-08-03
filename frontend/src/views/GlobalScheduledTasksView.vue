@@ -643,12 +643,10 @@
               >
                 {{ historyError }}
               </div>
-              <div
+              <EmptyState
                 v-else-if="!executions.length"
-                class="text-center py-5 text-muted"
-              >
-                Aucune exécution enregistrée pour cette tâche.
-              </div>
+                title="Aucune exécution enregistrée pour cette tâche."
+              />
               <div v-else>
                 <table class="table table-vcenter table-hover mb-0">
                   <thead>

@@ -16,12 +16,10 @@
           :lines="4"
         />
       </div>
-      <div
+      <EmptyState
         v-else-if="!history.length"
-        class="p-3 text-muted"
-      >
-        Aucune version disponible.
-      </div>
+        title="Aucune version disponible."
+      />
       <div
         v-else
         class="table-responsive scroll-table"
@@ -83,6 +81,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import { formatDateTime } from '../../utils/formatters'
 import type { ReleaseVersionHistoryItem } from '../../types/tracker'
 

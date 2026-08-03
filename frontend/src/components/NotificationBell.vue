@@ -47,25 +47,18 @@
       <!-- List -->
       <div class="notification-list-scroll">
         <!-- Loading -->
-        <div
+        <LoadingSkeleton
           v-if="loading"
-          class="text-center text-secondary py-4 small"
-        >
-          Chargement…
-        </div>
+          variant="list"
+        />
 
         <!-- Empty -->
-        <div
+        <EmptyState
           v-else-if="!notifications.length"
-          class="text-center text-secondary py-4 small"
-        >
-          <IconBell
-            :size="32"
-            class="mb-2"
-            :stroke-width="1.5"
-          />
-          <div>Aucune notification</div>
-        </div>
+          :icon="IconBell"
+          :icon-size="32"
+          title="Aucune notification"
+        />
 
         <!-- Items -->
         <div
@@ -178,6 +171,8 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { IconBell, IconCheck, IconServer } from '@tabler/icons-vue'
 import BadgePill from './common/BadgePill.vue'
+import EmptyState from './EmptyState.vue'
+import LoadingSkeleton from './LoadingSkeleton.vue'
 import RelativeTime from './RelativeTime.vue'
 import { useAuthStore } from '../stores/auth'
 import { useNotifications } from '../composables/useNotifications'

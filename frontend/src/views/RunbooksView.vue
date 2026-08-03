@@ -309,12 +309,10 @@
             <div v-if="executionsLoading">
               <LoadingSkeleton variant="table" />
             </div>
-            <div
+            <EmptyState
               v-else-if="executions.length === 0"
-              class="text-muted text-center py-4"
-            >
-              Aucune exécution pour ce runbook.
-            </div>
+              title="Aucune exécution pour ce runbook."
+            />
             <div
               v-else
               class="table-responsive scroll-table"

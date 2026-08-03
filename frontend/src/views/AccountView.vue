@@ -337,9 +337,12 @@
                 <tr v-if="cmdsLoading">
                   <td
                     colspan="7"
-                    class="text-center text-secondary py-3"
+                    class="py-2"
                   >
-                    Chargement...
+                    <LoadingSkeleton
+                      variant="table"
+                      :lines="4"
+                    />
                   </td>
                 </tr>
                 <tr v-else-if="!myCommands.length">
@@ -404,6 +407,7 @@
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { useAccount } from '../composables/useAccount'
 

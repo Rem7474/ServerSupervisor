@@ -283,12 +283,10 @@
               </h3>
             </div>
             <div class="card-body p-0">
-              <div
+              <EmptyState
                 v-if="!topPaths.length"
-                class="text-center py-4 text-secondary small"
-              >
-                Aucun chemin suspect.
-              </div>
+                title="Aucun chemin suspect."
+              />
               <div
                 v-for="p in pagedTopPaths"
                 v-else

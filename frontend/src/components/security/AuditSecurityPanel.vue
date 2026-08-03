@@ -66,12 +66,10 @@
             </h3>
           </div>
           <div class="card-body p-0">
-            <div
+            <EmptyState
               v-if="!security.blocked_ips?.length"
-              class="text-center py-4 text-secondary small"
-            >
-              Aucune IP bloquée
-            </div>
+              title="Aucune IP bloquée"
+            />
             <div v-else>
               <div
                 v-for="ip in security.blocked_ips"
@@ -103,12 +101,10 @@
             </h3>
           </div>
           <div class="card-body p-0">
-            <div
+            <EmptyState
               v-if="!security.top_failed_ips?.length"
-              class="text-center py-4 text-secondary small"
-            >
-              Aucun échec enregistré sur cette période
-            </div>
+              title="Aucun échec enregistré sur cette période"
+            />
             <div v-else>
               <div
                 v-for="item in security.top_failed_ips"
@@ -138,6 +134,8 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from '../EmptyState.vue'
+
 export interface SecurityFailedIp { ip_address: string; fail_count: number }
 export interface SecurityStats { total?: number; failures?: number; unique_ips?: number }
 export interface SecurityData {

@@ -134,12 +134,10 @@
           </tbody>
         </table>
       </div>
-      <div
+      <EmptyState
         v-if="portRows.length === 0"
-        class="text-center text-secondary py-4"
-      >
-        Aucun port visible
-      </div>
+        title="Aucun port visible"
+      />
     </div>
 
     <div class="card">
@@ -200,12 +198,10 @@
           </tbody>
         </table>
       </div>
-      <div
+      <EmptyState
         v-if="hosts.length === 0"
-        class="text-center text-secondary py-4"
-      >
-        Aucun hôte trouvé
-      </div>
+        title="Aucun hôte trouvé"
+      />
     </div>
 
     <div
@@ -352,12 +348,10 @@
           </tbody>
         </table>
       </div>
-      <div
+      <EmptyState
         v-if="!ipInventoryLoading && proxmoxGuests.length === 0"
-        class="text-center text-secondary py-4"
-      >
-        Aucune IP Proxmox détectée
-      </div>
+        title="Aucune IP Proxmox détectée"
+      />
     </div>
 
     <div
@@ -436,12 +430,10 @@
           </tbody>
         </table>
       </div>
-      <div
+      <EmptyState
         v-if="!ipInventoryLoading && npmEntries.length === 0"
-        class="text-center text-secondary py-4"
-      >
-        Aucun domaine NPM détecté
-      </div>
+        title="Aucun domaine NPM détecté"
+      />
     </div>
   </div>
 </template>
@@ -450,6 +442,7 @@
 import { computed, ref } from 'vue'
 import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../../types/network'
 import SortableHeader from '../common/SortableHeader.vue'
+import EmptyState from '../EmptyState.vue'
 
 interface PortMapping {
   host_port?: number | string

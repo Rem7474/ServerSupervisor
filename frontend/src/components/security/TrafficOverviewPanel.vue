@@ -217,12 +217,10 @@
               </h3>
             </div>
             <div class="card-body p-0">
-              <div
+              <EmptyState
                 v-if="!topThreatIPs.length"
-                class="text-center text-secondary py-4"
-              >
-                Aucune IP suspecte.
-              </div>
+                title="Aucune IP suspecte."
+              />
               <button
                 v-for="ip in topThreatIPs.slice(0, 10)"
                 v-else
@@ -315,12 +313,10 @@
               </h3>
             </div>
             <div class="card-body">
-              <div
+              <EmptyState
                 v-if="!topProxyHosts.length"
-                class="text-center text-secondary py-4"
-              >
-                Aucune donnée domaine.
-              </div>
+                title="Aucune donnée domaine."
+              />
               <div v-else>
                 <div
                   v-for="h in topProxyHosts.slice(0, 8)"

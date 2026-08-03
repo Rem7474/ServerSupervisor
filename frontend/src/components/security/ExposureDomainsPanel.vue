@@ -70,12 +70,10 @@
         </div>
       </div>
 
-      <div
+      <EmptyState
         v-if="exposure.domains.length === 0"
-        class="text-center text-muted py-4"
-      >
-        Aucun domaine NPM ne route vers {{ subjectLabel }}.
-      </div>
+        :title="`Aucun domaine NPM ne route vers ${subjectLabel}.`"
+      />
 
       <div
         v-else
@@ -183,6 +181,7 @@
 <script setup lang="ts">
 import DomainDetailsModal from './DomainDetailsModal.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import { useDomainDetails } from '../../composables/useDomainDetails'
 import type { HostExposure } from '../../types/host'
 import { formatBytes } from '../../utils/formatters'

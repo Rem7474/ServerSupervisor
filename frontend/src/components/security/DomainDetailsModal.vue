@@ -107,12 +107,10 @@
                   </h4>
                 </div>
                 <div class="card-body p-0">
-                  <div
+                  <EmptyState
                     v-if="!(details.top_paths || []).length"
-                    class="text-center py-3 text-secondary small"
-                  >
-                    Aucun chemin
-                  </div>
+                    title="Aucun chemin"
+                  />
                   <div
                     v-for="p in details.top_paths"
                     v-else
@@ -143,12 +141,10 @@
                   </h4>
                 </div>
                 <div class="card-body p-0">
-                  <div
+                  <EmptyState
                     v-if="!(details.top_clients || []).length"
-                    class="text-center py-3 text-secondary small"
-                  >
-                    Aucune IP
-                  </div>
+                    title="Aucune IP"
+                  />
                   <div
                     v-for="c in details.top_clients"
                     v-else

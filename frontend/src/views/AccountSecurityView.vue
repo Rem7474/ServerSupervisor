@@ -255,12 +255,10 @@
           comme facteur d'authentification supplémentaire, en plus ou à la place du code TOTP.
         </p>
 
-        <div
+        <LoadingSkeleton
           v-if="webauthnLoading && !webauthnCredentials.length"
-          class="text-secondary small"
-        >
-          Chargement…
-        </div>
+          variant="list"
+        />
 
         <table
           v-else-if="webauthnCredentials.length"
@@ -416,6 +414,7 @@
 <script setup lang="ts">
 import { IconClock, IconCopy, IconDeviceDesktop, IconKey, IconX } from '@tabler/icons-vue'
 import ConnectionsTable from '../components/common/ConnectionsTable.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useAccountSecurity } from '../composables/useAccountSecurity'
 import { useDateFormatter } from '../composables/useDateFormatter'
 

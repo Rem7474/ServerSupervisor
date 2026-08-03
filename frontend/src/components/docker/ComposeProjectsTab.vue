@@ -239,22 +239,11 @@
     </div>
   </div>
 
-  <div
+  <EmptyState
     v-if="filteredComposeProjects.length === 0"
-    class="text-center text-secondary py-5"
-  >
-    <div class="fw-medium">
-      {{ composeSearch || composeHostFilter || composeStateFilter ? 'Aucun résultat pour ces filtres' : 'Aucun projet Compose trouvé' }}
-    </div>
-    <div class="small mt-1 opacity-75">
-      <template v-if="composeSearch || composeHostFilter || composeStateFilter">
-        Modifiez vos critères de recherche
-      </template>
-      <template v-else>
-        Les projets Docker Compose apparaissent ici lorsque l'agent les détecte
-      </template>
-    </div>
-  </div>
+    :title="composeSearch || composeHostFilter || composeStateFilter ? 'Aucun résultat pour ces filtres' : 'Aucun projet Compose trouvé'"
+    :subtitle="composeSearch || composeHostFilter || composeStateFilter ? 'Modifiez vos critères de recherche' : 'Les projets Docker Compose apparaissent ici lorsque l\'agent les détecte'"
+  />
 
   <!-- Modal projet compose (raw config) -->
   <div
@@ -371,6 +360,7 @@ import { ref, computed, watch } from 'vue'
 import { IconFile, IconList, IconPlayerPlay, IconRefresh, IconPlayerStop } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
+import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 import { useModalChrome } from '../../composables/useModalChrome'
 

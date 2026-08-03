@@ -127,7 +127,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="connections.length === 0">
+          <tr v-if="loading && !connections.length">
+            <td colspan="7">
+              <LoadingSkeleton variant="table" />
+            </td>
+          </tr>
+          <tr v-else-if="connections.length === 0">
             <td colspan="7">
               <EmptyState title="Aucune connexion NPM configurée." />
             </td>
@@ -234,6 +239,7 @@ import type { NPMConnection } from '../../types/npm'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 const { confirm } = useConfirmDialog()
 
@@ -253,6 +259,7 @@ interface NPMForm {
 }
 
 const connections = ref<NPMConnection[]>([])
+const loading = ref(false)
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
@@ -274,11 +281,14 @@ const emptyForm = (): NPMForm => ({
 const form = ref<NPMForm>(emptyForm())
 
 async function load(): Promise<void> {
+  loading.value = true
   try {
     const res = await npmApi.listConnections()
     connections.value = res.data.connections ?? []
   } catch {
     // silently ignore
+  } finally {
+    loading.value = false
   }
 }
 

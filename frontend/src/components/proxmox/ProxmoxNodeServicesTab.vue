@@ -48,6 +48,15 @@
       </div>
     </div>
     <div
+      v-if="loading && !services.length"
+      class="card-body"
+    >
+      <LoadingSkeleton
+        variant="table"
+        :lines="4"
+      />
+    </div>
+    <div
       v-if="!services.length && !loading && !error"
       class="card-body"
     >
@@ -185,6 +194,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconReload } from '@tabler/icons-vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 interface Service {
   name: string

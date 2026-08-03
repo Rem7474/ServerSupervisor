@@ -406,9 +406,9 @@
               </div>
               <div
                 v-else-if="!hostActiveIncidents.length"
-                class="card-body text-center text-secondary py-4"
+                class="card-body"
               >
-                Aucune alerte active sur cet hôte.
+                <EmptyState title="Aucune alerte active sur cet hôte." />
               </div>
               <div
                 v-else
@@ -577,12 +577,11 @@
                 <div v-if="permLoading">
                   <LoadingSkeleton variant="table" />
                 </div>
-                <div
+                <EmptyState
                   v-else-if="!hostPerms.length"
-                  class="text-center py-3 text-muted small"
-                >
-                  Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
-                </div>
+                  title="Aucune restriction"
+                  subtitle="Tous les utilisateurs accèdent à cet hôte selon leur rôle global."
+                />
                 <table
                   v-else
                   class="table table-vcenter mb-0"
@@ -764,6 +763,7 @@ import HostTasksTab from '../components/host/HostTasksTab.vue'
 import HostTimelineTab from '../components/host/HostTimelineTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import EmptyState from '../components/EmptyState.vue'
 import BadgePill from '../components/common/BadgePill.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 

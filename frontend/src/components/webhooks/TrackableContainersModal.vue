@@ -38,17 +38,11 @@
             variant="list"
           />
 
-          <div
+          <EmptyState
             v-else-if="!containers.length"
-            class="empty"
-          >
-            <p class="empty-title">
-              Aucun conteneur à suivre
-            </p>
-            <p class="empty-subtitle text-muted">
-              Tous les conteneurs compose détectés ont déjà un tracker, ou aucun n'a été collecté.
-            </p>
-          </div>
+            title="Aucun conteneur à suivre"
+            subtitle="Tous les conteneurs compose détectés ont déjà un tracker, ou aucun n'a été collecté."
+          />
 
           <template v-else>
             <!-- Global options applied to all created trackers -->
@@ -169,6 +163,7 @@ import { computed, ref, watch } from 'vue'
 import api from '../../api'
 import { useModalChrome } from '../../composables/useModalChrome'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 
 interface Container {
   host_id: string

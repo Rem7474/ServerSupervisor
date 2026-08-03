@@ -23,9 +23,9 @@
     </div>
     <div
       v-else-if="executions.length === 0"
-      class="card-body text-center text-muted py-5"
+      class="card-body"
     >
-      {{ emptyText }}
+      <EmptyState :title="emptyText" />
     </div>
     <div
       v-else
@@ -215,6 +215,7 @@ import { IconBraces, IconFileText, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import { usePagination } from '../../composables/usePagination'
 import { commandStatusLabel } from '../../utils/commandStatus'
 import { execBadgeColor } from '../../utils/statusClasses'

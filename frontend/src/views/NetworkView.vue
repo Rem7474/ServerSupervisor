@@ -265,8 +265,7 @@
                 v-if="!topologyConfigLoaded"
                 class="graph-state-overlay"
               >
-                <span class="spinner-border spinner-border-sm me-2" />
-                Chargement de la topologie…
+                <LoadingSkeleton variant="chart" />
               </div>
               <div
                 v-else-if="hosts.length === 0"
@@ -349,6 +348,7 @@
 import { ref } from 'vue'
 import { IconInfoCircle, IconChartBar, IconLayoutGrid, IconSitemap, IconSettings, IconStack2 } from '@tabler/icons-vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import NetworkGraph from '../components/network/NetworkGraph.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import NetworkNodeDetail from '../components/network/NetworkNodeDetail.vue'

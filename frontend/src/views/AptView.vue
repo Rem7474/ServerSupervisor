@@ -73,8 +73,8 @@
             class="col-12"
           >
             <div class="card">
-              <div class="card-body text-center text-secondary py-4">
-                Aucun hôte ne correspond aux filtres.
+              <div class="card-body">
+                <EmptyState title="Aucun hôte ne correspond aux filtres." />
               </div>
             </div>
           </div>
@@ -125,6 +125,7 @@ import { IconList } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import EmptyState from '../components/EmptyState.vue'
 import AptToolbar from '../components/apt/AptToolbar.vue'
 import AptHostCard from '../components/apt/AptHostCard.vue'
 import AptScheduleModal from '../components/apt/AptScheduleModal.vue'
