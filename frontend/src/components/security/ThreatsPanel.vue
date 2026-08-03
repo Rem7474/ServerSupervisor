@@ -115,7 +115,7 @@
               <div class="text-secondary small mb-1">
                 Requêtes suspectes
               </div>
-              <div class="h2 mb-0 text-orange">
+              <div class="h2 mb-0 text-warning">
                 {{ (threats.suspicious_requests || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
@@ -127,7 +127,7 @@
               <div class="text-secondary small mb-1">
                 IPs suspectes
               </div>
-              <div class="h2 mb-0 text-orange">
+              <div class="h2 mb-0 text-warning">
                 {{ (threats.suspicious_ips || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
@@ -139,7 +139,7 @@
               <div class="text-secondary small mb-1">
                 Domaines ciblés
               </div>
-              <div class="h2 mb-0 text-orange">
+              <div class="h2 mb-0 text-warning">
                 {{ (threats.targeted_hosts || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
@@ -303,7 +303,7 @@
                     {{ p.category || 'Unknown' }}
                   </div>
                 </div>
-                <span class="badge bg-yellow-lt text-yellow flex-shrink-0">{{ (p.hits || 0).toLocaleString('fr-FR') }}</span>
+                <span class="badge bg-warning-lt text-warning flex-shrink-0">{{ (p.hits || 0).toLocaleString('fr-FR') }}</span>
               </div>
             </div>
             <div
@@ -510,7 +510,7 @@
               <h3 class="card-title mb-0">
                 IPs bloquées par CrowdSec
               </h3>
-              <span class="badge bg-green-lt text-green fs-4">
+              <span class="badge bg-success-lt text-success fs-4">
                 {{ crowdSecTotal.toLocaleString() }} décisions actives
               </span>
             </div>

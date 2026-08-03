@@ -216,9 +216,9 @@ const filteredServices = computed(() => {
 })
 
 function stateClass(state: string | undefined): string {
-  if (state === 'active') return 'badge bg-green-lt text-green'
-  if (state === 'failed') return 'badge bg-red-lt text-red'
-  if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'
+  if (state === 'active') return 'badge bg-success-lt text-success'
+  if (state === 'failed') return 'badge bg-danger-lt text-danger'
+  if (state === 'activating' || state === 'deactivating') return 'badge bg-warning-lt text-warning'
   return 'badge bg-secondary-lt text-secondary'
 }
 

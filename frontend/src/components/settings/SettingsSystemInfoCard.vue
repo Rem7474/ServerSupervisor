@@ -26,7 +26,7 @@
         <div class="text-secondary small">
           Mode HTTPS/TLS
         </div>
-        <span :class="settings.tlsEnabled ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">
+        <span :class="settings.tlsEnabled ? 'badge bg-success-lt text-success' : 'badge bg-warning-lt text-warning'">
           {{ settings.tlsEnabled ? 'Active' : 'Desactive' }}
         </span>
       </div>

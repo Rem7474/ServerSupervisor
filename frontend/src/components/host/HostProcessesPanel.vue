@@ -143,7 +143,7 @@
             <td>
               <span
                 class="badge"
-                :class="proc.state.startsWith('S') || proc.state.startsWith('I') ? 'bg-secondary-lt text-secondary' : proc.state.startsWith('R') ? 'bg-green-lt text-green' : proc.state.startsWith('Z') ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow'"
+                :class="proc.state.startsWith('S') || proc.state.startsWith('I') ? 'bg-secondary-lt text-secondary' : proc.state.startsWith('R') ? 'bg-success-lt text-success' : proc.state.startsWith('Z') ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'"
               >
                 {{ proc.state }}
               </span>

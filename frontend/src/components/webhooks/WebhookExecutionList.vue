@@ -89,7 +89,7 @@
                 <router-link
                   v-if="execution.alerts_after_count"
                   to="/alerts?tab=incidents"
-                  class="badge bg-red-lt text-red ms-1 text-decoration-none"
+                  class="badge bg-danger-lt text-danger ms-1 text-decoration-none"
                   :title="`${execution.alerts_after_count} alerte(s) déclenchée(s) sur l'hôte dans les 15 min suivant ce déploiement`"
                 >
                   ⚠ {{ execution.alerts_after_count }}

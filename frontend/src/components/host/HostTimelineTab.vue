@@ -169,25 +169,25 @@ function stopRefreshTimer(): void {
 
 function iconBg(ev: HostTimelineEvent): string {
   if (ev.type === 'incident') {
-    return ev.severity === 'crit' ? 'bg-red text-white' : 'bg-yellow text-white'
+    return ev.severity === 'crit' ? 'bg-danger text-white' : 'bg-warning text-white'
   }
-  if (ev.type === 'command') return 'bg-blue text-white'
+  if (ev.type === 'command') return 'bg-primary text-white'
   return 'bg-secondary text-white'
 }
 
 function severityBadge(severity: string): string {
-  return severity === 'crit' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow'
+  return severity === 'crit' ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'
 }
 
 function statusBadge(status: string): string {
   const map: Record<string, string> = {
-    completed: 'bg-green-lt text-green',
-    failed: 'bg-red-lt text-red',
-    running: 'bg-blue-lt text-blue',
+    completed: 'bg-success-lt text-success',
+    failed: 'bg-danger-lt text-danger',
+    running: 'bg-primary-lt text-primary',
     pending: 'bg-secondary-lt text-secondary',
-    cancelled: 'bg-orange-lt text-orange',
-    active: 'bg-red-lt text-red',
-    resolved: 'bg-green-lt text-green',
+    cancelled: 'bg-secondary-lt text-secondary',
+    active: 'bg-danger-lt text-danger',
+    resolved: 'bg-success-lt text-success',
   }
   return map[status] || 'bg-secondary-lt text-secondary'
 }

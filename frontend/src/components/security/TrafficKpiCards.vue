@@ -42,7 +42,7 @@
           <div class="text-secondary small mb-1">
             Taux 5xx
           </div>
-          <div class="h2 mb-0 text-red">
+          <div class="h2 mb-0 text-danger">
             {{ percent(traffic.ratio_5xx) }}
           </div>
           <div
@@ -120,11 +120,11 @@ function deltaClass(metric: string): string {
 
   const increaseIsBad = metric === 'ratio_5xx' || metric === 'suspicious_ips'
   if (!increaseIsBad) {
-    if (value > 0) return 'text-green'
-    if (value < 0) return 'text-red'
+    if (value > 0) return 'text-success'
+    if (value < 0) return 'text-danger'
   } else {
-    if (value > 0) return 'text-red'
-    if (value < 0) return 'text-green'
+    if (value > 0) return 'text-danger'
+    if (value < 0) return 'text-success'
   }
   return 'text-secondary'
 }

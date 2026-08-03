@@ -422,7 +422,7 @@
                 >
                   <span
                     class="badge"
-                    :class="item.severity === 'crit' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow'"
+                    :class="item.severity === 'crit' ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'"
                   >{{ item.severity }}</span>
                   <span class="flex-grow-1">{{ item.rule_name || item.metric }}</span>
                   <RelativeTime :date="item.triggered_at || ''" />
@@ -571,7 +571,7 @@
                   />
                   Permissions par hôte
                 </h3>
-                <span class="badge badge-sm bg-red text-white">Admin only</span>
+                <span class="badge badge-sm bg-danger text-white">Admin only</span>
               </div>
               <div class="card-body p-0">
                 <div v-if="permLoading">
@@ -873,7 +873,7 @@ const hostTabs = computed<EntityTab[]>(() => {
       key: 'overview',
       label: "Vue d'ensemble",
       badges: hostActiveIncidents.value.length
-        ? [{ value: hostActiveIncidents.value.length, badgeClass: 'badge bg-red-lt text-red ms-1' }]
+        ? [{ value: hostActiveIncidents.value.length, badgeClass: 'badge bg-danger-lt text-danger ms-1' }]
         : [],
     },
     { key: 'metrics', label: 'Métriques' },
@@ -886,9 +886,9 @@ const hostTabs = computed<EntityTab[]>(() => {
       key: 'apt',
       label: 'APT',
       badges: securityUpdates > 0
-        ? [{ value: securityUpdates, badgeClass: 'badge bg-red-lt text-red ms-1' }]
+        ? [{ value: securityUpdates, badgeClass: 'badge bg-danger-lt text-danger ms-1' }]
         : pendingPackages > 0
-          ? [{ value: pendingPackages, badgeClass: 'badge bg-yellow-lt text-yellow ms-1' }]
+          ? [{ value: pendingPackages, badgeClass: 'badge bg-warning-lt text-warning ms-1' }]
           : [],
     },
     { key: 'backup', label: 'Sauvegardes' },

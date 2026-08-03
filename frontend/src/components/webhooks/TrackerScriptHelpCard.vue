@@ -37,7 +37,7 @@
       <div class="d-flex align-items-center gap-2">
         <span
           v-if="detectedComposePath"
-          class="badge bg-green-lt text-green"
+          class="badge bg-success-lt text-success"
           title="Chemin détecté depuis les projets Compose de l'hôte"
         >
           Chemin détecté automatiquement

@@ -79,7 +79,7 @@
                 class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
               >
                 <div class="d-flex align-items-center gap-2">
-                  <span class="badge bg-red-lt text-red">Bloquée</span>
+                  <span class="badge bg-danger-lt text-danger">Bloquée</span>
                   <span class="font-monospace small">{{ ip }}</span>
                 </div>
                 <button
@@ -117,7 +117,7 @@
               >
                 <div class="d-flex align-items-center justify-content-between mb-1">
                   <span class="font-monospace small">{{ item.ip_address }}</span>
-                  <span class="badge bg-red-lt text-red">{{ item.fail_count }} échecs</span>
+                  <span class="badge bg-danger-lt text-danger">{{ item.fail_count }} échecs</span>
                 </div>
                 <div
                   class="progress"

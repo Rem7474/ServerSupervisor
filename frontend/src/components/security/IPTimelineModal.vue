@@ -58,7 +58,7 @@
             </template>
             <span
               v-else
-              class="badge bg-green-lt text-green align-self-center"
+              class="badge bg-success-lt text-success align-self-center"
             >
               IP bloquée par CrowdSec
             </span>
@@ -139,7 +139,7 @@
                 </div>
                 <div class="timeline-kpi-chip">
                   <span class="timeline-kpi-label">Erreurs</span>
-                  <span class="timeline-kpi-value text-red">{{ timelineStats.errors }}</span>
+                  <span class="timeline-kpi-value text-danger">{{ timelineStats.errors }}</span>
                 </div>
                 <div class="timeline-kpi-chip">
                   <span class="timeline-kpi-label">Chemins uniques</span>
@@ -205,8 +205,8 @@
                 </div>
                 <div class="timeline-group-kpis">
                   <span class="badge bg-blue-lt text-blue">{{ group.count }} req</span>
-                  <span class="badge bg-red-lt text-red">{{ group.errorCount }} erreurs</span>
-                  <span class="badge bg-yellow-lt text-yellow">{{ group.uniquePaths }} chemins</span>
+                  <span class="badge bg-danger-lt text-danger">{{ group.errorCount }} erreurs</span>
+                  <span class="badge bg-warning-lt text-warning">{{ group.uniquePaths }} chemins</span>
                   <span class="badge bg-indigo-lt text-indigo">{{ group.uniqueVhosts }} domaines</span>
                 </div>
               </div>
@@ -257,7 +257,7 @@
                         <span v-if="r.blocked">
                           <strong>Blocage:</strong>
                           <span
-                            class="badge bg-green-lt text-green ms-1"
+                            class="badge bg-success-lt text-success ms-1"
                             :title="r.blocked_reason || '-'"
                           >
                             {{ r.blocked_source || 'crowdsec' }}
@@ -530,27 +530,27 @@ async function handleBanClick() {
 }
 
 .timeline-frieze-dot.is-calm {
-  border-color: var(--tblr-blue);
-  background: var(--tblr-blue-lt);
+  border-color: var(--tblr-primary);
+  background: var(--tblr-primary-lt);
 }
 
 .timeline-frieze-dot.is-warm {
-  border-color: var(--tblr-yellow);
-  background: var(--tblr-yellow-lt);
+  border-color: var(--tblr-warning);
+  background: var(--tblr-warning-lt);
 }
 
 .timeline-frieze-dot.is-hot {
-  border-color: var(--tblr-red);
-  background: var(--tblr-red-lt);
+  border-color: var(--tblr-danger);
+  background: var(--tblr-danger-lt);
 }
 
 .timeline-frieze-item.active .timeline-frieze-dot {
-  border-color: var(--tblr-red);
+  border-color: var(--tblr-danger);
 }
 
 .timeline-frieze-item.active {
-  border-color: rgba(var(--tblr-red-rgb, 214, 57, 57), 0.35);
-  background: rgba(var(--tblr-red-rgb, 214, 57, 57), 0.08);
+  border-color: rgba(var(--tblr-danger-rgb), 0.35);
+  background: rgba(var(--tblr-danger-rgb), 0.08);
 }
 
 .timeline-frieze-time {

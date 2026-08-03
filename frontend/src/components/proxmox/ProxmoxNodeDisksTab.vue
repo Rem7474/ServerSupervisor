@@ -76,11 +76,11 @@
           <td>
             <span
               v-if="d.health === 'PASSED'"
-              class="badge bg-green-lt text-green"
+              class="badge bg-success-lt text-success"
             >PASSED</span>
             <span
               v-else-if="d.health === 'FAILED'"
-              class="badge bg-red-lt text-red"
+              class="badge bg-danger-lt text-danger"
             >FAILED</span>
             <span
               v-else

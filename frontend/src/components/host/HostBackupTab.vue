@@ -257,13 +257,13 @@ const statusBadge = computed(() => {
 function runBadgeClass(status: string): string {
   switch (status) {
     case 'ok':
-      return 'bg-green-lt text-green'
+      return 'bg-success-lt text-success'
     case 'running':
-      return 'bg-blue-lt text-blue'
+      return 'bg-primary-lt text-primary'
     case 'warning':
-      return 'bg-orange-lt text-orange'
+      return 'bg-warning-lt text-warning'
     case 'error':
-      return 'bg-red-lt text-red'
+      return 'bg-danger-lt text-danger'
     default:
       return 'bg-secondary-lt text-secondary'
   }

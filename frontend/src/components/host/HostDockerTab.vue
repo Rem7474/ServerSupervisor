@@ -37,11 +37,11 @@
                 <br>
                 <span
                   v-if="containerVersion(c)?.is_up_to_date"
-                  class="badge bg-green-lt text-green mt-1"
+                  class="badge bg-success-lt text-success mt-1"
                 >À jour</span>
                 <span
                   v-else-if="containerVersion(c)?.running_version || containerVersion(c)?.update_confirmed"
-                  class="badge bg-yellow-lt text-yellow mt-1"
+                  class="badge bg-warning-lt text-warning mt-1"
                   :title="`Dernière version : ${containerVersion(c)?.latest_version}`"
                 >Mise à jour disponible</span>
                 <span
@@ -57,7 +57,7 @@
               <code v-else>{{ c.image_tag }}</code>
             </td>
             <td>
-              <span :class="c.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+              <span :class="c.state === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
                 {{ ({ running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' } as Record<string, string>)[c.state || ''] || c.state }}
               </span>
             </td>

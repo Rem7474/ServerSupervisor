@@ -239,7 +239,7 @@
                     {{ ip.level || 'LOW' }} · chemins {{ ip.unique_paths || 0 }}
                   </div>
                 </div>
-                <span class="badge bg-red-lt text-red">{{ numberFormat(ip.hits || 0) }}</span>
+                <span class="badge bg-danger-lt text-danger">{{ numberFormat(ip.hits || 0) }}</span>
               </button>
             </div>
           </div>
@@ -397,10 +397,10 @@
                     <td class="text-end">
                       {{ numberFormat(item.hits || 0) }}
                     </td>
-                    <td class="text-end text-yellow">
+                    <td class="text-end text-warning">
                       {{ numberFormat(item.errors_4xx || 0) }}
                     </td>
-                    <td class="text-end text-red">
+                    <td class="text-end text-danger">
                       {{ numberFormat(item.errors_5xx || 0) }}
                     </td>
                   </tr>

@@ -10,7 +10,7 @@
         <div class="text-secondary small">
           Connexion
         </div>
-        <span :class="dbStatus.connected ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
+        <span :class="dbStatus.connected ? 'badge bg-success-lt text-success' : 'badge bg-danger-lt text-danger'">
           {{ dbStatus.connected ? 'Connectee' : 'Deconnectee' }}
         </span>
       </div>

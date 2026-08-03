@@ -124,11 +124,11 @@
                 <span class="badge bg-secondary-lt text-secondary me-1">:{{ d.forward_port }}</span>
                 <span
                   v-if="d.ssl_enabled"
-                  class="badge bg-green-lt text-green me-1"
+                  class="badge bg-success-lt text-success me-1"
                 >SSL</span>
                 <span
                   v-if="!d.npm_enabled"
-                  class="badge bg-red-lt text-red"
+                  class="badge bg-danger-lt text-danger"
                 >Désactivé</span>
               </td>
               <td class="text-end">

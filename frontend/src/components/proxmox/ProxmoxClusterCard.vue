@@ -34,13 +34,13 @@
             <div class="d-flex align-items-baseline gap-1">
               <span
                 class="h2 mb-0"
-                :class="nodesDown > 0 ? 'text-red' : 'text-green'"
+                :class="nodesDown > 0 ? 'text-danger' : 'text-success'"
               >{{ onlineNodes }}</span>
               <span class="text-secondary small">/ {{ nodes.length }}</span>
             </div>
             <div
               v-if="nodesDown > 0"
-              class="text-red small"
+              class="text-danger small"
             >
               {{ nodesDown }} hors ligne
             </div>
@@ -106,7 +106,7 @@
           >
             <div class="d-flex align-items-center gap-2 p-2 rounded hover-bg">
               <!-- Status dot -->
-              <span :class="node.status === 'online' ? 'badge bg-green node-status-dot' : 'badge bg-red node-status-dot'" />
+              <span :class="node.status === 'online' ? 'badge bg-success node-status-dot' : 'badge bg-danger node-status-dot'" />
               <div class="flex-grow-1 min-width-0">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <span class="fw-semibold text-body small text-truncate">{{ node.node_name }}</span>
@@ -199,21 +199,21 @@ function nodRamPct(node: ClusterNode): number {
 }
 
 function pctColor(pct: number): string {
-  if (pct > 90) return 'text-red'
-  if (pct > 70) return 'text-yellow'
-  return 'text-green'
+  if (pct > 90) return 'text-danger'
+  if (pct > 70) return 'text-warning'
+  return 'text-success'
 }
 
 function cpuBarColor(pct: number): string {
-  if (pct > 90) return 'bg-red'
-  if (pct > 70) return 'bg-yellow'
-  return 'bg-blue'
+  if (pct > 90) return 'bg-danger'
+  if (pct > 70) return 'bg-warning'
+  return 'bg-primary'
 }
 
 function ramBarColor(pct: number): string {
-  if (pct > 90) return 'bg-red'
-  if (pct > 75) return 'bg-yellow'
-  return 'bg-green'
+  if (pct > 90) return 'bg-danger'
+  if (pct > 75) return 'bg-warning'
+  return 'bg-success'
 }
 
 function formatBytes(bytes: number): string {
