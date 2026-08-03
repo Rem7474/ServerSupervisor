@@ -81,7 +81,7 @@
           <dd class="col-7">
             <span
               v-if="tracker.last_release_tag"
-              class="badge bg-green-lt text-green"
+              class="badge bg-success-lt text-success"
             >{{ tracker.last_release_tag }}</span>
             <span
               v-else

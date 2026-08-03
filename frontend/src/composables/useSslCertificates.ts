@@ -93,10 +93,10 @@ export function useSslCertificates() {
 
   function daysBadge(d: number | null | undefined): string {
     if (d == null) return 'bg-secondary-lt text-secondary'
-    if (d < 0) return 'bg-red text-white'
-    if (d <= 7) return 'bg-red-lt text-red'
-    if (d <= 30) return 'bg-yellow-lt text-yellow'
-    return 'bg-green-lt text-green'
+    if (d < 0) return 'bg-danger text-white'
+    if (d <= 7) return 'bg-danger-lt text-danger'
+    if (d <= 30) return 'bg-warning-lt text-warning'
+    return 'bg-success-lt text-success'
   }
 
   async function fetchCerts(): Promise<void> {

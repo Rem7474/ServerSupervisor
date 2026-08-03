@@ -14,7 +14,7 @@
         Versions &amp; Mises à jour Docker
         <span
           v-if="outdatedCount > 0"
-          class="badge bg-yellow-lt text-yellow"
+          class="badge bg-warning-lt text-warning"
         >{{ outdatedCount }} en retard</span>
         <IconChevronDown
           :size="16"
@@ -92,11 +92,11 @@
             <td>
               <span
                 v-if="v.is_up_to_date"
-                class="badge bg-green-lt text-green"
+                class="badge bg-success-lt text-success"
               >À jour</span>
               <span
                 v-else-if="v.running_version || v.update_confirmed"
-                class="badge bg-yellow-lt text-yellow"
+                class="badge bg-warning-lt text-warning"
               >Mise à jour disponible</span>
               <span
                 v-else
@@ -106,12 +106,12 @@
             <td>
               <span
                 v-if="v.custom_task_id"
-                class="badge bg-green-lt text-green"
+                class="badge bg-success-lt text-success"
                 title="Task de déploiement configurée"
               >✅ Déploiement</span>
               <span
                 v-else-if="v.tracker_id"
-                class="badge bg-yellow-lt text-yellow"
+                class="badge bg-warning-lt text-warning"
                 title="Surveillance active mais aucune task configurée"
               >⏸️ Surveillance</span>
               <span
@@ -157,7 +157,8 @@
       </table>
       <div
         v-if="feedback"
-        class="alert alert-info alert-dismissible m-3 mb-0 py-2"
+        class="alert alert-dismissible m-3 mb-0 py-2"
+        :class="feedbackIsError ? 'alert-danger' : 'alert-success'"
         role="status"
       >
         {{ feedback }}
@@ -205,12 +206,14 @@ const isOpen = ref(false)
 const panelId = 'dashboard-docker-versions-panel'
 const runningIds = ref<Record<string, boolean>>({})
 const feedback = ref('')
+const feedbackIsError = ref(false)
 const FEEDBACK_TIMEOUT_MS = 6000
 let feedbackTimer: ReturnType<typeof setTimeout> | null = null
 
-function showFeedback(message: string): void {
+function showFeedback(message: string, isError = false): void {
   if (feedbackTimer) clearTimeout(feedbackTimer)
   feedback.value = message
+  feedbackIsError.value = isError
   feedbackTimer = setTimeout(() => {
     feedback.value = ''
     feedbackTimer = null
@@ -265,7 +268,7 @@ async function runTracker(v: DockerVersion): Promise<void> {
     await apiClient.runReleaseTracker(id)
     showFeedback(`Déclenchement lancé pour ${v.docker_image}.`)
   } catch (e: unknown) {
-    showFeedback(getApiErrorMessage(e, 'Échec du déclenchement manuel.'))
+    showFeedback(getApiErrorMessage(e, 'Échec du déclenchement manuel.'), true)
   } finally {
     const next = { ...runningIds.value }
     delete next[id]

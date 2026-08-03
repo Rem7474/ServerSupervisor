@@ -308,7 +308,7 @@
                     <router-link
                       v-if="isNeverConnectedHost(host)"
                       :to="`/hosts/${host.id}`"
-                      class="badge bg-yellow-lt text-yellow text-decoration-none"
+                      class="badge bg-warning-lt text-warning text-decoration-none"
                       title="Hôte enregistré, mais l'agent ne s'est jamais connecté — ouvrez la fiche hôte pour régénérer la clé et récupérer la commande d'installation."
                     >
                       Installation en attente
@@ -365,7 +365,7 @@
                 <td>
                   <span
                     v-if="aptPendingHosts[host.id]"
-                    class="badge bg-yellow-lt text-yellow"
+                    class="badge bg-warning-lt text-warning"
                   >{{ aptPendingHosts[host.id] }}</span>
                   <span
                     v-else
@@ -549,7 +549,7 @@
         apt upgrade
         <span
           v-if="selectedCount > 5"
-          class="badge bg-red-lt text-red ms-1"
+          class="badge bg-danger-lt text-danger ms-1"
         >DANGER</span>
       </button>
     </BulkActionBar>
@@ -689,15 +689,15 @@ const bannerItems = computed<BannerItem[]>(() => {
 })
 
 function bannerBadgeClass(severity: BannerItem['severity']): string {
-  if (severity === 'danger') return 'bg-red-lt text-red'
-  if (severity === 'warning') return 'bg-yellow-lt text-yellow'
-  return 'bg-azure-lt text-azure'
+  if (severity === 'danger') return 'bg-danger-lt text-danger'
+  if (severity === 'warning') return 'bg-warning-lt text-warning'
+  return 'bg-primary-lt text-primary'
 }
 
 function bannerIconClass(severity: BannerItem['severity']): string {
-  if (severity === 'danger') return 'text-red'
-  if (severity === 'warning') return 'text-yellow'
-  return 'text-azure'
+  if (severity === 'danger') return 'text-danger'
+  if (severity === 'warning') return 'text-warning'
+  return 'text-primary'
 }
 
 const chartOpen = ref(false)

@@ -104,10 +104,10 @@ export function useBot() {
 
   function levelClass(level: string): string {
     switch (level) {
-      case 'CRITICAL': return 'bg-red-lt text-red'
-      case 'HIGH': return 'bg-orange-lt text-orange'
-      case 'MEDIUM': return 'bg-yellow-lt text-yellow'
-      default: return 'bg-azure-lt text-azure'
+      case 'CRITICAL': return 'bg-danger-lt text-danger'
+      case 'HIGH': return 'bg-warning-lt text-warning'
+      case 'MEDIUM': return 'bg-primary-lt text-primary'
+      default: return 'bg-secondary-lt text-secondary'
     }
   }
 
@@ -128,16 +128,16 @@ export function useBot() {
     const t = type.toLowerCase()
     let baseClass = 'bg-secondary-lt text-secondary'
     switch (t) {
-      case 'ban': baseClass = 'bg-red-lt text-red'; break
-      case 'captcha': baseClass = 'bg-yellow-lt text-yellow'; break
-      case 'audit': baseClass = 'bg-azure-lt text-azure'; break
+      case 'ban': baseClass = 'bg-danger-lt text-danger'; break
+      case 'captcha': baseClass = 'bg-warning-lt text-warning'; break
+      case 'audit': baseClass = 'bg-primary-lt text-primary'; break
     }
 
-    // Si blockedUntil est fourni et valide, c'est un blocage temporaire → orange
+    // Si blockedUntil est fourni et valide, c'est un blocage temporaire (moins définitif qu'un ban)
     if (blockedUntil) {
       const d = new Date(blockedUntil)
       if (!Number.isNaN(d.getTime()) && d > new Date()) {
-        return 'bg-orange-lt text-orange'  // blocage temporaire en orange
+        return 'bg-warning-lt text-warning'
       }
     }
 

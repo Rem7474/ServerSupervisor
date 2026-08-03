@@ -253,7 +253,7 @@
               </label>
               <span
                 v-if="filterInternetOnly || filterHideInternal"
-                class="badge bg-blue-lt text-blue small"
+                class="badge bg-primary-lt text-primary small"
               >
                 Filtre actif
               </span>

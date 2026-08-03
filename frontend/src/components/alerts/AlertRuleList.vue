@@ -97,7 +97,7 @@
                 <span class="fw-bold">{{ rule.name || 'Sans nom' }}</span>
                 <span
                   v-if="(rule.active_incident_count ?? 0) > 0"
-                  class="badge bg-red-lt text-red"
+                  class="badge bg-danger-lt text-danger"
                   :title="`${rule.active_incident_count} incident${(rule.active_incident_count ?? 0) > 1 ? 's' : ''} actif${(rule.active_incident_count ?? 0) > 1 ? 's' : ''}`"
                 >{{ rule.active_incident_count }} actif{{ (rule.active_incident_count ?? 0) > 1 ? 's' : '' }}</span>
               </div>

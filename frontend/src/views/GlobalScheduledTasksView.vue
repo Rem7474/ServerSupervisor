@@ -282,7 +282,7 @@
                 <span
                   v-else-if="!canManage"
                   class="badge"
-                  :class="task.enabled ? 'bg-green-lt' : 'bg-secondary-lt'"
+                  :class="task.enabled ? 'bg-success-lt' : 'bg-secondary-lt'"
                 >
                   {{ task.enabled ? 'Oui' : 'Non' }}
                 </span>

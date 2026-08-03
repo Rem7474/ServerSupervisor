@@ -186,7 +186,7 @@
                     v-for="tick in probeHistory[row.probe.id]"
                     :key="tick.id"
                     class="flex-fill rounded-1"
-                    :class="tick.success ? 'bg-green' : 'bg-red'"
+                    :class="tick.success ? 'bg-success' : 'bg-danger'"
                     style="height: 100%; min-width: 2px;"
                     :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? 'OK' : 'KO'}`"
                   />

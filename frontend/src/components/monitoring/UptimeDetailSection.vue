@@ -117,7 +117,7 @@
               v-for="r in heartbeatBar"
               :key="r.id"
               class="flex-fill rounded-1"
-              :class="r.success ? 'bg-green' : 'bg-red'"
+              :class="r.success ? 'bg-success' : 'bg-danger'"
               style="height: 100%; min-width: 3px;"
               :title="`${formatDateTime(r.checked_at)} — ${r.success ? 'OK' : 'KO'}${r.success ? ` (${r.latency_ms} ms)` : (r.error ? ` — ${r.error}` : '')}`"
             />
@@ -194,7 +194,7 @@
                   </div>
                 </td>
                 <td>
-                  <span :class="['badge', g.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red']">
+                  <span :class="['badge', g.success ? 'bg-success-lt text-success' : 'bg-danger-lt text-danger']">
                     {{ g.success ? 'OK' : 'KO' }}
                   </span>
                 </td>

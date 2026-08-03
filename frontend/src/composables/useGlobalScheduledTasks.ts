@@ -51,7 +51,7 @@ function formatDate(iso: string | undefined): string {
 }
 
 function statusBadge(status: string | undefined): string {
-  return getExecutionStateClass(status, 'badge bg-yellow-lt text-yellow')
+  return getExecutionStateClass(status, 'badge bg-warning-lt text-warning')
 }
 
 function durationSec(start: string, end: string): string {

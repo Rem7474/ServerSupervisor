@@ -31,7 +31,7 @@
           >Désactivé</span>
           <span
             v-if="tracker && cooldownActive"
-            class="badge bg-yellow-lt text-yellow"
+            class="badge bg-warning-lt text-warning"
             :title="`Déploiement prévu: ${cooldownEtaText}`"
           >Cooldown actif · reste {{ cooldownRemainingText }}</span>
         </h2>
@@ -60,7 +60,7 @@
         v-if="tracker?.last_release_tag"
         class="col-lg-12"
       >
-        <div class="card bg-info-lt border-info">
+        <div class="card bg-primary-lt border-primary">
           <div class="card-body">
             <h4 class="card-title">
               Dernière version détectée

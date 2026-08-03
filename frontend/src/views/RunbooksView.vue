@@ -552,9 +552,9 @@ function executionStatusLabel(status: string): string {
 }
 
 function executionBadgeClass(status: string): string {
-  if (status === 'completed') return 'bg-green-lt text-green'
-  if (status === 'failed') return 'bg-red-lt text-red'
-  if (status === 'running' || status === 'pending') return 'bg-blue-lt text-blue'
+  if (status === 'completed') return 'bg-success-lt text-success'
+  if (status === 'failed') return 'bg-danger-lt text-danger'
+  if (status === 'running' || status === 'pending') return 'bg-primary-lt text-primary'
   return 'bg-secondary-lt text-secondary'
 }
 

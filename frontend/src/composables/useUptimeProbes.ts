@@ -105,8 +105,8 @@ export function useUptimeProbes() {
 
   function probeBadge(p: Probe): string {
     if (!p.enabled) return 'bg-secondary-lt text-secondary'
-    if (p.last_status === 'up') return 'bg-green-lt text-green'
-    if (p.last_status === 'down') return 'bg-red-lt text-red'
+    if (p.last_status === 'up') return 'bg-success-lt text-success'
+    if (p.last_status === 'down') return 'bg-danger-lt text-danger'
     return 'bg-secondary-lt text-secondary'
   }
 
@@ -117,9 +117,9 @@ export function useUptimeProbes() {
   }
 
   function uptimeBadgeClass(pct: number): string {
-    if (pct >= 99) return 'bg-green-lt text-green'
-    if (pct >= 95) return 'bg-yellow-lt text-yellow'
-    return 'bg-red-lt text-red'
+    if (pct >= 99) return 'bg-success-lt text-success'
+    if (pct >= 95) return 'bg-warning-lt text-warning'
+    return 'bg-danger-lt text-danger'
   }
 
   async function fetchProbes(): Promise<void> {

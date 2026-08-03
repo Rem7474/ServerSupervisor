@@ -78,12 +78,12 @@
               </router-link>
             </td>
             <td>
-              <span :class="getComposeStatus(p) === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+              <span :class="getComposeStatus(p) === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
                 {{ getComposeStatus(p) === 'running' ? 'En cours' : 'Arrêté' }}
               </span>
               <span
                 v-if="getComposeUpdates(p).length > 0"
-                class="badge bg-yellow-lt text-yellow ms-1"
+                class="badge bg-warning-lt text-warning ms-1"
                 :title="getComposeUpdates(p).map(v => `${v.docker_image} : ${v.latest_version} dispo`).join('\n')"
               >
                 {{ getComposeUpdates(p).length }} MAJ
@@ -231,7 +231,8 @@
     </div>
     <div
       v-if="trackerFeedback"
-      class="alert alert-info m-3 mt-0 py-2"
+      class="alert m-3 mt-0 py-2"
+      :class="trackerFeedbackIsError ? 'alert-danger' : 'alert-success'"
       role="status"
     >
       {{ trackerFeedback }}
@@ -436,6 +437,7 @@ useModalChrome(modalRef, () => !!selectedProject.value, { onClose: () => { selec
 const copied = ref(false)
 const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')
+const trackerFeedbackIsError = ref(false)
 
 const composeProjectStatus = computed<Record<string, string>>(() => {
   const statusMap: Record<string, string> = {}
@@ -538,11 +540,13 @@ async function runTracker(vc: VersionComparison, project?: ComposeProject): Prom
   const id = vc.tracker_id!
   trackerRunLoading.value = { ...trackerRunLoading.value, [id]: true }
   trackerFeedback.value = ''
+  trackerFeedbackIsError.value = false
   try {
     await apiClient.runReleaseTracker(id)
     trackerFeedback.value = `Déclenchement lancé pour ${project?.name || vc?.docker_image || 'le tracker'}.`
   } catch (e: unknown) {
     trackerFeedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
+    trackerFeedbackIsError.value = true
   } finally {
     const next = { ...trackerRunLoading.value }
     delete next[id]

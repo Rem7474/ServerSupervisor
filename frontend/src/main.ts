@@ -56,7 +56,7 @@ function renderFatalFallback(detail: FatalDetail): void {
             <div class="alert alert-danger" role="alert">
               <div class="d-flex">
                 <div class="me-3">
-                  <span class="avatar avatar-sm bg-red-lt text-red">!</span>
+                  <span class="avatar avatar-sm bg-danger-lt text-danger">!</span>
                 </div>
                 <div class="flex-fill">
                   <h3 class="alert-title mb-1">${title}</h3>

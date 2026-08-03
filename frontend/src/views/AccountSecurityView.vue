@@ -38,7 +38,7 @@
           <div class="fw-semibold">
             Authentification multi-facteur
           </div>
-          <span :class="mfaEnabled ? 'badge bg-green-lt text-green' : 'badge bg-orange-lt text-orange'">
+          <span :class="mfaEnabled ? 'badge bg-success-lt text-success' : 'badge bg-warning-lt text-warning'">
             {{ mfaEnabled ? 'Activé' : 'Désactivé' }}
           </span>
         </div>

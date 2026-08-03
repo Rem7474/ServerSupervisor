@@ -109,9 +109,9 @@ export function useTraffic() {
   }
 
   function statusClass(status: number): string {
-    if (status >= 200 && status < 300) return 'bg-green-lt text-green'
-    if (status >= 300 && status < 400) return 'bg-yellow-lt text-yellow'
-    if (status >= 400) return 'bg-red-lt text-red'
+    if (status >= 200 && status < 300) return 'bg-success-lt text-success'
+    if (status >= 300 && status < 400) return 'bg-warning-lt text-warning'
+    if (status >= 400) return 'bg-danger-lt text-danger'
     return 'bg-secondary-lt text-secondary'
   }
 

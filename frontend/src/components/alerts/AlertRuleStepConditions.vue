@@ -4,7 +4,7 @@
     <template v-if="form.metric === 'docker_container_state'">
       <div class="row">
         <div class="col-md-6 mb-3">
-          <label class="form-label">États déclenchant une alerte <span class="badge bg-yellow-lt text-yellow ms-1">warn</span></label>
+          <label class="form-label">États déclenchant une alerte <span class="badge bg-warning-lt text-warning ms-1">warn</span></label>
           <div class="border rounded p-2 d-flex flex-wrap gap-2">
             <label
               v-for="s in DOCKER_STATES"
@@ -22,7 +22,7 @@
           </div>
         </div>
         <div class="col-md-6 mb-3">
-          <label class="form-label">États déclenchant une alerte <span class="badge bg-red-lt text-red ms-1">crit</span></label>
+          <label class="form-label">États déclenchant une alerte <span class="badge bg-danger-lt text-danger ms-1">crit</span></label>
           <div class="border rounded p-2 d-flex flex-wrap gap-2">
             <label
               v-for="s in DOCKER_STATES"
@@ -284,11 +284,11 @@
           Résultat du test
           <span
             v-if="testResults.any_fires"
-            class="badge bg-red-lt text-red ms-2"
+            class="badge bg-danger-lt text-danger ms-2"
           >Déclencherait une alerte</span>
           <span
             v-else
-            class="badge bg-green-lt text-green ms-2"
+            class="badge bg-success-lt text-success ms-2"
           >Aucune alerte déclenchée</span>
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -340,11 +340,11 @@
               <td>
                 <span
                   v-if="result.would_fire"
-                  class="badge bg-red-lt text-red"
+                  class="badge bg-danger-lt text-danger"
                 >Alerte</span>
                 <span
                   v-else
-                  class="badge bg-green-lt text-green"
+                  class="badge bg-success-lt text-success"
                 >OK</span>
               </td>
             </tr>

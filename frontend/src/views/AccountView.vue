@@ -151,7 +151,7 @@
                 </div>
                 <span
                   class="badge"
-                  :class="profile?.mfa_enabled ? 'bg-green-lt text-green' : 'bg-orange-lt text-orange'"
+                  :class="profile?.mfa_enabled ? 'bg-success-lt text-success' : 'bg-warning-lt text-warning'"
                 >
                   {{ profile?.mfa_enabled ? 'Actif' : 'Inactif' }}
                 </span>

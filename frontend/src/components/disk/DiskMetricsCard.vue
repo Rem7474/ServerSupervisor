@@ -128,7 +128,7 @@ function formatGB(bytes: number): string {
 function getProgressBarClass(percent: number): string {
   if (percent >= 90) return 'bg-danger'
   if (percent >= 80) return 'bg-warning'
-  if (percent >= 70) return 'bg-info'
+  if (percent >= 70) return 'bg-primary'
   return 'bg-success'
 }
 

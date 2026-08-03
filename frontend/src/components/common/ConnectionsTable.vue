@@ -55,7 +55,7 @@
           <td>
             <span
               class="badge"
-              :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
+              :class="ev.success ? 'bg-success-lt text-success' : 'bg-danger-lt text-danger'"
             >
               {{ ev.success ? 'Succès' : 'Échec' }}
             </span>

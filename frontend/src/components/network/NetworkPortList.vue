@@ -126,7 +126,7 @@
                 >-</span>
               </td>
               <td>
-                <span :class="row.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+                <span :class="row.state === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
                   {{ ({ running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' } as Record<string, string>)[row.state || ''] || row.state || 'inconnu' }}
                 </span>
               </td>
@@ -191,7 +191,7 @@
                 {{ formatBytes(h.network_tx_bytes || 0) }}
               </td>
               <td>
-                <span :class="h.status === 'online' ? 'status status-lime' : h.status === 'warning' ? 'status status-yellow' : 'status status-red'">
+                <span :class="h.status === 'online' ? 'status status-success' : h.status === 'warning' ? 'status status-warning' : 'status status-danger'">
                   <span class="status-dot status-dot-animated" />
                   <span :data-translation-id="h.status === 'online' ? 'online' : h.status === 'offline' ? 'offline' : 'unknown'">{{ h.status || 'unknown' }}</span>
                 </span>
@@ -344,7 +344,7 @@
                 >Non lié</span>
               </td>
               <td>
-                <span :class="g.status === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+                <span :class="g.status === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
                   {{ g.status === 'running' ? 'En cours' : g.status || 'inconnu' }}
                 </span>
               </td>

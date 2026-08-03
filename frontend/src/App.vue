@@ -38,7 +38,7 @@
                 v-if="hostsDownCount > 0"
                 class="nav-item d-flex align-items-center"
               >
-                <span class="badge bg-red-lt text-red ms-2 py-2 hosts-down-badge">
+                <span class="badge bg-danger-lt text-danger ms-2 py-2 hosts-down-badge">
                   <IconAlertTriangle class="icon icon-sm me-1" />
                   {{ hostsDownCount }} HORS LIGNE
                 </span>
