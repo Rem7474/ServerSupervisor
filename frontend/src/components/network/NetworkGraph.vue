@@ -60,7 +60,7 @@
     <div class="graph-controls">
       <button
         type="button"
-        class="btn btn-sm btn-outline-secondary graph-btn"
+        class="btn btn-sm btn-ghost-secondary graph-btn"
         title="Zoom +"
         @click="zoomIn"
       >
@@ -76,7 +76,7 @@
       </button>
       <button
         type="button"
-        class="btn btn-sm btn-outline-secondary graph-btn"
+        class="btn btn-sm btn-ghost-secondary graph-btn"
         title="Zoom −"
         @click="zoomOut"
       >
@@ -92,7 +92,7 @@
       </button>
       <button
         type="button"
-        class="btn btn-sm btn-outline-secondary graph-btn"
+        class="btn btn-sm btn-ghost-secondary graph-btn"
         title="Ajuster à l'écran"
         @click="fitView"
       >
@@ -109,7 +109,7 @@
       </button>
       <button
         type="button"
-        class="btn btn-sm btn-outline-secondary graph-btn"
+        class="btn btn-sm btn-ghost-secondary graph-btn"
         title="Réinitialiser la disposition"
         @click="resetLayout"
       >
@@ -210,7 +210,7 @@ const hasData = computed(() => Array.isArray(props.data) && props.data.length > 
 // Canvas (Cytoscape) status hues — kept in sync with the --ss-status-* CSS
 // tokens in style.css. Canvas can't read CSS vars, so the hex is duplicated;
 // update both when changing a status color.
-const statusColors: Record<string, string> = { online: '#2fb344', warning: '#fb923c', offline: '#d63939', unknown: '#94a3b8' }
+const statusColors: Record<string, string> = { online: '#2fb344', warning: '#f59f00', offline: '#d63939', unknown: '#94a3b8' }
 
 // Computed: does the data contain authelia/internet targets?
 const hasAutheliaTargets = computed(() => props.services.some(s => s.linkToAuthelia))

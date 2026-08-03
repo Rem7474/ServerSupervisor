@@ -75,7 +75,7 @@
             </button>
             <button
               type="button"
-              class="btn btn-primary"
+              class="btn btn-outline-primary"
               :disabled="isCmdLoading"
               @click="$emit('run-cmd', 'upgrade')"
             >

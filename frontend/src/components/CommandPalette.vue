@@ -14,7 +14,7 @@
       <div class="modal-content command-palette">
         <div class="command-palette-input-wrap">
           <IconSearch
-            :size="18"
+            :size="16"
             class="icon text-secondary me-2"
           />
           <input
@@ -55,7 +55,7 @@
             >
               <component
                 :is="result.icon"
-                :size="18"
+                :size="16"
                 class="icon me-2 text-secondary flex-shrink-0"
               />
               <span class="command-palette-item-label">

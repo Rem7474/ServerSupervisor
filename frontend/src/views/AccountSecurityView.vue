@@ -235,7 +235,7 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title mb-0">
           <IconKey
-            :size="18"
+            :size="24"
             class="icon me-2"
           />
           Clés de sécurité / Passkeys
@@ -356,7 +356,7 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title mb-0">
           <IconDeviceDesktop
-            :size="18"
+            :size="24"
             class="icon me-2"
           />
           Historique de connexion

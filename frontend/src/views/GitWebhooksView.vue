@@ -215,7 +215,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-icon btn-sm btn-outline-danger ms-auto"
+                  class="btn btn-icon btn-sm btn-ghost-danger ms-auto"
                   @click="confirmDeleteWebhook(webhook)"
                 >
                   <IconTrash :size="14" />
@@ -475,7 +475,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-icon btn-sm btn-outline-danger ms-auto"
+                  class="btn btn-icon btn-sm btn-ghost-danger ms-auto"
                   @click="confirmDeleteTracker(tracker)"
                 >
                   <IconTrash :size="14" />

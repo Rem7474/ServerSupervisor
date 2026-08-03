@@ -27,7 +27,7 @@
             @click="startAdd"
           >
             <IconPlus
-              :size="20"
+              :size="16"
               class="icon me-1"
             />
             Nouveau runbook
@@ -104,7 +104,7 @@
                 <div class="btn-group">
                   <button
                     type="button"
-                    class="btn btn-icon btn-sm btn-primary"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     title="Lancer"
                     :disabled="runningIds.has(rb.id)"
                     @click="handleRun(rb)"
@@ -115,7 +115,7 @@
                     />
                     <IconPlayerPlay
                       v-else
-                      :size="18"
+                      :size="14"
                       class="icon"
                     />
                   </button>
@@ -126,7 +126,7 @@
                     @click="openHistory(rb)"
                   >
                     <IconHistory
-                      :size="18"
+                      :size="14"
                       class="icon"
                     />
                   </button>
@@ -137,7 +137,7 @@
                     @click="startEdit(rb)"
                   >
                     <IconPencil
-                      :size="18"
+                      :size="14"
                       class="icon"
                     />
                   </button>
@@ -148,7 +148,7 @@
                     @click="handleDelete(rb)"
                   >
                     <IconTrash
-                      :size="18"
+                      :size="14"
                       class="icon"
                     />
                   </button>

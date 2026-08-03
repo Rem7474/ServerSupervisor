@@ -107,12 +107,21 @@
                   <button
                     v-if="vc.tracker_id"
                     type="button"
-                    class="btn btn-sm btn-primary"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="isTrackerRunDisabled(vc)"
                     :title="trackerRunTooltip(vc)"
+                    aria-label="Déclencher le tracker"
                     @click="runTracker(vc, p)"
                   >
-                    {{ trackerRunLoading[vc.tracker_id] ? '...' : 'Run' }}
+                    <span
+                      v-if="trackerRunLoading[vc.tracker_id]"
+                      class="spinner-border spinner-border-sm"
+                    />
+                    <IconPlayerPlay
+                      v-else
+                      :size="14"
+                      class="icon"
+                    />
                   </button>
                 </template>
               </div>

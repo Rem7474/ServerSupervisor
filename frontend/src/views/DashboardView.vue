@@ -21,7 +21,7 @@
         class="btn btn-primary btn-sm"
       >
         <IconPlus
-          :size="20"
+          :size="14"
           class="icon"
         />
         <span class="d-none d-sm-inline ms-1">Ajouter un hôte</span>
@@ -45,7 +45,7 @@
       <div class="card-header">
         <h3 class="card-title mb-0">
           <IconListCheck
-            :size="18"
+            :size="24"
             class="icon me-1"
           />
           Points d'attention
@@ -84,7 +84,7 @@
       class="alert alert-success d-flex align-items-center gap-2 mb-3"
     >
       <IconCircleCheck
-        :size="20"
+        :size="16"
         class="icon flex-shrink-0"
       />
       <span>Tout est opérationnel — aucune alerte, mise à jour de sécurité ou anomalie Proxmox en attente.</span>

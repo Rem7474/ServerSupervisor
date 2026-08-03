@@ -13,7 +13,7 @@
       :aria-expanded="isOpen"
       @click.stop="toggleOpen"
     >
-      <IconBell :size="20" />
+      <IconBell :size="16" />
       <span
         v-if="unreadCount > 0"
         class="badge bg-danger text-white position-absolute notification-bell-counter"
@@ -56,7 +56,6 @@
         <EmptyState
           v-else-if="!notifications.length"
           :icon="IconBell"
-          :icon-size="32"
           title="Aucune notification"
         />
 
@@ -126,7 +125,7 @@
                 @click="isOpen = false"
               >
                 <IconServer
-                  :size="12"
+                  :size="14"
                   class="me-1"
                 />
                 {{ item.host_name }}

@@ -242,15 +242,21 @@
                     <button
                       v-if="cmd.status === 'pending' || cmd.status === 'running'"
                       type="button"
-                      class="btn btn-sm btn-outline-danger ms-1"
+                      class="btn btn-icon btn-sm btn-ghost-danger ms-1"
                       :disabled="cancellingId === cmd.id"
+                      title="Annuler"
+                      aria-label="Annuler la commande"
                       @click="cancelCmd(cmd.id)"
                     >
                       <span
                         v-if="cancellingId === cmd.id"
-                        class="spinner-border spinner-border-sm me-1"
+                        class="spinner-border spinner-border-sm"
                       />
-                      Annuler
+                      <IconX
+                        v-else
+                        :size="16"
+                        class="icon icon-sm"
+                      />
                     </button>
                   </td>
                 </tr>
@@ -321,7 +327,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconList } from '@tabler/icons-vue'
+import { IconList, IconX } from '@tabler/icons-vue'
 import { useDateFormatter } from '../composables/useDateFormatter'
 import { useAuditLogs } from '../composables/useAuditLogs'
 import PaginationNav from '../components/PaginationNav.vue'

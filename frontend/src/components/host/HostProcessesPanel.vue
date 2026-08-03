@@ -64,7 +64,7 @@
       class="table-responsive scroll-table"
     >
       <table
-        class="table table-vcenter table-hover card-table mb-0"
+        class="table table-vcenter card-table mb-0"
         style="font-size: 0.82rem;"
       >
         <thead>

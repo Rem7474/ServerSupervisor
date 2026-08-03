@@ -20,7 +20,6 @@
     >
       <EmptyState
         :icon="IconClock"
-        :icon-size="36"
         title="Aucune donnée de disque disponible"
         subtitle="L'agent doit être actif pour collecter les métriques disque"
       />

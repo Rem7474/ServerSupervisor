@@ -133,7 +133,7 @@
             <div class="card-header">
               <h3 class="card-title">
                 <IconLock
-                  :size="20"
+                  :size="24"
                   class="icon me-2"
                 />
                 Authentification à deux facteurs
@@ -172,7 +172,7 @@
             <div class="card-header">
               <h3 class="card-title">
                 <IconKey
-                  :size="20"
+                  :size="24"
                   class="icon me-2"
                 />
                 Changer le mot de passe
@@ -310,7 +310,7 @@
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title mb-0">
               <IconClock
-                :size="20"
+                :size="24"
                 class="icon me-2"
               />
               Activité récente

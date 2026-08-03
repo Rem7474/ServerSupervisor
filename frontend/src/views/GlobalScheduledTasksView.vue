@@ -138,7 +138,6 @@
       >
         <EmptyState
           :icon="IconClock"
-          :icon-size="40"
           title="Aucune tâche trouvée"
           :subtitle="tasks.length ? 'Modifiez vos filtres.' : canManage ? 'Cliquez sur « Nouvelle tâche » pour commencer.' : 'Aucune tâche configurée.'"
         />
@@ -310,15 +309,21 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-ghost-primary"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="runningId === task.id"
+                    title="Exécuter"
+                    aria-label="Exécuter la tâche maintenant"
                     @click="runNow(task)"
                   >
                     <span
                       v-if="runningId === task.id"
                       class="spinner-border spinner-border-sm"
                     />
-                    <span v-else>Exécuter</span>
+                    <IconPlayerPlay
+                      v-else
+                      :size="16"
+                      class="icon icon-sm"
+                    />
                   </button>
                   <button
                     v-if="canManage"
@@ -742,7 +747,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { IconClock, IconPencil, IconTrash } from '@tabler/icons-vue'
+import { IconClock, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'

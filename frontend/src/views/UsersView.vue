@@ -180,13 +180,17 @@
               </td>
               <td class="text-end">
                 <button
-                  type="button" 
-                  class="btn btn-sm btn-danger"
+                  type="button"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
                   :disabled="saving || user.username === auth.username || (isLastAdmin(user.id) && user.role === 'admin')"
                   :title="getDeleteButtonTitle(user)"
+                  aria-label="Supprimer l'utilisateur"
                   @click="deleteUser(user)"
                 >
-                  Supprimer
+                  <IconTrash
+                    :size="14"
+                    class="icon"
+                  />
                 </button>
               </td>
             </tr>
@@ -203,6 +207,7 @@
 </template>
 
 <script setup lang="ts">
+import { IconTrash } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import EmptyState from '../components/EmptyState.vue'

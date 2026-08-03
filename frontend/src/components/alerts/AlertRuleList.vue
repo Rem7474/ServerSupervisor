@@ -184,10 +184,11 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Modifier"
+                  aria-label="Modifier la règle"
                   @click="$emit('edit', rule)"
                 >
                   <IconPencil
-                    :size="20"
+                    :size="14"
                     class="icon"
                   />
                 </button>
@@ -195,10 +196,11 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Supprimer"
+                  aria-label="Supprimer la règle"
                   @click="$emit('delete', rule)"
                 >
                   <IconTrash
-                    :size="20"
+                    :size="14"
                     class="icon"
                   />
                 </button>

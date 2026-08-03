@@ -133,12 +133,21 @@
                 <button
                   v-if="v.tracker_id"
                   type="button"
-                  class="btn btn-sm btn-primary"
+                  class="btn btn-icon btn-sm btn-ghost-success"
                   :disabled="isRunDisabled(v)"
                   :title="runTooltip(v)"
+                  aria-label="Déclencher le tracker"
                   @click="runTracker(v)"
                 >
-                  {{ runningIds[v.tracker_id] ? 'Déclenchement...' : 'Déclencher' }}
+                  <span
+                    v-if="runningIds[v.tracker_id]"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconPlayerPlay
+                    v-else
+                    :size="14"
+                    class="icon"
+                  />
                 </button>
               </div>
             </td>
@@ -175,7 +184,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
-import { IconChevronDown } from '@tabler/icons-vue'
+import { IconChevronDown, IconPlayerPlay } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import { useAuthStore } from '../../stores/auth'
 import EmptyState from '../EmptyState.vue'

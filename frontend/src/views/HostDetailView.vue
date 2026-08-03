@@ -386,7 +386,7 @@
               <div class="card-header d-flex align-items-center justify-content-between">
                 <h3 class="card-title mb-0">
                   <IconAlertTriangle
-                    :size="18"
+                    :size="24"
                     class="icon me-1"
                   />
                   Alertes actives sur cet hôte

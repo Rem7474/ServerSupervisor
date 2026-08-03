@@ -246,16 +246,18 @@
                   >
                     <button
                       type="button"
-                      class="btn btn-icon btn-outline-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       title="Modifier la sonde"
+                      aria-label="Modifier la sonde"
                       @click="openEditProbe(row.probe)"
                     >
                       <IconActivity :size="14" />
                     </button>
                     <button
                       type="button"
-                      class="btn btn-icon btn-outline-danger"
+                      class="btn btn-icon btn-sm btn-ghost-danger"
                       title="Supprimer la sonde"
+                      aria-label="Supprimer la sonde"
                       @click="confirmDeleteProbe(row.probe)"
                     >
                       <IconTrash :size="14" />
@@ -267,16 +269,18 @@
                   >
                     <button
                       type="button"
-                      class="btn btn-icon btn-outline-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       title="Modifier le certificat"
+                      aria-label="Modifier le certificat"
                       @click="openEditCert(row.cert)"
                     >
                       <IconLock :size="14" />
                     </button>
                     <button
                       type="button"
-                      class="btn btn-icon btn-outline-danger"
+                      class="btn btn-icon btn-sm btn-ghost-danger"
                       title="Supprimer le certificat"
+                      aria-label="Supprimer le certificat"
                       @click="confirmDeleteCert(row.cert)"
                     >
                       <IconTrash :size="14" />

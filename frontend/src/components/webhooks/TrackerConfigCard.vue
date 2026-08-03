@@ -19,7 +19,7 @@
         </button>
         <button
           type="button"
-          class="btn btn-sm btn-primary"
+          class="btn btn-sm btn-outline-success"
           :disabled="running || !canRunManually"
           :title="runDisabledReason"
           @click="$emit('run')"

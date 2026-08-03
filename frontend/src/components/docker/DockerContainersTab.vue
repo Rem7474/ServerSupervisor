@@ -343,7 +343,7 @@
                   v-if="containerVersion(c)?.tracker_id"
                   type="button"
                   :disabled="isTrackerRunDisabled(containerVersion(c))"
-                  class="btn btn-icon btn-sm btn-ghost-primary"
+                  class="btn btn-icon btn-sm btn-ghost-success"
                   :title="trackerRunTooltip(containerVersion(c))"
                   aria-label="Déclencher le tracker"
                   @click="runTracker(containerVersion(c), c)"

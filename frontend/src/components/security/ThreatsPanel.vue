@@ -586,18 +586,22 @@
                       <div class="d-flex gap-1 justify-content-end">
                         <button
                           type="button"
-                          class="btn btn-sm"
-                          :class="rowState[entry.ip] === 'error' ? 'btn-danger' : 'btn-outline-success'"
+                          class="btn btn-icon btn-sm"
+                          :class="rowState[entry.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-success'"
                           :disabled="rowState[entry.ip] === 'loading'"
+                          :title="rowState[entry.ip] === 'error' ? 'Erreur — Réessayer' : 'Débloquer'"
+                          aria-label="Débloquer cette IP"
                           @click="unblockCrowdSecEntry(entry.ip)"
                         >
                           <span
                             v-if="rowState[entry.ip] === 'loading'"
-                            class="spinner-border spinner-border-sm me-1"
+                            class="spinner-border spinner-border-sm"
                           />
-                          <span v-if="rowState[entry.ip] === 'loading'">Déblocage…</span>
-                          <span v-else-if="rowState[entry.ip] === 'error'">Erreur — Réessayer</span>
-                          <span v-else>Débloquer</span>
+                          <IconLockOpen
+                            v-else
+                            :size="14"
+                            class="icon"
+                          />
                         </button>
                         <button
                           type="button"
@@ -662,6 +666,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { IconLockOpen } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import EmptyState from '../EmptyState.vue'

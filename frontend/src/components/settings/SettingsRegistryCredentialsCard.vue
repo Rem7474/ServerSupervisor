@@ -130,19 +130,27 @@
               <div class="d-flex gap-1 justify-content-end">
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Modifier"
+                  aria-label="Modifier l'identifiant"
                   @click="openEditForm(cred)"
                 >
-                  Modifier
+                  <IconPencil
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-danger"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Supprimer"
+                  aria-label="Supprimer l'identifiant"
                   @click="remove(cred)"
                 >
-                  Supprimer
+                  <IconTrash
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
               </div>
             </td>
@@ -162,6 +170,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'

@@ -33,7 +33,6 @@
       >
         <EmptyState
           :icon="IconClock"
-          :icon-size="40"
           title="Aucune tâche planifiée"
           subtitle="Automatisez vos opérations en créant une tâche planifiée."
           :cta-label="canRunApt ? 'Nouvelle tâche' : ''"
@@ -44,7 +43,7 @@
         v-else
         class="table-responsive"
       >
-        <table class="table table-vcenter table-hover card-table mb-0">
+        <table class="table table-vcenter card-table mb-0">
           <thead>
             <tr>
               <th>
@@ -152,31 +151,47 @@
                   <button
                     v-if="canRunApt"
                     type="button"
-                    class="btn btn-sm btn-outline-primary"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="taskRunningId === task.id"
+                    title="Exécuter"
+                    aria-label="Exécuter la tâche maintenant"
                     @click="runTaskNow(task)"
                   >
                     <span
                       v-if="taskRunningId === task.id"
                       class="spinner-border spinner-border-sm"
                     />
-                    <span v-else>Exécuter</span>
+                    <IconPlayerPlay
+                      v-else
+                      :size="16"
+                      class="icon icon-sm"
+                    />
                   </button>
                   <button
                     v-if="canRunApt"
                     type="button"
-                    class="btn btn-sm btn-outline-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
+                    title="Modifier"
+                    aria-label="Modifier la tâche"
                     @click="openEditTask(task)"
                   >
-                    Modifier
+                    <IconPencil
+                      :size="16"
+                      class="icon icon-sm"
+                    />
                   </button>
                   <button
                     v-if="canRunApt"
                     type="button"
-                    class="btn btn-sm btn-outline-danger"
+                    class="btn btn-icon btn-sm btn-ghost-danger"
+                    title="Supprimer"
+                    aria-label="Supprimer la tâche"
                     @click="confirmDeleteTask(task)"
                   >
-                    Supprimer
+                    <IconTrash
+                      :size="16"
+                      class="icon icon-sm"
+                    />
                   </button>
                 </div>
               </td>
@@ -407,7 +422,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconClock, IconList } from '@tabler/icons-vue'
+import { IconClock, IconList, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
