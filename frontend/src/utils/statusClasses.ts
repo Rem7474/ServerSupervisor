@@ -9,16 +9,16 @@
 
 const ENTITY_STATE_MAP: Record<string, string> = {
   // Host
-  online:     'badge bg-green-lt text-green',
-  offline:    'badge bg-red-lt text-red',
+  online:     'badge bg-success-lt text-success',
+  offline:    'badge bg-danger-lt text-danger',
   // Docker container
-  running:    'badge bg-green-lt text-green',
-  restarting: 'badge bg-yellow-lt text-yellow',
-  paused:     'badge bg-yellow-lt text-yellow',
-  created:    'badge bg-blue-lt text-blue',
+  running:    'badge bg-success-lt text-success',
+  restarting: 'badge bg-warning-lt text-warning',
+  paused:     'badge bg-warning-lt text-warning',
+  created:    'badge bg-primary-lt text-primary',
   exited:     'badge bg-secondary-lt text-secondary',
-  dead:       'badge bg-red-lt text-red',
-  removing:   'badge bg-orange-lt text-orange',
+  dead:       'badge bg-danger-lt text-danger',
+  removing:   'badge bg-warning-lt text-warning',
   // Proxmox guest
   stopped:    'badge bg-secondary-lt text-secondary',
 }
@@ -34,15 +34,15 @@ export function getEntityStateClass(
 // ─── Execution / command states ───────────────────────────────────────────────
 
 const EXECUTION_STATE_MAP: Record<string, string> = {
-  pending:   'badge bg-yellow-lt text-yellow',
-  running:   'badge bg-blue-lt text-blue',
-  completed: 'badge bg-green-lt text-green',
-  success:   'badge bg-green-lt text-green',
-  succeeded: 'badge bg-green-lt text-green',
-  failed:    'badge bg-red-lt text-red',
-  error:     'badge bg-red-lt text-red',
+  pending:   'badge bg-warning-lt text-warning',
+  running:   'badge bg-primary-lt text-primary',
+  completed: 'badge bg-success-lt text-success',
+  success:   'badge bg-success-lt text-success',
+  succeeded: 'badge bg-success-lt text-success',
+  failed:    'badge bg-danger-lt text-danger',
+  error:     'badge bg-danger-lt text-danger',
   skipped:   'badge bg-secondary-lt text-secondary',
-  cancelled: 'badge bg-orange-lt text-orange',
+  cancelled: 'badge bg-secondary-lt text-secondary',
 }
 
 export function getExecutionStateClass(

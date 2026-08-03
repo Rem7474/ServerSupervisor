@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { IconExternalLink } from '@tabler/icons-vue'
+import { cveSeverityClass } from '../../utils/cveSeverity'
 
 interface CVE {
   id: string
@@ -43,20 +44,7 @@ const cveUrl = computed(() => {
   return `https://ubuntu.com/security/${props.cve.id}`
 })
 
-const badgeClass = computed(() => {
-  const severity = props.cve.severity?.toUpperCase() || 'UNKNOWN'
-
-  const classes: Record<string, string> = {
-    'CRITICAL': 'bg-red-lt text-red',
-    'HIGH': 'bg-orange-lt text-orange',
-    'MEDIUM': 'bg-yellow-lt text-yellow',
-    'LOW': 'bg-blue-lt text-blue',
-    'NEGLIGIBLE': 'bg-secondary-lt text-secondary',
-    'UNKNOWN': 'bg-secondary-lt text-secondary'
-  }
-
-  return classes[severity] || classes['UNKNOWN']
-})
+const badgeClass = computed(() => cveSeverityClass(props.cve.severity))
 
 const cveTitle = computed(() => {
   const packageName = String(props.cve.package || '').trim() || 'N/A'

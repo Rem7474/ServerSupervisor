@@ -42,9 +42,9 @@
               :show-icon="true"
             />
             <span
-              :class="severityClass(group.severity)"
+              :class="cveSeverityClass(group.severity)"
               class="badge"
-            >{{ normalizeSeverity(group.severity) }}</span>
+            >{{ normalizeCveSeverity(group.severity) }}</span>
             <span
               v-if="group.cvss_score"
               class="text-secondary small"
@@ -84,6 +84,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import CVEBadge from './CVEBadge.vue'
+import { cveSeverityClass, cveSeverityOrder, normalizeCveSeverity } from '../../utils/cveSeverity'
 
 interface CVE {
   id?: string
@@ -129,15 +130,6 @@ const cves = computed<CVE[]>(() => {
   }
 })
 
-const severityOrder: Record<string, number> = {
-  'CRITICAL': 5,
-  'HIGH': 4,
-  'MEDIUM': 3,
-  'LOW': 2,
-  'NEGLIGIBLE': 1,
-  'UNKNOWN': 0
-}
-
 interface CVEGroupInternal {
   id: string
   severity: string
@@ -162,8 +154,8 @@ const cveGroups = computed<CVEGroup[]>(() => {
     const entry = grouped.get(cveId)!
     entry.packages.add(packageName)
 
-    const currentRank = severityOrder[String(entry.severity || '').toUpperCase()] || 0
-    const nextRank = severityOrder[String(cve?.severity || '').toUpperCase()] || 0
+    const currentRank = cveSeverityOrder(entry.severity)
+    const nextRank = cveSeverityOrder(cve?.severity)
     if (nextRank > currentRank) {
       entry.severity = cve?.severity || entry.severity
     }
@@ -180,8 +172,8 @@ const cveGroups = computed<CVEGroup[]>(() => {
       packages: Array.from(group.packages).sort((a, b) => a.localeCompare(b)),
     }))
     .sort((a, b) => {
-      const rankA = severityOrder[String(a.severity || '').toUpperCase()] || 0
-      const rankB = severityOrder[String(b.severity || '').toUpperCase()] || 0
+      const rankA = cveSeverityOrder(a.severity)
+      const rankB = cveSeverityOrder(b.severity)
       if (rankA !== rankB) return rankB - rankA
       const scoreA = Number(a.cvss_score || 0)
       const scoreB = Number(b.cvss_score || 0)
@@ -207,42 +199,23 @@ const impactedPackageCount = computed(() => {
 
 const maxSeverity = computed(() => {
   if (cves.value.length === 0) return 'NONE'
-  
+
   let max = 'UNKNOWN'
   let maxValue = 0
-  
+
   for (const cve of cves.value) {
-    const severity = cve.severity?.toUpperCase() || 'UNKNOWN'
-    const value = severityOrder[severity] || 0
+    const severity = normalizeCveSeverity(cve.severity)
+    const value = cveSeverityOrder(severity)
     if (value > maxValue) {
       maxValue = value
       max = severity
     }
   }
-  
+
   return max
 })
 
-const maxSeverityClass = computed(() => {
-  return severityClass(maxSeverity.value)
-})
-
-function normalizeSeverity(severity: string | undefined): string {
-  return severity?.toUpperCase() || 'UNKNOWN'
-}
-
-function severityClass(severity: string | undefined): string {
-  const normalized = normalizeSeverity(severity)
-  const classes: Record<string, string> = {
-    'CRITICAL': 'bg-red-lt text-red',
-    'HIGH': 'bg-orange-lt text-orange',
-    'MEDIUM': 'bg-yellow-lt text-yellow',
-    'LOW': 'bg-blue-lt text-blue',
-    'NEGLIGIBLE': 'bg-secondary-lt text-secondary',
-    'UNKNOWN': 'bg-secondary-lt text-secondary'
-  }
-  return classes[normalized] || classes.UNKNOWN
-}
+const maxSeverityClass = computed(() => cveSeverityClass(maxSeverity.value))
 </script>
 
 <style scoped>
