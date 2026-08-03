@@ -172,12 +172,6 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
-    path: '/notifications',
-    name: 'NotificationCenter',
-    component: () => import('../views/NotificationCenterView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
     path: '/npm',
     name: 'NPM',
     component: () => import('../views/NPMView.vue'),
@@ -190,6 +184,10 @@ const routes: RouteRecordRaw[] = [
   // /commands was a standalone page; it merged into Audit's Commandes tab
   // (same remote_commands data, now with search/sort/host links it lacked).
   { path: '/commands', redirect: '/audit' },
+  // /notifications was a standalone page duplicating the same
+  // GET /v1/notifications feed as Alerts' Incidents tab; merged there
+  // (host-grouping, search/filter/sort, real pagination it lacked).
+  { path: '/notifications', redirect: '/alerts?tab=incidents' },
   {
     path: '/proxmox/nodes/:id',
     name: 'ProxmoxNode',

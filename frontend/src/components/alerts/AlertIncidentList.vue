@@ -99,13 +99,31 @@
             type="button"
             class="btn btn-sm btn-ghost-secondary"
             :disabled="markingRead"
-            @click="markAllRead"
+            @click="$emit('mark-all-read')"
           >
             <IconCheck
               :size="16"
               class="icon me-1"
             />
             Tout marquer lu
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-ghost-secondary"
+            :title="groupByHost ? 'Afficher en liste chronologique' : 'Regrouper par hôte'"
+            @click="groupByHost = !groupByHost"
+          >
+            <IconStack2
+              v-if="!groupByHost"
+              :size="14"
+              class="icon me-1"
+            />
+            <IconList
+              v-else
+              :size="14"
+              class="icon me-1"
+            />
+            {{ groupByHost ? 'Vue chronologique' : 'Regrouper par hôte' }}
           </button>
           <button
             v-if="hasActiveFilters"
@@ -170,163 +188,190 @@
             <th>Élément</th>
             <th>Source</th>
             <th>Détails</th>
-            <th>Déclenché</th>
-            <th>Terminé</th>
+            <th>
+              <SortableHeader
+                label="Déclenché"
+                :active="sortKey === 'triggered_at'"
+                :direction="sortDir"
+                @toggle="toggleSort('triggered_at')"
+              />
+            </th>
+            <th>
+              <SortableHeader
+                label="Terminé"
+                :active="sortKey === 'resolved_at'"
+                :direction="sortDir"
+                @toggle="toggleSort('resolved_at')"
+              />
+            </th>
             <th style="width: 60px;" />
           </tr>
         </thead>
         <tbody>
           <template
-            v-for="item in paginatedIncidents"
-            :key="item.id"
+            v-for="row in displayRows"
+            :key="row.kind === 'group-header' ? `host-${row.hostKey}` : row.item.id"
           >
-            <tr
-              v-if="item._showSeparator"
-            >
+            <tr v-if="row.kind === 'group-header'">
               <td
                 colspan="8"
-                class="text-center text-muted small py-1 border-top"
+                class="bg-body-tertiary"
               >
-                — Plus de 7 jours —
-              </td>
-            </tr>
-            <tr :class="{ 'text-muted': item._isOld }">
-              <td>
-                <span
-                  v-if="isCompleted(item)"
-                  class="badge bg-green-lt text-green"
-                >Terminé</span>
-                <span
-                  v-else
-                  class="badge bg-red-lt text-red"
-                >Actif</span>
-              </td>
-              <td>
-                <span
-                  v-if="item.type === 'release_tracker_detected'"
-                  class="badge bg-blue-lt text-blue"
-                >Release tracker</span>
-                <span
-                  v-else-if="item.type === 'release_tracker_execution'"
-                  class="badge bg-indigo-lt text-indigo"
-                >Exécution tracker</span>
-                <span
-                  v-else-if="(item.severity || '').toLowerCase() === 'crit'"
-                  class="badge bg-red-lt text-red"
-                >Alerte critique</span>
-                <span
-                  v-else-if="(item.severity || '').toLowerCase() === 'warn'"
-                  class="badge bg-yellow-lt text-yellow"
-                >Alerte avertissement</span>
-                <span
-                  v-else
-                  class="badge bg-secondary-lt text-secondary"
-                >-</span>
-              </td>
-              <td>
-                <div
-                  class="fw-semibold text-truncate"
-                  style="max-width: 220px;"
-                  :title="item.rule_name"
-                >
-                  {{ notificationTitle(item) }}
-                </div>
-                <div
-                  v-if="item.metric"
-                  class="text-muted small"
-                >
-                  {{ metricLabel(item.metric) }}
-                </div>
-              </td>
-              <td>
-                <router-link
-                  v-if="notificationRoute(item)"
-                  :to="notificationRoute(item)"
-                  class="text-decoration-none"
-                >
-                  {{ item.host_name || 'Source inconnue' }}
-                </router-link>
-                <span v-else>{{ item.host_name || 'Source inconnue' }}</span>
-                <div
-                  v-if="item.source_label && item.source_label !== item.host_name"
-                  class="text-muted small text-truncate"
-                  :title="item.source_label"
-                  style="max-width: 260px;"
-                >
-                  {{ item.source_label }}
-                </div>
-              </td>
-              <td>
-                <template v-if="item.type === 'release_tracker_detected' || item.type === 'release_tracker_execution'">
-                  <div>
-                    Version : <code>{{ item.version || '-' }}</code>
-                  </div>
-                  <div class="text-muted small">
-                    {{ trackerStatusLabel(item.status) }}
-                  </div>
-                </template>
-                <template v-else>
-                  <code>{{ formatIncidentValue({ value: item.value, metric: item.metric, value_label: item.value_label }) }}</code>
-                  <div
-                    v-if="!isCompleted(item) && item.current_value != null"
-                    class="text-muted small mt-1"
-                  >
-                    Actuel :
-                    <span class="fw-medium">{{ formatIncidentValue({ value: item.current_value, metric: item.metric, value_label: item.value_label }) }}</span>
-                    <span
-                      v-if="resolveHint(item)"
-                      class="ms-1"
-                    >· {{ resolveHint(item) }}</span>
-                  </div>
-                  <div
-                    v-if="item.command_status"
-                    class="text-muted small mt-1"
-                  >
-                    Remédiation :
-                    <span :class="getExecutionStateClass(item.command_status)">{{ commandStatusLabel(item.command_status) }}</span>
-                  </div>
-                </template>
-              </td>
-              <td class="text-muted small">
-                {{ formatDate(item.triggered_at) }}
-              </td>
-              <td class="text-muted small">
-                <template v-if="item.resolved_at">
-                  {{ formatDate(item.resolved_at) }}
-                  <span v-if="!isTrackerType(item)">({{ incidentDuration(item) }})</span>
-                </template>
-                <span
-                  v-else
-                  class="text-secondary"
-                >-</span>
-              </td>
-              <td>
                 <button
-                  v-if="isAdmin && !isCompleted(item) && item.id"
                   type="button"
-                  class="btn btn-icon btn-sm btn-ghost-secondary"
-                  :disabled="resolvingId === item.id"
-                  title="Clôturer manuellement"
-                  @click="manualResolve(item)"
+                  class="btn btn-link btn-sm text-decoration-none d-flex align-items-center gap-2 p-0 w-100 text-start"
+                  @click="toggleHostGroup(row.hostKey)"
                 >
-                  <span
-                    v-if="resolvingId === item.id"
-                    class="spinner-border spinner-border-sm"
+                  <IconChevronRight
+                    :size="16"
+                    class="icon transition-transform"
+                    :class="{ 'rotate-90': !isHostCollapsed(row.hostKey) }"
                   />
-                  <IconCheck v-else
-                    :size="14"
-                    class="icon"
+                  <span class="fw-medium text-body">{{ row.hostName }}</span>
+                  <BadgePill
+                    :text="String(row.count)"
+                    tone="secondary"
+                    compact
+                  />
+                  <BadgePill
+                    v-if="row.activeCount > 0"
+                    :text="`${row.activeCount} actif${row.activeCount > 1 ? 's' : ''}`"
+                    tone="danger"
+                    compact
                   />
                 </button>
               </td>
             </tr>
+            <template v-else>
+              <tr v-if="!groupByHost && row.item._showSeparator">
+                <td
+                  colspan="8"
+                  class="text-center text-muted small py-1 border-top"
+                >
+                  — Plus de 7 jours —
+                </td>
+              </tr>
+              <tr :class="{ 'text-muted': row.item._isOld }">
+                <td>
+                  <BadgePill
+                    :tone="notificationStateTone(row.item)"
+                    :text="notificationStateLabel(row.item)"
+                    compact
+                  />
+                </td>
+                <td>
+                  <BadgePill
+                    :tone="notificationTypeTone(row.item)"
+                    :text="notificationTypeLabel(row.item)"
+                    compact
+                  />
+                </td>
+                <td>
+                  <div
+                    class="fw-semibold text-truncate"
+                    style="max-width: 220px;"
+                    :title="row.item.rule_name"
+                  >
+                    {{ notificationTitle(row.item) }}
+                  </div>
+                  <div
+                    v-if="row.item.metric"
+                    class="text-muted small"
+                  >
+                    {{ metricLabel(row.item.metric) }}
+                  </div>
+                </td>
+                <td>
+                  <router-link
+                    v-if="notificationRoute(row.item)"
+                    :to="notificationRoute(row.item)"
+                    class="text-decoration-none"
+                  >
+                    {{ row.item.host_name || 'Source inconnue' }}
+                  </router-link>
+                  <span v-else>{{ row.item.host_name || 'Source inconnue' }}</span>
+                  <div
+                    v-if="row.item.source_label && row.item.source_label !== row.item.host_name"
+                    class="text-muted small text-truncate"
+                    :title="row.item.source_label"
+                    style="max-width: 260px;"
+                  >
+                    {{ row.item.source_label }}
+                  </div>
+                </td>
+                <td>
+                  <template v-if="isTrackerType(row.item)">
+                    <div>
+                      Version : <code>{{ row.item.version || '-' }}</code>
+                    </div>
+                    <div class="text-muted small">
+                      {{ trackerStatusLabel(row.item.status) }}
+                    </div>
+                  </template>
+                  <template v-else>
+                    <code>{{ formatIncidentValue({ value: row.item.value, metric: row.item.metric, value_label: row.item.value_label }) }}</code>
+                    <div
+                      v-if="!isCompleted(row.item) && row.item.current_value != null"
+                      class="text-muted small mt-1"
+                    >
+                      Actuel :
+                      <span class="fw-medium">{{ formatIncidentValue({ value: row.item.current_value, metric: row.item.metric, value_label: row.item.value_label }) }}</span>
+                      <span
+                        v-if="resolveHint(row.item)"
+                        class="ms-1"
+                      >· {{ resolveHint(row.item) }}</span>
+                    </div>
+                    <div
+                      v-if="row.item.command_status"
+                      class="text-muted small mt-1"
+                    >
+                      Remédiation :
+                      <span :class="getExecutionStateClass(row.item.command_status)">{{ commandStatusLabel(row.item.command_status) }}</span>
+                    </div>
+                  </template>
+                </td>
+                <td class="text-muted small">
+                  {{ formatDate(row.item.triggered_at) }}
+                </td>
+                <td class="text-muted small">
+                  <template v-if="row.item.resolved_at">
+                    {{ formatDate(row.item.resolved_at) }}
+                    <span v-if="!isTrackerType(row.item)">({{ incidentDuration(row.item) }})</span>
+                  </template>
+                  <span
+                    v-else
+                    class="text-secondary"
+                  >-</span>
+                </td>
+                <td>
+                  <button
+                    v-if="isAdmin && !isCompleted(row.item) && row.item.id"
+                    type="button"
+                    class="btn btn-icon btn-sm btn-ghost-success"
+                    :disabled="resolvingId === row.item.id"
+                    title="Clôturer manuellement"
+                    @click="$emit('resolve', row.item)"
+                  >
+                    <span
+                      v-if="resolvingId === row.item.id"
+                      class="spinner-border spinner-border-sm"
+                    />
+                    <IconCheck
+                      v-else
+                      :size="14"
+                      class="icon"
+                    />
+                  </button>
+                </td>
+              </tr>
+            </template>
           </template>
         </tbody>
       </table>
     </div>
 
     <div
-      v-if="totalPages > 1"
+      v-if="!groupByHost && totalPages > 1"
       class="card-footer d-flex align-items-center justify-content-between"
     >
       <p class="m-0 text-muted">
@@ -343,15 +388,19 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconBell, IconCheck, IconSearch, IconX } from '@tabler/icons-vue'
-import apiClient from '../../api'
+import { IconBell, IconCheck, IconChevronRight, IconList, IconSearch, IconStack2, IconX } from '@tabler/icons-vue'
 import BadgePill from '../common/BadgePill.vue'
+import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PaginationNav from '../PaginationNav.vue'
-import { addToast } from '../../composables/useGlobalToast'
-import { getApiErrorMessage } from '../../api/client'
 import { getExecutionStateClass } from '../../utils/statusClasses'
+import {
+  notificationStateLabel,
+  notificationStateTone,
+  notificationTypeLabel,
+  notificationTypeTone,
+} from '../../utils/notificationBadges'
 import {
   formatIncidentValue,
   incidentDuration,
@@ -360,7 +409,6 @@ import {
   notificationResolved as isCompleted,
   notificationRoute,
   notificationTitle,
-  resolvableIncidentId,
   resolveHint,
   trackerStatusLabel,
 } from '../../utils/incidentFormat'
@@ -373,6 +421,19 @@ interface AnnotatedIncident extends Incident {
   _showSeparator: boolean
 }
 
+interface GroupHeaderRow {
+  kind: 'group-header'
+  hostKey: string
+  hostName: string
+  count: number
+  activeCount: number
+}
+interface ItemRow {
+  kind: 'item'
+  item: AnnotatedIncident
+}
+type DisplayRow = GroupHeaderRow | ItemRow
+
 const PAGE_SIZE = 50
 const AGE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -380,7 +441,7 @@ const TYPE_FILTERS = [
   { value: 'all', label: 'Tous', activeClass: 'btn-primary shadow-sm' },
   { value: 'crit', label: 'Critique', activeClass: 'btn-danger shadow-sm' },
   { value: 'warn', label: 'Avertissement', activeClass: 'btn-warning shadow-sm' },
-  { value: 'tracker', label: 'Tracker', activeClass: 'btn-info shadow-sm' },
+  { value: 'tracker', label: 'Tracker', activeClass: 'btn-secondary shadow-sm' },
 ] as const
 
 const STATUS_FILTERS = [
@@ -396,6 +457,8 @@ const props = withDefaults(defineProps<{
   activeIncidentCount?: number
   isAdmin?: boolean
   initialSearch?: string
+  markingRead?: boolean
+  resolvingId?: string | number | null
 }>(), {
   incidents: () => [],
   loading: false,
@@ -403,10 +466,13 @@ const props = withDefaults(defineProps<{
   activeIncidentCount: 0,
   isAdmin: false,
   initialSearch: '',
+  markingRead: false,
+  resolvingId: null,
 })
 
-const emit = defineEmits<{
-  (e: 'refresh'): void
+defineEmits<{
+  (e: 'mark-all-read'): void
+  (e: 'resolve', item: Incident): void
 }>()
 
 const filterType = ref('all')
@@ -416,20 +482,22 @@ const filterStatus = ref('all')
 // the full undifferentiated list.
 const searchQuery = ref(props.initialSearch)
 const currentPage = ref(1)
-const markingRead = ref(false)
-const resolvingId = ref<string | number | null>(null)
+const sortKey = ref<'triggered_at' | 'resolved_at'>('triggered_at')
+const sortDir = ref<'asc' | 'desc'>('desc')
+const groupByHost = ref(false)
+const collapsedHosts = ref(new Set<string>())
 
 const filteredIncidents = computed(() => {
   const search = searchQuery.value.trim().toLowerCase()
   return props.incidents.filter((incident) => {
     if (filterType.value === 'crit') {
-      if (incident.type === 'release_tracker_detected' || incident.type === 'release_tracker_execution') return false
+      if (isTrackerType(incident)) return false
       if ((incident.severity || '').toLowerCase() !== 'crit') return false
     } else if (filterType.value === 'warn') {
-      if (incident.type === 'release_tracker_detected' || incident.type === 'release_tracker_execution') return false
+      if (isTrackerType(incident)) return false
       if ((incident.severity || '').toLowerCase() !== 'warn') return false
     } else if (filterType.value === 'tracker') {
-      if (incident.type !== 'release_tracker_detected' && incident.type !== 'release_tracker_execution') return false
+      if (!isTrackerType(incident)) return false
     }
 
     if (filterStatus.value === 'active' && isCompleted(incident)) return false
@@ -468,10 +536,28 @@ watch([filterType, filterStatus, searchQuery], () => {
   currentPage.value = 1
 })
 
+function toggleSort(key: 'triggered_at' | 'resolved_at'): void {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortKey.value = key
+  sortDir.value = 'desc'
+}
+
+const sortedIncidents = computed(() => {
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return [...filteredIncidents.value].sort((a, b) => {
+    const av = a[sortKey.value] ? new Date(a[sortKey.value] as string).getTime() : 0
+    const bv = b[sortKey.value] ? new Date(b[sortKey.value] as string).getTime() : 0
+    return (av - bv) * dir
+  })
+})
+
 const annotatedIncidents = computed<AnnotatedIncident[]>(() => {
   const now = Date.now()
   let separatorShown = false
-  return filteredIncidents.value.map((incident) => {
+  return sortedIncidents.value.map((incident) => {
     const isOld = incident.triggered_at
       ? now - new Date(incident.triggered_at).getTime() > AGE_THRESHOLD_MS
       : false
@@ -484,8 +570,53 @@ const annotatedIncidents = computed<AnnotatedIncident[]>(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(annotatedIncidents.value.length / PAGE_SIZE)))
 
 const paginatedIncidents = computed(() => {
+  if (groupByHost.value) return annotatedIncidents.value
   const start = (currentPage.value - 1) * PAGE_SIZE
   return annotatedIncidents.value.slice(start, start + PAGE_SIZE)
+})
+
+function isHostCollapsed(key: string): boolean {
+  return collapsedHosts.value.has(key)
+}
+
+function toggleHostGroup(key: string): void {
+  const next = new Set(collapsedHosts.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  collapsedHosts.value = next
+}
+
+const displayRows = computed<DisplayRow[]>(() => {
+  if (!groupByHost.value) {
+    return paginatedIncidents.value.map((item): ItemRow => ({ kind: 'item', item }))
+  }
+
+  const order: string[] = []
+  const map = new Map<string, AnnotatedIncident[]>()
+  for (const item of annotatedIncidents.value) {
+    const key = item.host_name || '__sans_hote__'
+    if (!map.has(key)) {
+      map.set(key, [])
+      order.push(key)
+    }
+    map.get(key)!.push(item)
+  }
+
+  const rows: DisplayRow[] = []
+  for (const key of order) {
+    const list = map.get(key)!
+    rows.push({
+      kind: 'group-header',
+      hostKey: key,
+      hostName: key === '__sans_hote__' ? 'Sans hôte' : key,
+      count: list.length,
+      activeCount: list.filter((item) => !isCompleted(item)).length,
+    })
+    if (!isHostCollapsed(key)) {
+      for (const item of list) rows.push({ kind: 'item', item })
+    }
+  }
+  return rows
 })
 
 function setTypeFilter(value: string): void {
@@ -509,30 +640,6 @@ function resetFilters() {
   currentPage.value = 1
 }
 
-async function markAllRead() {
-  markingRead.value = true
-  try {
-    await apiClient.markNotificationsRead()
-  } finally {
-    markingRead.value = false
-  }
-}
-
-async function manualResolve(incident: Incident) {
-  const id = resolvableIncidentId(incident)
-  if (!id || resolvingId.value) return
-  resolvingId.value = incident.id
-  try {
-    await apiClient.resolveAlertIncident(id)
-    addToast('Incident résolu', 'success')
-    emit('refresh')
-  } catch (err: unknown) {
-    addToast(getApiErrorMessage(err, 'Impossible de résoudre'), 'error')
-  } finally {
-    resolvingId.value = null
-  }
-}
-
 // Describes the remote_commands row a rule's command_trigger dispatched when
 // this incident fired (item.command_status, joined server-side from
 // remote_commands.status) — adjectival wording ("réussie"/"échouée") to
@@ -551,3 +658,12 @@ function formatDate(dateStr: string | undefined | null): string {
   return new Date(dateStr).toLocaleString('fr-FR')
 }
 </script>
+
+<style scoped>
+.transition-transform {
+  transition: transform 0.15s ease;
+}
+.rotate-90 {
+  transform: rotate(90deg);
+}
+</style>

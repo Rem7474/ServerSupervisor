@@ -16,7 +16,7 @@
       <IconBell :size="20" />
       <span
         v-if="unreadCount > 0"
-        class="badge bg-red text-white position-absolute notification-bell-counter"
+        class="badge bg-danger text-white position-absolute notification-bell-counter"
       >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
     </button>
 
@@ -78,7 +78,7 @@
           <div class="flex-shrink-0 mt-1">
             <span
               class="badge notification-status-dot"
-              :class="item.resolved_at ? 'bg-secondary-lt text-secondary' : 'bg-red-lt text-red'"
+              :class="notificationIconTone(item)"
             />
           </div>
 
@@ -91,19 +91,26 @@
               >
                 {{ notificationTitle(item) }}
               </div>
-              <span
+              <BadgePill
                 v-if="notificationResolved(item)"
-                class="badge bg-green-lt text-green flex-shrink-0 notification-state-badge"
-              >Termine</span>
+                :tone="notificationStateTone(item)"
+                :text="notificationStateLabel(item)"
+                compact
+                class="flex-shrink-0"
+              />
               <div
                 v-else
                 class="d-flex align-items-center gap-1 flex-shrink-0"
               >
-                <span class="badge bg-red-lt text-red notification-state-badge">Actif</span>
+                <BadgePill
+                  :tone="notificationStateTone(item)"
+                  :text="notificationStateLabel(item)"
+                  compact
+                />
                 <button
                   v-if="auth.isAdmin && item.type === 'alert_incident'"
                   type="button"
-                  class="btn btn-icon btn-sm btn-outline-success py-0 px-1 notification-resolve-btn"
+                  class="btn btn-icon btn-sm btn-ghost-success py-0 px-1 notification-resolve-btn"
                   title="Résoudre"
                   :disabled="resolvingId === item.id"
                   @click.stop="resolveIncident(item)"
@@ -156,7 +163,7 @@
       <!-- Footer -->
       <div class="px-3 py-2 text-center border-top">
         <router-link
-          to="/notifications"
+          to="/alerts?tab=incidents"
           class="text-secondary small"
           @click="isOpen = false"
         >
@@ -170,9 +177,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { IconBell, IconCheck, IconServer } from '@tabler/icons-vue'
+import BadgePill from './common/BadgePill.vue'
 import RelativeTime from './RelativeTime.vue'
 import { useAuthStore } from '../stores/auth'
 import { useNotifications } from '../composables/useNotifications'
+import {
+  notificationIconTone,
+  notificationStateLabel,
+  notificationStateTone,
+} from '../utils/notificationBadges'
 
 const auth = useAuthStore()
 const bellRef = ref<HTMLElement | null>(null)
@@ -269,10 +282,6 @@ onUnmounted(() => {
 
 .notification-rule {
   max-width: 220px;
-}
-
-.notification-state-badge {
-  font-size: 0.65rem;
 }
 
 .notification-meta {

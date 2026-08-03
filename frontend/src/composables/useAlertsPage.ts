@@ -1,4 +1,4 @@
-import { computed, ComputedRef, Ref, ref } from 'vue'
+import { Ref, ref } from 'vue'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useDateFormatter } from './useDateFormatter'
 import { useHostsStore } from '../stores/hosts'
@@ -9,24 +9,6 @@ import type { Host } from '../types/host'
 import type { ReleaseTracker } from '../types/tracker'
 import type { AlertRule } from '../types/alert'
 import type { WSNotificationMessage } from '../types/ws'
-
-interface Incident {
-  id: string
-  type?: string
-  status?: string
-  tracker_id?: string
-  tracker_type?: string
-  release_url?: string
-  release_name?: string
-  version?: string
-  host_id?: string
-  host_name?: string
-  rule_name?: string
-  metric?: string
-  value?: number
-  triggered_at?: string
-  resolved_at?: string | null
-}
 
 interface AlertRuleCapabilities {
   metrics: unknown[]
@@ -48,10 +30,6 @@ type AlertRulePayload = Record<string, unknown>
 
 interface UseAlertsPageApi {
   alertsTab: Ref<string>
-  incidents: Ref<Incident[]>
-  incidentsLoading: Ref<boolean>
-  incidentsError: Ref<string>
-  incidentsLoaded: Ref<boolean>
   trackers: Ref<ReleaseTracker[]>
   trackersLoading: Ref<boolean>
   trackersError: Ref<string>
@@ -67,11 +45,8 @@ interface UseAlertsPageApi {
   capabilities: Ref<AlertRuleCapabilities | null>
   capabilitiesLoading: Ref<boolean>
   capabilitiesError: Ref<string>
-  activeIncidentCount: ComputedRef<number>
   init: () => Promise<void>
-  loadIncidents: () => Promise<void>
   loadTrackers: () => Promise<void>
-  switchToIncidents: () => Promise<void>
   switchToTrackers: () => Promise<void>
   startAddAlert: () => void
   startEditAlert: (rule: AlertRule) => void
@@ -90,10 +65,6 @@ export function useAlertsPage(): UseAlertsPageApi {
   const rulesStore = useAlertRulesStore()
 
   const alertsTab: Ref<string> = ref('rules')
-  const incidents: Ref<Incident[]> = ref([])
-  const incidentsLoading: Ref<boolean> = ref(false)
-  const incidentsError: Ref<string> = ref('')
-  const incidentsLoaded: Ref<boolean> = ref(false)
   const trackers: Ref<ReleaseTracker[]> = ref([])
   const trackersLoading: Ref<boolean> = ref(false)
   const trackersError: Ref<string> = ref('')
@@ -109,13 +80,6 @@ export function useAlertsPage(): UseAlertsPageApi {
   // Expose store state (reactive refs shared across navigations)
   const { rules, loading, fetched, error: fetchError } = storeToRefs(rulesStore)
   const { hosts } = storeToRefs(hostsStore)
-
-  const activeIncidentCount: ComputedRef<number> = computed(
-    () =>
-      incidents.value.filter(
-        (incident) => (incident.type === 'alert_incident' || !incident.type) && !incident.resolved_at
-      ).length
-  )
 
   async function init(): Promise<void> {
     capabilitiesLoading.value = true
@@ -172,20 +136,6 @@ export function useAlertsPage(): UseAlertsPageApi {
     }
   }
 
-  async function loadIncidents(): Promise<void> {
-    incidentsLoading.value = true
-    incidentsError.value = ''
-    try {
-      const response = await apiClient.getNotifications()
-      incidents.value = response.data?.notifications || []
-      incidentsLoaded.value = true
-    } catch {
-      incidentsError.value = "Impossible de charger l'historique des notifications"
-    } finally {
-      incidentsLoading.value = false
-    }
-  }
-
   async function loadTrackers(): Promise<void> {
     trackersLoading.value = true
     trackersError.value = ''
@@ -198,11 +148,6 @@ export function useAlertsPage(): UseAlertsPageApi {
     } finally {
       trackersLoading.value = false
     }
-  }
-
-  async function switchToIncidents(): Promise<void> {
-    alertsTab.value = 'incidents'
-    if (!incidentsLoaded.value) await loadIncidents()
   }
 
   async function switchToTrackers(): Promise<void> {
@@ -240,14 +185,14 @@ export function useAlertsPage(): UseAlertsPageApi {
     }
   }
 
+  // Disabling a rule can close its active incidents server-side — the
+  // incidents-tab refresh this used to trigger directly now happens in
+  // AlertsView.vue's onToggleEnabled wrapper, which owns both this composable
+  // and useNotificationHistory().
   async function toggleEnabled(rule: AlertRule): Promise<void> {
     try {
-      const nextEnabled = !rule.enabled
-      await apiClient.updateAlertRule(rule.id, { enabled: nextEnabled })
+      await apiClient.updateAlertRule(rule.id, { enabled: !rule.enabled })
       await rulesStore.fetchRules(true)
-      if (!nextEnabled && incidentsLoaded.value) {
-        await loadIncidents()
-      }
     } catch {
       // ignore
     }
@@ -279,46 +224,21 @@ export function useAlertsPage(): UseAlertsPageApi {
     return formatLocaleDateTime(dateStr)
   }
 
+  // Trackers-only concern now — the incidents-relevant branches of this
+  // event (alert_incident_update / new_alert / a second refresh on
+  // release_tracker_*) moved to useNotificationHistory.ts, which subscribes
+  // to the same shared WS feed independently (see AlertsView.vue).
   function onWebSocketAlert(payload: WSNotificationMessage): void {
-    // Incident created or resolved — refresh the list
-    if (payload.type === 'alert_incident_update') {
-      loadIncidents()
-      return
-    }
     if (
-      payload.type === 'release_tracker_detected' ||
-      payload.type === 'release_tracker_execution'
+      (payload.type === 'release_tracker_detected' || payload.type === 'release_tracker_execution') &&
+      trackersLoaded.value
     ) {
-      loadIncidents()
-      if (trackersLoaded.value) loadTrackers()
-      return
+      loadTrackers()
     }
-
-    if (payload.type !== 'new_alert' || !payload.notification) return
-
-    const incoming = payload.notification
-    const idx = incidents.value.findIndex((item) => item.id === incoming.id)
-
-    if (idx >= 0) {
-      incidents.value = [
-        { ...incidents.value[idx], ...incoming },
-        ...incidents.value.slice(0, idx),
-        ...incidents.value.slice(idx + 1),
-      ]
-    } else {
-      incidents.value = [incoming, ...incidents.value]
-    }
-
-    incidentsLoaded.value = true
-    loadIncidents()
   }
 
   return {
     alertsTab,
-    incidents,
-    incidentsLoading,
-    incidentsError,
-    incidentsLoaded,
     trackers,
     trackersLoading,
     trackersError,
@@ -334,11 +254,8 @@ export function useAlertsPage(): UseAlertsPageApi {
     capabilities,
     capabilitiesLoading,
     capabilitiesError,
-    activeIncidentCount,
     init,
-    loadIncidents,
     loadTrackers,
-    switchToIncidents,
     switchToTrackers,
     startAddAlert,
     startEditAlert,
