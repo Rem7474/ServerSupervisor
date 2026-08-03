@@ -50,14 +50,14 @@
           </h2>
           <span
             v-if="node.status === 'online'"
-            class="status status-lime"
+            class="status status-success"
           >
             <span class="status-dot status-dot-animated" />
             <span data-translation-id="online">En ligne</span>
           </span>
           <span
             v-else
-            class="status status-red"
+            class="status status-danger"
           >
             <span class="status-dot status-dot-animated" />
             <span data-translation-id="offline">Hors ligne</span>

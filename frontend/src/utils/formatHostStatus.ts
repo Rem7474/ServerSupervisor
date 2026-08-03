@@ -11,9 +11,9 @@ export function formatHostStatus(status: string): string {
 /** Retourne la classe CSS Tabler correspondant au statut d'un hôte. */
 export function hostStatusClass(status: string): string {
   switch (status) {
-    case 'online':  return 'status status-lime'
-    case 'warning': return 'status status-yellow'
-    case 'offline': return 'status status-red'
+    case 'online':  return 'status status-success'
+    case 'warning': return 'status status-warning'
+    case 'offline': return 'status status-danger'
     default:        return 'status status-secondary'
   }
 }
