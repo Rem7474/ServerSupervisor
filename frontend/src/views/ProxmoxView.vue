@@ -575,6 +575,14 @@ function formatDate(iso: string | undefined): string {
   cursor: pointer;
 }
 
+/* These KPI cards are real click targets (role="button" + @click + keydown)
+   but had zero hover feedback beyond the cursor — same treatment as the
+   shared .clickable-row convention (style.css) so hovering any of the 3
+   inactive cards reads as interactive, not just the active one. */
+.cursor-pointer:hover {
+  background-color: var(--tblr-bg-surface-secondary);
+}
+
 .health-card-active {
   box-shadow: 0 0 0 2px var(--tblr-primary);
 }

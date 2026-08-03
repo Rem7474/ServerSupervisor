@@ -496,6 +496,14 @@ export function useHostDetail() {
     if (!proxmoxLink.value) return
     const linkId = asString(proxmoxLink.value.id)
     if (!linkId) return
+
+    const confirmed = await dialog.confirm({
+      title: 'Supprimer le lien Proxmox',
+      message: 'Le lien entre cet hôte et sa VM/LXC Proxmox sera supprimé. Les métriques basculeront sur la source agent (si disponible).',
+      variant: 'danger',
+    })
+    if (!confirmed) return
+
     linkSaving.value = true
     try {
       await apiClient.deleteProxmoxLink(linkId)
@@ -596,6 +604,13 @@ export function useHostDetail() {
   }
 
   async function revokePermission(username: string) {
+    const confirmed = await dialog.confirm({
+      title: 'Révoquer la permission',
+      message: `${username} n'aura plus accès à cet hôte.`,
+      variant: 'danger',
+    })
+    if (!confirmed) return
+
     try {
       await apiClient.deleteHostPermission(hostId, username)
       await loadHostPerms()

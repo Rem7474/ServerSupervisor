@@ -5,6 +5,7 @@ import { addToast } from './useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
 import { useDomainDetails } from './useDomainDetails'
+import { useConfirmDialog } from './useConfirmDialog'
 import type { WebLogIPTimelineRow } from '../types/security'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
@@ -17,6 +18,7 @@ export function useBot() {
   // uses, applied to this page's filter bar instead of a tab.
   const route = useRoute()
   const router = useRouter()
+  const dialog = useConfirmDialog()
 
   const period = ref(typeof route.query.period === 'string' ? route.query.period : '24h')
   const periodOptions = [
@@ -293,6 +295,14 @@ export function useBot() {
       addToast('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte', 'error')
       return
     }
+
+    const confirmed = await dialog.confirm({
+      title: `Débloquer l'IP ${ip}`,
+      message: `Cette IP ne sera plus bannie par CrowdSec sur cet hôte.`,
+      variant: 'danger',
+    })
+    if (!confirmed) return
+
     rowState.value = { ...rowState.value, [ip]: 'loading' }
     try {
       const res = await apiClient.unblockCrowdSecIP(ip, targetHost)

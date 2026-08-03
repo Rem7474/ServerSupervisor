@@ -514,6 +514,7 @@
 import { computed, watch } from 'vue'
 import { IconPlus, IconRefresh } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 interface NetworkService {
   id: string
@@ -592,6 +593,8 @@ const props = withDefaults(defineProps<{
   hosts: () => [],
   containers: () => [],
 })
+
+const dialog = useConfirmDialog()
 
 const discoveredPortsByHost = computed<Record<string, DiscoveredPort[]>>(() => {
   const map: Record<string, DiscoveredPort[]> = {}
@@ -766,8 +769,16 @@ function addServiceRow(): void {
   })
 }
 
-function removeServiceRow(serviceId: string): void {
-  networkServices.value = networkServices.value.filter((service) => service.id !== serviceId)
+async function removeServiceRow(serviceId: string): Promise<void> {
+  const service = networkServices.value.find((s) => s.id === serviceId)
+  const confirmed = await dialog.confirm({
+    title: 'Supprimer le service',
+    message: `Le service "${service?.name || 'sans nom'}" sera retiré de la configuration réseau.`,
+    variant: 'danger',
+  })
+  if (!confirmed) return
+
+  networkServices.value = networkServices.value.filter((s) => s.id !== serviceId)
 }
 </script>
 
