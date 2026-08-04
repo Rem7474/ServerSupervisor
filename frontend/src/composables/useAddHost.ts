@@ -4,10 +4,16 @@ import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { parseTagsInput } from '../utils/tags'
 import { buildInstallCommand, buildAgentConfig } from '../utils/agentInstall'
+import type { NetworkProxmoxGuestIP } from '../types/network'
 
 interface HostResult {
   id?: string
   api_key?: string
+}
+
+interface GuestIPOption {
+  guest: NetworkProxmoxGuestIP
+  ip: string
 }
 
 const AGENT_POLL_INTERVAL_MS = 3000
@@ -32,6 +38,57 @@ export function useAddHost() {
     if (!touched.value.ip_address || isValidIp.value === null) return ''
     return isValidIp.value ? '' : 'Adresse IPv4 invalide (ex: 192.168.1.100)'
   })
+  const showGuestPicker = ref(false)
+  const guestsLoading = ref(false)
+  const guestsError = ref('')
+  const guests = ref<NetworkProxmoxGuestIP[]>([])
+  let guestsLoaded = false
+  const guestSearch = ref('')
+
+  // Flattened one row per guest IP (a guest can report several interfaces),
+  // excluding guests already linked to an existing Host — picking one of
+  // those would just create a duplicate host for the same machine.
+  const guestIPOptions = computed<GuestIPOption[]>(() =>
+    guests.value
+      .filter((g) => !g.host_id)
+      .flatMap((guest) => guest.ip_addresses.map((ip) => ({ guest, ip })))
+  )
+
+  const filteredGuestIPOptions = computed<GuestIPOption[]>(() => {
+    const q = guestSearch.value.trim().toLowerCase()
+    if (!q) return guestIPOptions.value
+    return guestIPOptions.value.filter(
+      ({ guest, ip }) =>
+        guest.name.toLowerCase().includes(q) ||
+        guest.node.toLowerCase().includes(q) ||
+        ip.includes(q)
+    )
+  })
+
+  async function toggleGuestPicker(): Promise<void> {
+    showGuestPicker.value = !showGuestPicker.value
+    if (!showGuestPicker.value || guestsLoaded) return
+    guestsLoading.value = true
+    guestsError.value = ''
+    try {
+      const res = await apiClient.getIPInventory()
+      guests.value = res.data?.proxmox_guests ?? []
+      guestsLoaded = true
+    } catch (e: unknown) {
+      guestsError.value = getApiErrorMessage(e, 'Erreur lors du chargement des hôtes Proxmox')
+    } finally {
+      guestsLoading.value = false
+    }
+  }
+
+  function pickGuestIP(option: GuestIPOption): void {
+    form.value.ip_address = option.ip
+    if (!form.value.name.trim()) form.value.name = option.guest.name
+    touched.value.ip_address = true
+    showGuestPicker.value = false
+    guestSearch.value = ''
+  }
+
   const result = ref<HostResult | null>(null)
   const copiedApiKey = ref(false)
   const copiedConfig = ref(false)
@@ -136,6 +193,13 @@ export function useAddHost() {
     touched,
     isValidIp,
     ipFeedback,
+    showGuestPicker,
+    guestsLoading,
+    guestsError,
+    guestSearch,
+    filteredGuestIPOptions,
+    toggleGuestPicker,
+    pickGuestIP,
     result,
     copiedApiKey,
     copiedConfig,
