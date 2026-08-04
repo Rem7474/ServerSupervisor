@@ -87,7 +87,11 @@
       @reconnect="reconnect"
     />
 
-    <HostDiagnosticsBanner :diagnostics="hostDiagnostics" />
+    <HostDiagnosticsBanner
+      :diagnostics="hostDiagnostics"
+      :last-seen="host?.last_seen"
+      :host-status="host?.status"
+    />
 
     <LoadingSkeleton
       v-if="!host"

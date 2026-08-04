@@ -133,10 +133,19 @@
             </div>
           </div>
           <div
-            v-if="parsedProcesses"
+            v-if="structuredOutput?.kind === 'processes'"
             class="console-processes flex-fill p-3"
           >
-            <ProcessesTable :processes="parsedProcesses" />
+            <ProcessesTable :processes="structuredOutput.data" />
+          </div>
+          <div
+            v-else-if="structuredOutput?.kind === 'systemd'"
+            class="console-processes flex-fill p-3"
+          >
+            <SystemdTable
+              :services="structuredOutput.data"
+              readonly
+            />
           </div>
           <pre
             v-else
@@ -170,8 +179,9 @@ import { copyConsoleOutput, downloadConsoleOutput } from '../../utils/consoleOut
 import { moduleLabel, moduleClass } from '../../utils/moduleMeta'
 import { useStatusBadge } from '../../composables/useStatusBadge'
 import { useDateFormatter } from '../../composables/useDateFormatter'
+import { resolveStructuredOutput } from '../../utils/structuredCommandOutput'
 import ProcessesTable from './ProcessesTable.vue'
-import type { HostProcess } from '../../composables/useHostProcesses'
+import SystemdTable from './SystemdTable.vue'
 
 interface CommandRecord {
   host_name?: string
@@ -252,23 +262,12 @@ const outputText = computed(() => {
   return processCarriageReturns(raw)
 })
 
-// module=processes/action=list output is a raw JSON array of ProcessInfo
-// (agent/internal/collector/processes.go) — render it as the same table the
-// Processus tab uses instead of dumping the JSON as plain text. Falls back
-// to the raw <pre> view while the command is still streaming (output isn't
-// valid JSON yet) or for any other module/action.
-const parsedProcesses = computed<HostProcess[] | null>(() => {
-  if (props.command?.module !== 'processes' || props.command?.action !== 'list') return null
-  const raw = props.command?.output
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return null
-    return parsed as HostProcess[]
-  } catch {
-    return null
-  }
-})
+// Some module/action combinations report structured JSON instead of a human
+// log (see utils/structuredCommandOutput.ts) — render those with a proper
+// table instead of dumping the JSON as plain text. Falls back to the raw
+// <pre> view while the command is still streaming (output isn't valid JSON
+// yet) or for any module/action with no known structured shape.
+const structuredOutput = computed(() => resolveStructuredOutput(props.command?.module, props.command?.action, props.command?.output))
 
 // Scroll to bottom whenever output changes
 watch(outputText, () => {

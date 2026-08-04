@@ -64,62 +64,18 @@
       class="col-md-3"
     >
       <label class="form-label form-label-sm">{{ targetInfo.label }}</label>
-      <select
-        v-if="module === 'custom' && customTasks.length"
+      <RestrictedSelect
         v-model="target"
-        class="form-select form-select-sm"
-      >
-        <option value="">
-          Sélectionner une tâche...
-        </option>
-        <option
-          v-for="t in customTasks"
-          :key="t.id"
-          :value="t.id"
-        >
-          {{ t.name }} ({{ t.id }})
-        </option>
-      </select>
-      <select
-        v-else-if="module === 'restic' && (resticProfiles.length || resticGroups.length)"
-        v-model="target"
-        class="form-select form-select-sm"
-      >
-        <option value="">
-          Profil (défaut)
-        </option>
-        <optgroup
-          v-if="resticProfiles.length"
-          label="Profils"
-        >
-          <option
-            v-for="p in resticProfiles"
-            :key="p"
-            :value="p"
-          >
-            {{ p }}
-          </option>
-        </optgroup>
-        <optgroup
-          v-if="resticGroups.length"
-          label="Groupes"
-        >
-          <option
-            v-for="g in resticGroups"
-            :key="g"
-            :value="g"
-          >
-            {{ g }}
-          </option>
-        </optgroup>
-      </select>
-      <input
-        v-else
-        v-model="target"
-        type="text"
-        class="form-control form-control-sm"
+        :options="targetOptions"
+        :empty-label="targetEmptyLabel"
         :placeholder="targetInfo.placeholder"
+      />
+      <div
+        v-if="module === 'restic' && resticGroups.length"
+        class="form-hint"
       >
+        Un groupe lance plusieurs profils en une seule exécution.
+      </div>
     </div>
     <div
       v-if="showCron"
@@ -136,6 +92,8 @@ import { computed, nextTick, ref, watch } from 'vue'
 import apiClient from '../api'
 import { useHostsStore } from '../stores/hosts'
 import CronBuilder from './CronBuilder.vue'
+import RestrictedSelect from './RestrictedSelect.vue'
+import type { SelectOption, OptionGroup } from './RestrictedSelect.vue'
 import type { CustomTaskSummary } from '../types/task'
 import { DISPATCH_MODULES } from '../utils/dispatchStep'
 import type { DispatchOption } from '../utils/dispatchStep'
@@ -219,4 +177,27 @@ watch([hostId, module], ([h, m]) => {
     .then((res) => { resticGroups.value = res.data?.groups || [] })
     .catch(() => { resticGroups.value = [] })
 }, { immediate: true })
+
+// Feeds RestrictedSelect for every module: custom/restic get real discovered
+// options, everything else (docker/apt/systemd/…) gets an empty list, which
+// makes RestrictedSelect fall back to its own free-text input — the same
+// behavior those modules always had.
+const targetOptions = computed<SelectOption[] | OptionGroup[]>(() => {
+  if (module.value === 'custom') {
+    return customTasks.value.map((t) => ({ value: t.id, label: `${t.name} (${t.id})` }))
+  }
+  if (module.value === 'restic') {
+    const groups: OptionGroup[] = []
+    if (resticProfiles.value.length) groups.push({ label: 'Profils', options: resticProfiles.value })
+    if (resticGroups.value.length) groups.push({ label: 'Groupes', options: resticGroups.value })
+    return groups
+  }
+  return []
+})
+
+const targetEmptyLabel = computed(() => {
+  if (module.value === 'custom') return 'Sélectionner une tâche...'
+  if (module.value === 'restic') return 'Profil (défaut)'
+  return ''
+})
 </script>

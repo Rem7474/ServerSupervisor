@@ -68,7 +68,7 @@ describe('HostBackupTab', () => {
     getBackupRuns.mockResolvedValue({
       data: {
         runs: [
-          { id: 'run-1', host_id: 'h1', status: 'ok', started_at: new Date().toISOString(), triggered_by: 'alice' },
+          { id: 'run-1', host_id: 'h1', status: 'ok', profile: 'full-backup', started_at: new Date().toISOString(), triggered_by: 'alice' },
           { id: 'run-0', host_id: 'h1', status: 'error', started_at: new Date().toISOString(), triggered_by: 'scheduled_task', error_message: 'repo locked' },
         ],
       },
@@ -78,7 +78,10 @@ describe('HostBackupTab', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('abc123')
-    expect(wrapper.findAll('tbody tr').length).toBe(2)
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows.length).toBe(2)
+    expect(rows[0].text()).toContain('full-backup')
+    expect(rows[1].text()).toContain('défaut')
     expect(wrapper.text()).toContain('Planifié')
     expect(wrapper.text()).toContain('repo locked')
   })
@@ -156,6 +159,7 @@ describe('HostBackupTab', () => {
     expect(select.exists()).toBe(true)
     const optgroups = select.findAll('optgroup')
     expect(optgroups.map((g) => g.attributes('label'))).toEqual(['Profils', 'Groupes'])
+    expect(select.attributes('title')).toContain('plusieurs profils')
 
     await select.setValue('full-backup')
     const runButton = wrapper.findAll('button').find((b) => b.text().includes('Lancer un backup'))

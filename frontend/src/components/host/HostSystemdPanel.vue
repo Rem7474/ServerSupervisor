@@ -64,140 +64,27 @@
       </div>
     </div>
     <div
-      v-if="filteredServices.length"
-      class="table-responsive scroll-table"
+      v-if="services.length && !loading"
+      class="card-body"
     >
-      <table class="table table-vcenter card-table mb-0">
-        <thead>
-          <tr>
-            <th>Service</th>
-            <th>État</th>
-            <th>Mode</th>
-            <th>Description</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="svc in filteredServices"
-            :key="svc.name"
-          >
-            <td class="font-monospace small">
-              {{ svc.name }}
-            </td>
-            <td>
-              <span :class="stateClass(svc.active_state)">{{ svc.active_state }}</span>
-            </td>
-            <td class="text-secondary small">
-              {{ svc.sub_state }}
-            </td>
-            <td
-              class="text-secondary small text-truncate"
-              style="max-width: 250px;"
-              :title="svc.description"
-            >
-              {{ svc.description || '—' }}
-            </td>
-            <td class="text-nowrap">
-              <div class="d-flex align-items-center gap-1">
-                <button
-                  v-if="svc.active_state !== 'active'"
-                  type="button"
-                  :disabled="!!actionPending[svc.name]"
-                  class="btn btn-icon btn-sm btn-ghost-success"
-                  title="Démarrer"
-                  aria-label="Démarrer le service"
-                  @click="runAction(svc.name, 'start')"
-                >
-                  <span
-                    v-if="actionPending[svc.name] === 'start'"
-                    class="spinner-border spinner-border-sm"
-                  />
-                  <IconPlayerPlay
-                    v-else
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-                <button
-                  v-if="svc.active_state === 'active'"
-                  type="button"
-                  :disabled="!!actionPending[svc.name]"
-                  class="btn btn-icon btn-sm btn-ghost-danger"
-                  title="Arrêter"
-                  aria-label="Arrêter le service"
-                  @click="runAction(svc.name, 'stop')"
-                >
-                  <span
-                    v-if="actionPending[svc.name] === 'stop'"
-                    class="spinner-border spinner-border-sm"
-                  />
-                  <IconPlayerStop
-                    v-else
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-                <button
-                  type="button"
-                  :disabled="!!actionPending[svc.name]"
-                  class="btn btn-icon btn-sm btn-ghost-warning"
-                  title="Redémarrer"
-                  aria-label="Redémarrer le service"
-                  @click="runAction(svc.name, 'restart')"
-                >
-                  <span
-                    v-if="actionPending[svc.name] === 'restart'"
-                    class="spinner-border spinner-border-sm"
-                  />
-                  <IconRefresh
-                    v-else
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-                <button
-                  type="button"
-                  :disabled="!!actionPending[svc.name]"
-                  class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Statut"
-                  aria-label="Voir le statut du service"
-                  @click="runAction(svc.name, 'status')"
-                >
-                  <span
-                    v-if="actionPending[svc.name] === 'status'"
-                    class="spinner-border spinner-border-sm"
-                  />
-                  <IconTerminal2
-                    v-else
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <SystemdTable
+        :services="filteredServices"
+        :action-pending="actionPending"
+        @action="runAction"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import SystemdTable from './SystemdTable.vue'
+import type { SystemdService } from './SystemdTable.vue'
 import apiClient, { getApiErrorMessage } from '../../api'
 import { useCommandStream } from '../../composables/useCommandStream'
 import { useLocalStorage } from '../../composables/useLocalStorage'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
-
-interface SystemdService {
-  name: string
-  active_state?: string
-  sub_state?: string
-  description?: string
-}
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -224,13 +111,6 @@ const filteredServices = computed(() => {
   if (filter.value === 'all') return services.value
   return services.value.filter((s) => s.active_state === 'active')
 })
-
-function stateClass(state: string | undefined): string {
-  if (state === 'active') return 'badge bg-success-lt text-success'
-  if (state === 'failed') return 'badge bg-danger-lt text-danger'
-  if (state === 'activating' || state === 'deactivating') return 'badge bg-warning-lt text-warning'
-  return 'badge bg-secondary-lt text-secondary'
-}
 
 async function loadServices(): Promise<void> {
   loading.value = true

@@ -10,50 +10,16 @@
           class="badge"
           :class="statusBadge.badgeClass"
         >{{ statusBadge.label }}</span>
-        <select
-          v-if="canRun && (resticProfiles.length || resticGroups.length)"
+        <RestrictedSelect
+          v-if="canRun"
           v-model="runProfile"
-          class="form-select form-select-sm"
-          style="width: 160px"
-          :disabled="backupLoading === 'run' || liveStatus === 'running'"
-        >
-          <option value="">
-            Profil (défaut)
-          </option>
-          <optgroup
-            v-if="resticProfiles.length"
-            label="Profils"
-          >
-            <option
-              v-for="p in resticProfiles"
-              :key="p"
-              :value="p"
-            >
-              {{ p }}
-            </option>
-          </optgroup>
-          <optgroup
-            v-if="resticGroups.length"
-            label="Groupes"
-          >
-            <option
-              v-for="g in resticGroups"
-              :key="g"
-              :value="g"
-            >
-              {{ g }}
-            </option>
-          </optgroup>
-        </select>
-        <input
-          v-else-if="canRun"
-          v-model="runProfile"
-          type="text"
-          class="form-control form-control-sm"
-          style="width: 160px"
+          :options="resticOptionGroups"
+          empty-label="Profil (défaut)"
           placeholder="Profil (défaut)"
+          style="min-width: 160px"
           :disabled="backupLoading === 'run' || liveStatus === 'running'"
-        >
+          :title="resticGroups.length ? 'Un groupe lance plusieurs profils en une seule exécution.' : undefined"
+        />
         <button
           v-if="canRun"
           type="button"
@@ -209,6 +175,7 @@
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Cible</th>
                 <th>Statut</th>
                 <th>Durée</th>
                 <th>Volume</th>
@@ -223,6 +190,9 @@
               >
                 <td class="text-nowrap small">
                   {{ formatDate(run.started_at) }}
+                </td>
+                <td class="small">
+                  {{ run.profile || 'défaut' }}
                 </td>
                 <td>
                   <span
@@ -266,9 +236,10 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { IconExternalLink } from '@tabler/icons-vue'
 import dayjs from '../../utils/dayjs'
 import EmptyState from '../EmptyState.vue'
+import RestrictedSelect from '../RestrictedSelect.vue'
+import type { OptionGroup } from '../RestrictedSelect.vue'
 import { useBackup } from '../../composables/useBackup'
-
-const configDocURL = 'https://github.com/Rem7474/ServerSupervisor/blob/main/docs/backup-restic.md'
+import { RESTIC_BACKUP_DOC_URL as configDocURL } from '../../utils/docLinks'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -292,6 +263,13 @@ const {
 } = useBackup(props.hostId)
 
 const runProfile = ref('')
+
+const resticOptionGroups = computed<OptionGroup[]>(() => {
+  const groups: OptionGroup[] = []
+  if (resticProfiles.value.length) groups.push({ label: 'Profils', options: resticProfiles.value })
+  if (resticGroups.value.length) groups.push({ label: 'Groupes', options: resticGroups.value })
+  return groups
+})
 
 const latestRun = computed(() => backupStatus.value?.latest_run || null)
 const passiveState = computed(() => backupStatus.value?.passive_state || null)
