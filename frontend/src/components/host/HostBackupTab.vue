@@ -1,13 +1,13 @@
 <template>
   <div class="card">
-    <div class="card-header d-flex align-items-center justify-content-between">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
       <h3 class="card-title mb-0">
         Sauvegardes Restic
       </h3>
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex flex-wrap align-items-center gap-2">
         <span
           v-if="statusBadge"
-          class="badge"
+          class="badge text-nowrap flex-shrink-0"
           :class="statusBadge.badgeClass"
         >{{ statusBadge.label }}</span>
         <RestrictedSelect
