@@ -615,6 +615,12 @@ export interface Host {
    * Collectors tracks which metrics sources are active on this host (docker, smart, cpu_temp, web_logs, etc.)
    */
   collectors: { [key: string]: boolean}; // e.g., {"docker": true, "smart": false, "cpu_temp": true}
+  /**
+   * Diagnostics is the agent's own last self-check of its config against
+   * reality (e.g. collect_restic: true but resticconf missing) — see
+   * DiagnosticIssue. Empty when nothing's wrong, or before the first report.
+   */
+  diagnostics: DiagnosticIssue[];
 }
 export interface HostRegistration {
   name: string;
@@ -1246,6 +1252,18 @@ export interface AgentCapabilities {
   restic: boolean; // Restic backup collector enabled
 }
 /**
+ * DiagnosticIssue mirrors agent/internal/collector.DiagnosticIssue — one
+ * config-vs-reality mismatch found by the agent's CheckConfig (e.g.
+ * collect_restic: true with a resticconf path that doesn't exist). Severity
+ * is "error" (the collector will produce zero data) or "warning" (partially
+ * degraded).
+ */
+export interface DiagnosticIssue {
+  collector: string;
+  severity: string;
+  message: string;
+}
+/**
  * ResticStatus mirrors agent/internal/collector.ResticStatus — the periodic,
  * passive snapshot of Restic's state. Never contains resticconf content or
  * resolved credential values.
@@ -1270,6 +1288,7 @@ export interface AgentReport {
   host_id: string;
   agent_version: string;
   capabilities?: AgentCapabilities; // Which collectors are enabled on this agent
+  diagnostics: DiagnosticIssue[]; // Config-vs-reality mismatches found by the agent — always sent (even empty) so a fixed issue clears server-side
   metrics?: SystemMetrics;
   docker?: DockerReport;
   unattended_upgrades?: UnattendedUpgradesStatus;

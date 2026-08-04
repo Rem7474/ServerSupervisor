@@ -68,6 +68,7 @@ type Repository interface {
 	UpdateHostTasksConfigYAML(ctx context.Context, hostID, yaml string) error
 	UpdateHostResticProfiles(ctx context.Context, hostID, profilesJSON string) error
 	UpdateHostCollectors(ctx context.Context, hostID, collectorsJSON string) error
+	UpdateHostDiagnostics(ctx context.Context, hostID, diagnosticsJSON string) error
 	UpdateHostWebLogs(ctx context.Context, hostID string, report *models.WebLogReport) error
 	InsertWebLogSnapshot(ctx context.Context, hostID string, report *models.WebLogReport) error
 	GetRemoteCommandByID(ctx context.Context, id string) (*models.RemoteCommand, error)
@@ -536,6 +537,20 @@ func (s *Service) storeDiskAndMetadata(ctx context.Context, hostID, safeHostID s
 		if b, err := json.Marshal(report.Capabilities); err == nil {
 			if err := s.repo.UpdateHostCollectors(ctx, hostID, string(b)); err != nil {
 				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store collectors for host %s: %v", safeHostID, err))
+			}
+		}
+	}
+
+	// Unlike ResticProfiles (only meaningfully present when configured), a
+	// current agent always sends Diagnostics — even as an
+	// empty array once a prior misconfiguration is fixed — specifically so
+	// this write always fires and clears a resolved issue. Only a
+	// pre-diagnostics agent binary would decode this as nil; skipping that
+	// case (rather than clobbering with an empty write) is intentional.
+	if report.Diagnostics != nil {
+		if b, err := json.Marshal(report.Diagnostics); err == nil {
+			if err := s.repo.UpdateHostDiagnostics(ctx, hostID, string(b)); err != nil {
+				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store diagnostics for host %s: %v", safeHostID, err))
 			}
 		}
 	}

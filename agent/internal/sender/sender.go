@@ -49,6 +49,7 @@ type Report struct {
 	HostID             string                              `json:"host_id"`
 	AgentVersion       string                              `json:"agent_version"`
 	Capabilities       *Capabilities                       `json:"capabilities"` // Agent collector status (docker, smart, cpu_temp, web_logs, etc.)
+	Diagnostics        []collector.DiagnosticIssue         `json:"diagnostics"`  // Config-vs-reality mismatches found by collector.CheckConfig — always sent (even empty) so a fixed issue clears server-side
 	Metrics            *collector.SystemMetrics            `json:"metrics"`
 	Docker             *DockerPayload                      `json:"docker"`
 	UnattendedUpgrades *collector.UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`

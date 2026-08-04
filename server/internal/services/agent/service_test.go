@@ -27,6 +27,7 @@ type fakeRepo struct {
 	upsertedApt        *models.AptStatus
 	upsertedAptPending *models.AptStatus
 	upsertedRestic     *models.ResticStatus
+	updatedDiagnostics *string
 	updatedSchedStatus string
 	createdCompleted   bool
 	createdAuditAction string
@@ -85,6 +86,10 @@ func (f *fakeRepo) UpdateHostCustomTasks(context.Context, string, string) error 
 func (f *fakeRepo) UpdateHostTasksConfigYAML(context.Context, string, string) error       { return nil }
 func (f *fakeRepo) UpdateHostResticProfiles(context.Context, string, string) error        { return nil }
 func (f *fakeRepo) UpdateHostCollectors(context.Context, string, string) error            { return nil }
+func (f *fakeRepo) UpdateHostDiagnostics(_ context.Context, _, diagnosticsJSON string) error {
+	f.updatedDiagnostics = &diagnosticsJSON
+	return nil
+}
 func (f *fakeRepo) UpdateHostWebLogs(context.Context, string, *models.WebLogReport) error { return nil }
 func (f *fakeRepo) InsertWebLogSnapshot(context.Context, string, *models.WebLogReport) error {
 	return nil
@@ -217,6 +222,52 @@ func TestReceiveReport_PublishesSnapshotTopics(t *testing.T) {
 	case <-host:
 	case <-time.After(time.Second):
 		t.Fatal("an agent report must wake the reporting host's subscribers")
+	}
+}
+
+func TestReceiveReport_StoresDiagnostics(t *testing.T) {
+	repo := &fakeRepo{}
+	s := newSvc(repo, &recordingStreamHub{})
+
+	issues := []models.DiagnosticIssue{{Collector: "restic", Severity: "error", Message: "resticconf missing"}}
+	if _, err := s.ReceiveReport(context.Background(), "h1", "h1", &models.AgentReport{Diagnostics: issues}); err != nil {
+		t.Fatalf("ReceiveReport: %v", err)
+	}
+	if repo.updatedDiagnostics == nil || *repo.updatedDiagnostics == "" {
+		t.Fatal("expected diagnostics to be stored")
+	}
+}
+
+func TestReceiveReport_EmptyDiagnosticsClearsStaleIssues(t *testing.T) {
+	// A current agent always sends Diagnostics, even as an empty array once a
+	// prior misconfiguration is fixed — the write must still fire so the
+	// resolved issue actually clears server-side instead of lingering.
+	repo := &fakeRepo{}
+	s := newSvc(repo, &recordingStreamHub{})
+
+	report := &models.AgentReport{Diagnostics: []models.DiagnosticIssue{}}
+	if _, err := s.ReceiveReport(context.Background(), "h1", "h1", report); err != nil {
+		t.Fatalf("ReceiveReport: %v", err)
+	}
+	if repo.updatedDiagnostics == nil {
+		t.Fatal("expected an empty-array diagnostics report to still trigger a write")
+	}
+	if *repo.updatedDiagnostics != "[]" {
+		t.Errorf("expected an empty JSON array to be stored, got %q", *repo.updatedDiagnostics)
+	}
+}
+
+func TestReceiveReport_NilDiagnosticsSkipsWrite(t *testing.T) {
+	// A pre-diagnostics agent binary won't send the field at all, decoding to
+	// nil — must not overwrite whatever the host's diagnostics cache holds.
+	repo := &fakeRepo{}
+	s := newSvc(repo, &recordingStreamHub{})
+
+	if _, err := s.ReceiveReport(context.Background(), "h1", "h1", &models.AgentReport{}); err != nil {
+		t.Fatalf("ReceiveReport: %v", err)
+	}
+	if repo.updatedDiagnostics != nil {
+		t.Errorf("expected no diagnostics write for a report with a nil Diagnostics field, got %q", *repo.updatedDiagnostics)
 	}
 }
 

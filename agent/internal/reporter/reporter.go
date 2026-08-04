@@ -217,9 +217,12 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		Restic:  r.cfg.CollectRestic,
 	}
 
+	diagnostics := collector.CheckConfig(r.cfg)
+
 	report := &sender.Report{
 		AgentVersion:       r.version,
 		Capabilities:       capabilities,
+		Diagnostics:        diagnostics,
 		Metrics:            collectedMetrics,
 		Docker:             dockerData,
 		UnattendedUpgrades: uuData,
