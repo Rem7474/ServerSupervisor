@@ -239,106 +239,17 @@
                   placeholder="Mise a jour APT hebdomadaire"
                 >
               </div>
-              <div class="row g-3 mb-3">
-                <div class="col">
-                  <label class="form-label">Module</label>
-                  <select
-                    v-model="taskForm.module"
-                    class="form-select"
-                    @change="onTaskModuleChange"
-                  >
-                    <option value="apt">
-                      apt
-                    </option>
-                    <option value="docker">
-                      docker
-                    </option>
-                    <option value="systemd">
-                      systemd
-                    </option>
-                    <option value="journal">
-                      journal
-                    </option>
-                    <option value="processes">
-                      processes
-                    </option>
-                    <option value="custom">
-                      custom
-                    </option>
-                  </select>
-                </div>
-                <div class="col">
-                  <label class="form-label">Action</label>
-                  <select
-                    v-if="taskModuleActions[taskForm.module as TaskModule]"
-                    v-model="taskForm.action"
-                    class="form-select"
-                  >
-                    <option
-                      v-for="a in taskModuleActions[taskForm.module as TaskModule]"
-                      :key="a"
-                      :value="a"
-                    >
-                      {{ a }}
-                    </option>
-                  </select>
-                  <input
-                    v-else
-                    v-model="taskForm.action"
-                    type="text"
-                    class="form-control"
-                    placeholder="run"
-                  >
-                </div>
-              </div>
-              <div
-                v-if="taskForm.module !== 'apt' && taskForm.module !== 'processes'"
-                class="mb-3"
-              >
-                <label class="form-label">{{ taskForm.module === 'custom' ? 'Tache (tasks.yaml)' : 'Cible' }}</label>
-                <template v-if="taskForm.module === 'custom'">
-                  <select
-                    v-if="customTaskOptions.length"
-                    v-model="taskForm.target"
-                    class="form-select"
-                  >
-                    <option
-                      value=""
-                      disabled
-                    >
-                      -- Sélectionner une tâche --
-                    </option>
-                    <option
-                      v-for="t in customTaskOptions"
-                      :key="t.id"
-                      :value="t.id"
-                    >
-                      {{ t.name }} ({{ t.id }})
-                    </option>
-                  </select>
-                  <template v-else>
-                    <input
-                      v-model="taskForm.target"
-                      type="text"
-                      class="form-control"
-                      placeholder="cleanup_logs"
-                      aria-describedby="task-yaml-hint"
-                    >
-                    <div
-                      id="task-yaml-hint"
-                      class="form-hint"
-                    >
-                      Aucune tâche détectée dans <code>tasks.yaml</code> - saisissez l'ID manuellement.
-                    </div>
-                  </template>
-                </template>
-                <input
-                  v-else
-                  v-model="taskForm.target"
-                  type="text"
-                  class="form-control"
-                  placeholder="nginx.service"
-                >
+              <div class="mb-3">
+                <DispatchStepEditor
+                  v-model:module="taskForm.module"
+                  v-model:action="taskForm.action"
+                  v-model:target="taskForm.target"
+                  :host-id="String(props.hostId)"
+                  :actions-for-module="scheduledTaskActions"
+                  :target-config="scheduledTaskTargetConfig"
+                  :modules="availableModules"
+                  :show-host="false"
+                />
               </div>
               <div class="mb-3">
                 <label class="form-check form-switch">
@@ -424,6 +335,7 @@
 import { computed, ref, watch } from 'vue'
 import { IconClock, IconList, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
+import DispatchStepEditor from '../DispatchStepEditor.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
@@ -436,8 +348,7 @@ import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
 import { getExecutionStateClass } from '../../utils/statusClasses'
 import { commandStatusLabel } from '../../utils/commandStatus'
-
-type TaskModule = 'apt' | 'docker' | 'systemd' | 'journal' | 'processes' | 'custom'
+import { SCHEDULED_TASK_MODULES, availableScheduledTaskModules, scheduledTaskActions, scheduledTaskTargetConfig } from '../../utils/scheduledTaskDispatch'
 
 interface Task {
   id: string | number
@@ -462,23 +373,9 @@ interface TaskForm {
   enabled: boolean
 }
 
-interface CustomTaskOption {
-  id: string
-  name?: string
-}
-
 interface TaskRunResult {
   id: string | number
   name: string
-}
-
-const taskModuleActions: Record<TaskModule, string[] | null> = {
-  apt: ['update', 'upgrade', 'dist-upgrade'],
-  docker: ['start', 'stop', 'restart', 'logs', 'pull'],
-  systemd: ['start', 'stop', 'restart', 'status', 'enable', 'disable'],
-  journal: ['read'],
-  processes: ['list'],
-  custom: null,
 }
 
 const emit = defineEmits<{
@@ -491,9 +388,11 @@ const props = withDefaults(defineProps<{
   hostId: string | number
   canRunApt?: boolean
   active?: boolean
+  collectors?: Record<string, boolean>
 }>(), {
   canRunApt: false,
   active: false,
+  collectors: undefined,
 })
 
 const dialog = useConfirmDialog()
@@ -535,8 +434,18 @@ const editingTask = ref<Task | null>(null)
 const taskSaving = ref(false)
 const taskModalError = ref('')
 const taskManualOnly = ref(false)
-const customTaskOptions = ref<CustomTaskOption[]>([])
 const taskForm = ref<TaskForm>({ name: '', module: 'apt', action: 'update', target: '', cron_expression: '0 3 * * 0', enabled: true })
+
+// Narrowed to what this host's agent actually reports as active (collectors)
+// — a host with e.g. collect_docker off shouldn't offer that module. Always
+// keeps the currently selected module visible too, so editing an existing
+// task whose collector was disabled afterwards doesn't silently blank it.
+const availableModules = computed(() => {
+  const filtered = availableScheduledTaskModules(props.collectors)
+  if (filtered.some((m) => m.value === taskForm.value.module)) return filtered
+  const current = SCHEDULED_TASK_MODULES.find((m) => m.value === taskForm.value.module)
+  return current ? [...filtered, current] : filtered
+})
 
 watch(
   tasks,
@@ -581,41 +490,24 @@ async function loadTasks(): Promise<void> {
   }
 }
 
-async function loadCustomTasks(): Promise<void> {
-  try {
-    const { data } = await apiClient.getHostCustomTasks(String(props.hostId))
-    customTaskOptions.value = Array.isArray(data) ? data : []
-    if (customTaskOptions.value.length && !taskForm.value.target) {
-      taskForm.value.target = customTaskOptions.value[0].id
-    }
-  } catch {
-    customTaskOptions.value = []
-  }
-}
-
-async function onTaskModuleChange(): Promise<void> {
-  const actions = taskModuleActions[taskForm.value.module as TaskModule]
-  taskForm.value.action = actions ? actions[0] : 'run'
-  if (taskForm.value.module === 'custom') await loadCustomTasks()
-}
-
 function openCreateTask(): void {
   editingTask.value = null
   taskManualOnly.value = false
-  customTaskOptions.value = []
-  taskForm.value = { name: '', module: 'apt', action: 'update', target: '', cron_expression: '0 3 * * 0', enabled: true }
+  const defaultModule = availableScheduledTaskModules(props.collectors)[0]?.value || 'apt'
+  taskForm.value = {
+    name: '', module: defaultModule, action: scheduledTaskActions(defaultModule)[0]?.value || '',
+    target: '', cron_expression: '0 3 * * 0', enabled: true,
+  }
   taskModalError.value = ''
   showTaskModal.value = true
 }
 
-async function openEditTask(task: Task): Promise<void> {
+function openEditTask(task: Task): void {
   editingTask.value = task
   taskManualOnly.value = isManualOnly(task)
-  customTaskOptions.value = []
   taskForm.value = { name: task.name, module: task.module, action: task.action, target: task.target || '', cron_expression: task.cron_expression, enabled: task.enabled }
   taskModalError.value = ''
   showTaskModal.value = true
-  if (task.module === 'custom') await loadCustomTasks()
 }
 
 function closeTaskModal(): void {

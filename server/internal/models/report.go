@@ -51,5 +51,6 @@ type AgentReport struct {
 	CustomTasks        []CustomTaskSummary       `json:"custom_tasks,omitempty"`
 	TasksConfigYAML    string                    `json:"tasks_config_yaml,omitempty"`
 	Restic             *ResticStatus             `json:"restic,omitempty"`
+	ResticProfiles     []string                  `json:"restic_profiles,omitempty"`
 	Timestamp          time.Time                 `json:"timestamp"`
 }

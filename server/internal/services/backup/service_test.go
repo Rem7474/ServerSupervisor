@@ -14,15 +14,17 @@ import (
 )
 
 type fakeRepo struct {
-	created        *models.BackupRun
-	updated        *models.BackupRun
-	byCommandID    *models.BackupRun
-	byCommandIDErr error
-	remoteCmd      *models.RemoteCommand
-	remoteCmdErr   error
-	getRunResult   *models.BackupRun
-	getRunErr      error
-	stalled        []models.BackupRun
+	created          *models.BackupRun
+	updated          *models.BackupRun
+	byCommandID      *models.BackupRun
+	byCommandIDErr   error
+	remoteCmd        *models.RemoteCommand
+	remoteCmdErr     error
+	getRunResult     *models.BackupRun
+	getRunErr        error
+	stalled          []models.BackupRun
+	resticProfiles   string
+	resticProfileErr error
 }
 
 func (f *fakeRepo) CreateBackupRun(_ context.Context, r models.BackupRun) (*models.BackupRun, error) {
@@ -56,6 +58,9 @@ func (f *fakeRepo) GetResticStatus(context.Context, string) (*models.ResticStatu
 }
 func (f *fakeRepo) ListStalledBackupRuns(context.Context, int) ([]models.BackupRun, error) {
 	return f.stalled, nil
+}
+func (f *fakeRepo) GetHostResticProfiles(context.Context, string) (string, error) {
+	return f.resticProfiles, f.resticProfileErr
 }
 
 type fakeDispatcher struct {
@@ -120,6 +125,28 @@ func TestListRuns_NeverNil(t *testing.T) {
 	}
 	if got == nil {
 		t.Error("ListRuns must return a non-nil slice")
+	}
+}
+
+func TestGetProfiles_ParsesCachedJSON(t *testing.T) {
+	svc := NewService(&fakeRepo{resticProfiles: `["db","files"]`}, &fakeDispatcher{}, nil, nil, nil)
+	got, err := svc.GetProfiles(context.Background(), "host-1")
+	if err != nil {
+		t.Fatalf("GetProfiles: %v", err)
+	}
+	if len(got) != 2 || got[0] != "db" || got[1] != "files" {
+		t.Errorf("expected [db files], got %v", got)
+	}
+}
+
+func TestGetProfiles_NeverNilWhenUncached(t *testing.T) {
+	svc := NewService(&fakeRepo{resticProfiles: ""}, &fakeDispatcher{}, nil, nil, nil)
+	got, err := svc.GetProfiles(context.Background(), "host-1")
+	if err != nil {
+		t.Fatalf("GetProfiles: %v", err)
+	}
+	if got == nil {
+		t.Error("GetProfiles must return a non-nil slice")
 	}
 }
 

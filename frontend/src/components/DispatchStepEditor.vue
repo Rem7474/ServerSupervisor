@@ -69,7 +69,7 @@
         type="text"
         class="form-control form-control-sm"
         :placeholder="targetInfo.placeholder"
-        :list="module === 'custom' ? listId : undefined"
+        :list="module === 'custom' || module === 'restic' ? listId : undefined"
       >
       <datalist
         v-if="module === 'custom'"
@@ -82,6 +82,16 @@
         >
           {{ t.name }}
         </option>
+      </datalist>
+      <datalist
+        v-else-if="module === 'restic'"
+        :id="listId"
+      >
+        <option
+          v-for="p in resticProfiles"
+          :key="p"
+          :value="p"
+        />
       </datalist>
     </div>
     <div
@@ -158,5 +168,20 @@ watch([hostId, module], ([h, m]) => {
   apiClient.getHostCustomTasks(h)
     .then((res) => { customTasks.value = res.data || [] })
     .catch(() => { customTasks.value = [] })
+}, { immediate: true })
+
+// Restic profile target autocomplete: mirrors the custom-task datalist
+// above — the agent reports the host's resticprofile.yaml profile names
+// (GET /hosts/:id/backup/profiles), suggested here instead of a blind
+// free-text field.
+const resticProfiles = ref<string[]>([])
+const loadedResticForHost = ref('')
+
+watch([hostId, module], ([h, m]) => {
+  if (m !== 'restic' || !h || h === loadedResticForHost.value) return
+  loadedResticForHost.value = h
+  apiClient.getBackupProfiles(h)
+    .then((res) => { resticProfiles.value = res.data?.profiles || [] })
+    .catch(() => { resticProfiles.value = [] })
 }, { immediate: true })
 </script>

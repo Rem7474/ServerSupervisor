@@ -10,6 +10,26 @@
           class="badge"
           :class="statusBadge.badgeClass"
         >{{ statusBadge.label }}</span>
+        <input
+          v-if="canRun"
+          v-model="runProfile"
+          type="text"
+          class="form-control form-control-sm"
+          style="width: 160px"
+          placeholder="Profil (défaut)"
+          list="host-backup-profile-list"
+          :disabled="backupLoading === 'run' || liveStatus === 'running'"
+        >
+        <datalist
+          v-if="canRun"
+          id="host-backup-profile-list"
+        >
+          <option
+            v-for="p in resticProfiles"
+            :key="p"
+            :value="p"
+          />
+        </datalist>
         <button
           v-if="canRun"
           type="button"
@@ -218,7 +238,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { IconExternalLink } from '@tabler/icons-vue'
 import dayjs from '../../utils/dayjs'
 import EmptyState from '../EmptyState.vue'
@@ -236,6 +256,7 @@ const props = withDefaults(defineProps<{
 const {
   backupStatus,
   backupRuns,
+  resticProfiles,
   backupLoading,
   liveStatus,
   liveProgress,
@@ -244,6 +265,8 @@ const {
   handleRunBackup,
   stopWatchingLiveBackup,
 } = useBackup(props.hostId)
+
+const runProfile = ref('')
 
 const latestRun = computed(() => backupStatus.value?.latest_run || null)
 const passiveState = computed(() => backupStatus.value?.passive_state || null)
@@ -270,7 +293,7 @@ function runBadgeClass(status: string): string {
 }
 
 function onRunBackup(): void {
-  void handleRunBackup()
+  void handleRunBackup(runProfile.value.trim() || undefined)
 }
 
 function formatDate(date: string | null | undefined): string {

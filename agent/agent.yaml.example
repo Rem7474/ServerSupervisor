@@ -67,6 +67,13 @@ restic_bin: "/home/user/restic-backups/restic"
 restic_conf_path: "/home/user/restic-backups/resticconf"
 restic_run_script_path: "/home/user/restic-backups/run_backup.sh"
 restic_status_file_path: "/home/user/restic-backups/backup-status.json"
+
+# Path to resticprofile.yaml. Read locally to report the list of available
+# profile names (used to populate the "Lancer un backup" / scheduled-task
+# profile pickers) — only profile names are ever sent to the server, never
+# file content.
+restic_profile_config_path: "/home/user/restic-backups/resticprofile.yaml"
+
 restic_enable_progress: true
 restic_progress_fps: 0.1
 

@@ -50,6 +50,7 @@ interface ResticProgressEvent {
 export function useBackup(hostId: string) {
   const backupStatus = ref<BackupStatus | null>(null)
   const backupRuns = ref<BackupRun[]>([])
+  const resticProfiles = ref<string[]>([])
   const backupLoading = ref('')
   const backupError = ref('')
 
@@ -61,12 +62,14 @@ export function useBackup(hostId: string) {
 
   async function loadBackupData(): Promise<void> {
     try {
-      const [statusRes, runsRes] = await Promise.all([
+      const [statusRes, runsRes, profilesRes] = await Promise.all([
         apiClient.getBackupStatus(hostId),
         apiClient.getBackupRuns(hostId),
+        apiClient.getBackupProfiles(hostId),
       ])
       backupStatus.value = statusRes.data || null
       backupRuns.value = runsRes.data?.runs || []
+      resticProfiles.value = profilesRes.data?.profiles || []
     } catch {
       // non-critical — the tab still renders with empty state
     }
@@ -142,6 +145,7 @@ export function useBackup(hostId: string) {
   return {
     backupStatus,
     backupRuns,
+    resticProfiles,
     backupLoading,
     backupError,
     liveStatus,

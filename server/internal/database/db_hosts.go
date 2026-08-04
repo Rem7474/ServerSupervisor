@@ -35,6 +35,17 @@ func parseTags(raw string) []string {
 	return tags
 }
 
+func parseCollectors(raw string) map[string]bool {
+	if raw == "" {
+		return map[string]bool{}
+	}
+	var collectors map[string]bool
+	if err := json.Unmarshal([]byte(raw), &collectors); err != nil {
+		return map[string]bool{}
+	}
+	return collectors
+}
+
 func (db *DB) RegisterHost(ctx context.Context, host *models.Host) error {
 	lastSeen := host.LastSeen
 	if lastSeen.IsZero() {
@@ -51,15 +62,16 @@ func (db *DB) RegisterHost(ctx context.Context, host *models.Host) error {
 
 func (db *DB) GetHost(ctx context.Context, id string) (*models.Host, error) {
 	var h models.Host
-	var tagsJSON string
+	var tagsJSON, collectorsJSON string
 	err := db.conn.QueryRowContext(ctx,
-		`SELECT id, name, hostname, ip_address, os, agent_version, api_key, tags, status, last_seen, created_at, updated_at
+		`SELECT id, name, hostname, ip_address, os, agent_version, api_key, tags, status, last_seen, created_at, updated_at, collectors::text
 		 FROM hosts WHERE id = $1`, id,
-	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
+	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt, &collectorsJSON)
 	if err != nil {
 		return nil, err
 	}
 	h.Tags = parseTags(tagsJSON)
+	h.Collectors = parseCollectors(collectorsJSON)
 	return &h, nil
 }
 
@@ -91,7 +103,7 @@ func (db *DB) GetHostByAPIKey(ctx context.Context, apiKey string) (*models.Host,
 
 func (db *DB) GetAllHosts(ctx context.Context) ([]models.Host, error) {
 	rows, err := db.conn.QueryContext(ctx,
-		`SELECT id, name, hostname, ip_address, os, agent_version, tags, status, last_seen, created_at, updated_at
+		`SELECT id, name, hostname, ip_address, os, agent_version, tags, status, last_seen, created_at, updated_at, collectors::text
 		 FROM hosts ORDER BY name`,
 	)
 	if err != nil {
@@ -102,11 +114,12 @@ func (db *DB) GetAllHosts(ctx context.Context) ([]models.Host, error) {
 	var hosts []models.Host
 	for rows.Next() {
 		var h models.Host
-		var tagsJSON string
-		if err := rows.Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt); err != nil {
+		var tagsJSON, collectorsJSON string
+		if err := rows.Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt, &collectorsJSON); err != nil {
 			return nil, err
 		}
 		h.Tags = parseTags(tagsJSON)
+		h.Collectors = parseCollectors(collectorsJSON)
 		hosts = append(hosts, h)
 	}
 	return hosts, nil
@@ -143,6 +156,25 @@ func (db *DB) GetHostTasksConfigYAML(ctx context.Context, hostID string) (string
 	err := db.conn.QueryRowContext(ctx,
 		`SELECT tasks_config_yaml FROM hosts WHERE id = $1`, hostID).Scan(&yaml)
 	return yaml, err
+}
+
+// UpdateHostResticProfiles stores the list of resticprofile.yaml profile
+// names reported by the agent for a host. profilesJSON must be a valid JSON
+// array of strings (e.g. `["files","db"]`).
+func (db *DB) UpdateHostResticProfiles(ctx context.Context, hostID, profilesJSON string) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE hosts SET restic_profiles = $1::jsonb WHERE id = $2`,
+		profilesJSON, hostID)
+	return err
+}
+
+// GetHostResticProfiles returns the cached restic profile list for a host as
+// a JSON array string.
+func (db *DB) GetHostResticProfiles(ctx context.Context, hostID string) (string, error) {
+	var profiles string
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT restic_profiles::text FROM hosts WHERE id = $1`, hostID).Scan(&profiles)
+	return profiles, err
 }
 
 func (db *DB) UpdateHostStatus(ctx context.Context, id, status string) error {

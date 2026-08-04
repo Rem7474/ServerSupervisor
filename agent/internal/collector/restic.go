@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/serversupervisor/agent/internal/config"
 	"github.com/serversupervisor/agent/internal/security"
+	"gopkg.in/yaml.v3"
 )
 
 // resticEnvAllowedPrefixes is the allowlist of environment variable name
@@ -193,6 +195,47 @@ func collectResticStatusFromCommands(ctx context.Context, cfg *config.Config, bi
 	}
 
 	return status
+}
+
+// reservedResticProfileKeys are resticprofile.yaml's non-profile top-level
+// keys (see https://creativeprojects.github.io/resticprofile/configuration/)
+// — never returned as a profile name.
+var reservedResticProfileKeys = map[string]bool{
+	"version": true, "global": true, "includes": true, "groups": true,
+}
+
+// ListResticProfiles reads resticprofile.yaml and returns its top-level
+// profile names, sorted. That file holds only profile definitions (sources,
+// excludes, schedule hints) — repository/backend credentials live in
+// resticconf, never here — so parsing it locally is safe; only the
+// resulting profile *names* are ever reported to the server, never the file
+// content itself. Returns (nil, nil) when unconfigured or the file is
+// absent, consistent with the rest of this collector's tolerant-of-missing-
+// setup behavior.
+func ListResticProfiles(path string) ([]string, error) {
+	if path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var doc map[string]any
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	profiles := make([]string, 0, len(doc))
+	for key := range doc {
+		if reservedResticProfileKeys[key] {
+			continue
+		}
+		profiles = append(profiles, key)
+	}
+	sort.Strings(profiles)
+	return profiles, nil
 }
 
 // RunResticBackupWithProgress runs the configured run_backup.sh script for the

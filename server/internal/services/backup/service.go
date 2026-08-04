@@ -37,6 +37,7 @@ type Repository interface {
 	GetRemoteCommandByID(ctx context.Context, id string) (*models.RemoteCommand, error)
 	GetResticStatus(ctx context.Context, hostID string) (*models.ResticStatus, error)
 	ListStalledBackupRuns(ctx context.Context, olderThanMinutes int) ([]models.BackupRun, error)
+	GetHostResticProfiles(ctx context.Context, hostID string) (string, error)
 }
 
 // Dispatcher is the agent-command port. *dispatch.Dispatcher satisfies it.
@@ -132,6 +133,23 @@ func (s *Service) ListRuns(ctx context.Context, hostID string, limit int) ([]mod
 		runs = []models.BackupRun{}
 	}
 	return runs, nil
+}
+
+// GetProfiles returns the resticprofile.yaml profile names last reported by
+// the host's agent (never nil, empty slice when none reported yet).
+func (s *Service) GetProfiles(ctx context.Context, hostID string) ([]string, error) {
+	raw, err := s.repo.GetHostResticProfiles(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+	profiles := []string{}
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &profiles) // best-effort; empty on malformed cache
+	}
+	if profiles == nil {
+		profiles = []string{}
+	}
+	return profiles, nil
 }
 
 // GetRun returns a single backup run by id, or apperr.NotFound.

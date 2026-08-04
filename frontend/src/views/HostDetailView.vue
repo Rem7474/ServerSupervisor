@@ -547,6 +547,7 @@
               :host-id="hostId"
               :can-run-apt="canRunApt"
               :active="activeTab === 'planifiees'"
+              :collectors="hostCollectors"
               @open-command="openCommand"
               @tasks-count="tasksCount = $event"
               @history-changed="loadCmdHistoryRefresh"
@@ -859,6 +860,10 @@ const exposureDomainCount = ref(0)
 // Incidents' `host_name` is `hosts.name` (see db_notifications.go), so this
 // pre-fills AlertIncidentList's search box to this host instead of landing on
 // the undifferentiated full incidents list.
+// Narrows the "Tâches planifiées" tab's module picker to what this host's
+// agent actually reports collecting (see HostTasksTab's `collectors` prop).
+const hostCollectors = computed(() => host.value?.collectors as Record<string, boolean> | undefined)
+
 const hostAlertsLink = computed(() => ({
   path: '/alerts',
   query: { tab: 'incidents', host: host.value?.name || host.value?.hostname || '' },

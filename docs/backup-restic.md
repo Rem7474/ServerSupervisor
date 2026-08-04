@@ -127,6 +127,7 @@ restic_bin: "/usr/local/bin/restic"
 restic_conf_path: "/home/user/restic-backups/resticconf"
 restic_run_script_path: "/home/user/restic-backups/run_backup.sh"
 restic_status_file_path: "/home/user/restic-backups/backup-status.json"
+restic_profile_config_path: "/home/user/restic-backups/resticprofile.yaml"
 restic_enable_progress: true
 restic_progress_fps: 0.1
 restic_backup_idle_timeout_minutes: 20
@@ -139,6 +140,7 @@ restic_backup_idle_timeout_minutes: 20
 | `restic_conf_path` | Chemin de `resticconf` (secrets, jamais lus par le serveur) |
 | `restic_run_script_path` | Chemin de `run_backup.sh`, exécuté par l'action **Lancer un backup** |
 | `restic_status_file_path` | Chemin du status-file resticprofile — source privilégiée du monitoring passif |
+| `restic_profile_config_path` | Chemin de `resticprofile.yaml` — lu localement pour lister les noms de profils (`files`, `db`, …) et peupler les sélecteurs de profil dans l'UI (backup manuel + tâche planifiée). Seuls les noms sont transmis au serveur, jamais le contenu du fichier |
 | `restic_enable_progress` | Active le parsing de la progression en direct pendant un backup manuel |
 | `restic_progress_fps` | Fréquence des événements de progression forcés (défaut `0.1`, un toutes les 10s) |
 | `restic_backup_idle_timeout_minutes` | Un backup manuel n'a pas de plafond de durée fixe ; il est coupé s'il reste silencieux (aucune ligne `--json`) plus longtemps que cette valeur (défaut 20 min) |

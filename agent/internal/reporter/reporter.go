@@ -58,6 +58,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		uuData           *collector.UnattendedUpgradesStatus
 		webLogs          *collector.WebLogReport
 		resticStatus     *collector.ResticStatus
+		resticProfiles   []string
 	)
 
 	var wg sync.WaitGroup
@@ -175,6 +176,12 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 				return
 			}
 			resticStatus = status
+			profiles, err := collector.ListResticProfiles(r.cfg.ResticProfileConfigPath)
+			if err != nil {
+				slog.Warn("restic profile list collection skipped", "err", err)
+				return
+			}
+			resticProfiles = profiles
 		}()
 	}
 
@@ -224,6 +231,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		CustomTasks:        customTasksList,
 		TasksConfigYAML:    config.LoadTasksConfigRaw(),
 		Restic:             resticStatus,
+		ResticProfiles:     resticProfiles,
 		Timestamp:          time.Now(),
 	}
 	trimWebLogsForReportSize(report, r.cfg.MaxReportBodyBytes)
