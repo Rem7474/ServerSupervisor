@@ -74,14 +74,28 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 		slog.Info("apt command completed", "action", cmd.Action)
 	}
 
-	// Report the terminal status first, before the (slow, network-bound) CVE
-	// enrichment below. The package list + CVEs are pushed separately via
-	// /api/agent/apt-status, so the command's completion is never delayed by — nor
-	// falsely timed-out because of — the Ubuntu CVE API round-trips on a fresh host.
+	// Bundle a fast, CVE-free package count into the terminal report itself —
+	// collector.CollectAPTFast is a single bounded apt-get upgrade --simulate
+	// call (no per-package apt-cache/CVE lookups), so it stays quick even on a
+	// large backlog. The server applies CommandResult.AptStatus synchronously
+	// (server/internal/services/agent/service.go), so this is what makes the
+	// UI's pending-package count update the instant the command completes,
+	// instead of only ever being set by the slower goroutine below.
+	fastStatus, fastErr := collector.CollectAPTFast(ctx)
+	if fastErr != nil {
+		slog.Warn("fast apt status collection failed", "action", cmd.Action, "err", fastErr)
+	}
+
+	// Report the terminal status (with the fast package count above), before
+	// the (slow, network-bound) CVE enrichment below. The CVE-enriched
+	// snapshot is pushed separately via /api/agent/apt-status, so the
+	// command's completion is never delayed by — nor falsely timed-out
+	// because of — the Ubuntu CVE API round-trips on a fresh host.
 	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
 		CommandID: cmd.ID,
 		Status:    status,
 		Output:    output,
+		AptStatus: fastStatus,
 	}); err != nil {
 		slog.Warn("failed to report apt command result", "err", err)
 	}

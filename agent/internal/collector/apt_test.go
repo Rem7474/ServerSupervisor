@@ -37,3 +37,38 @@ func TestCollectAPT_RespectsCancelledContext(t *testing.T) {
 		t.Fatal("expected a non-nil status even when the simulate call is cancelled")
 	}
 }
+
+// CollectAPTFast must return quickly and never populate SecurityUpdates/CVEList
+// (those are the slower CollectAPT(true)'s job) — it's called synchronously on
+// the command-completion hot path (handler_apt.go), so it must stay cheap.
+func TestCollectAPTFast(t *testing.T) {
+	done := make(chan struct{})
+	var status *AptStatus
+	var err error
+	go func() {
+		status, err = CollectAPTFast(context.Background())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(35 * time.Second):
+		t.Fatal("CollectAPTFast did not return within its bounded budget")
+	}
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status == nil {
+		t.Fatal("expected a non-nil status")
+	}
+	if status.SecurityUpdates != 0 {
+		t.Errorf("expected SecurityUpdates to stay 0 (no per-package lookups), got %d", status.SecurityUpdates)
+	}
+	if status.CVEList != "[]" {
+		t.Errorf("expected CVEList to stay empty, got %q", status.CVEList)
+	}
+	if status.PackageList == "" {
+		t.Error("expected PackageList to always be set (even to \"[]\"), got empty string")
+	}
+}

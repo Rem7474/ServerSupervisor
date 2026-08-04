@@ -43,6 +43,78 @@ type AptStatus struct {
 	CVEList         string    `json:"cve_list"` // JSON array of CVEInfo
 }
 
+// listUpgradablePackages runs `apt-get upgrade --simulate` and parses the
+// "Inst " lines into a package name list. Pure parsing beyond the single
+// bounded exec call — no per-package apt-cache/network round-trips — so it's
+// cheap enough to call synchronously on a command's hot path.
+func listUpgradablePackages(ctx context.Context) ([]string, error) {
+	simCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(simCtx, "apt-get", "upgrade", "--simulate").Output()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var packages []string
+	for _, line := range lines {
+		// Only process lines starting with "Inst " (package installation lines)
+		if !strings.HasPrefix(line, "Inst ") {
+			continue
+		}
+		// Format: "Inst package_name [current_version] (new_version ...)"
+		// Extract package name (second token)
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		packages = append(packages, fields[1])
+	}
+	return packages, nil
+}
+
+func packageListJSON(packages []string) string {
+	if len(packages) == 0 {
+		return "[]"
+	}
+	quoted := make([]string, len(packages))
+	for i, p := range packages {
+		quoted[i] = fmt.Sprintf("%q", p)
+	}
+	return "[" + strings.Join(quoted, ",") + "]"
+}
+
+// CollectAPTFast returns just the pending-package count/list: a single bounded
+// `apt-get upgrade --simulate` call plus parsing, no per-package apt-cache
+// policy checks or CVE lookups. Meant to be called synchronously right after
+// an apt mutation completes, so the terminal command report can carry a fresh
+// package count immediately — see handler_apt.go, which bundles this into
+// CommandResult.AptStatus rather than making the UI wait for CollectAPT(true)'s
+// slower, network-bound security/CVE enrichment.
+func CollectAPTFast(ctx context.Context) (*AptStatus, error) {
+	if _, err := exec.LookPath("apt-get"); err != nil {
+		return nil, fmt.Errorf("apt-get not found in PATH")
+	}
+
+	status := &AptStatus{
+		LastUpdate:  getLastAptAction("Start-Date", "/var/log/apt/history.log"),
+		LastUpgrade: getLastAptUpgrade(),
+		CVEList:     "[]", // filled in later by the async CVE-enriched refresh
+	}
+
+	packages, err := listUpgradablePackages(ctx)
+	if err != nil {
+		slog.Warn("apt-get upgrade --simulate failed", "err", err)
+		status.PackageList = "[]"
+		return status, nil
+	}
+
+	status.PendingPackages = len(packages)
+	status.PackageList = packageListJSON(packages)
+	return status, nil
+}
+
 // CollectAPT checks for available APT updates
 // If extractCVE is true, extracts CVE information (resource intensive)
 //
@@ -54,9 +126,6 @@ type AptStatus struct {
 // output, no further exec calls) regardless of how much of ctx's budget is
 // left; only the finer security-update/CVE detail is skipped once ctx expires.
 func CollectAPT(ctx context.Context, extractCVE bool) (*AptStatus, error) {
-	simCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	status := &AptStatus{}
 
 	// Check if apt-get is available
@@ -69,32 +138,18 @@ func CollectAPT(ctx context.Context, extractCVE bool) (*AptStatus, error) {
 	status.LastUpgrade = getLastAptUpgrade()
 
 	// List upgradable packages using dry-run simulation
-	out, err := exec.CommandContext(simCtx, "apt-get", "upgrade", "--simulate").Output()
+	packages, err := listUpgradablePackages(ctx)
 	if err != nil {
 		slog.Warn("apt-get upgrade --simulate failed", "err", err)
+		status.PackageList = "[]"
+		status.CVEList = "[]"
 		return status, nil
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	var packages []string
 	secCount := 0
 	var cveInfos []CVEInfo
 
-	for _, line := range lines {
-		// Only process lines starting with "Inst " (package installation lines)
-		if !strings.HasPrefix(line, "Inst ") {
-			continue
-		}
-
-		// Format: "Inst package_name [current_version] (new_version ...)"
-		// Extract package name (second token)
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-		packageName := fields[1]
-		packages = append(packages, packageName)
-
+	for _, packageName := range packages {
 		if ctx.Err() != nil {
 			// Overall deadline hit — keep the package count/list (already
 			// complete above) but stop spending time on security/CVE detail.
@@ -114,17 +169,7 @@ func CollectAPT(ctx context.Context, extractCVE bool) (*AptStatus, error) {
 
 	status.PendingPackages = len(packages)
 	status.SecurityUpdates = secCount
-
-	// Build JSON array of package names
-	if len(packages) > 0 {
-		quoted := make([]string, len(packages))
-		for i, p := range packages {
-			quoted[i] = fmt.Sprintf("%q", p)
-		}
-		status.PackageList = "[" + strings.Join(quoted, ",") + "]"
-	} else {
-		status.PackageList = "[]"
-	}
+	status.PackageList = packageListJSON(packages)
 
 	// Build JSON array of CVE info
 	if len(cveInfos) > 0 {

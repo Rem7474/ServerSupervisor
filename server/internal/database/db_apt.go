@@ -28,6 +28,27 @@ func (db *DB) UpsertAptStatus(ctx context.Context, status *models.AptStatus) err
 	return err
 }
 
+// UpsertAptPendingPackages updates only the pending-package count/list (+
+// last_update/last_upgrade/updated_at) — deliberately leaves security_updates
+// and cve_list untouched on conflict (no SET clause for them at all) since the
+// caller (the fast, synchronous post-command path in handler_apt.go) never
+// computes those; a full UpsertAptStatus call here would wipe the real CVE
+// data back to 0/"[]" until the slower CVE-enrichment refresh lands.
+func (db *DB) UpsertAptPendingPackages(ctx context.Context, status *models.AptStatus) error {
+	_, err := db.conn.ExecContext(ctx,
+		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, updated_at)
+		 VALUES ($1,$2,$3,$4,$5,NOW())
+		 ON CONFLICT (host_id) DO UPDATE SET
+			last_update  = GREATEST(EXCLUDED.last_update,  COALESCE(apt_status.last_update,  EXCLUDED.last_update)),
+			last_upgrade = GREATEST(EXCLUDED.last_upgrade, COALESCE(apt_status.last_upgrade, EXCLUDED.last_upgrade)),
+			pending_packages = EXCLUDED.pending_packages,
+			package_list = EXCLUDED.package_list,
+			updated_at = NOW()`,
+		status.HostID, status.LastUpdate, status.LastUpgrade, status.PendingPackages, status.PackageList,
+	)
+	return err
+}
+
 func (db *DB) GetAptStatus(ctx context.Context, hostID string) (*models.AptStatus, error) {
 	var s models.AptStatus
 	err := db.conn.QueryRowContext(ctx, 

@@ -25,6 +25,7 @@ type fakeRepo struct {
 	updatedCmdStatus   string
 	touchedAptActions  []string
 	upsertedApt        *models.AptStatus
+	upsertedAptPending *models.AptStatus
 	upsertedRestic     *models.ResticStatus
 	updatedSchedStatus string
 	createdCompleted   bool
@@ -105,6 +106,10 @@ func (f *fakeRepo) UpdateScheduledTaskStatus(_ context.Context, _, status string
 }
 func (f *fakeRepo) UpsertAptStatus(_ context.Context, status *models.AptStatus) error {
 	f.upsertedApt = status
+	return nil
+}
+func (f *fakeRepo) UpsertAptPendingPackages(_ context.Context, status *models.AptStatus) error {
+	f.upsertedAptPending = status
 	return nil
 }
 func (f *fakeRepo) UpsertResticStatus(_ context.Context, _ string, status *models.ResticStatus) error {
@@ -244,8 +249,11 @@ func TestReportCommandResult_AptPostProcessingAndStream(t *testing.T) {
 	if len(repo.touchedAptActions) != 1 || repo.touchedAptActions[0] != "upgrade" {
 		t.Errorf("touched apt actions = %v, want [upgrade]", repo.touchedAptActions)
 	}
-	if repo.upsertedApt == nil || repo.upsertedApt.HostID != "h1" {
-		t.Errorf("apt status not upserted with host id, got %+v", repo.upsertedApt)
+	if repo.upsertedAptPending == nil || repo.upsertedAptPending.HostID != "h1" {
+		t.Errorf("apt pending-packages not upserted with host id, got %+v", repo.upsertedAptPending)
+	}
+	if repo.upsertedApt != nil {
+		t.Errorf("expected the full UpsertAptStatus NOT to be called from the terminal-report fast path (would wipe security_updates/cve_list), got %+v", repo.upsertedApt)
 	}
 }
 
