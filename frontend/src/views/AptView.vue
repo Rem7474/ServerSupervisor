@@ -92,6 +92,7 @@
               :selected="selectedHosts.includes(host.id)"
               :can-run-apt="canRunApt"
               :cmd-loading="hostCmdLoading[host.id]"
+              :enriching="!!enrichingHosts[host.id]"
               @update:selected="val => toggleSelected(host.id, val)"
               @update:expanded="val => hostExpanded[host.id] = val"
               @run-cmd="cmd => runAptCmdForHost(host, cmd)"
@@ -138,6 +139,7 @@ const {
   aptStatuses,
   aptHistories,
   hostCmdLoading,
+  enrichingHosts,
   canRunApt,
   selectAll,
   toggleSelected,
