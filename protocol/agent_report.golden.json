@@ -11,6 +11,13 @@
     "journal": true,
     "restic": true
   },
+  "diagnostics": [
+    {
+      "collector": "contract",
+      "severity": "contract",
+      "message": "contract"
+    }
+  ],
   "metrics": {
     "cpu_usage_percent": 1.5,
     "cpu_cores": 7,

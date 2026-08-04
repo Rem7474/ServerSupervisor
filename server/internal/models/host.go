@@ -27,6 +27,10 @@ type Host struct {
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 	// Collectors tracks which metrics sources are active on this host (docker, smart, cpu_temp, web_logs, etc.)
 	Collectors map[string]bool `json:"collectors" db:"collectors"` // e.g., {"docker": true, "smart": false, "cpu_temp": true}
+	// Diagnostics is the agent's own last self-check of its config against
+	// reality (e.g. collect_restic: true but resticconf missing) — see
+	// DiagnosticIssue. Empty when nothing's wrong, or before the first report.
+	Diagnostics []DiagnosticIssue `json:"diagnostics" db:"diagnostics"`
 }
 
 type HostRegistration struct {
