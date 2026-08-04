@@ -43,12 +43,89 @@ type AptStatus struct {
 	CVEList         string    `json:"cve_list"` // JSON array of CVEInfo
 }
 
-// CollectAPT checks for available APT updates
-// If extractCVE is true, extracts CVE information (resource intensive)
-func CollectAPT(extractCVE bool) (*AptStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+// listUpgradablePackages runs `apt-get upgrade --simulate` and parses the
+// "Inst " lines into a package name list. Pure parsing beyond the single
+// bounded exec call — no per-package apt-cache/network round-trips — so it's
+// cheap enough to call synchronously on a command's hot path.
+func listUpgradablePackages(ctx context.Context) ([]string, error) {
+	simCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
+	out, err := exec.CommandContext(simCtx, "apt-get", "upgrade", "--simulate").Output()
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var packages []string
+	for _, line := range lines {
+		// Only process lines starting with "Inst " (package installation lines)
+		if !strings.HasPrefix(line, "Inst ") {
+			continue
+		}
+		// Format: "Inst package_name [current_version] (new_version ...)"
+		// Extract package name (second token)
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		packages = append(packages, fields[1])
+	}
+	return packages, nil
+}
+
+func packageListJSON(packages []string) string {
+	if len(packages) == 0 {
+		return "[]"
+	}
+	quoted := make([]string, len(packages))
+	for i, p := range packages {
+		quoted[i] = fmt.Sprintf("%q", p)
+	}
+	return "[" + strings.Join(quoted, ",") + "]"
+}
+
+// CollectAPTFast returns just the pending-package count/list: a single bounded
+// `apt-get upgrade --simulate` call plus parsing, no per-package apt-cache
+// policy checks or CVE lookups. Meant to be called synchronously right after
+// an apt mutation completes, so the terminal command report can carry a fresh
+// package count immediately — see handler_apt.go, which bundles this into
+// CommandResult.AptStatus rather than making the UI wait for CollectAPT(true)'s
+// slower, network-bound security/CVE enrichment.
+func CollectAPTFast(ctx context.Context) (*AptStatus, error) {
+	if _, err := exec.LookPath("apt-get"); err != nil {
+		return nil, fmt.Errorf("apt-get not found in PATH")
+	}
+
+	status := &AptStatus{
+		LastUpdate:  getLastAptAction("Start-Date", "/var/log/apt/history.log"),
+		LastUpgrade: getLastAptUpgrade(),
+		CVEList:     "[]", // filled in later by the async CVE-enriched refresh
+	}
+
+	packages, err := listUpgradablePackages(ctx)
+	if err != nil {
+		slog.Warn("apt-get upgrade --simulate failed", "err", err)
+		status.PackageList = "[]"
+		return status, nil
+	}
+
+	status.PendingPackages = len(packages)
+	status.PackageList = packageListJSON(packages)
+	return status, nil
+}
+
+// CollectAPT checks for available APT updates
+// If extractCVE is true, extracts CVE information (resource intensive)
+//
+// ctx bounds the *entire* call, including the per-package security/CVE
+// lookups below — those are sequential, one-or-more subprocess/network calls
+// per pending package, so on a fresh host with a large backlog they can
+// otherwise run for many minutes. The pending-package count/list itself is
+// always fully computed (pure parsing of the already-fetched --simulate
+// output, no further exec calls) regardless of how much of ctx's budget is
+// left; only the finer security-update/CVE detail is skipped once ctx expires.
+func CollectAPT(ctx context.Context, extractCVE bool) (*AptStatus, error) {
 	status := &AptStatus{}
 
 	// Check if apt-get is available
@@ -61,38 +138,30 @@ func CollectAPT(extractCVE bool) (*AptStatus, error) {
 	status.LastUpgrade = getLastAptUpgrade()
 
 	// List upgradable packages using dry-run simulation
-	out, err := exec.CommandContext(ctx, "apt-get", "upgrade", "--simulate").Output()
+	packages, err := listUpgradablePackages(ctx)
 	if err != nil {
 		slog.Warn("apt-get upgrade --simulate failed", "err", err)
+		status.PackageList = "[]"
+		status.CVEList = "[]"
 		return status, nil
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	var packages []string
 	secCount := 0
 	var cveInfos []CVEInfo
 
-	for _, line := range lines {
-		// Only process lines starting with "Inst " (package installation lines)
-		if !strings.HasPrefix(line, "Inst ") {
+	for _, packageName := range packages {
+		if ctx.Err() != nil {
+			// Overall deadline hit — keep the package count/list (already
+			// complete above) but stop spending time on security/CVE detail.
 			continue
 		}
-
-		// Format: "Inst package_name [current_version] (new_version ...)"
-		// Extract package name (second token)
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-		packageName := fields[1]
-		packages = append(packages, packageName)
 
 		// Check if it's a security update by looking at policy
-		if isSecurityUpdate(packageName) {
+		if isSecurityUpdate(ctx, packageName) {
 			secCount++
 			// Extract CVEs for security packages only if requested
 			if extractCVE {
-				cves := extractCVEsForPackage(packageName)
+				cves := extractCVEsForPackage(ctx, packageName)
 				cveInfos = append(cveInfos, cves...)
 			}
 		}
@@ -100,17 +169,7 @@ func CollectAPT(extractCVE bool) (*AptStatus, error) {
 
 	status.PendingPackages = len(packages)
 	status.SecurityUpdates = secCount
-
-	// Build JSON array of package names
-	if len(packages) > 0 {
-		quoted := make([]string, len(packages))
-		for i, p := range packages {
-			quoted[i] = fmt.Sprintf("%q", p)
-		}
-		status.PackageList = "[" + strings.Join(quoted, ",") + "]"
-	} else {
-		status.PackageList = "[]"
-	}
+	status.PackageList = packageListJSON(packages)
 
 	// Build JSON array of CVE info
 	if len(cveInfos) > 0 {
@@ -340,8 +399,8 @@ func getLastAptUpgrade() time.Time {
 }
 
 // isSecurityUpdate checks if a package upgrade comes from security repositories
-func isSecurityUpdate(packageName string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func isSecurityUpdate(parent context.Context, packageName string) bool {
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 
 	out, err := exec.CommandContext(ctx, "apt-cache", "policy", packageName).Output()
@@ -418,7 +477,7 @@ var cveHTTPClient = &http.Client{Timeout: cveAPITimeout}
 
 // fetchUbuntuCVE fetches CVE data from Ubuntu's security API with one retry.
 // Results are cached on disk for cveCacheTTL to avoid hammering the API.
-func fetchUbuntuCVE(cveID string) (*ubuntuCVEResponse, error) {
+func fetchUbuntuCVE(ctx context.Context, cveID string) (*ubuntuCVEResponse, error) {
 	cacheFile := filepath.Join(cveCacheDir, cveID+".json")
 
 	// Return cached result if still fresh.
@@ -439,8 +498,11 @@ func fetchUbuntuCVE(cveID string) (*ubuntuCVEResponse, error) {
 		if attempt > 0 {
 			time.Sleep(2 * time.Second)
 		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 
-		result, body, err := doUbuntuCVERequest(url)
+		result, body, err := doUbuntuCVERequest(ctx, url)
 		if err == errCVENotFound {
 			// Cache a sentinel so we don't retry for cveCacheTTL.
 			sentinel, _ := json.Marshal(ubuntuCVEResponse{ID: cveID, Priority: "unknown"})
@@ -467,8 +529,8 @@ func fetchUbuntuCVE(cveID string) (*ubuntuCVEResponse, error) {
 // The caller caches a sentinel so we don't retry for cveCacheTTL.
 var errCVENotFound = fmt.Errorf("CVE not found in Ubuntu database")
 
-func doUbuntuCVERequest(url string) (*ubuntuCVEResponse, []byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), cveAPITimeout)
+func doUbuntuCVERequest(parent context.Context, url string) (*ubuntuCVEResponse, []byte, error) {
+	ctx, cancel := context.WithTimeout(parent, cveAPITimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -511,7 +573,7 @@ func doUbuntuCVERequest(url string) (*ubuntuCVEResponse, []byte, error) {
 // enrichCVEsWithUbuntuData queries the Ubuntu CVE API for each CVE ID (in parallel)
 // and fills in UbuntuPriority, Severity, CVSSScore, and CVSSVector.
 // Falls back to "UNKNOWN" if the API is unreachable.
-func enrichCVEsWithUbuntuData(cves []CVEInfo) []CVEInfo {
+func enrichCVEsWithUbuntuData(ctx context.Context, cves []CVEInfo) []CVEInfo {
 	sem := make(chan struct{}, cveParallelLimit)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -523,7 +585,7 @@ func enrichCVEsWithUbuntuData(cves []CVEInfo) []CVEInfo {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			data, err := fetchUbuntuCVE(cves[idx].ID)
+			data, err := fetchUbuntuCVE(ctx, cves[idx].ID)
 			if err != nil {
 				slog.Debug("CVE API fetch failed", "cve", cves[idx].ID, "err", err)
 				return
@@ -549,18 +611,18 @@ func enrichCVEsWithUbuntuData(cves []CVEInfo) []CVEInfo {
 // extractCVEsForPackage extracts CVE IDs from the package changelog (entries
 // strictly newer than the installed version) then enriches them with official
 // Ubuntu priority and CVSS data from the Ubuntu Security API.
-func extractCVEsForPackage(packageName string) []CVEInfo {
+func extractCVEsForPackage(parent context.Context, packageName string) []CVEInfo {
 	cveMap := make(map[string]bool)
 
-	installedVersion := getInstalledPackageVersion(packageName)
+	installedVersion := getInstalledPackageVersion(parent, packageName)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "apt-get", "changelog", packageName)
 	output, err := cmd.Output()
 	if err != nil {
-		return extractCVEsFromPolicy(packageName)
+		return extractCVEsFromPolicy(parent, packageName)
 	}
 
 	changelog := extractChangelogSinceVersion(string(output), installedVersion, packageName)
@@ -584,15 +646,15 @@ func extractCVEsForPackage(packageName string) []CVEInfo {
 	}
 
 	if len(cves) > 0 {
-		cves = enrichCVEsWithUbuntuData(cves)
+		cves = enrichCVEsWithUbuntuData(parent, cves)
 	}
 
 	return cves
 }
 
 // getInstalledPackageVersion returns the currently installed version of a package via dpkg-query.
-func getInstalledPackageVersion(packageName string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func getInstalledPackageVersion(parent context.Context, packageName string) string {
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "dpkg-query", "-W", "-f=${Version}", packageName).Output()
 	if err != nil {
@@ -652,8 +714,8 @@ func extractChangelogSinceVersion(changelog, installedVersion, _ string) string 
 
 // extractCVEsFromPolicy is a fallback when the changelog is unavailable.
 // It detects that a security update exists but cannot provide CVE-level detail.
-func extractCVEsFromPolicy(packageName string) []CVEInfo {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func extractCVEsFromPolicy(parent context.Context, packageName string) []CVEInfo {
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 
 	out, err := exec.CommandContext(ctx, "apt-cache", "policy", packageName).Output()
@@ -692,7 +754,10 @@ func extractCVEsFromPolicy(packageName string) []CVEInfo {
 	}
 
 	if len(cves) > 0 {
-		cves = enrichCVEsWithUbuntuData(cves)
+		// parent, not the local (already apt-cache-policy-scoped, near-expired)
+		// ctx above — CVE enrichment needs its own fresh sub-budget off the
+		// overall CollectAPT deadline, same as extractCVEsForPackage.
+		cves = enrichCVEsWithUbuntuData(parent, cves)
 	}
 
 	return cves

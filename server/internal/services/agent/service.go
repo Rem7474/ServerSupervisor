@@ -75,6 +75,7 @@ type Repository interface {
 	UpdateAuditLogStatus(ctx context.Context, id int64, status, details string) error
 	UpdateScheduledTaskStatus(ctx context.Context, id, status string) error
 	UpsertAptStatus(ctx context.Context, status *models.AptStatus) error
+	UpsertAptPendingPackages(ctx context.Context, status *models.AptStatus) error
 	UpsertResticStatus(ctx context.Context, hostID string, status *models.ResticStatus) error
 	GetRecentCommandsByHost(ctx context.Context, hostID string, limit int) ([]models.RemoteCommand, error)
 	GetMetricsHistory(ctx context.Context, hostID string, hours int) ([]models.SystemMetrics, error)
@@ -210,7 +211,12 @@ func (s *Service) ReportCommandResult(ctx context.Context, hostID string, result
 		_ = s.repo.TouchAptLastAction(ctx, cmd.HostID, cmd.Action)
 		if result.AptStatus != nil {
 			result.AptStatus.HostID = cmd.HostID
-			if err := s.repo.UpsertAptStatus(ctx, result.AptStatus); err != nil {
+			// Partial, not UpsertAptStatus: this is the fast, CVE-free package
+			// count bundled into the terminal command report (handler_apt.go's
+			// CollectAPTFast) — a full upsert here would wipe the real
+			// security_updates/cve_list back to 0/"[]" until the slower,
+			// out-of-band CVE-enriched refresh (UpdateAptStatus, below) lands.
+			if err := s.repo.UpsertAptPendingPackages(ctx, result.AptStatus); err != nil {
 				slog.ErrorContext(ctx, fmt.Sprintf("Failed to update APT status: %v", err))
 			}
 		}

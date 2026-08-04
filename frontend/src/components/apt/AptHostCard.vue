@@ -43,6 +43,17 @@
           />
           apt {{ activeCommand.action }} — {{ statusLabel(activeCommand.status) }}
         </span>
+        <span
+          v-else-if="enriching"
+          class="badge bg-secondary-lt text-secondary d-inline-flex align-items-center gap-1 flex-shrink-0"
+          title="La commande est terminée — l'agent recalcule les paquets/CVE en arrière-plan, ça peut prendre quelques minutes sur un hôte avec un gros historique"
+        >
+          <span
+            class="spinner-border spinner-border-sm"
+            role="status"
+          />
+          Actualisation des données…
+        </span>
         <button
           v-if="activeCommand"
           type="button"
@@ -340,6 +351,7 @@ const props = defineProps<{
   selected: boolean
   canRunApt: boolean
   cmdLoading: string | null | undefined
+  enriching?: boolean
 }>()
 
 defineEmits<{

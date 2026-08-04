@@ -100,6 +100,13 @@ type AptStatus struct {
 	SecurityUpdates int       `json:"security_updates" db:"security_updates"`
 	CVEList         string    `json:"cve_list" db:"cve_list"` // JSON array of CVEInfo
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
+	// CVEUpdatedAt is when security_updates/cve_list were last actually
+	// refreshed by the CVE-enriched pass — nil until the first one ever runs
+	// for this host. Distinct from UpdatedAt, which also bumps on the faster
+	// pending-packages-only path (UpsertAptPendingPackages) that never
+	// touches CVE data — lets a consumer tell "package count is fresh" apart
+	// from "CVE detail is fresh".
+	CVEUpdatedAt *time.Time `json:"cve_updated_at,omitempty" db:"cve_updated_at"`
 }
 
 // AptCVESummary aggregates CVE severity counts across all hosts.

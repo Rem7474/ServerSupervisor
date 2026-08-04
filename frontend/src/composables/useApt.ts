@@ -16,6 +16,8 @@ interface AptStatusView {
   pending_packages?: number
   security_updates?: number
   cve_list?: CveInfo[]
+  updated_at?: string
+  cve_updated_at?: string
   [key: string]: unknown
 }
 interface AptCommand {
@@ -59,6 +61,44 @@ export function useApt() {
   const aptStatuses = ref<Record<string, AptStatusView>>({})
   const aptHistories = ref<Record<string, AptCommand[]>>({})
   const hostCmdLoading = ref<Record<string, string | null>>({})
+
+  // ── Enrichissement CVE en arrière-plan (post-commande) ──────────────────────
+  // After an apt update/upgrade/dist-upgrade command completes, the agent still
+  // runs its CVE-enrichment refresh in the background before pushing a fresh
+  // apt_status (agent/internal/dispatcher/handler_apt.go's aptStatusRefreshTimeout,
+  // bounded to 5min) — without this, the UI goes silent between "command
+  // completed" and the CVE/security numbers actually updating, which reads as
+  // broken/stuck. Tracked per host, cleared as soon as a WS snapshot arrives
+  // with a newer apt_status.cve_updated_at than the one captured when the
+  // command completed, or after a safety timeout. cve_updated_at (not the
+  // general updated_at) is what's compared: updated_at also bumps from the
+  // separate, near-instant pending-packages-only refresh bundled into the
+  // command's own completion report (CollectAPTFast/UpsertAptPendingPackages,
+  // which never touches security_updates/cve_list) — comparing updated_at
+  // would clear this badge the moment *that* lands, seconds in, well before
+  // the CVE data this badge exists to cover has actually refreshed.
+  const ENRICHING_ACTIONS = new Set(['update', 'upgrade', 'dist-upgrade'])
+  const ENRICHING_SAFETY_TIMEOUT_MS = 5.5 * 60_000
+  const enrichingHosts = ref<Record<string, boolean>>({})
+  const enrichingSinceCveUpdatedAt: Record<string, string | undefined> = {}
+  const enrichingTimers: Record<string, ReturnType<typeof setTimeout>> = {}
+
+  function startEnriching(hostId: string): void {
+    enrichingSinceCveUpdatedAt[hostId] = aptStatuses.value[hostId]?.cve_updated_at
+    enrichingHosts.value = { ...enrichingHosts.value, [hostId]: true }
+    clearTimeout(enrichingTimers[hostId])
+    enrichingTimers[hostId] = setTimeout(() => stopEnriching(hostId), ENRICHING_SAFETY_TIMEOUT_MS)
+  }
+
+  function stopEnriching(hostId: string): void {
+    clearTimeout(enrichingTimers[hostId])
+    delete enrichingTimers[hostId]
+    if (!enrichingHosts.value[hostId]) return
+    const next = { ...enrichingHosts.value }
+    delete next[hostId]
+    enrichingHosts.value = next
+  }
+
   const auth = useAuthStore()
   const dialog = useConfirmDialog()
   const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
@@ -193,12 +233,16 @@ export function useApt() {
   function syncAptHistoryCommand(commandId: string, patch: CommandPatch): void {
     const hostId = liveCommand.value?.id === commandId ? liveCommand.value.hostId : null
     if (!hostId) return
+    const action = liveCommand.value?.action || patch.action
     upsertAptHistory(hostId, {
       id: commandId,
-      action: liveCommand.value?.action || patch.action,
+      action,
       output: liveCommand.value?.output || '',
       ...patch,
     })
+    if ((patch.status === 'completed' || patch.status === 'failed') && action && ENRICHING_ACTIONS.has(action)) {
+      startEnriching(hostId)
+    }
   }
 
   function connectStreamWebSocket(commandId: string): void {
@@ -356,10 +400,17 @@ export function useApt() {
     hosts.value = (payload.hosts || []) as Host[]
     aptStatuses.value = (payload.apt_statuses || {}) as unknown as Record<string, AptStatusView>
     aptHistories.value = (payload.apt_histories || {}) as unknown as Record<string, AptCommand[]>
+    for (const hostId of Object.keys(enrichingHosts.value)) {
+      const cveUpdatedAt = aptStatuses.value[hostId]?.cve_updated_at
+      if (cveUpdatedAt && cveUpdatedAt !== enrichingSinceCveUpdatedAt[hostId]) {
+        stopEnriching(hostId)
+      }
+    }
   }, { debounceMs: 750 })
 
   onUnmounted(() => {
     closeStream()
+    Object.values(enrichingTimers).forEach(clearTimeout)
   })
 
   return {
@@ -369,6 +420,7 @@ export function useApt() {
     aptStatuses,
     aptHistories,
     hostCmdLoading,
+    enrichingHosts,
     auth,
     canRunApt,
     selectAll,
