@@ -86,6 +86,21 @@ db:
 `extended-status: true` est recommandé pour que le status-file contienne le
 résultat de chaque exécution de profil.
 
+Optionnel : une section `groups` permet de regrouper plusieurs profils sous
+un nom unique, exécutés ensemble en une seule invocation :
+
+```yaml
+groups:
+  full-backup:
+    - files
+    - db
+```
+
+`resticprofile` résout un groupe exactement comme un profil quand on lui
+passe `--name <nom>` — l'agent découvre donc les deux (profils **et**
+groupes) et les propose séparément dans les sélecteurs de l'UI (backup manuel
+et tâche planifiée).
+
 ## 4. `run_backup.sh` — le script que l'agent exécute
 
 Créez `/home/user/restic-backups/run_backup.sh`, exécuté par l'agent avec le
@@ -140,7 +155,7 @@ restic_backup_idle_timeout_minutes: 20
 | `restic_conf_path` | Chemin de `resticconf` (secrets, jamais lus par le serveur) |
 | `restic_run_script_path` | Chemin de `run_backup.sh`, exécuté par l'action **Lancer un backup** |
 | `restic_status_file_path` | Chemin du status-file resticprofile — source privilégiée du monitoring passif |
-| `restic_profile_config_path` | Chemin de `resticprofile.yaml` — lu localement pour lister les noms de profils (`files`, `db`, …) et peupler les sélecteurs de profil dans l'UI (backup manuel + tâche planifiée). Seuls les noms sont transmis au serveur, jamais le contenu du fichier |
+| `restic_profile_config_path` | Chemin de `resticprofile.yaml` — lu localement pour lister les noms de profils (`files`, `db`, …) et de groupes (section `groups`) et peupler les sélecteurs de profil/groupe dans l'UI (backup manuel + tâche planifiée). Seuls les noms sont transmis au serveur, jamais le contenu du fichier |
 | `restic_enable_progress` | Active le parsing de la progression en direct pendant un backup manuel |
 | `restic_progress_fps` | Fréquence des événements de progression forcés (défaut `0.1`, un toutes les 10s) |
 | `restic_backup_idle_timeout_minutes` | Un backup manuel n'a pas de plafond de durée fixe ; il est coupé s'il reste silencieux (aucune ligne `--json`) plus longtemps que cette valeur (défaut 20 min) |
@@ -172,8 +187,9 @@ backup récurrent est une tâche planifiée comme une autre :
 
 1. Aller sur **Tâches planifiées**.
 2. Créer une tâche avec module `restic`, action `run_backup`.
-3. Cible (`target`) = nom du profil resticprofile (`files`, `db`, …) — laisser
-   vide pour le profil par défaut défini dans `run_backup.sh`.
+3. Cible (`target`) = nom du profil ou du groupe resticprofile (`files`, `db`,
+   `full-backup`, …) — laisser vide pour le profil par défaut défini dans
+   `run_backup.sh`.
 4. Choisir la fréquence (cron).
 
 ## 9. Dépannage

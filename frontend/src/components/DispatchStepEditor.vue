@@ -81,20 +81,37 @@
         </option>
       </select>
       <select
-        v-else-if="module === 'restic' && resticProfiles.length"
+        v-else-if="module === 'restic' && (resticProfiles.length || resticGroups.length)"
         v-model="target"
         class="form-select form-select-sm"
       >
         <option value="">
           Profil (défaut)
         </option>
-        <option
-          v-for="p in resticProfiles"
-          :key="p"
-          :value="p"
+        <optgroup
+          v-if="resticProfiles.length"
+          label="Profils"
         >
-          {{ p }}
-        </option>
+          <option
+            v-for="p in resticProfiles"
+            :key="p"
+            :value="p"
+          >
+            {{ p }}
+          </option>
+        </optgroup>
+        <optgroup
+          v-if="resticGroups.length"
+          label="Groupes"
+        >
+          <option
+            v-for="g in resticGroups"
+            :key="g"
+            :value="g"
+          >
+            {{ g }}
+          </option>
+        </optgroup>
       </select>
       <input
         v-else
@@ -181,11 +198,15 @@ watch([hostId, module], ([h, m]) => {
     .catch(() => { customTasks.value = [] })
 }, { immediate: true })
 
-// Restic profile target: mirrors the custom-task <select> above — the agent
-// reports the host's resticprofile.yaml profile names (GET
-// /hosts/:id/backup/profiles), restricting the field to those instead of a
-// blind free-text field.
+// Restic profile/group target: mirrors the custom-task <select> above — the
+// agent reports the host's resticprofile.yaml profile names (GET
+// /hosts/:id/backup/profiles) and "groups" section names (GET
+// /hosts/:id/backup/groups) — a group runs several profiles together and
+// resticprofile resolves it identically to a profile when passed to
+// run_backup.sh's --name argument, so both are offered as separate option
+// groups in the same <select> instead of a blind free-text field.
 const resticProfiles = ref<string[]>([])
+const resticGroups = ref<string[]>([])
 const loadedResticForHost = ref('')
 
 watch([hostId, module], ([h, m]) => {
@@ -194,5 +215,8 @@ watch([hostId, module], ([h, m]) => {
   apiClient.getBackupProfiles(h)
     .then((res) => { resticProfiles.value = res.data?.profiles || [] })
     .catch(() => { resticProfiles.value = [] })
+  apiClient.getBackupGroups(h)
+    .then((res) => { resticGroups.value = res.data?.groups || [] })
+    .catch(() => { resticGroups.value = [] })
 }, { immediate: true })
 </script>

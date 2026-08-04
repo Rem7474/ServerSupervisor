@@ -25,6 +25,8 @@ type fakeRepo struct {
 	stalled          []models.BackupRun
 	resticProfiles   string
 	resticProfileErr error
+	resticGroups     string
+	resticGroupErr   error
 }
 
 func (f *fakeRepo) CreateBackupRun(_ context.Context, r models.BackupRun) (*models.BackupRun, error) {
@@ -61,6 +63,9 @@ func (f *fakeRepo) ListStalledBackupRuns(context.Context, int) ([]models.BackupR
 }
 func (f *fakeRepo) GetHostResticProfiles(context.Context, string) (string, error) {
 	return f.resticProfiles, f.resticProfileErr
+}
+func (f *fakeRepo) GetHostResticGroups(context.Context, string) (string, error) {
+	return f.resticGroups, f.resticGroupErr
 }
 
 type fakeDispatcher struct {
@@ -147,6 +152,28 @@ func TestGetProfiles_NeverNilWhenUncached(t *testing.T) {
 	}
 	if got == nil {
 		t.Error("GetProfiles must return a non-nil slice")
+	}
+}
+
+func TestGetGroups_ParsesCachedJSON(t *testing.T) {
+	svc := NewService(&fakeRepo{resticGroups: `["full-backup"]`}, &fakeDispatcher{}, nil, nil, nil)
+	got, err := svc.GetGroups(context.Background(), "host-1")
+	if err != nil {
+		t.Fatalf("GetGroups: %v", err)
+	}
+	if len(got) != 1 || got[0] != "full-backup" {
+		t.Errorf("expected [full-backup], got %v", got)
+	}
+}
+
+func TestGetGroups_NeverNilWhenUncached(t *testing.T) {
+	svc := NewService(&fakeRepo{resticGroups: ""}, &fakeDispatcher{}, nil, nil, nil)
+	got, err := svc.GetGroups(context.Background(), "host-1")
+	if err != nil {
+		t.Fatalf("GetGroups: %v", err)
+	}
+	if got == nil {
+		t.Error("GetGroups must return a non-nil slice")
 	}
 }
 

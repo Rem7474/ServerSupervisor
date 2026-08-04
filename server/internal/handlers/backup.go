@@ -83,6 +83,17 @@ func (h *BackupHandler) GetProfiles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"profiles": profiles})
 }
 
+// GetGroups returns the resticprofile.yaml "groups" section group names last
+// reported by the host's agent, for the same pickers as GetProfiles.
+func (h *BackupHandler) GetGroups(c *gin.Context) {
+	groups, err := h.svc.GetGroups(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"groups": groups})
+}
+
 // RunBackup dispatches a manual backup for a host.
 func (h *BackupHandler) RunBackup(c *gin.Context) {
 	hostID := c.Param("id")
