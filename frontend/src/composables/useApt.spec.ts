@@ -50,11 +50,13 @@ function mountUseApt() {
   return { wrapper, api: api! }
 }
 
-function emitAptSnapshot(hostId: string, updatedAt: string | undefined) {
+function emitAptSnapshot(hostId: string, cveUpdatedAt: string | undefined, updatedAt?: string) {
   wsMessageHandler.current?.({
     type: 'apt',
     hosts: [HOST],
-    apt_statuses: updatedAt ? { [hostId]: { pending_packages: 3, updated_at: updatedAt } } : {},
+    apt_statuses: (cveUpdatedAt || updatedAt)
+      ? { [hostId]: { pending_packages: 3, updated_at: updatedAt, cve_updated_at: cveUpdatedAt } }
+      : {},
     apt_histories: {},
   })
 }
@@ -71,7 +73,7 @@ afterEach(() => {
 })
 
 describe('useApt — post-command CVE enrichment indicator', () => {
-  it('marks the host as enriching once an update/upgrade/dist-upgrade command completes, and clears it when a fresher apt_status arrives', () => {
+  it('marks the host as enriching once an update/upgrade/dist-upgrade command completes, and clears it when a fresher cve_updated_at arrives', () => {
     const { api } = mountUseApt()
     api.liveCommand.value = {
       id: 'cmd-1', hostId: 'h1', host_name: 'web-01', module: 'apt', action: 'update', target: '', status: 'running', output: '',
@@ -84,11 +86,26 @@ describe('useApt — post-command CVE enrichment indicator', () => {
     streamOptionsByCommand.get('cmd-1')?.onStatus?.({ status: 'completed', output: 'Reading package lists... Done' })
     expect(api.enrichingHosts.value.h1).toBe(true)
 
-    // A WS snapshot with the same (stale) updated_at must not clear it.
+    // A WS snapshot with the same (stale) cve_updated_at must not clear it.
     emitAptSnapshot('h1', undefined)
     expect(api.enrichingHosts.value.h1).toBe(true)
 
-    // A fresh snapshot (new updated_at) clears it.
+    // A fresh snapshot (new cve_updated_at) clears it.
+    emitAptSnapshot('h1', new Date().toISOString())
+    expect(api.enrichingHosts.value.h1).toBeUndefined()
+  })
+
+  it('does NOT clear the flag when only updated_at bumps (the fast, CVE-free pending-count refresh) — only cve_updated_at counts', () => {
+    const { api } = mountUseApt()
+    api.watchCommand({ id: 'cmd-4', action: 'update', status: 'running', output: '' }, HOST)
+    streamOptionsByCommand.get('cmd-4')?.onStatus?.({ status: 'completed' })
+    expect(api.enrichingHosts.value.h1).toBe(true)
+
+    // Fast pending-packages-only path lands: updated_at bumps, cve_updated_at doesn't.
+    emitAptSnapshot('h1', undefined, new Date().toISOString())
+    expect(api.enrichingHosts.value.h1).toBe(true)
+
+    // The slow CVE-enriched pass finally lands.
     emitAptSnapshot('h1', new Date().toISOString())
     expect(api.enrichingHosts.value.h1).toBeUndefined()
   })

@@ -12,9 +12,9 @@ import (
 // ========== APT Status ==========
 
 func (db *DB) UpsertAptStatus(ctx context.Context, status *models.AptStatus) error {
-	_, err := db.conn.ExecContext(ctx, 
-		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,CAST($7 AS JSONB),NOW())
+	_, err := db.conn.ExecContext(ctx,
+		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at, cve_updated_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,CAST($7 AS JSONB),NOW(),NOW())
 		 ON CONFLICT (host_id) DO UPDATE SET
 			last_update  = GREATEST(EXCLUDED.last_update,  COALESCE(apt_status.last_update,  EXCLUDED.last_update)),
 			last_upgrade = GREATEST(EXCLUDED.last_upgrade, COALESCE(apt_status.last_upgrade, EXCLUDED.last_upgrade)),
@@ -22,7 +22,8 @@ func (db *DB) UpsertAptStatus(ctx context.Context, status *models.AptStatus) err
 			package_list = EXCLUDED.package_list,
 			security_updates = EXCLUDED.security_updates,
 			cve_list = EXCLUDED.cve_list,
-			updated_at = NOW()`,
+			updated_at = NOW(),
+			cve_updated_at = NOW()`,
 		status.HostID, status.LastUpdate, status.LastUpgrade, status.PendingPackages, status.PackageList, status.SecurityUpdates, status.CVEList,
 	)
 	return err
@@ -51,12 +52,16 @@ func (db *DB) UpsertAptPendingPackages(ctx context.Context, status *models.AptSt
 
 func (db *DB) GetAptStatus(ctx context.Context, hostID string) (*models.AptStatus, error) {
 	var s models.AptStatus
-	err := db.conn.QueryRowContext(ctx, 
-		`SELECT id, host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at
+	var cveUpdatedAt sql.NullTime
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT id, host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at, cve_updated_at
 		 FROM apt_status WHERE host_id = $1`, hostID,
-	).Scan(&s.ID, &s.HostID, &s.LastUpdate, &s.LastUpgrade, &s.PendingPackages, &s.PackageList, &s.SecurityUpdates, &s.CVEList, &s.UpdatedAt)
+	).Scan(&s.ID, &s.HostID, &s.LastUpdate, &s.LastUpgrade, &s.PendingPackages, &s.PackageList, &s.SecurityUpdates, &s.CVEList, &s.UpdatedAt, &cveUpdatedAt)
 	if err != nil {
 		return nil, err
+	}
+	if cveUpdatedAt.Valid {
+		s.CVEUpdatedAt = &cveUpdatedAt.Time
 	}
 	return &s, nil
 }

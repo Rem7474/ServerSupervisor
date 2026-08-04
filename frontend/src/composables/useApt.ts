@@ -17,6 +17,7 @@ interface AptStatusView {
   security_updates?: number
   cve_list?: CveInfo[]
   updated_at?: string
+  cve_updated_at?: string
   [key: string]: unknown
 }
 interface AptCommand {
@@ -66,18 +67,24 @@ export function useApt() {
   // runs its CVE-enrichment refresh in the background before pushing a fresh
   // apt_status (agent/internal/dispatcher/handler_apt.go's aptStatusRefreshTimeout,
   // bounded to 5min) — without this, the UI goes silent between "command
-  // completed" and the pending-package/CVE numbers actually updating, which
-  // reads as broken/stuck. Tracked per host, cleared as soon as a WS snapshot
-  // arrives with a newer apt_status.updated_at than the one captured when the
-  // command completed, or after a safety timeout.
+  // completed" and the CVE/security numbers actually updating, which reads as
+  // broken/stuck. Tracked per host, cleared as soon as a WS snapshot arrives
+  // with a newer apt_status.cve_updated_at than the one captured when the
+  // command completed, or after a safety timeout. cve_updated_at (not the
+  // general updated_at) is what's compared: updated_at also bumps from the
+  // separate, near-instant pending-packages-only refresh bundled into the
+  // command's own completion report (CollectAPTFast/UpsertAptPendingPackages,
+  // which never touches security_updates/cve_list) — comparing updated_at
+  // would clear this badge the moment *that* lands, seconds in, well before
+  // the CVE data this badge exists to cover has actually refreshed.
   const ENRICHING_ACTIONS = new Set(['update', 'upgrade', 'dist-upgrade'])
   const ENRICHING_SAFETY_TIMEOUT_MS = 5.5 * 60_000
   const enrichingHosts = ref<Record<string, boolean>>({})
-  const enrichingSinceUpdatedAt: Record<string, string | undefined> = {}
+  const enrichingSinceCveUpdatedAt: Record<string, string | undefined> = {}
   const enrichingTimers: Record<string, ReturnType<typeof setTimeout>> = {}
 
   function startEnriching(hostId: string): void {
-    enrichingSinceUpdatedAt[hostId] = aptStatuses.value[hostId]?.updated_at
+    enrichingSinceCveUpdatedAt[hostId] = aptStatuses.value[hostId]?.cve_updated_at
     enrichingHosts.value = { ...enrichingHosts.value, [hostId]: true }
     clearTimeout(enrichingTimers[hostId])
     enrichingTimers[hostId] = setTimeout(() => stopEnriching(hostId), ENRICHING_SAFETY_TIMEOUT_MS)
@@ -394,8 +401,8 @@ export function useApt() {
     aptStatuses.value = (payload.apt_statuses || {}) as unknown as Record<string, AptStatusView>
     aptHistories.value = (payload.apt_histories || {}) as unknown as Record<string, AptCommand[]>
     for (const hostId of Object.keys(enrichingHosts.value)) {
-      const updatedAt = aptStatuses.value[hostId]?.updated_at
-      if (updatedAt && updatedAt !== enrichingSinceUpdatedAt[hostId]) {
+      const cveUpdatedAt = aptStatuses.value[hostId]?.cve_updated_at
+      if (cveUpdatedAt && cveUpdatedAt !== enrichingSinceCveUpdatedAt[hostId]) {
         stopEnriching(hostId)
       }
     }

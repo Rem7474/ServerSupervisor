@@ -517,6 +517,15 @@ export interface AptStatus {
   security_updates: number /* int */;
   cve_list: string; // JSON array of CVEInfo
   updated_at: string;
+  /**
+   * CVEUpdatedAt is when security_updates/cve_list were last actually
+   * refreshed by the CVE-enriched pass — nil until the first one ever runs
+   * for this host. Distinct from UpdatedAt, which also bumps on the faster
+   * pending-packages-only path (UpsertAptPendingPackages) that never
+   * touches CVE data — lets a consumer tell "package count is fresh" apart
+   * from "CVE detail is fresh".
+   */
+  cve_updated_at?: string;
 }
 /**
  * AptCVESummary aggregates CVE severity counts across all hosts.
