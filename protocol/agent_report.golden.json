@@ -222,5 +222,8 @@
   "restic_profiles": [
     "contract"
   ],
+  "restic_groups": [
+    "contract"
+  ],
   "timestamp": "2024-01-02T03:04:05Z"
 }

@@ -30,7 +30,7 @@ const TARGET_LABELS: Record<string, string> = {
   systemd: 'Service systemd',
   custom: 'ID de tâche custom',
   apt: 'Paquet (optionnel pour install/remove)',
-  restic: 'Profil resticprofile (optionnel)',
+  restic: 'Profil ou groupe resticprofile (optionnel)',
 }
 
 const TARGET_PLACEHOLDERS: Record<string, string> = {

@@ -1282,6 +1282,7 @@ export interface AgentReport {
   tasks_config_yaml?: string;
   restic?: ResticStatus;
   restic_profiles?: string[];
+  restic_groups?: string[];
   timestamp: string;
 }
 

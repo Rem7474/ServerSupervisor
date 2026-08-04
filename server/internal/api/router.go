@@ -535,6 +535,7 @@ func registerBackupRoutes(g *gin.RouterGroup, h *handlers.BackupHandler) {
 	g.GET("/hosts/:id/backup", h.GetStatus)
 	g.GET("/hosts/:id/backup/runs", h.ListRuns)
 	g.GET("/hosts/:id/backup/profiles", h.GetProfiles)
+	g.GET("/hosts/:id/backup/groups", h.GetGroups)
 	g.GET("/backup/runs/:runId", h.GetRun)
 	g.POST("/hosts/:id/backup/run", h.RunBackup)
 }

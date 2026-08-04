@@ -238,6 +238,39 @@ func ListResticProfiles(path string) ([]string, error) {
 	return profiles, nil
 }
 
+// ListResticGroups reads resticprofile.yaml's top-level "groups" section and
+// returns the group names defined there, sorted. A group bundles several
+// profiles to run together and is resolved by resticprofile itself when
+// passed to `resticprofile --name <group>` — from run_backup.sh's point of
+// view a group name and a profile name are interchangeable, so this is a
+// second, separate discovery pass rather than a variant of
+// ListResticProfiles: unlike a profile, a group is a *value* nested one level
+// under the reserved "groups" key, not a top-level key itself.
+func ListResticGroups(path string) ([]string, error) {
+	if path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Groups map[string]any `yaml:"groups"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	groups := make([]string, 0, len(doc.Groups))
+	for key := range doc.Groups {
+		groups = append(groups, key)
+	}
+	sort.Strings(groups)
+	return groups, nil
+}
+
 // RunResticBackupWithProgress runs the configured run_backup.sh script for the
 // given resticprofile profile (empty = script default), streaming progress to
 // chunkCB. Uses an idle-timeout watchdog (via runCommandWithStreaming, shared
