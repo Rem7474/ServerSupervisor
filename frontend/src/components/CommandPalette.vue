@@ -29,12 +29,10 @@
           <kbd class="command-palette-esc">Échap</kbd>
         </div>
         <div class="command-palette-results">
-          <div
+          <EmptyState
             v-if="!results.length"
-            class="text-center text-secondary py-4 small"
-          >
-            {{ query.trim() ? 'Aucun résultat.' : 'Commencez à taper pour rechercher.' }}
-          </div>
+            :title="query.trim() ? 'Aucun résultat.' : 'Commencez à taper pour rechercher.'"
+          />
           <div
             v-for="group in groupedResults"
             v-else
@@ -94,6 +92,7 @@ import { IconSearch } from '@tabler/icons-vue'
 import { useCommandPalette, type PaletteResult } from '../composables/useCommandPalette'
 import { useModalChrome } from '../composables/useModalChrome'
 import { highlightParts } from '../utils/highlightMatch'
+import EmptyState from './EmptyState.vue'
 
 const { query, activeIndex, results, isOpen, close, selectResult } = useCommandPalette()
 

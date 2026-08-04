@@ -33,12 +33,10 @@
       variant="list"
     />
 
-    <div
+    <EmptyState
       v-else-if="filteredEvents.length === 0"
-      class="text-center text-muted py-4"
-    >
-      Aucun événement.
-    </div>
+      title="Aucun événement."
+    />
 
     <div
       v-else
@@ -117,6 +115,7 @@ import type { HostTimelineEvent } from '../../types/audit'
 import RelativeTime from '../RelativeTime.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 
 const props = defineProps<{ hostId: string }>()

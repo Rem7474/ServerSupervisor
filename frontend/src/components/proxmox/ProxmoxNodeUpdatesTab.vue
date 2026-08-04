@@ -20,26 +20,13 @@
       >{{ aptRefreshMsg }}</span>
     </div>
 
-    <div
+    <EmptyState
       v-if="pendingUpdates === 0"
-      class="text-center text-muted py-3"
-    >
-      <div class="mb-1">
-        Aucune mise à jour en attente détectée.
-      </div>
-      <div
-        v-if="lastUpdateCheckAt"
-        class="small"
-      >
-        Dernière vérification : {{ formatDate(lastUpdateCheckAt) }}
-      </div>
-      <div
-        v-else
-        class="small"
-      >
-        Données non encore disponibles (prochain cycle de polling).
-      </div>
-    </div>
+      title="Aucune mise à jour en attente détectée."
+      :subtitle="lastUpdateCheckAt
+        ? `Dernière vérification : ${formatDate(lastUpdateCheckAt)}`
+        : 'Données non encore disponibles (prochain cycle de polling).'"
+    />
     <div v-else>
       <div class="d-flex align-items-center gap-3 mb-3">
         <div class="h2 mb-0">
@@ -66,6 +53,8 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from '../EmptyState.vue'
+
 defineProps<{
   pendingUpdates?: number
   lastUpdateCheckAt?: string | null

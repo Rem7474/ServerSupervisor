@@ -308,7 +308,7 @@
                     <router-link
                       v-if="isNeverConnectedHost(host)"
                       :to="`/hosts/${host.id}`"
-                      class="badge bg-warning-lt text-warning text-decoration-none"
+                      class="badge bg-warning-lt text-warning text-decoration-none badge-link"
                       title="Hôte enregistré, mais l'agent ne s'est jamais connecté — ouvrez la fiche hôte pour régénérer la clé et récupérer la commande d'installation."
                     >
                       Installation en attente
@@ -316,7 +316,7 @@
                     <router-link
                       v-if="proxmoxGuestPath(host.id)"
                       :to="proxmoxGuestPath(host.id)"
-                      class="badge bg-orange-lt text-orange text-decoration-none"
+                      class="badge bg-orange-lt text-orange text-decoration-none badge-link"
                     >
                       Stats Proxmox
                     </router-link>
@@ -827,6 +827,12 @@ onBeforeUnmount(() => {
 
 .empty-state-icon {
   opacity: 0.35;
+}
+
+/* text-decoration-none on these badge-as-link removes the only native hover
+   hint a link has; restore it on hover instead of leaving zero feedback. */
+.badge-link:hover {
+  text-decoration: underline;
 }
 
 .last-activity-col {

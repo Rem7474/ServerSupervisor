@@ -5,6 +5,35 @@
 **Périmètre** : 28 vues (`frontend/src/views/`) + ~107 composants (`frontend/src/components/**`) — couverture exhaustive de tout le frontend.
 **Contexte** : suite de [UIUX-AUDIT-2026.md](UIUX-AUDIT-2026.md) (31 juillet 2026). Cette vague fait le point après la fusion des pages de notifications (Centre + Historique) et l'introduction d'un outillage anti-dérive automatique (voir plus bas) — et étend l'audit à tout le reste de l'application, qui n'avait pas été repassé au crible depuis.
 
+## Mise à jour (état des lieux, 4 août 2026)
+
+**Les 8 sections ci-dessous (§1 à §8) sont corrigées.** Vérifié par relecture directe du code actuel (pas seulement des messages de commit) — un échantillon représentatif de chaque section a été recontrôlé ligne par ligne : `DashboardKPIs.vue`, `CVEBadge.vue`/`CVEList.vue`, `ProxmoxNodeSecurityTab.vue`, `ProxmoxClusterCard.vue`, `ProxmoxNodeDisksTab.vue`, `NetworkNodeDetail.vue`, `useHostDetail.ts`/`useDomainDetails.ts`/`useBot.ts` (§7), `ProxmoxView.vue` (§8), les 4 fichiers `table-hover` du §5. Tous confirmés conformes au référentiel de `frontend/CLAUDE.md`. `npm run typecheck`/`lint`/`lint:css`/`test` passent (0 erreur, 121/121 tests).
+
+| Section | Commit | Statut |
+|---|---|---|
+| Boutons (`btn-xs`/`btn-outline-light`/`btn-outline-orange`) | `5a4a8cd` (lint ESLint/stylelint, cf. section ci-dessous) | ✅ Enforced en CI |
+| §7 — Confirmations manquantes | `96158ca` | ✅ Corrigé |
+| §8 — Couleurs de hover (ProxmoxView) | `96158ca` | ✅ Corrigé |
+| §1 — Couleurs sémantiques, tranche 1 (statusClasses, DashboardKPIs, CVE) | `0559eea` | ✅ Corrigé |
+| §1 — Couleurs sémantiques, tranche 2 (Proxmox, Host, Sécurité, Settings/Webhooks) | `b12a58a` | ✅ Corrigé |
+| §1 — Couleurs sémantiques, tranche 3 (vues restantes, Docker/réseau/monitoring, composables) | `7e5343c` | ✅ Corrigé |
+| §1 — Pastilles de statut hôte (`status-lime` ≠ vert de succès) | `b2725c6` | ✅ Corrigé |
+| §2/§3 — États vides/chargement ad-hoc → `EmptyState`/`LoadingSkeleton` | `e45b4c0` | ✅ Corrigé |
+| §4/§5/§6 — Rôles de bouton, `table-hover`, tailles d'icône | `56eb0e3` | ✅ Corrigé |
+
+**4 écarts résiduels trouvés pendant cette relecture** (hors périmètre des deux vagues d'audit précédentes — jamais signalés, donc jamais corrigés) — **tous corrigés le 4 août 2026** :
+
+| Fichier | Constat |
+|---|---|
+| `components/host/HostTimelineTab.vue:38` | ✅ État vide ad-hoc (`text-center text-muted py-4`, "Aucun événement.") → `<EmptyState>`. |
+| `components/proxmox/GuestExposureCard.vue:23` | ✅ Idem ("Aucune adresse IP détectée pour ce guest…") → `<EmptyState>`. |
+| `components/proxmox/ProxmoxNodeUpdatesTab.vue:25` | ✅ Idem ("Aucune mise à jour en attente détectée.") → `<EmptyState>` (+ `subtitle` pour la ligne "Dernière vérification"). |
+| `components/CommandPalette.vue:34` | ✅ Placeholder de recherche ad-hoc → `<EmptyState>`, aligné sur `NotificationBell.vue`. |
+
+Et l'item §8 résiduel ci-dessous — **corrigé** : `views/DashboardView.vue` — ajout d'une classe `badge-link` + règle `:hover { text-decoration: underline; }` sur les deux badges `<router-link>` "Installation en attente"/"Stats Proxmox".
+
+`npm run typecheck`/`lint`/`test` repassés après ces 5 correctifs : toujours 0 erreur, 121/121 tests.
+
 ## Ce qui est désormais mécaniquement enforced (ne PAS re-corriger, c'est déjà bloquant en CI)
 
 Deux catégories de la vague précédente sont maintenant vérifiées automatiquement, pas seulement documentées :
@@ -210,10 +239,12 @@ Le bug corrigé cette session (barre de recherche du navbar, `App.vue` — texte
 
 ---
 
-## Priorisation suggérée
+## Priorisation suggérée *(close — tout est traité, y compris les écarts résiduels trouvés lors de la mise à jour du 4 août 2026, voir en tête de document)*
 
-1. **§7 (confirmations manquantes)** — 5 corrections ciblées, chacune un ajout de `useConfirmDialog()` dans un composable existant. Risque quasi nul, gain réel.
-2. **§8 (hover ProxmoxView)** — 1 règle CSS à ajouter, même ampleur que le correctif déjà fait sur `App.vue`.
-3. **§1 (couleurs sémantiques)** — le plus gros volume, mais mécanique une fois qu'un petit nombre de mappings (running/success, offline/danger, pending/warning, catégoriel/secondary) sont extraits en fonctions/utilitaires partagés par domaine (à l'image de `notificationBadges.ts` fait pour les notifications) plutôt que corrigés fichier par fichier. Prioriser `DashboardKPIs.vue` (8 occurrences, écran d'accueil) et la paire `CVEBadge.vue`/`CVEList.vue` (logique dupliquée à fusionner en un seul utilitaire) en premier.
-4. **§2/§3 (empty/loading ad-hoc)** — remplacement mécanique, faible risque, gain de cohérence large pour un faible coût (comme noté dans la vague 1).
-5. **§4/§5/§6** — cosmétique, à traiter au fil de l'eau plutôt qu'en chantier dédié.
+1. ~~**§7 (confirmations manquantes)**~~ — ✅ `96158ca`.
+2. ~~**§8 (hover ProxmoxView)**~~ — ✅ `96158ca`. Le second item §8 *(confiance moindre)* — les badges `<router-link>` "Installation en attente"/"Stats Proxmox" de `DashboardView.vue:309-320` — ✅ corrigé le 4 août 2026 (classe `badge-link` + `text-decoration: underline` au survol).
+3. ~~**§1 (couleurs sémantiques)**~~ — ✅ `0559eea` + `b12a58a` + `7e5343c` + `b2725c6`.
+4. ~~**§2/§3 (empty/loading ad-hoc)**~~ — ✅ `e45b4c0`. 4 écarts résiduels trouvés le 4 août 2026 — ✅ corrigés le même jour (`HostTimelineTab.vue`, `GuestExposureCard.vue`, `ProxmoxNodeUpdatesTab.vue`, `CommandPalette.vue`).
+5. ~~**§4/§5/§6**~~ — ✅ `56eb0e3`.
+
+Plus aucun écart connu à date sur cet audit.
