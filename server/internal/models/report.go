@@ -16,6 +16,17 @@ type AgentCapabilities struct {
 	Restic  bool `json:"restic"`   // Restic backup collector enabled
 }
 
+// DiagnosticIssue mirrors agent/internal/collector.DiagnosticIssue — one
+// config-vs-reality mismatch found by the agent's CheckConfig (e.g.
+// collect_restic: true with a resticconf path that doesn't exist). Severity
+// is "error" (the collector will produce zero data) or "warning" (partially
+// degraded).
+type DiagnosticIssue struct {
+	Collector string `json:"collector"`
+	Severity  string `json:"severity"`
+	Message   string `json:"message"`
+}
+
 // ResticStatus mirrors agent/internal/collector.ResticStatus — the periodic,
 // passive snapshot of Restic's state. Never contains resticconf content or
 // resolved credential values.
@@ -40,6 +51,7 @@ type AgentReport struct {
 	HostID             string                    `json:"host_id"`
 	AgentVersion       string                    `json:"agent_version"`
 	Capabilities       *AgentCapabilities        `json:"capabilities,omitempty"` // Which collectors are enabled on this agent
+	Diagnostics        []DiagnosticIssue         `json:"diagnostics"`            // Config-vs-reality mismatches found by the agent — always sent (even empty) so a fixed issue clears server-side
 	Metrics            *SystemMetrics            `json:"metrics,omitempty"`
 	Docker             *DockerReport             `json:"docker,omitempty"`
 	UnattendedUpgrades *UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`

@@ -87,6 +87,8 @@
       @reconnect="reconnect"
     />
 
+    <HostDiagnosticsBanner :diagnostics="hostDiagnostics" />
+
     <LoadingSkeleton
       v-if="!host"
       :lines="6"
@@ -754,8 +756,10 @@ import WsStatusBar from '../components/WsStatusBar.vue'
 import HostAptTab from '../components/host/HostAptTab.vue'
 import HostBackupTab from '../components/host/HostBackupTab.vue'
 import HostCommandsTab from '../components/host/HostCommandsTab.vue'
+import HostDiagnosticsBanner from '../components/host/HostDiagnosticsBanner.vue'
 import EntityTabShell from '../components/EntityTabShell.vue'
 import type { EntityTab } from '../components/EntityTabShell.vue'
+import type { DiagnosticIssue } from '../types/host'
 import HostDockerTab from '../components/host/HostDockerTab.vue'
 import HostEditForm from '../components/host/HostEditForm.vue'
 import HostExposureTab from '../components/host/HostExposureTab.vue'
@@ -863,6 +867,10 @@ const exposureDomainCount = ref(0)
 // Narrows the "Tâches planifiées" tab's module picker to what this host's
 // agent actually reports collecting (see HostTasksTab's `collectors` prop).
 const hostCollectors = computed(() => host.value?.collectors as Record<string, boolean> | undefined)
+
+// The agent's own last self-check of its config against reality (e.g.
+// collect_restic: true but resticconf missing) — see HostDiagnosticsBanner.
+const hostDiagnostics = computed(() => host.value?.diagnostics as DiagnosticIssue[] | undefined)
 
 const hostAlertsLink = computed(() => ({
   path: '/alerts',

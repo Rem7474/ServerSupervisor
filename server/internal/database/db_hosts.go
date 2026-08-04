@@ -46,6 +46,20 @@ func parseCollectors(raw string) map[string]bool {
 	return collectors
 }
 
+func parseDiagnostics(raw string) []models.DiagnosticIssue {
+	if raw == "" {
+		return []models.DiagnosticIssue{}
+	}
+	var issues []models.DiagnosticIssue
+	if err := json.Unmarshal([]byte(raw), &issues); err != nil {
+		return []models.DiagnosticIssue{}
+	}
+	if issues == nil {
+		issues = []models.DiagnosticIssue{}
+	}
+	return issues
+}
+
 func (db *DB) RegisterHost(ctx context.Context, host *models.Host) error {
 	lastSeen := host.LastSeen
 	if lastSeen.IsZero() {
@@ -62,16 +76,17 @@ func (db *DB) RegisterHost(ctx context.Context, host *models.Host) error {
 
 func (db *DB) GetHost(ctx context.Context, id string) (*models.Host, error) {
 	var h models.Host
-	var tagsJSON, collectorsJSON string
+	var tagsJSON, collectorsJSON, diagnosticsJSON string
 	err := db.conn.QueryRowContext(ctx,
-		`SELECT id, name, hostname, ip_address, os, agent_version, api_key, tags, status, last_seen, created_at, updated_at, collectors::text
+		`SELECT id, name, hostname, ip_address, os, agent_version, api_key, tags, status, last_seen, created_at, updated_at, collectors::text, diagnostics::text
 		 FROM hosts WHERE id = $1`, id,
-	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt, &collectorsJSON)
+	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt, &collectorsJSON, &diagnosticsJSON)
 	if err != nil {
 		return nil, err
 	}
 	h.Tags = parseTags(tagsJSON)
 	h.Collectors = parseCollectors(collectorsJSON)
+	h.Diagnostics = parseDiagnostics(diagnosticsJSON)
 	return &h, nil
 }
 
@@ -103,7 +118,7 @@ func (db *DB) GetHostByAPIKey(ctx context.Context, apiKey string) (*models.Host,
 
 func (db *DB) GetAllHosts(ctx context.Context) ([]models.Host, error) {
 	rows, err := db.conn.QueryContext(ctx,
-		`SELECT id, name, hostname, ip_address, os, agent_version, tags, status, last_seen, created_at, updated_at, collectors::text
+		`SELECT id, name, hostname, ip_address, os, agent_version, tags, status, last_seen, created_at, updated_at, collectors::text, diagnostics::text
 		 FROM hosts ORDER BY name`,
 	)
 	if err != nil {
@@ -114,12 +129,13 @@ func (db *DB) GetAllHosts(ctx context.Context) ([]models.Host, error) {
 	var hosts []models.Host
 	for rows.Next() {
 		var h models.Host
-		var tagsJSON, collectorsJSON string
-		if err := rows.Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt, &collectorsJSON); err != nil {
+		var tagsJSON, collectorsJSON, diagnosticsJSON string
+		if err := rows.Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt, &collectorsJSON, &diagnosticsJSON); err != nil {
 			return nil, err
 		}
 		h.Tags = parseTags(tagsJSON)
 		h.Collectors = parseCollectors(collectorsJSON)
+		h.Diagnostics = parseDiagnostics(diagnosticsJSON)
 		hosts = append(hosts, h)
 	}
 	return hosts, nil
@@ -267,6 +283,16 @@ func (db *DB) UpdateHostCollectors(ctx context.Context, hostID, collectorsJSON s
 	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET collectors = $1::jsonb, updated_at = NOW() WHERE id = $2`,
 		collectorsJSON, hostID)
+	return err
+}
+
+// UpdateHostDiagnostics stores the agent's latest self-check of its own
+// config against reality (see models.DiagnosticIssue). diagnosticsJSON must
+// be a valid JSON array (possibly empty: `[]`).
+func (db *DB) UpdateHostDiagnostics(ctx context.Context, hostID, diagnosticsJSON string) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE hosts SET diagnostics = $1::jsonb WHERE id = $2`,
+		diagnosticsJSON, hostID)
 	return err
 }
 
