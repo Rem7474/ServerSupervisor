@@ -64,35 +64,45 @@
       class="col-md-3"
     >
       <label class="form-label form-label-sm">{{ targetInfo.label }}</label>
-      <input
+      <select
+        v-if="module === 'custom' && customTasks.length"
         v-model="target"
-        type="text"
-        class="form-control form-control-sm"
-        :placeholder="targetInfo.placeholder"
-        :list="module === 'custom' || module === 'restic' ? listId : undefined"
+        class="form-select form-select-sm"
       >
-      <datalist
-        v-if="module === 'custom'"
-        :id="listId"
-      >
+        <option value="">
+          Sélectionner une tâche...
+        </option>
         <option
           v-for="t in customTasks"
           :key="t.id"
           :value="t.id"
         >
-          {{ t.name }}
+          {{ t.name }} ({{ t.id }})
         </option>
-      </datalist>
-      <datalist
-        v-else-if="module === 'restic'"
-        :id="listId"
+      </select>
+      <select
+        v-else-if="module === 'restic' && resticProfiles.length"
+        v-model="target"
+        class="form-select form-select-sm"
       >
+        <option value="">
+          Profil (défaut)
+        </option>
         <option
           v-for="p in resticProfiles"
           :key="p"
           :value="p"
-        />
-      </datalist>
+        >
+          {{ p }}
+        </option>
+      </select>
+      <input
+        v-else
+        v-model="target"
+        type="text"
+        class="form-control form-control-sm"
+        :placeholder="targetInfo.placeholder"
+      >
     </div>
     <div
       v-if="showCron"
@@ -140,7 +150,6 @@ const target = defineModel<string>('target', { required: true })
 const cronExpression = defineModel<string>('cronExpression', { default: '' })
 
 const hostsStore = useHostsStore()
-const listId = `dispatch-step-custom-tasks-${crypto.randomUUID()}`
 
 const actionOptions = computed(() => props.actionsForModule(module.value))
 const targetInfo = computed(() => props.targetConfig(module.value))
@@ -156,9 +165,11 @@ async function onModuleChange(): Promise<void> {
   action.value = actionOptions.value[0]?.value || ''
 }
 
-// Custom-task target autocomplete: the agent already reports each host's
-// tasks.yaml-defined tasks (GET /hosts/:id/custom-tasks), previously wired
-// up nowhere in the UI — a plain <input> with no hint of valid task IDs.
+// Custom-task target: the agent already reports each host's tasks.yaml-defined
+// tasks (GET /hosts/:id/custom-tasks) — restrict the field to a <select> of
+// exactly what the agent discovered rather than a blind free-text field, only
+// falling back to text if nothing has been reported yet (host unreachable, or
+// tasks.yaml empty).
 const customTasks = ref<CustomTaskSummary[]>([])
 const loadedForHost = ref('')
 
@@ -170,10 +181,10 @@ watch([hostId, module], ([h, m]) => {
     .catch(() => { customTasks.value = [] })
 }, { immediate: true })
 
-// Restic profile target autocomplete: mirrors the custom-task datalist
-// above — the agent reports the host's resticprofile.yaml profile names
-// (GET /hosts/:id/backup/profiles), suggested here instead of a blind
-// free-text field.
+// Restic profile target: mirrors the custom-task <select> above — the agent
+// reports the host's resticprofile.yaml profile names (GET
+// /hosts/:id/backup/profiles), restricting the field to those instead of a
+// blind free-text field.
 const resticProfiles = ref<string[]>([])
 const loadedResticForHost = ref('')
 

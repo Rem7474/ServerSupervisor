@@ -10,26 +10,33 @@
           class="badge"
           :class="statusBadge.badgeClass"
         >{{ statusBadge.label }}</span>
+        <select
+          v-if="canRun && resticProfiles.length"
+          v-model="runProfile"
+          class="form-select form-select-sm"
+          style="width: 160px"
+          :disabled="backupLoading === 'run' || liveStatus === 'running'"
+        >
+          <option value="">
+            Profil (défaut)
+          </option>
+          <option
+            v-for="p in resticProfiles"
+            :key="p"
+            :value="p"
+          >
+            {{ p }}
+          </option>
+        </select>
         <input
-          v-if="canRun"
+          v-else-if="canRun"
           v-model="runProfile"
           type="text"
           class="form-control form-control-sm"
           style="width: 160px"
           placeholder="Profil (défaut)"
-          list="host-backup-profile-list"
           :disabled="backupLoading === 'run' || liveStatus === 'running'"
         >
-        <datalist
-          v-if="canRun"
-          id="host-backup-profile-list"
-        >
-          <option
-            v-for="p in resticProfiles"
-            :key="p"
-            :value="p"
-          />
-        </datalist>
         <button
           v-if="canRun"
           type="button"
