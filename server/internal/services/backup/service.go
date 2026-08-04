@@ -38,6 +38,7 @@ type Repository interface {
 	GetResticStatus(ctx context.Context, hostID string) (*models.ResticStatus, error)
 	ListStalledBackupRuns(ctx context.Context, olderThanMinutes int) ([]models.BackupRun, error)
 	GetHostResticProfiles(ctx context.Context, hostID string) (string, error)
+	GetHostResticGroups(ctx context.Context, hostID string) (string, error)
 }
 
 // Dispatcher is the agent-command port. *dispatch.Dispatcher satisfies it.
@@ -150,6 +151,26 @@ func (s *Service) GetProfiles(ctx context.Context, hostID string) ([]string, err
 		profiles = []string{}
 	}
 	return profiles, nil
+}
+
+// GetGroups returns the resticprofile.yaml "groups" section group names last
+// reported by the host's agent (never nil, empty slice when none reported
+// yet). A group is resolved by resticprofile the same way as a profile when
+// passed to run_backup.sh as --name, so it's exposed as a second, parallel
+// pickable list rather than merged into GetProfiles's result.
+func (s *Service) GetGroups(ctx context.Context, hostID string) ([]string, error) {
+	raw, err := s.repo.GetHostResticGroups(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+	groups := []string{}
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &groups) // best-effort; empty on malformed cache
+	}
+	if groups == nil {
+		groups = []string{}
+	}
+	return groups, nil
 }
 
 // GetRun returns a single backup run by id, or apperr.NotFound.

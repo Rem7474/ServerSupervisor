@@ -83,6 +83,7 @@ func (f *fakeRepo) InsertDiskHealth(context.Context, []models.DiskHealth) error 
 func (f *fakeRepo) UpdateHostCustomTasks(context.Context, string, string) error           { return nil }
 func (f *fakeRepo) UpdateHostTasksConfigYAML(context.Context, string, string) error       { return nil }
 func (f *fakeRepo) UpdateHostResticProfiles(context.Context, string, string) error        { return nil }
+func (f *fakeRepo) UpdateHostResticGroups(context.Context, string, string) error          { return nil }
 func (f *fakeRepo) UpdateHostCollectors(context.Context, string, string) error            { return nil }
 func (f *fakeRepo) UpdateHostWebLogs(context.Context, string, *models.WebLogReport) error { return nil }
 func (f *fakeRepo) InsertWebLogSnapshot(context.Context, string, *models.WebLogReport) error {

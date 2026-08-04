@@ -8,4 +8,6 @@ export const backupApi = {
     api.post(`/v1/hosts/${hostId}/backup/run`, { profile }),
   getBackupProfiles: (hostId: string) =>
     api.get<{ profiles: string[] }>(`/v1/hosts/${hostId}/backup/profiles`),
+  getBackupGroups: (hostId: string) =>
+    api.get<{ groups: string[] }>(`/v1/hosts/${hostId}/backup/groups`),
 }

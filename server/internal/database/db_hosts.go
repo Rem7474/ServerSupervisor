@@ -177,6 +177,25 @@ func (db *DB) GetHostResticProfiles(ctx context.Context, hostID string) (string,
 	return profiles, err
 }
 
+// UpdateHostResticGroups stores the list of resticprofile.yaml "groups"
+// section group names reported by the agent for a host. groupsJSON must be a
+// valid JSON array of strings (e.g. `["full-backup"]`).
+func (db *DB) UpdateHostResticGroups(ctx context.Context, hostID, groupsJSON string) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE hosts SET restic_groups = $1::jsonb WHERE id = $2`,
+		groupsJSON, hostID)
+	return err
+}
+
+// GetHostResticGroups returns the cached restic group list for a host as a
+// JSON array string.
+func (db *DB) GetHostResticGroups(ctx context.Context, hostID string) (string, error) {
+	var groups string
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT restic_groups::text FROM hosts WHERE id = $1`, hostID).Scan(&groups)
+	return groups, err
+}
+
 func (db *DB) UpdateHostStatus(ctx context.Context, id, status string) error {
 	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET status = $1, last_seen = NOW(), updated_at = NOW() WHERE id = $2`,

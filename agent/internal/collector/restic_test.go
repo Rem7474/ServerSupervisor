@@ -128,6 +128,88 @@ func TestListResticProfiles_MissingFile(t *testing.T) {
 	}
 }
 
+func TestListResticGroups_Nominal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "resticprofile.yaml")
+	content := `version: "1"
+
+global:
+  status-file: /home/user/restic-backups/backup-status.json
+
+groups:
+  full-backup:
+    - files
+    - db
+  files-only:
+    - files
+
+files:
+  backup:
+    source:
+      - /home/user/data
+
+db:
+  backup:
+    source:
+      - /home/user/restic-backups/mydb.sql
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	groups, err := ListResticGroups(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"files-only", "full-backup"}
+	if len(groups) != len(want) || groups[0] != want[0] || groups[1] != want[1] {
+		t.Errorf("expected groups %v (sorted), got %v", want, groups)
+	}
+}
+
+func TestListResticGroups_NoGroupsSection(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "resticprofile.yaml")
+	content := `version: "1"
+
+files:
+  backup:
+    source:
+      - /home/user/data
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	groups, err := ListResticGroups(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(groups) != 0 {
+		t.Errorf("expected no groups, got %v", groups)
+	}
+}
+
+func TestListResticGroups_Unconfigured(t *testing.T) {
+	groups, err := ListResticGroups("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if groups != nil {
+		t.Errorf("expected nil groups when path is unconfigured, got %v", groups)
+	}
+}
+
+func TestListResticGroups_MissingFile(t *testing.T) {
+	groups, err := ListResticGroups("/nonexistent/resticprofile.yaml")
+	if err != nil {
+		t.Fatalf("expected a missing file to be tolerated, got error: %v", err)
+	}
+	if groups != nil {
+		t.Errorf("expected nil groups for a missing file, got %v", groups)
+	}
+}
+
 func TestParseResticProgressLine_Status(t *testing.T) {
 	line := `{"message_type":"status","percent_done":0.5,"total_files":100,"files_done":50,"total_bytes":2000,"bytes_done":1000,"seconds_elapsed":10,"seconds_remaining":10}`
 	var summary ResticBackupSummary

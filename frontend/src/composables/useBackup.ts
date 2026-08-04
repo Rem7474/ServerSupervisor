@@ -51,6 +51,7 @@ export function useBackup(hostId: string) {
   const backupStatus = ref<BackupStatus | null>(null)
   const backupRuns = ref<BackupRun[]>([])
   const resticProfiles = ref<string[]>([])
+  const resticGroups = ref<string[]>([])
   const backupLoading = ref('')
   const backupError = ref('')
 
@@ -62,14 +63,16 @@ export function useBackup(hostId: string) {
 
   async function loadBackupData(): Promise<void> {
     try {
-      const [statusRes, runsRes, profilesRes] = await Promise.all([
+      const [statusRes, runsRes, profilesRes, groupsRes] = await Promise.all([
         apiClient.getBackupStatus(hostId),
         apiClient.getBackupRuns(hostId),
         apiClient.getBackupProfiles(hostId),
+        apiClient.getBackupGroups(hostId),
       ])
       backupStatus.value = statusRes.data || null
       backupRuns.value = runsRes.data?.runs || []
       resticProfiles.value = profilesRes.data?.profiles || []
+      resticGroups.value = groupsRes.data?.groups || []
     } catch {
       // non-critical — the tab still renders with empty state
     }
@@ -146,6 +149,7 @@ export function useBackup(hostId: string) {
     backupStatus,
     backupRuns,
     resticProfiles,
+    resticGroups,
     backupLoading,
     backupError,
     liveStatus,

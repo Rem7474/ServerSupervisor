@@ -61,6 +61,7 @@ type Report struct {
 	TasksConfigYAML    string                              `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
 	Restic             *collector.ResticStatus             `json:"restic,omitempty"`
 	ResticProfiles     []string                            `json:"restic_profiles,omitempty"` // Profile names from resticprofile.yaml
+	ResticGroups       []string                            `json:"restic_groups,omitempty"`   // Group names from resticprofile.yaml's "groups" section
 	Timestamp          time.Time                           `json:"timestamp"`
 }
 

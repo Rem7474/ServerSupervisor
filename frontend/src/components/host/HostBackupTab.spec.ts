@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
-const { getBackupStatus, getBackupRuns, getBackupProfiles, runBackup, openCommandStream, closeStream, getLastStreamOptions } = vi.hoisted(() => {
+const { getBackupStatus, getBackupRuns, getBackupProfiles, getBackupGroups, runBackup, openCommandStream, closeStream, getLastStreamOptions } = vi.hoisted(() => {
   let lastStreamOptions: {
     onChunk?: (p: { chunk: string }) => void
     onStatus?: (p: { status: string }) => void
@@ -10,6 +10,7 @@ const { getBackupStatus, getBackupRuns, getBackupProfiles, runBackup, openComman
     getBackupStatus: vi.fn(),
     getBackupRuns: vi.fn(),
     getBackupProfiles: vi.fn(),
+    getBackupGroups: vi.fn(),
     runBackup: vi.fn(),
     closeStream: vi.fn(),
     openCommandStream: vi.fn((_commandId: string, options: typeof lastStreamOptions) => {
@@ -20,7 +21,7 @@ const { getBackupStatus, getBackupRuns, getBackupProfiles, runBackup, openComman
 })
 
 vi.mock('../../api', () => ({
-  default: { getBackupStatus, getBackupRuns, getBackupProfiles, runBackup },
+  default: { getBackupStatus, getBackupRuns, getBackupProfiles, getBackupGroups, runBackup },
   getApiErrorMessage: (e: unknown) => String(e),
 }))
 
@@ -36,11 +37,13 @@ function mockEmptyBackend() {
   getBackupStatus.mockResolvedValue({ data: {} })
   getBackupRuns.mockResolvedValue({ data: { runs: [] } })
   getBackupProfiles.mockResolvedValue({ data: { profiles: [] } })
+  getBackupGroups.mockResolvedValue({ data: { groups: [] } })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   getBackupProfiles.mockResolvedValue({ data: { profiles: [] } })
+  getBackupGroups.mockResolvedValue({ data: { groups: [] } })
 })
 
 describe('HostBackupTab', () => {
@@ -138,5 +141,27 @@ describe('HostBackupTab', () => {
     await flushPromises()
     wrapper.unmount()
     expect(closeStream).toHaveBeenCalled()
+  })
+
+  it('offers discovered profiles and groups as a select, grouped, and runs a chosen group', async () => {
+    mockEmptyBackend()
+    getBackupProfiles.mockResolvedValue({ data: { profiles: ['files', 'db'] } })
+    getBackupGroups.mockResolvedValue({ data: { groups: ['full-backup'] } })
+    runBackup.mockResolvedValue({ data: { command_id: 'cmd-1' } })
+
+    const wrapper = mount(HostBackupTab, { props: { hostId: 'h1', canRun: true } })
+    await flushPromises()
+
+    const select = wrapper.find('select')
+    expect(select.exists()).toBe(true)
+    const optgroups = select.findAll('optgroup')
+    expect(optgroups.map((g) => g.attributes('label'))).toEqual(['Profils', 'Groupes'])
+
+    await select.setValue('full-backup')
+    const runButton = wrapper.findAll('button').find((b) => b.text().includes('Lancer un backup'))
+    await runButton!.trigger('click')
+    await flushPromises()
+
+    expect(runBackup).toHaveBeenCalledWith('h1', 'full-backup')
   })
 })

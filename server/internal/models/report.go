@@ -52,5 +52,6 @@ type AgentReport struct {
 	TasksConfigYAML    string                    `json:"tasks_config_yaml,omitempty"`
 	Restic             *ResticStatus             `json:"restic,omitempty"`
 	ResticProfiles     []string                  `json:"restic_profiles,omitempty"`
+	ResticGroups       []string                  `json:"restic_groups,omitempty"`
 	Timestamp          time.Time                 `json:"timestamp"`
 }

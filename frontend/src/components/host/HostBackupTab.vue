@@ -11,7 +11,7 @@
           :class="statusBadge.badgeClass"
         >{{ statusBadge.label }}</span>
         <select
-          v-if="canRun && resticProfiles.length"
+          v-if="canRun && (resticProfiles.length || resticGroups.length)"
           v-model="runProfile"
           class="form-select form-select-sm"
           style="width: 160px"
@@ -20,13 +20,30 @@
           <option value="">
             Profil (défaut)
           </option>
-          <option
-            v-for="p in resticProfiles"
-            :key="p"
-            :value="p"
+          <optgroup
+            v-if="resticProfiles.length"
+            label="Profils"
           >
-            {{ p }}
-          </option>
+            <option
+              v-for="p in resticProfiles"
+              :key="p"
+              :value="p"
+            >
+              {{ p }}
+            </option>
+          </optgroup>
+          <optgroup
+            v-if="resticGroups.length"
+            label="Groupes"
+          >
+            <option
+              v-for="g in resticGroups"
+              :key="g"
+              :value="g"
+            >
+              {{ g }}
+            </option>
+          </optgroup>
         </select>
         <input
           v-else-if="canRun"
@@ -264,6 +281,7 @@ const {
   backupStatus,
   backupRuns,
   resticProfiles,
+  resticGroups,
   backupLoading,
   liveStatus,
   liveProgress,
