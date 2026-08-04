@@ -427,6 +427,27 @@ select:-webkit-autofill:focus {
   background: var(--tblr-bg-surface);
 }
 
+/* ── Buttons ── */
+
+/* Tabler's own --tblr-secondary (#6b7280, a mid gray) isn't dark-theme-aware
+   — it resolves to the exact same value in light and dark mode, unlike
+   --tblr-bg-surface-secondary (which the app already relies on for
+   .clickable-row:hover below). .btn-outline-secondary/.btn-outline.btn-
+   secondary use --tblr-secondary for their own --tblr-btn-hover-bg/--tblr-
+   btn-active-bg, so every outline-secondary button — the app's standard
+   "Secondary action" per frontend/CLAUDE.md — filled with a washed-out
+   mid-gray on hover/active against this dark-only app's near-black
+   surfaces. Overriding just these two component-scoped variables (not the
+   global --tblr-secondary, which text-secondary/border-secondary/badges
+   also depend on) swaps the fill for the same dark surface token
+   .clickable-row already uses, without touching anything else that reads
+   --tblr-secondary. */
+.btn-outline-secondary,
+.btn-outline.btn-secondary {
+  --tblr-btn-hover-bg: var(--tblr-bg-surface-secondary);
+  --tblr-btn-active-bg: var(--tblr-bg-surface-secondary);
+}
+
 /* Shared "this whole row opens a detail view" affordance — one hover/focus
    color used everywhere a full row (or a full-width row-shaped button, e.g.
    Traffic's "Top IPs suspectes" list) is clickable, so the interaction reads
