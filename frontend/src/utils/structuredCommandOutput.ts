@@ -9,16 +9,28 @@
 // to know the details of any one module.
 import type { HostProcess } from '../composables/useHostProcesses'
 import type { SystemdService } from '../components/host/SystemdTable.vue'
+import type { ResticBackupSummary } from '../components/host/ResticBackupSummaryCard.vue'
 
 export type StructuredOutput =
   | { kind: 'processes'; data: HostProcess[] }
   | { kind: 'systemd'; data: SystemdService[] }
+  | { kind: 'restic_backup_summary'; data: ResticBackupSummary }
 
 function parseJSONArray<T>(raw: string): T[] | null {
   try {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return null
     return parsed as T[]
+  } catch {
+    return null
+  }
+}
+
+function parseJSONObject<T>(raw: string): T | null {
+  try {
+    const parsed = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null
+    return parsed as T
   } catch {
     return null
   }
@@ -42,6 +54,11 @@ export function resolveStructuredOutput(
   if (module === 'systemd' && action === 'list') {
     const data = parseJSONArray<SystemdService>(raw)
     return data ? { kind: 'systemd', data } : null
+  }
+
+  if (module === 'restic' && action === 'run_backup') {
+    const data = parseJSONObject<ResticBackupSummary>(raw)
+    return data ? { kind: 'restic_backup_summary', data } : null
   }
 
   return null
