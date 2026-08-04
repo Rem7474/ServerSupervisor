@@ -28,6 +28,26 @@ describe('CommandLogPanel', () => {
     expect(wrapper.find('pre.console-output').exists()).toBe(false)
   })
 
+  it('renders the systemd table (read-only, no action buttons) for a completed module=systemd/action=list command', () => {
+    const wrapper = mount(CommandLogPanel, {
+      props: {
+        show: true,
+        command: {
+          ...baseCommand,
+          module: 'systemd',
+          action: 'list',
+          output: JSON.stringify([
+            { name: 'nginx.service', active_state: 'active', sub_state: 'running', description: 'web server' },
+          ]),
+        },
+      },
+    })
+    expect(wrapper.find('table').exists()).toBe(true)
+    expect(wrapper.text()).toContain('nginx.service')
+    expect(wrapper.text()).not.toContain('Actions')
+    expect(wrapper.find('pre.console-output').exists()).toBe(false)
+  })
+
   it('falls back to raw output for a non-processes module', () => {
     const wrapper = mount(CommandLogPanel, {
       props: {
