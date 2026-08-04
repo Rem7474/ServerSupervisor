@@ -138,6 +138,48 @@ describe('HostBackupTab', () => {
     expect(runButton).toBeFalsy()
   })
 
+  it('resumes watching an already-running backup on mount (e.g. after leaving and reopening the tab)', async () => {
+    mockEmptyBackend()
+    getBackupStatus.mockResolvedValue({
+      data: {
+        latest_run: {
+          id: 'run-1', host_id: 'h1', status: 'running', profile: 'files',
+          command_id: 'cmd-resume', started_at: new Date().toISOString(),
+        },
+      },
+    })
+
+    const wrapper = mount(HostBackupTab, { props: { hostId: 'h1', canRun: true } })
+    await flushPromises()
+
+    // No click on "Lancer un backup" — the component itself must notice the
+    // run in progress and reopen the stream.
+    expect(openCommandStream).toHaveBeenCalledWith('cmd-resume', expect.anything())
+    expect(wrapper.text()).toContain('Backup en cours')
+
+    getLastStreamOptions()?.onStatus?.({ status: 'completed' })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Backup terminé')
+  })
+
+  it('does not resume-subscribe when the latest run is not running', async () => {
+    mockEmptyBackend()
+    getBackupStatus.mockResolvedValue({
+      data: {
+        latest_run: {
+          id: 'run-1', host_id: 'h1', status: 'ok', profile: 'files',
+          command_id: 'cmd-done', started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
+        },
+      },
+    })
+
+    const wrapper = mount(HostBackupTab, { props: { hostId: 'h1', canRun: true } })
+    await flushPromises()
+
+    expect(openCommandStream).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Backup en cours')
+  })
+
   it('unmounts cleanly and stops watching the live stream', async () => {
     mockEmptyBackend()
     const wrapper = mount(HostBackupTab, { props: { hostId: 'h1', canRun: true } })
