@@ -5,10 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/sender"
 )
+
+// aptStatusRefreshTimeout bounds the post-command CollectAPT(true) call below —
+// on a fresh host with a large backlog, its per-package security/CVE lookups
+// (agent/internal/collector/apt.go) are sequential subprocess + network calls
+// that could otherwise run for tens of minutes.
+const aptStatusRefreshTimeout = 5 * time.Minute
 
 func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.PendingCommand) {
 	stream := func(chunk string) { streamChunk(ctx, s, cmd.ID, chunk) }
@@ -81,16 +88,32 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 
 	// After every apt mutation we resnapshot the package list + CVEs so the server can
 	// refresh its tile immediately — without waiting for the next periodic report.
-	slog.Debug("collecting apt status with CVE extraction", "action", cmd.Action)
-	apt, aptErr := collector.CollectAPT(true)
-	if aptErr != nil {
-		slog.Warn("failed to collect apt status", "action", cmd.Action, "err", aptErr)
-		return
-	}
-	slog.Debug("apt status collected", "packages", apt.PendingPackages, "security", apt.SecurityUpdates)
-	if err := s.SendAptStatus(ctx, apt); err != nil {
-		slog.Warn("failed to push apt status", "action", cmd.Action, "err", err)
-	}
+	// This runs detached in its own goroutine, *after* handleApt has already
+	// returned the command as completed: CollectAPT(true)'s security/CVE lookups
+	// (apt-cache/apt-get changelog/Ubuntu CVE API, one round-trip per pending
+	// package) are read-only w.r.t. dpkg and don't need aptMu at all, but until
+	// this was detached they ran synchronously *inside* the aptMu-locked call —
+	// so a second apt command would sit stuck "pending" for however long CVE
+	// enrichment took (minutes, on a fresh host with a large backlog), even
+	// though the first command had already finished. ctx (execute()'s bounded
+	// per-command context) is cancelled the instant handleApt returns, so this
+	// goroutine gets its own independent, bounded context instead.
+	go func() {
+		slog.Debug("collecting apt status with CVE extraction", "action", cmd.Action)
+		collectCtx, cancel := context.WithTimeout(context.Background(), aptStatusRefreshTimeout)
+		apt, aptErr := collector.CollectAPT(collectCtx, true)
+		cancel()
+		if aptErr != nil {
+			slog.Warn("failed to collect apt status", "action", cmd.Action, "err", aptErr)
+			return
+		}
+		slog.Debug("apt status collected", "packages", apt.PendingPackages, "security", apt.SecurityUpdates)
+		sendCtx, sendCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer sendCancel()
+		if err := s.SendAptStatus(sendCtx, apt); err != nil {
+			slog.Warn("failed to push apt status", "action", cmd.Action, "err", err)
+		}
+	}()
 }
 
 func finaliseUUResult(err error, output string) (string, string) {
