@@ -75,7 +75,7 @@
                 <div class="text-secondary small">
                   4xx
                 </div>
-                <div class="h3 mb-0 text-yellow">
+                <div class="h3 mb-0 text-warning">
                   {{ details.status_4xx || 0 }}
                 </div>
               </button>
@@ -91,7 +91,7 @@
                 <div class="text-secondary small">
                   5xx
                 </div>
-                <div class="h3 mb-0 text-red">
+                <div class="h3 mb-0 text-danger">
                   {{ details.status_5xx || 0 }}
                 </div>
               </button>
@@ -107,12 +107,10 @@
                   </h4>
                 </div>
                 <div class="card-body p-0">
-                  <div
+                  <EmptyState
                     v-if="!(details.top_paths || []).length"
-                    class="text-center py-3 text-secondary small"
-                  >
-                    Aucun chemin
-                  </div>
+                    title="Aucun chemin"
+                  />
                   <div
                     v-for="p in details.top_paths"
                     v-else
@@ -143,12 +141,10 @@
                   </h4>
                 </div>
                 <div class="card-body p-0">
-                  <div
+                  <EmptyState
                     v-if="!(details.top_clients || []).length"
-                    class="text-center py-3 text-secondary small"
-                  >
-                    Aucune IP
-                  </div>
+                    title="Aucune IP"
+                  />
                   <div
                     v-for="c in details.top_clients"
                     v-else
@@ -166,7 +162,7 @@
                       {{ c.ip }}
                       <span
                         v-if="c.blocked"
-                        class="badge bg-red-lt text-red ms-1"
+                        class="badge bg-danger-lt text-danger ms-1"
                       >Bloquée</span>
                     </span>
                     <span class="d-flex align-items-center gap-1 flex-shrink-0">
@@ -413,12 +409,12 @@
                       >{{ r.status }}</span>
                       <span
                         v-if="r.blocked"
-                        class="badge bg-red-lt text-red ms-1"
+                        class="badge bg-danger-lt text-danger ms-1"
                         title="Bloquée"
                       >B</span>
                       <span
                         v-if="r.suspicious"
-                        class="badge bg-yellow-lt text-yellow ms-1"
+                        class="badge bg-warning-lt text-warning ms-1"
                         title="Suspecte"
                       >S</span>
                     </td>
@@ -538,9 +534,9 @@ function formatDate(v: string): string {
 }
 
 function statusClass(status: number): string {
-  if (status >= 200 && status < 300) return 'bg-green-lt text-green'
-  if (status >= 300 && status < 400) return 'bg-yellow-lt text-yellow'
-  if (status >= 400) return 'bg-red-lt text-red'
+  if (status >= 200 && status < 300) return 'bg-success-lt text-success'
+  if (status >= 300 && status < 400) return 'bg-warning-lt text-warning'
+  if (status >= 400) return 'bg-danger-lt text-danger'
   return 'bg-secondary-lt text-secondary'
 }
 </script>

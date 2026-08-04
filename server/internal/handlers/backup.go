@@ -72,6 +72,17 @@ func (h *BackupHandler) GetRun(c *gin.Context) {
 	c.JSON(http.StatusOK, run)
 }
 
+// GetProfiles returns the resticprofile.yaml profile names last reported by
+// the host's agent, for the backup/scheduled-task profile pickers.
+func (h *BackupHandler) GetProfiles(c *gin.Context) {
+	profiles, err := h.svc.GetProfiles(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"profiles": profiles})
+}
+
 // RunBackup dispatches a manual backup for a host.
 func (h *BackupHandler) RunBackup(c *gin.Context) {
 	hostID := c.Param("id")

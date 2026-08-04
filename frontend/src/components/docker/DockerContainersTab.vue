@@ -79,7 +79,8 @@
   >
     <div
       v-if="trackerFeedback"
-      class="alert alert-info m-3 mb-0 py-2"
+      class="alert m-3 mb-0 py-2"
+      :class="trackerFeedbackIsError ? 'alert-danger' : 'alert-success'"
       role="status"
     >
       {{ trackerFeedback }}
@@ -196,11 +197,11 @@
                 <template v-if="containerVersion(c)">
                   <span
                     v-if="containerVersion(c)?.is_up_to_date"
-                    class="badge bg-green-lt text-green"
+                    class="badge bg-success-lt text-success"
                   >À jour</span>
                   <span
                     v-else-if="containerVersion(c)?.running_version || containerVersion(c)?.update_confirmed"
-                    class="badge bg-yellow-lt text-yellow"
+                    class="badge bg-warning-lt text-warning"
                     :title="`Dernière version : ${containerVersion(c)?.latest_version}`"
                   >Mise à jour disponible</span>
                   <span
@@ -342,7 +343,7 @@
                   v-if="containerVersion(c)?.tracker_id"
                   type="button"
                   :disabled="isTrackerRunDisabled(containerVersion(c))"
-                  class="btn btn-icon btn-sm btn-ghost-primary"
+                  class="btn btn-icon btn-sm btn-ghost-success"
                   :title="trackerRunTooltip(containerVersion(c))"
                   aria-label="Déclencher le tracker"
                   @click="runTracker(containerVersion(c), c)"
@@ -862,6 +863,7 @@ useModalChrome(containerModalRef, () => !!selectedContainer.value, { onClose: ()
 useModalChrome(inspectModalRef, () => !!inspectTarget.value, { onClose: () => { inspectTarget.value = null } })
 const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')
+const trackerFeedbackIsError = ref(false)
 
 function toggleSort(key: keyof Container): void {
   if (sortBy.value === key) {
@@ -935,13 +937,13 @@ function stateRank(state: string | undefined): number {
 
 function stateClass(state: string | undefined): string {
   const map: Record<string, string> = {
-    running:    'badge bg-green-lt text-green',
-    restarting: 'badge bg-yellow-lt text-yellow',
-    paused:     'badge bg-yellow-lt text-yellow',
-    created:    'badge bg-blue-lt text-blue',
+    running:    'badge bg-success-lt text-success',
+    restarting: 'badge bg-warning-lt text-warning',
+    paused:     'badge bg-warning-lt text-warning',
+    created:    'badge bg-primary-lt text-primary',
     exited:     'badge bg-secondary-lt text-secondary',
-    dead:       'badge bg-red-lt text-red',
-    removing:   'badge bg-orange-lt text-orange',
+    dead:       'badge bg-danger-lt text-danger',
+    removing:   'badge bg-warning-lt text-warning',
   }
   return map[state || ''] || 'badge bg-secondary-lt text-secondary'
 }
@@ -985,11 +987,13 @@ async function runTracker(vc: VersionComparison | null | undefined, container?: 
   const id = vc.tracker_id!
   trackerRunLoading.value = { ...trackerRunLoading.value, [id]: true }
   trackerFeedback.value = ''
+  trackerFeedbackIsError.value = false
   try {
     await apiClient.runReleaseTracker(id)
     trackerFeedback.value = `Déclenchement lancé pour ${container?.image || 'le tracker'}.`
   } catch (e: unknown) {
     trackerFeedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
+    trackerFeedbackIsError.value = true
   } finally {
     const next = { ...trackerRunLoading.value }
     delete next[id]

@@ -60,6 +60,7 @@ type Report struct {
 	CustomTasks        []config.TaskSummary                `json:"custom_tasks,omitempty"`      // Available custom tasks from tasks.yaml
 	TasksConfigYAML    string                              `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
 	Restic             *collector.ResticStatus             `json:"restic,omitempty"`
+	ResticProfiles     []string                            `json:"restic_profiles,omitempty"` // Profile names from resticprofile.yaml
 	Timestamp          time.Time                           `json:"timestamp"`
 }
 

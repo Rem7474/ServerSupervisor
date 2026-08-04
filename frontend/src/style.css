@@ -115,7 +115,7 @@ body {
    * blues / oranges that were drifting across components. */
   --ss-status-online:  #2fb344;  /* aligned to --tblr-green */
   --ss-status-offline: #d63939;  /* aligned to --tblr-red */
-  --ss-status-warning: #fb923c;  /* aligned to --tblr-orange */
+  --ss-status-warning: #f59f00;  /* aligned to --tblr-warning — was orange, contradicting the "don't use orange for warning" rule */
 
   /* "Done/success" accents (used by alert step chips & similar) */
   --ss-success-border: #4fb37f;

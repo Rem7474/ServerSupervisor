@@ -215,7 +215,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-icon btn-sm btn-outline-danger ms-auto"
+                  class="btn btn-icon btn-sm btn-ghost-danger ms-auto"
                   @click="confirmDeleteWebhook(webhook)"
                 >
                   <IconTrash :size="14" />
@@ -388,7 +388,7 @@
                       class="text-muted"
                       style="min-width:60px"
                     >Dernière</span>
-                    <span class="badge bg-green-lt text-green">{{ tracker.last_release_tag }}</span>
+                    <span class="badge bg-success-lt text-success">{{ tracker.last_release_tag }}</span>
                   </div>
                   <div class="d-flex gap-2 mb-1">
                     <span
@@ -414,7 +414,7 @@
                     class="mb-2"
                   >
                     <span
-                      class="badge bg-yellow-lt text-yellow"
+                      class="badge bg-warning-lt text-warning"
                       :title="`Déploiement prévu: ${cooldownEtaLabel(tracker)}`"
                     >Cooldown actif · reste {{ cooldownRemainingLabel(tracker) }}</span>
                   </div>
@@ -430,12 +430,12 @@
                     <span class="text-muted">Dernière vérif : {{ formatRelative(tracker.last_checked_at) }}</span>
                     <span
                       v-if="tracker.last_error"
-                      class="ms-1 badge bg-red-lt text-red"
+                      class="ms-1 badge bg-danger-lt text-danger"
                       :title="(tracker.last_error as string)"
                     >erreur</span>
                     <span
                       v-else-if="!tracker.last_release_tag && tracker.tracker_type !== 'docker'"
-                      class="ms-1 badge bg-yellow-lt text-yellow"
+                      class="ms-1 badge bg-warning-lt text-warning"
                     >aucune release trouvée</span>
                   </template>
                   <template v-else>
@@ -459,7 +459,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-icon btn-sm btn-outline-info"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Verifier maintenant"
                   @click="checkNow(tracker)"
                 >
@@ -475,7 +475,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-icon btn-sm btn-outline-danger ms-auto"
+                  class="btn btn-icon btn-sm btn-ghost-danger ms-auto"
                   @click="confirmDeleteTracker(tracker)"
                 >
                   <IconTrash :size="14" />

@@ -97,7 +97,7 @@
                 <span class="fw-bold">{{ rule.name || 'Sans nom' }}</span>
                 <span
                   v-if="(rule.active_incident_count ?? 0) > 0"
-                  class="badge bg-red-lt text-red"
+                  class="badge bg-danger-lt text-danger"
                   :title="`${rule.active_incident_count} incident${(rule.active_incident_count ?? 0) > 1 ? 's' : ''} actif${(rule.active_incident_count ?? 0) > 1 ? 's' : ''}`"
                 >{{ rule.active_incident_count }} actif{{ (rule.active_incident_count ?? 0) > 1 ? 's' : '' }}</span>
               </div>
@@ -184,10 +184,11 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Modifier"
+                  aria-label="Modifier la règle"
                   @click="$emit('edit', rule)"
                 >
                   <IconPencil
-                    :size="20"
+                    :size="14"
                     class="icon"
                   />
                 </button>
@@ -195,10 +196,11 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Supprimer"
+                  aria-label="Supprimer la règle"
                   @click="$emit('delete', rule)"
                 >
                   <IconTrash
-                    :size="20"
+                    :size="14"
                     class="icon"
                   />
                 </button>

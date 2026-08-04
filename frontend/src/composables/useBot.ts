@@ -5,6 +5,7 @@ import { addToast } from './useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
 import { useDomainDetails } from './useDomainDetails'
+import { useConfirmDialog } from './useConfirmDialog'
 import type { WebLogIPTimelineRow } from '../types/security'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
@@ -17,6 +18,7 @@ export function useBot() {
   // uses, applied to this page's filter bar instead of a tab.
   const route = useRoute()
   const router = useRouter()
+  const dialog = useConfirmDialog()
 
   const period = ref(typeof route.query.period === 'string' ? route.query.period : '24h')
   const periodOptions = [
@@ -102,10 +104,10 @@ export function useBot() {
 
   function levelClass(level: string): string {
     switch (level) {
-      case 'CRITICAL': return 'bg-red-lt text-red'
-      case 'HIGH': return 'bg-orange-lt text-orange'
-      case 'MEDIUM': return 'bg-yellow-lt text-yellow'
-      default: return 'bg-azure-lt text-azure'
+      case 'CRITICAL': return 'bg-danger-lt text-danger'
+      case 'HIGH': return 'bg-warning-lt text-warning'
+      case 'MEDIUM': return 'bg-primary-lt text-primary'
+      default: return 'bg-secondary-lt text-secondary'
     }
   }
 
@@ -126,16 +128,16 @@ export function useBot() {
     const t = type.toLowerCase()
     let baseClass = 'bg-secondary-lt text-secondary'
     switch (t) {
-      case 'ban': baseClass = 'bg-red-lt text-red'; break
-      case 'captcha': baseClass = 'bg-yellow-lt text-yellow'; break
-      case 'audit': baseClass = 'bg-azure-lt text-azure'; break
+      case 'ban': baseClass = 'bg-danger-lt text-danger'; break
+      case 'captcha': baseClass = 'bg-warning-lt text-warning'; break
+      case 'audit': baseClass = 'bg-primary-lt text-primary'; break
     }
 
-    // Si blockedUntil est fourni et valide, c'est un blocage temporaire → orange
+    // Si blockedUntil est fourni et valide, c'est un blocage temporaire (moins définitif qu'un ban)
     if (blockedUntil) {
       const d = new Date(blockedUntil)
       if (!Number.isNaN(d.getTime()) && d > new Date()) {
-        return 'bg-orange-lt text-orange'  // blocage temporaire en orange
+        return 'bg-warning-lt text-warning'
       }
     }
 
@@ -293,6 +295,14 @@ export function useBot() {
       addToast('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte', 'error')
       return
     }
+
+    const confirmed = await dialog.confirm({
+      title: `Débloquer l'IP ${ip}`,
+      message: `Cette IP ne sera plus bannie par CrowdSec sur cet hôte.`,
+      variant: 'danger',
+    })
+    if (!confirmed) return
+
     rowState.value = { ...rowState.value, [ip]: 'loading' }
     try {
       const res = await apiClient.unblockCrowdSecIP(ip, targetHost)

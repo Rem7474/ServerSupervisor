@@ -386,7 +386,7 @@
               <div class="card-header d-flex align-items-center justify-content-between">
                 <h3 class="card-title mb-0">
                   <IconAlertTriangle
-                    :size="18"
+                    :size="24"
                     class="icon me-1"
                   />
                   Alertes actives sur cet hôte
@@ -406,9 +406,9 @@
               </div>
               <div
                 v-else-if="!hostActiveIncidents.length"
-                class="card-body text-center text-secondary py-4"
+                class="card-body"
               >
-                Aucune alerte active sur cet hôte.
+                <EmptyState title="Aucune alerte active sur cet hôte." />
               </div>
               <div
                 v-else
@@ -422,7 +422,7 @@
                 >
                   <span
                     class="badge"
-                    :class="item.severity === 'crit' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow'"
+                    :class="item.severity === 'crit' ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'"
                   >{{ item.severity }}</span>
                   <span class="flex-grow-1">{{ item.rule_name || item.metric }}</span>
                   <RelativeTime :date="item.triggered_at || ''" />
@@ -547,6 +547,7 @@
               :host-id="hostId"
               :can-run-apt="canRunApt"
               :active="activeTab === 'planifiees'"
+              :collectors="hostCollectors"
               @open-command="openCommand"
               @tasks-count="tasksCount = $event"
               @history-changed="loadCmdHistoryRefresh"
@@ -571,18 +572,17 @@
                   />
                   Permissions par hôte
                 </h3>
-                <span class="badge badge-sm bg-red text-white">Admin only</span>
+                <span class="badge badge-sm bg-danger text-white">Admin only</span>
               </div>
               <div class="card-body p-0">
                 <div v-if="permLoading">
                   <LoadingSkeleton variant="table" />
                 </div>
-                <div
+                <EmptyState
                   v-else-if="!hostPerms.length"
-                  class="text-center py-3 text-muted small"
-                >
-                  Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
-                </div>
+                  title="Aucune restriction"
+                  subtitle="Tous les utilisateurs accèdent à cet hôte selon leur rôle global."
+                />
                 <table
                   v-else
                   class="table table-vcenter mb-0"
@@ -764,6 +764,7 @@ import HostTasksTab from '../components/host/HostTasksTab.vue'
 import HostTimelineTab from '../components/host/HostTimelineTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import EmptyState from '../components/EmptyState.vue'
 import BadgePill from '../components/common/BadgePill.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 
@@ -859,6 +860,10 @@ const exposureDomainCount = ref(0)
 // Incidents' `host_name` is `hosts.name` (see db_notifications.go), so this
 // pre-fills AlertIncidentList's search box to this host instead of landing on
 // the undifferentiated full incidents list.
+// Narrows the "Tâches planifiées" tab's module picker to what this host's
+// agent actually reports collecting (see HostTasksTab's `collectors` prop).
+const hostCollectors = computed(() => host.value?.collectors as Record<string, boolean> | undefined)
+
 const hostAlertsLink = computed(() => ({
   path: '/alerts',
   query: { tab: 'incidents', host: host.value?.name || host.value?.hostname || '' },
@@ -873,7 +878,7 @@ const hostTabs = computed<EntityTab[]>(() => {
       key: 'overview',
       label: "Vue d'ensemble",
       badges: hostActiveIncidents.value.length
-        ? [{ value: hostActiveIncidents.value.length, badgeClass: 'badge bg-red-lt text-red ms-1' }]
+        ? [{ value: hostActiveIncidents.value.length, badgeClass: 'badge bg-danger-lt text-danger ms-1' }]
         : [],
     },
     { key: 'metrics', label: 'Métriques' },
@@ -886,9 +891,9 @@ const hostTabs = computed<EntityTab[]>(() => {
       key: 'apt',
       label: 'APT',
       badges: securityUpdates > 0
-        ? [{ value: securityUpdates, badgeClass: 'badge bg-red-lt text-red ms-1' }]
+        ? [{ value: securityUpdates, badgeClass: 'badge bg-danger-lt text-danger ms-1' }]
         : pendingPackages > 0
-          ? [{ value: pendingPackages, badgeClass: 'badge bg-yellow-lt text-yellow ms-1' }]
+          ? [{ value: pendingPackages, badgeClass: 'badge bg-warning-lt text-warning ms-1' }]
           : [],
     },
     { key: 'backup', label: 'Sauvegardes' },

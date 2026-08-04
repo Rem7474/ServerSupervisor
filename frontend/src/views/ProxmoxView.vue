@@ -449,14 +449,14 @@
               <td>
                 <span
                   v-if="node.status === 'online'"
-                  class="status status-lime"
+                  class="status status-success"
                 >
                   <span class="status-dot status-dot-animated" />
                   <span data-translation-id="online">En ligne</span>
                 </span>
                 <span
                   v-else
-                  class="status status-red"
+                  class="status status-danger"
                 >
                   <span class="status-dot status-dot-animated" />
                   <span data-translation-id="offline">Hors ligne</span>
@@ -573,6 +573,14 @@ function formatDate(iso: string | undefined): string {
 <style scoped>
 .cursor-pointer {
   cursor: pointer;
+}
+
+/* These KPI cards are real click targets (role="button" + @click + keydown)
+   but had zero hover feedback beyond the cursor — same treatment as the
+   shared .clickable-row convention (style.css) so hovering any of the 3
+   inactive cards reads as interactive, not just the active one. */
+.cursor-pointer:hover {
+  background-color: var(--tblr-bg-surface-secondary);
 }
 
 .health-card-active {

@@ -30,7 +30,7 @@
           >
             <component
               :is="t.icon"
-              :size="18"
+              :size="16"
               class="icon"
             />
             {{ t.label }}
@@ -50,7 +50,7 @@
             @click="tab = 'maintenance'"
           >
             <IconAlertTriangle
-              :size="18"
+              :size="16"
               class="icon"
             />
             Maintenance

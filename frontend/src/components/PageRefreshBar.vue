@@ -11,7 +11,7 @@
       >{{ label }}</span>
       <button
         class="badge border-0 cursor-pointer"
-        :class="modelValue ? 'bg-green-lt text-green' : 'bg-secondary-lt text-secondary'"
+        :class="modelValue ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
         type="button"
         :title="modelValue ? 'Cliquer pour mettre en pause' : 'Cliquer pour reprendre'"
         @click="$emit('update:modelValue', !modelValue)"
@@ -59,7 +59,7 @@ const lastUpdatedLabel = computed(() => {
   height: 8px;
   flex-shrink: 0;
   border-radius: 999px;
-  background: var(--ss-status-online, #2fb344);
+  background: var(--ss-status-online);
   animation: pulse-dot 1.6s infinite;
 }
 

@@ -41,7 +41,7 @@
           <span class="badge bg-azure-lt text-azure ms-1">{{ containers.length }}</span>
           <span
             v-if="runningCount > 0"
-            class="badge bg-green-lt text-green ms-1"
+            class="badge bg-success-lt text-success ms-1"
           >{{ runningCount }} actifs</span>
         </a>
       </li>

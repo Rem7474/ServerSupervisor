@@ -10,10 +10,10 @@
             {{ hosts.length }}
           </div>
           <div class="text-secondary small mt-1">
-            <span class="text-green me-2">{{ onlineCount }} en ligne</span>
+            <span class="text-success me-2">{{ onlineCount }} en ligne</span>
             <span
               v-if="offlineCount > 0"
-              class="text-red"
+              class="text-danger"
             >{{ offlineCount }} hors ligne</span>
           </div>
         </div>
@@ -27,7 +27,7 @@
           </div>
           <div
             class="h1 mb-0"
-            :class="outdatedVersions > 0 ? 'text-yellow' : 'text-green'"
+            :class="outdatedVersions > 0 ? 'text-warning' : 'text-success'"
           >
             {{ outdatedVersions }}
           </div>
@@ -45,12 +45,12 @@
           >
             <span
               v-if="(cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0"
-              class="badge bg-red-lt text-red"
+              class="badge bg-danger-lt text-danger"
             >CRIT {{ cveSummary.critical_count || 0 }}</span>
             <span v-if="(cveSummary.hosts_with_critical || 0) > 0">{{ cveSummary.hosts_with_critical || 0 }} hôte{{ (cveSummary.hosts_with_critical || 0) > 1 ? 's' : '' }}</span>
             <span v-if="(cveSummary.high_count || 0) > 0 || (cveSummary.hosts_with_high || 0) > 0">
               <span v-if="(cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0">·</span>
-              <span class="badge bg-orange-lt text-orange">HIGH {{ cveSummary.high_count || 0 }}</span>
+              <span class="badge bg-warning-lt text-warning">HIGH {{ cveSummary.high_count || 0 }}</span>
             </span>
           </div>
         </div>
@@ -66,7 +66,7 @@
             </div>
             <div
               class="h1 mb-0"
-              :class="(proxmoxSummary?.nodes_down ?? 0) > 0 ? 'text-red' : 'text-green'"
+              :class="(proxmoxSummary?.nodes_down ?? 0) > 0 ? 'text-danger' : 'text-success'"
             >
               {{ (proxmoxSummary?.node_count ?? 0) - (proxmoxSummary?.nodes_down ?? 0) }}
               <span class="text-secondary fs-4">/ {{ proxmoxSummary?.node_count ?? 0 }}</span>
@@ -85,7 +85,7 @@
             </div>
             <div
               class="h1 mb-0"
-              :class="proxmoxStoragePct > 80 ? 'text-red' : proxmoxStoragePct > 60 ? 'text-yellow' : 'text-green'"
+              :class="proxmoxStoragePct > 80 ? 'text-danger' : proxmoxStoragePct > 60 ? 'text-warning' : 'text-success'"
             >
               {{ proxmoxStoragePct.toFixed(0) }}%
             </div>
@@ -103,7 +103,7 @@
             <div class="subheader">
               En ligne
             </div>
-            <div class="h1 mb-0 text-green">
+            <div class="h1 mb-0 text-success">
               {{ onlineCount }}
             </div>
           </div>
@@ -115,7 +115,7 @@
             <div class="subheader">
               Hors ligne
             </div>
-            <div class="h1 mb-0 text-red">
+            <div class="h1 mb-0 text-danger">
               {{ offlineCount }}
             </div>
           </div>

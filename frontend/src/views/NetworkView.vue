@@ -81,10 +81,10 @@
               Trafic réseau
               <span
                 class="ms-1"
-                style="cursor:help; color:#64748b;"
+                style="cursor:help; color:var(--ss-text-subtle-on-dark);"
                 title="Delta calculé entre les deux dernières mises à jour WebSocket. Les deltas négatifs (reset de compteur après redémarrage agent) sont ignorés."
               >
-                <IconInfoCircle :size="12" />
+                <IconInfoCircle :size="14" />
               </span>
             </div>
             <div class="h1 mb-0">
@@ -253,7 +253,7 @@
               </label>
               <span
                 v-if="filterInternetOnly || filterHideInternal"
-                class="badge bg-blue-lt text-blue small"
+                class="badge bg-primary-lt text-primary small"
               >
                 Filtre actif
               </span>
@@ -265,17 +265,16 @@
                 v-if="!topologyConfigLoaded"
                 class="graph-state-overlay"
               >
-                <span class="spinner-border spinner-border-sm me-2" />
-                Chargement de la topologie…
+                <LoadingSkeleton variant="chart" />
               </div>
               <div
                 v-else-if="hosts.length === 0"
                 class="graph-state-overlay graph-state-empty"
               >
                 <IconStack2
-                  :size="40"
+                  :size="48"
                   class="mb-3"
-                  :stroke-width="1.2"
+                  :stroke-width="1.5"
                 />
                 <div class="fw-semibold mb-1">
                   Aucun nœud réseau détecté
@@ -349,6 +348,7 @@
 import { ref } from 'vue'
 import { IconInfoCircle, IconChartBar, IconLayoutGrid, IconSitemap, IconSettings, IconStack2 } from '@tabler/icons-vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import NetworkGraph from '../components/network/NetworkGraph.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import NetworkNodeDetail from '../components/network/NetworkNodeDetail.vue'

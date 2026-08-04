@@ -63,20 +63,80 @@
                   class="form-label"
                   for="host-ip"
                 >Adresse IP</label>
-                <input
-                  id="host-ip"
-                  v-model="form.ip_address"
-                  type="text"
-                  :class="['form-control', touched.ip_address && isValidIp === false ? 'is-invalid' : touched.ip_address && isValidIp ? 'is-valid' : '']"
-                  required
-                  placeholder="192.168.1.100"
-                  @blur="touched.ip_address = true"
-                >
+                <div class="input-group">
+                  <input
+                    id="host-ip"
+                    v-model="form.ip_address"
+                    type="text"
+                    :class="['form-control', touched.ip_address && isValidIp === false ? 'is-invalid' : touched.ip_address && isValidIp ? 'is-valid' : '']"
+                    required
+                    placeholder="192.168.1.100"
+                    @blur="touched.ip_address = true"
+                  >
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    :class="{ active: showGuestPicker }"
+                    title="Choisir depuis un hôte Proxmox"
+                    @click="toggleGuestPicker"
+                  >
+                    <IconServer2 :size="16" />
+                  </button>
+                </div>
                 <div
                   v-if="ipFeedback"
-                  class="invalid-feedback"
+                  class="invalid-feedback d-block"
                 >
                   {{ ipFeedback }}
+                </div>
+
+                <div
+                  v-if="showGuestPicker"
+                  class="guest-picker mt-2"
+                >
+                  <input
+                    v-model="guestSearch"
+                    type="text"
+                    class="form-control form-control-sm mb-2"
+                    placeholder="Rechercher un hôte Proxmox (nom, nœud, IP)…"
+                    autofocus
+                  >
+                  <div
+                    v-if="guestsLoading"
+                    class="text-secondary small py-2"
+                  >
+                    Chargement des hôtes Proxmox…
+                  </div>
+                  <div
+                    v-else-if="guestsError"
+                    class="text-danger small py-2"
+                  >
+                    {{ guestsError }}
+                  </div>
+                  <div
+                    v-else-if="!filteredGuestIPOptions.length"
+                    class="text-secondary small py-2"
+                  >
+                    Aucun hôte Proxmox disponible avec une IP connue.
+                  </div>
+                  <div
+                    v-else
+                    class="guest-picker-list"
+                  >
+                    <button
+                      v-for="option in filteredGuestIPOptions"
+                      :key="`${option.guest.guest_id}-${option.ip}`"
+                      type="button"
+                      class="guest-picker-item"
+                      @click="pickGuestIP(option)"
+                    >
+                      <span class="fw-medium">{{ option.guest.name }}</span>
+                      <span class="text-secondary small">
+                        {{ option.guest.node }} · {{ option.guest.guest_type === 'lxc' ? 'LXC' : 'VM' }}
+                      </span>
+                      <span class="guest-picker-ip">{{ option.ip }}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
               <div class="mb-3">
@@ -218,7 +278,7 @@
 </template>
 
 <script setup lang="ts">
-import { IconCircleCheck } from '@tabler/icons-vue'
+import { IconCircleCheck, IconServer2 } from '@tabler/icons-vue'
 import { useAddHost } from '../composables/useAddHost'
 
 const {
@@ -228,6 +288,13 @@ const {
   touched,
   isValidIp,
   ipFeedback,
+  showGuestPicker,
+  guestsLoading,
+  guestsError,
+  guestSearch,
+  filteredGuestIPOptions,
+  toggleGuestPicker,
+  pickGuestIP,
   result,
   copiedApiKey,
   copiedConfig,
@@ -244,6 +311,46 @@ const {
 </script>
 
 <style scoped>
+.guest-picker {
+  background: var(--ss-panel-strong);
+  border: 1px solid var(--ss-border-default);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.guest-picker-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guest-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--tblr-body-color);
+}
+
+.guest-picker-item:hover {
+  background: rgba(var(--tblr-primary-rgb, 32, 107, 196), 0.1);
+}
+
+.guest-picker-ip {
+  margin-left: auto;
+  font-family: var(--tblr-font-monospace, monospace);
+  font-size: 0.8rem;
+  color: var(--tblr-secondary);
+  flex-shrink: 0;
+}
+
 .host-success {
   background: var(--ss-panel-medium);
   border: 1px solid rgba(56, 189, 248, 0.35);
@@ -302,7 +409,7 @@ const {
 
 .host-success-install {
   border-left: 3px solid rgba(56, 189, 248, 0.6);
-  color: #7dd3fc;
+  color: var(--ss-accent-blue-text);
 }
 
 .agent-connection-status {
@@ -318,13 +425,13 @@ const {
 .agent-waiting {
   background: rgba(99, 102, 241, 0.1);
   border: 1px solid rgba(99, 102, 241, 0.3);
-  color: #a5b4fc;
+  color: var(--ss-accent-blue-text);
 }
 
 .agent-connected {
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid rgba(34, 197, 94, 0.35);
-  color: #86efac;
+  color: var(--ss-success-text);
 }
 
 @media (max-width: 991px) {

@@ -115,7 +115,7 @@
               <div class="text-secondary small mb-1">
                 Requêtes suspectes
               </div>
-              <div class="h2 mb-0 text-orange">
+              <div class="h2 mb-0 text-warning">
                 {{ (threats.suspicious_requests || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
@@ -127,7 +127,7 @@
               <div class="text-secondary small mb-1">
                 IPs suspectes
               </div>
-              <div class="h2 mb-0 text-orange">
+              <div class="h2 mb-0 text-warning">
                 {{ (threats.suspicious_ips || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
@@ -139,7 +139,7 @@
               <div class="text-secondary small mb-1">
                 Domaines ciblés
               </div>
-              <div class="h2 mb-0 text-orange">
+              <div class="h2 mb-0 text-warning">
                 {{ (threats.targeted_hosts || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
@@ -283,12 +283,10 @@
               </h3>
             </div>
             <div class="card-body p-0">
-              <div
+              <EmptyState
                 v-if="!topPaths.length"
-                class="text-center py-4 text-secondary small"
-              >
-                Aucun chemin suspect.
-              </div>
+                title="Aucun chemin suspect."
+              />
               <div
                 v-for="p in pagedTopPaths"
                 v-else
@@ -303,7 +301,7 @@
                     {{ p.category || 'Unknown' }}
                   </div>
                 </div>
-                <span class="badge bg-yellow-lt text-yellow flex-shrink-0">{{ (p.hits || 0).toLocaleString('fr-FR') }}</span>
+                <span class="badge bg-warning-lt text-warning flex-shrink-0">{{ (p.hits || 0).toLocaleString('fr-FR') }}</span>
               </div>
             </div>
             <div
@@ -510,7 +508,7 @@
               <h3 class="card-title mb-0">
                 IPs bloquées par CrowdSec
               </h3>
-              <span class="badge bg-green-lt text-green fs-4">
+              <span class="badge bg-success-lt text-success fs-4">
                 {{ crowdSecTotal.toLocaleString() }} décisions actives
               </span>
             </div>
@@ -588,18 +586,22 @@
                       <div class="d-flex gap-1 justify-content-end">
                         <button
                           type="button"
-                          class="btn btn-sm"
-                          :class="rowState[entry.ip] === 'error' ? 'btn-danger' : 'btn-outline-success'"
+                          class="btn btn-icon btn-sm"
+                          :class="rowState[entry.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-success'"
                           :disabled="rowState[entry.ip] === 'loading'"
+                          :title="rowState[entry.ip] === 'error' ? 'Erreur — Réessayer' : 'Débloquer'"
+                          aria-label="Débloquer cette IP"
                           @click="unblockCrowdSecEntry(entry.ip)"
                         >
                           <span
                             v-if="rowState[entry.ip] === 'loading'"
-                            class="spinner-border spinner-border-sm me-1"
+                            class="spinner-border spinner-border-sm"
                           />
-                          <span v-if="rowState[entry.ip] === 'loading'">Déblocage…</span>
-                          <span v-else-if="rowState[entry.ip] === 'error'">Erreur — Réessayer</span>
-                          <span v-else>Débloquer</span>
+                          <IconLockOpen
+                            v-else
+                            :size="14"
+                            class="icon"
+                          />
                         </button>
                         <button
                           type="button"
@@ -664,6 +666,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { IconLockOpen } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import EmptyState from '../EmptyState.vue'

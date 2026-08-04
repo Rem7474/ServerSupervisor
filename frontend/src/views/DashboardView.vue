@@ -21,7 +21,7 @@
         class="btn btn-primary btn-sm"
       >
         <IconPlus
-          :size="20"
+          :size="14"
           class="icon"
         />
         <span class="d-none d-sm-inline ms-1">Ajouter un hôte</span>
@@ -45,7 +45,7 @@
       <div class="card-header">
         <h3 class="card-title mb-0">
           <IconListCheck
-            :size="18"
+            :size="24"
             class="icon me-1"
           />
           Points d'attention
@@ -84,7 +84,7 @@
       class="alert alert-success d-flex align-items-center gap-2 mb-3"
     >
       <IconCircleCheck
-        :size="20"
+        :size="16"
         class="icon flex-shrink-0"
       />
       <span>Tout est opérationnel — aucune alerte, mise à jour de sécurité ou anomalie Proxmox en attente.</span>
@@ -308,7 +308,7 @@
                     <router-link
                       v-if="isNeverConnectedHost(host)"
                       :to="`/hosts/${host.id}`"
-                      class="badge bg-yellow-lt text-yellow text-decoration-none"
+                      class="badge bg-warning-lt text-warning text-decoration-none badge-link"
                       title="Hôte enregistré, mais l'agent ne s'est jamais connecté — ouvrez la fiche hôte pour régénérer la clé et récupérer la commande d'installation."
                     >
                       Installation en attente
@@ -316,7 +316,7 @@
                     <router-link
                       v-if="proxmoxGuestPath(host.id)"
                       :to="proxmoxGuestPath(host.id)"
-                      class="badge bg-orange-lt text-orange text-decoration-none"
+                      class="badge bg-orange-lt text-orange text-decoration-none badge-link"
                     >
                       Stats Proxmox
                     </router-link>
@@ -365,7 +365,7 @@
                 <td>
                   <span
                     v-if="aptPendingHosts[host.id]"
-                    class="badge bg-yellow-lt text-yellow"
+                    class="badge bg-warning-lt text-warning"
                   >{{ aptPendingHosts[host.id] }}</span>
                   <span
                     v-else
@@ -549,7 +549,7 @@
         apt upgrade
         <span
           v-if="selectedCount > 5"
-          class="badge bg-red-lt text-red ms-1"
+          class="badge bg-danger-lt text-danger ms-1"
         >DANGER</span>
       </button>
     </BulkActionBar>
@@ -689,15 +689,15 @@ const bannerItems = computed<BannerItem[]>(() => {
 })
 
 function bannerBadgeClass(severity: BannerItem['severity']): string {
-  if (severity === 'danger') return 'bg-red-lt text-red'
-  if (severity === 'warning') return 'bg-yellow-lt text-yellow'
-  return 'bg-azure-lt text-azure'
+  if (severity === 'danger') return 'bg-danger-lt text-danger'
+  if (severity === 'warning') return 'bg-warning-lt text-warning'
+  return 'bg-primary-lt text-primary'
 }
 
 function bannerIconClass(severity: BannerItem['severity']): string {
-  if (severity === 'danger') return 'text-red'
-  if (severity === 'warning') return 'text-yellow'
-  return 'text-azure'
+  if (severity === 'danger') return 'text-danger'
+  if (severity === 'warning') return 'text-warning'
+  return 'text-primary'
 }
 
 const chartOpen = ref(false)
@@ -827,6 +827,12 @@ onBeforeUnmount(() => {
 
 .empty-state-icon {
   opacity: 0.35;
+}
+
+/* text-decoration-none on these badge-as-link removes the only native hover
+   hint a link has; restore it on hover instead of leaving zero feedback. */
+.badge-link:hover {
+  text-decoration: underline;
 }
 
 .last-activity-col {

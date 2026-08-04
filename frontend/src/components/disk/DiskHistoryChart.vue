@@ -28,7 +28,7 @@
       <div class="d-flex align-items-center gap-2">
         <span
           v-if="fillPrediction"
-          :class="['badge', fillPrediction.days <= 30 ? 'bg-red text-white' : 'bg-yellow text-white']"
+          :class="['badge', fillPrediction.days <= 30 ? 'bg-danger text-white' : 'bg-warning text-white']"
           :title="`Basé sur la tendance des ${chartHours}h`"
         >
           Plein dans ~{{ fillPrediction.days }}j

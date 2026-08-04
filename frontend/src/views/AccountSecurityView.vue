@@ -38,7 +38,7 @@
           <div class="fw-semibold">
             Authentification multi-facteur
           </div>
-          <span :class="mfaEnabled ? 'badge bg-green-lt text-green' : 'badge bg-orange-lt text-orange'">
+          <span :class="mfaEnabled ? 'badge bg-success-lt text-success' : 'badge bg-warning-lt text-warning'">
             {{ mfaEnabled ? 'Activé' : 'Désactivé' }}
           </span>
         </div>
@@ -235,7 +235,7 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title mb-0">
           <IconKey
-            :size="18"
+            :size="24"
             class="icon me-2"
           />
           Clés de sécurité / Passkeys
@@ -255,12 +255,10 @@
           comme facteur d'authentification supplémentaire, en plus ou à la place du code TOTP.
         </p>
 
-        <div
+        <LoadingSkeleton
           v-if="webauthnLoading && !webauthnCredentials.length"
-          class="text-secondary small"
-        >
-          Chargement…
-        </div>
+          variant="list"
+        />
 
         <table
           v-else-if="webauthnCredentials.length"
@@ -358,7 +356,7 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title mb-0">
           <IconDeviceDesktop
-            :size="18"
+            :size="24"
             class="icon me-2"
           />
           Historique de connexion
@@ -416,6 +414,7 @@
 <script setup lang="ts">
 import { IconClock, IconCopy, IconDeviceDesktop, IconKey, IconX } from '@tabler/icons-vue'
 import ConnectionsTable from '../components/common/ConnectionsTable.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useAccountSecurity } from '../composables/useAccountSecurity'
 import { useDateFormatter } from '../composables/useDateFormatter'
 

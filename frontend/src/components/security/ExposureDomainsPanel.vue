@@ -70,12 +70,10 @@
         </div>
       </div>
 
-      <div
+      <EmptyState
         v-if="exposure.domains.length === 0"
-        class="text-center text-muted py-4"
-      >
-        Aucun domaine NPM ne route vers {{ subjectLabel }}.
-      </div>
+        :title="`Aucun domaine NPM ne route vers ${subjectLabel}.`"
+      />
 
       <div
         v-else
@@ -124,11 +122,11 @@
                 <span class="badge bg-secondary-lt text-secondary me-1">:{{ d.forward_port }}</span>
                 <span
                   v-if="d.ssl_enabled"
-                  class="badge bg-green-lt text-green me-1"
+                  class="badge bg-success-lt text-success me-1"
                 >SSL</span>
                 <span
                   v-if="!d.npm_enabled"
-                  class="badge bg-red-lt text-red"
+                  class="badge bg-danger-lt text-danger"
                 >Désactivé</span>
               </td>
               <td class="text-end">
@@ -183,6 +181,7 @@
 <script setup lang="ts">
 import DomainDetailsModal from './DomainDetailsModal.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import { useDomainDetails } from '../../composables/useDomainDetails'
 import type { HostExposure } from '../../types/host'
 import { formatBytes } from '../../utils/formatters'

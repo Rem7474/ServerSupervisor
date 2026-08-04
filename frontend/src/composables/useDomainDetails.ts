@@ -2,6 +2,7 @@ import { computed, reactive, ref } from 'vue'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { addToast } from './useGlobalToast'
+import { useConfirmDialog } from './useConfirmDialog'
 import type { DomainDetailsParams } from '../types/security'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GetDomainDetails is an ad-hoc server-side aggregate (map[string]any), no Go model to type against — see types/security.ts
@@ -20,6 +21,7 @@ const PAGE_SIZE = 25
 // the interactive filter/sort/pagination behavior only has to be written
 // (and fixed) once.
 export function useDomainDetails() {
+  const dialog = useConfirmDialog()
   const show = ref(false)
   const domain = ref('')
   const period = ref('24h')
@@ -153,6 +155,14 @@ export function useDomainDetails() {
       addToast(`Hôte introuvable pour bloquer ${ip}`, 'error')
       return
     }
+
+    const confirmed = await dialog.confirm({
+      title: `Bloquer l'IP ${ip}`,
+      message: `Bloquer ${ip} via CrowdSec pour ${duration} ?`,
+      variant: 'danger',
+    })
+    if (!confirmed) return
+
     blockState[ip] = 'loading'
     try {
       await api.blockCrowdSecIP(ip, hostId, duration)

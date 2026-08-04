@@ -59,7 +59,7 @@
           :format-date="(formatDate as any)"
           @add="startAddAlert"
           @edit="(startEditAlert as any)"
-          @toggle="(toggleEnabled as any)"
+          @toggle="(onToggleEnabled as any)"
           @delete="(deleteAlert as any)"
         />
       </template>
@@ -80,7 +80,10 @@
           :active-incident-count="activeIncidentCount"
           :is-admin="auth.isAdmin"
           :initial-search="hostFilterFromQuery"
-          @refresh="loadIncidents"
+          :marking-read="markingRead"
+          :resolving-id="resolvingId"
+          @mark-all-read="markAllRead"
+          @resolve="resolveIncident"
         />
       </template>
     </EntityTabShell>
@@ -114,8 +117,10 @@ import EntityTabShell from '../components/EntityTabShell.vue'
 import type { EntityTab } from '../components/EntityTabShell.vue'
 import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
+import { useNotificationHistory } from '../composables/useNotificationHistory'
 import { onNotificationsMessage } from '../composables/useNotifications'
 import { useAuthStore } from '../stores/auth'
+import type { AlertRule } from '../types/alert'
 
 const auth = useAuthStore()
 
@@ -129,9 +134,6 @@ const route = useRoute()
 const router = useRouter()
 const {
   alertsTab,
-  incidents,
-  incidentsLoading,
-  incidentsError,
   trackers,
   trackersLoading,
   trackersError,
@@ -147,10 +149,7 @@ const {
   capabilities,
   capabilitiesLoading,
   capabilitiesError,
-  activeIncidentCount,
   init,
-  loadIncidents,
-  switchToIncidents,
   switchToTrackers,
   startAddAlert,
   startEditAlert,
@@ -161,6 +160,34 @@ const {
   formatDate,
   onWebSocketAlert,
 } = useAlertsPage()
+
+const {
+  incidents,
+  loading: incidentsLoading,
+  error: incidentsError,
+  loaded: incidentsLoaded,
+  activeIncidentCount,
+  loadIncidents,
+  markingRead,
+  markAllRead,
+  resolvingId,
+  resolveIncident,
+  onWebSocketAlert: onNotificationHistoryWSAlert,
+} = useNotificationHistory()
+
+async function switchToIncidents(): Promise<void> {
+  alertsTab.value = 'incidents'
+  if (!incidentsLoaded.value) await loadIncidents()
+}
+
+// Disabling a rule can auto-resolve its active incidents server-side — mirror
+// that in the incidents tab without coupling useAlertsPage.ts to
+// useNotificationHistory.ts (see useAlertsPage.ts's toggleEnabled comment).
+async function onToggleEnabled(rule: AlertRule): Promise<void> {
+  const nextEnabled = !rule.enabled
+  await toggleEnabled(rule)
+  if (!nextEnabled) await loadIncidents()
+}
 
 // `?host=` (set by HostDetailView's incident deep links) seeds the incidents
 // tab's search box so arriving from a specific host lands pre-filtered
@@ -185,7 +212,7 @@ const alertsTabs = computed<EntityTab[]>(() => [
   {
     key: 'incidents',
     label: 'Historique notifications',
-    badges: activeIncidentCount.value > 0 ? [{ value: activeIncidentCount.value, badgeClass: 'badge bg-red-lt text-red ms-1' }] : [],
+    badges: activeIncidentCount.value > 0 ? [{ value: activeIncidentCount.value, badgeClass: 'badge bg-danger-lt text-danger ms-1' }] : [],
     lazy: true,
   },
 ])
@@ -226,11 +253,14 @@ onMounted(async () => {
 // Shares the single app-wide notifications WebSocket connection (owned by
 // NotificationBell/useNotifications) instead of opening a second connection
 // to the same route — this view only needs the raw messages to refresh its
-// own incidents/trackers state.
+// own trackers state; useNotificationHistory() subscribes independently
+// below for incidents (onNotificationsMessage supports multiple listeners).
 const unsubscribeNotifications = onNotificationsMessage(onWebSocketAlert)
+const unsubscribeIncidentsNotifications = onNotificationsMessage(onNotificationHistoryWSAlert)
 
 onUnmounted(() => {
   unsubscribeNotifications()
+  unsubscribeIncidentsNotifications()
   if (incidentsPollTimer) {
     clearInterval(incidentsPollTimer)
     incidentsPollTimer = null

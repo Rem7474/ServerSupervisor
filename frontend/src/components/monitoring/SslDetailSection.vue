@@ -175,16 +175,19 @@
 
         <div
           v-if="loadingEvents"
-          class="card-body py-4 text-center text-secondary"
+          class="card-body"
         >
-          Chargement…
+          <LoadingSkeleton variant="list" />
         </div>
 
         <div
           v-else-if="!events.length"
-          class="card-body py-4 text-center text-secondary"
+          class="card-body"
         >
-          Aucun renouvellement enregistré. Les changements de certificat seront tracés lors des prochaines vérifications.
+          <EmptyState
+            title="Aucun renouvellement enregistré"
+            subtitle="Les changements de certificat seront tracés lors des prochaines vérifications."
+          />
         </div>
 
         <div
@@ -242,6 +245,7 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import RelativeTime from '../RelativeTime.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import { useSSLCertificateDetail } from '../../composables/useSSLCertificateDetail'

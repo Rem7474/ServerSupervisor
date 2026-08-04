@@ -75,10 +75,10 @@ const year = new Date().getFullYear()
 
 const wsDotClass = computed(() => {
   switch (props.wsStatus) {
-    case 'connected':    return 'status-dot-animated bg-green'
-    case 'connecting':   return 'status-dot-animated bg-yellow'
-    case 'reconnecting': return 'status-dot-animated bg-yellow'
-    case 'error':        return 'bg-red'
+    case 'connected':    return 'status-dot-animated bg-success'
+    case 'connecting':   return 'status-dot-animated bg-warning'
+    case 'reconnecting': return 'status-dot-animated bg-warning'
+    case 'error':        return 'bg-danger'
     case 'disconnected': return 'bg-secondary'
     default:             return 'bg-secondary'
   }

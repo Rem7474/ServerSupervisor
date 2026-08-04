@@ -217,12 +217,10 @@
               </h3>
             </div>
             <div class="card-body p-0">
-              <div
+              <EmptyState
                 v-if="!topThreatIPs.length"
-                class="text-center text-secondary py-4"
-              >
-                Aucune IP suspecte.
-              </div>
+                title="Aucune IP suspecte."
+              />
               <button
                 v-for="ip in topThreatIPs.slice(0, 10)"
                 v-else
@@ -239,7 +237,7 @@
                     {{ ip.level || 'LOW' }} · chemins {{ ip.unique_paths || 0 }}
                   </div>
                 </div>
-                <span class="badge bg-red-lt text-red">{{ numberFormat(ip.hits || 0) }}</span>
+                <span class="badge bg-danger-lt text-danger">{{ numberFormat(ip.hits || 0) }}</span>
               </button>
             </div>
           </div>
@@ -315,12 +313,10 @@
               </h3>
             </div>
             <div class="card-body">
-              <div
+              <EmptyState
                 v-if="!topProxyHosts.length"
-                class="text-center text-secondary py-4"
-              >
-                Aucune donnée domaine.
-              </div>
+                title="Aucune donnée domaine."
+              />
               <div v-else>
                 <div
                   v-for="h in topProxyHosts.slice(0, 8)"
@@ -397,10 +393,10 @@
                     <td class="text-end">
                       {{ numberFormat(item.hits || 0) }}
                     </td>
-                    <td class="text-end text-yellow">
+                    <td class="text-end text-warning">
                       {{ numberFormat(item.errors_4xx || 0) }}
                     </td>
-                    <td class="text-end text-red">
+                    <td class="text-end text-danger">
                       {{ numberFormat(item.errors_5xx || 0) }}
                     </td>
                   </tr>

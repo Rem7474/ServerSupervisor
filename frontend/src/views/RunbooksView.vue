@@ -27,7 +27,7 @@
             @click="startAdd"
           >
             <IconPlus
-              :size="20"
+              :size="16"
               class="icon me-1"
             />
             Nouveau runbook
@@ -104,7 +104,7 @@
                 <div class="btn-group">
                   <button
                     type="button"
-                    class="btn btn-icon btn-sm btn-primary"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     title="Lancer"
                     :disabled="runningIds.has(rb.id)"
                     @click="handleRun(rb)"
@@ -115,7 +115,7 @@
                     />
                     <IconPlayerPlay
                       v-else
-                      :size="18"
+                      :size="14"
                       class="icon"
                     />
                   </button>
@@ -126,7 +126,7 @@
                     @click="openHistory(rb)"
                   >
                     <IconHistory
-                      :size="18"
+                      :size="14"
                       class="icon"
                     />
                   </button>
@@ -137,7 +137,7 @@
                     @click="startEdit(rb)"
                   >
                     <IconPencil
-                      :size="18"
+                      :size="14"
                       class="icon"
                     />
                   </button>
@@ -148,7 +148,7 @@
                     @click="handleDelete(rb)"
                   >
                     <IconTrash
-                      :size="18"
+                      :size="14"
                       class="icon"
                     />
                   </button>
@@ -309,12 +309,10 @@
             <div v-if="executionsLoading">
               <LoadingSkeleton variant="table" />
             </div>
-            <div
+            <EmptyState
               v-else-if="executions.length === 0"
-              class="text-muted text-center py-4"
-            >
-              Aucune exécution pour ce runbook.
-            </div>
+              title="Aucune exécution pour ce runbook."
+            />
             <div
               v-else
               class="table-responsive scroll-table"
@@ -552,9 +550,9 @@ function executionStatusLabel(status: string): string {
 }
 
 function executionBadgeClass(status: string): string {
-  if (status === 'completed') return 'bg-green-lt text-green'
-  if (status === 'failed') return 'bg-red-lt text-red'
-  if (status === 'running' || status === 'pending') return 'bg-blue-lt text-blue'
+  if (status === 'completed') return 'bg-success-lt text-success'
+  if (status === 'failed') return 'bg-danger-lt text-danger'
+  if (status === 'running' || status === 'pending') return 'bg-primary-lt text-primary'
   return 'bg-secondary-lt text-secondary'
 }
 

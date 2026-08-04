@@ -209,10 +209,10 @@ function formatDate(dateStr: string | undefined): string {
 }
 
 const EXECUTION_BADGE: Record<string, string> = {
-  succeeded: 'bg-green-lt text-green',
-  failed: 'bg-red-lt text-red',
-  running: 'bg-blue-lt text-blue',
-  pending: 'bg-yellow-lt text-yellow',
+  succeeded: 'bg-success-lt text-success',
+  failed: 'bg-danger-lt text-danger',
+  running: 'bg-primary-lt text-primary',
+  pending: 'bg-warning-lt text-warning',
 }
 
 const EXECUTION_LABEL: Record<string, string> = {

@@ -47,6 +47,15 @@
       </div>
     </div>
     <div
+      v-if="loading && !services.length"
+      class="card-body"
+    >
+      <LoadingSkeleton
+        variant="table"
+        :lines="4"
+      />
+    </div>
+    <div
       v-if="!services.length && !loading && !error"
       class="card-body"
     >
@@ -58,7 +67,7 @@
       v-if="filteredServices.length"
       class="table-responsive scroll-table"
     >
-      <table class="table table-vcenter table-hover card-table mb-0">
+      <table class="table table-vcenter card-table mb-0">
         <thead>
           <tr>
             <th>Service</th>
@@ -177,6 +186,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import apiClient, { getApiErrorMessage } from '../../api'
 import { useCommandStream } from '../../composables/useCommandStream'
 import { useLocalStorage } from '../../composables/useLocalStorage'
@@ -216,9 +226,9 @@ const filteredServices = computed(() => {
 })
 
 function stateClass(state: string | undefined): string {
-  if (state === 'active') return 'badge bg-green-lt text-green'
-  if (state === 'failed') return 'badge bg-red-lt text-red'
-  if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'
+  if (state === 'active') return 'badge bg-success-lt text-success'
+  if (state === 'failed') return 'badge bg-danger-lt text-danger'
+  if (state === 'activating' || state === 'deactivating') return 'badge bg-warning-lt text-warning'
   return 'badge bg-secondary-lt text-secondary'
 }
 

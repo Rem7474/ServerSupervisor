@@ -65,10 +65,10 @@ function statusFamilyLabel(family: string): string {
 }
 
 function statusFamilyBadgeClass(family: string): string {
-  if (family === '5xx') return 'bg-red-lt text-red'
-  if (family === '4xx') return 'bg-yellow-lt text-yellow'
-  if (family === '3xx') return 'bg-azure-lt text-azure'
-  if (family === '2xx') return 'bg-green-lt text-green'
+  if (family === '5xx') return 'bg-danger-lt text-danger'
+  if (family === '4xx') return 'bg-warning-lt text-warning'
+  if (family === '3xx') return 'bg-primary-lt text-primary'
+  if (family === '2xx') return 'bg-success-lt text-success'
   return 'bg-secondary-lt text-secondary'
 }
 
@@ -80,10 +80,10 @@ function formatBucketLabel(startMs: number, bucketMs: number): string {
 
 /** Tailwind/Tabler badge class for an individual HTTP status code. */
 export function statusClass(status: number): string {
-  if (status >= 500 && status < 600) return 'bg-red-lt text-red'
-  if (status >= 400 && status < 500) return 'bg-yellow-lt text-yellow'
-  if (status >= 200 && status < 300) return 'bg-green-lt text-green'
-  if (status >= 300 && status < 400) return 'bg-azure-lt text-azure'
+  if (status >= 500 && status < 600) return 'bg-danger-lt text-danger'
+  if (status >= 400 && status < 500) return 'bg-warning-lt text-warning'
+  if (status >= 200 && status < 300) return 'bg-success-lt text-success'
+  if (status >= 300 && status < 400) return 'bg-primary-lt text-primary'
   return 'bg-secondary-lt text-secondary'
 }
 

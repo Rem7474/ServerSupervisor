@@ -50,14 +50,14 @@
           </h2>
           <span
             v-if="node.status === 'online'"
-            class="status status-lime"
+            class="status status-success"
           >
             <span class="status-dot status-dot-animated" />
             <span data-translation-id="online">En ligne</span>
           </span>
           <span
             v-else
-            class="status status-red"
+            class="status status-danger"
           >
             <span class="status-dot status-dot-animated" />
             <span data-translation-id="offline">Hors ligne</span>
@@ -652,14 +652,14 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
     label: 'Tâches',
     badges: [
       { value: node.value?.tasks?.length ?? 0, badgeClass: azureBadge },
-      ...(failedTaskCount.value > 0 ? [{ value: failedTaskCount.value, badgeClass: 'badge bg-yellow text-white ms-1' }] : []),
+      ...(failedTaskCount.value > 0 ? [{ value: failedTaskCount.value, badgeClass: 'badge bg-danger text-white ms-1' }] : []),
     ],
     lazy: true,
   },
   {
     key: 'updates',
     label: 'Mises à jour',
-    badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-yellow-lt text-yellow' }] : [],
+    badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-warning-lt text-warning' }] : [],
     lazy: true,
   },
   { key: 'services', label: 'Services', lazy: true },

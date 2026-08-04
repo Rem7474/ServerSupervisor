@@ -78,12 +78,12 @@
               </router-link>
             </td>
             <td>
-              <span :class="getComposeStatus(p) === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+              <span :class="getComposeStatus(p) === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
                 {{ getComposeStatus(p) === 'running' ? 'En cours' : 'Arrêté' }}
               </span>
               <span
                 v-if="getComposeUpdates(p).length > 0"
-                class="badge bg-yellow-lt text-yellow ms-1"
+                class="badge bg-warning-lt text-warning ms-1"
                 :title="getComposeUpdates(p).map(v => `${v.docker_image} : ${v.latest_version} dispo`).join('\n')"
               >
                 {{ getComposeUpdates(p).length }} MAJ
@@ -107,12 +107,21 @@
                   <button
                     v-if="vc.tracker_id"
                     type="button"
-                    class="btn btn-sm btn-primary"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="isTrackerRunDisabled(vc)"
                     :title="trackerRunTooltip(vc)"
+                    aria-label="Déclencher le tracker"
                     @click="runTracker(vc, p)"
                   >
-                    {{ trackerRunLoading[vc.tracker_id] ? '...' : 'Run' }}
+                    <span
+                      v-if="trackerRunLoading[vc.tracker_id]"
+                      class="spinner-border spinner-border-sm"
+                    />
+                    <IconPlayerPlay
+                      v-else
+                      :size="14"
+                      class="icon"
+                    />
                   </button>
                 </template>
               </div>
@@ -231,29 +240,19 @@
     </div>
     <div
       v-if="trackerFeedback"
-      class="alert alert-info m-3 mt-0 py-2"
+      class="alert m-3 mt-0 py-2"
+      :class="trackerFeedbackIsError ? 'alert-danger' : 'alert-success'"
       role="status"
     >
       {{ trackerFeedback }}
     </div>
   </div>
 
-  <div
+  <EmptyState
     v-if="filteredComposeProjects.length === 0"
-    class="text-center text-secondary py-5"
-  >
-    <div class="fw-medium">
-      {{ composeSearch || composeHostFilter || composeStateFilter ? 'Aucun résultat pour ces filtres' : 'Aucun projet Compose trouvé' }}
-    </div>
-    <div class="small mt-1 opacity-75">
-      <template v-if="composeSearch || composeHostFilter || composeStateFilter">
-        Modifiez vos critères de recherche
-      </template>
-      <template v-else>
-        Les projets Docker Compose apparaissent ici lorsque l'agent les détecte
-      </template>
-    </div>
-  </div>
+    :title="composeSearch || composeHostFilter || composeStateFilter ? 'Aucun résultat pour ces filtres' : 'Aucun projet Compose trouvé'"
+    :subtitle="composeSearch || composeHostFilter || composeStateFilter ? 'Modifiez vos critères de recherche' : 'Les projets Docker Compose apparaissent ici lorsque l\'agent les détecte'"
+  />
 
   <!-- Modal projet compose (raw config) -->
   <div
@@ -370,6 +369,7 @@ import { ref, computed, watch } from 'vue'
 import { IconFile, IconList, IconPlayerPlay, IconRefresh, IconPlayerStop } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
+import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 import { useModalChrome } from '../../composables/useModalChrome'
 
@@ -436,6 +436,7 @@ useModalChrome(modalRef, () => !!selectedProject.value, { onClose: () => { selec
 const copied = ref(false)
 const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')
+const trackerFeedbackIsError = ref(false)
 
 const composeProjectStatus = computed<Record<string, string>>(() => {
   const statusMap: Record<string, string> = {}
@@ -538,11 +539,13 @@ async function runTracker(vc: VersionComparison, project?: ComposeProject): Prom
   const id = vc.tracker_id!
   trackerRunLoading.value = { ...trackerRunLoading.value, [id]: true }
   trackerFeedback.value = ''
+  trackerFeedbackIsError.value = false
   try {
     await apiClient.runReleaseTracker(id)
     trackerFeedback.value = `Déclenchement lancé pour ${project?.name || vc?.docker_image || 'le tracker'}.`
   } catch (e: unknown) {
     trackerFeedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
+    trackerFeedbackIsError.value = true
   } finally {
     const next = { ...trackerRunLoading.value }
     delete next[id]

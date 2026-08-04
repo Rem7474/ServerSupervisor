@@ -41,11 +41,16 @@ type Config struct {
 	// credentials (repository password, storage backend keys) stay in the
 	// resticconf file on disk (ResticConfPath) and are never read into this
 	// struct or sent to the server.
-	CollectRestic                  bool    `yaml:"collect_restic"`
-	ResticBin                      string  `yaml:"restic_bin"`
-	ResticConfPath                 string  `yaml:"restic_conf_path"`
-	ResticRunScriptPath            string  `yaml:"restic_run_script_path"`
-	ResticStatusFilePath           string  `yaml:"restic_status_file_path"`
+	CollectRestic        bool   `yaml:"collect_restic"`
+	ResticBin            string `yaml:"restic_bin"`
+	ResticConfPath       string `yaml:"restic_conf_path"`
+	ResticRunScriptPath  string `yaml:"restic_run_script_path"`
+	ResticStatusFilePath string `yaml:"restic_status_file_path"`
+	// ResticProfileConfigPath points at resticprofile.yaml (profile
+	// definitions only — repository password/backend keys live in
+	// resticconf, not this file). Read locally to report the list of
+	// available profile names; never forwarded to the server as raw YAML.
+	ResticProfileConfigPath        string  `yaml:"restic_profile_config_path"`
 	ResticEnableProgress           bool    `yaml:"restic_enable_progress"`
 	ResticProgressFPS              float64 `yaml:"restic_progress_fps"`
 	ResticBackupIdleTimeoutMinutes int     `yaml:"restic_backup_idle_timeout_minutes"`
@@ -220,6 +225,9 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_RESTIC_STATUS_FILE_PATH"); env != "" {
 		cfg.ResticStatusFilePath = strings.TrimSpace(env)
 	}
+	if env := os.Getenv("SUPERVISOR_RESTIC_PROFILE_CONFIG_PATH"); env != "" {
+		cfg.ResticProfileConfigPath = strings.TrimSpace(env)
+	}
 	if env := os.Getenv("SUPERVISOR_RESTIC_ENABLE_PROGRESS"); env != "" {
 		cfg.ResticEnableProgress = env == "true" || env == "1"
 	}
@@ -362,6 +370,12 @@ restic_bin: "/usr/local/bin/restic"
 restic_conf_path: "/home/user/restic-backups/resticconf"
 restic_run_script_path: "/home/user/restic-backups/run_backup.sh"
 restic_status_file_path: "/home/user/restic-backups/backup-status.json"
+
+# Path to resticprofile.yaml. Read locally to report the list of available
+# profile names (e.g. for the "Lancer un backup" / scheduled-task pickers) —
+# only profile names are ever sent to the server, never file content.
+restic_profile_config_path: "/home/user/restic-backups/resticprofile.yaml"
+
 restic_enable_progress: true
 restic_progress_fps: 0.1
 

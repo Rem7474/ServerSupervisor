@@ -20,7 +20,6 @@
     >
       <EmptyState
         :icon="IconClock"
-        :icon-size="36"
         title="Aucune donnée SMART disponible"
         subtitle="Vérifie que l'agent collecte SMART et que smartmontools est installé."
       />

@@ -494,8 +494,8 @@ function onDockerScopeModeChange(): void {
 
 .metric-card {
   align-items: center;
-  background: var(--tblr-bg-surface, #ffffff);
-  border: 1px solid var(--tblr-border-color, #d9e2ee);
+  background: var(--tblr-bg-surface);
+  border: 1px solid var(--tblr-border-color);
   border-radius: 0.8rem;
   cursor: pointer;
   display: flex;
@@ -524,7 +524,7 @@ function onDockerScopeModeChange(): void {
 }
 
 .metric-label {
-  color: var(--tblr-body-color, #1f2d3d);
+  color: var(--tblr-body-color);
   font-size: 0.92rem;
   font-weight: 600;
 }

@@ -219,5 +219,8 @@
     "error_message": "contract",
     "source": "contract"
   },
+  "restic_profiles": [
+    "contract"
+  ],
   "timestamp": "2024-01-02T03:04:05Z"
 }

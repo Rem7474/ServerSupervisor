@@ -78,7 +78,7 @@
             </button>
             <button
               type="button"
-              class="btn btn-primary btn-sm"
+              class="btn btn-outline-primary btn-sm"
               :disabled="!!bulkLoading"
               @click="$emit('bulk-cmd', 'upgrade')"
             >

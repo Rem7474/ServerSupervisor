@@ -58,7 +58,7 @@
             </template>
             <span
               v-else
-              class="badge bg-green-lt text-green align-self-center"
+              class="badge bg-success-lt text-success align-self-center"
             >
               IP bloquée par CrowdSec
             </span>
@@ -139,7 +139,7 @@
                 </div>
                 <div class="timeline-kpi-chip">
                   <span class="timeline-kpi-label">Erreurs</span>
-                  <span class="timeline-kpi-value text-red">{{ timelineStats.errors }}</span>
+                  <span class="timeline-kpi-value text-danger">{{ timelineStats.errors }}</span>
                 </div>
                 <div class="timeline-kpi-chip">
                   <span class="timeline-kpi-label">Chemins uniques</span>
@@ -205,8 +205,8 @@
                 </div>
                 <div class="timeline-group-kpis">
                   <span class="badge bg-blue-lt text-blue">{{ group.count }} req</span>
-                  <span class="badge bg-red-lt text-red">{{ group.errorCount }} erreurs</span>
-                  <span class="badge bg-yellow-lt text-yellow">{{ group.uniquePaths }} chemins</span>
+                  <span class="badge bg-danger-lt text-danger">{{ group.errorCount }} erreurs</span>
+                  <span class="badge bg-warning-lt text-warning">{{ group.uniquePaths }} chemins</span>
                   <span class="badge bg-indigo-lt text-indigo">{{ group.uniqueVhosts }} domaines</span>
                 </div>
               </div>
@@ -257,7 +257,7 @@
                         <span v-if="r.blocked">
                           <strong>Blocage:</strong>
                           <span
-                            class="badge bg-green-lt text-green ms-1"
+                            class="badge bg-success-lt text-success ms-1"
                             :title="r.blocked_reason || '-'"
                           >
                             {{ r.blocked_source || 'crowdsec' }}
@@ -400,7 +400,7 @@ async function handleBanClick() {
   top: 0;
   z-index: 1;
   backdrop-filter: blur(3px);
-  background: linear-gradient(180deg, var(--tblr-bg-surface-secondary, #f8fafc) 0%, var(--tblr-bg-surface, #ffffff) 100%);
+  background: linear-gradient(180deg, var(--tblr-bg-surface-secondary) 0%, var(--tblr-bg-surface) 100%);
 }
 
 .timeline-interval-row {
@@ -463,7 +463,7 @@ async function handleBanClick() {
   border: 1px solid var(--tblr-border-color);
   border-radius: 0.5rem;
   padding: 0.45rem 0.6rem;
-  background: var(--tblr-bg-surface-secondary, #f8fafc);
+  background: var(--tblr-bg-surface-secondary);
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -502,7 +502,7 @@ async function handleBanClick() {
   z-index: 1;
   border: 1px solid transparent;
   border-radius: 0.5rem;
-  background: var(--tblr-bg-surface-secondary, #f8fafc);
+  background: var(--tblr-bg-surface-secondary);
   color: inherit;
   min-width: 64px;
   display: flex;
@@ -522,7 +522,7 @@ async function handleBanClick() {
 .timeline-frieze-dot {
   display: inline-block;
   border-radius: 999px;
-  background: var(--tblr-bg-surface, #ffffff);
+  background: var(--tblr-bg-surface);
   width: 14px;
   height: 14px;
   border: 3px solid var(--tblr-primary);
@@ -530,27 +530,27 @@ async function handleBanClick() {
 }
 
 .timeline-frieze-dot.is-calm {
-  border-color: var(--tblr-blue);
-  background: var(--tblr-blue-lt);
+  border-color: var(--tblr-primary);
+  background: var(--tblr-primary-lt);
 }
 
 .timeline-frieze-dot.is-warm {
-  border-color: var(--tblr-yellow);
-  background: var(--tblr-yellow-lt);
+  border-color: var(--tblr-warning);
+  background: var(--tblr-warning-lt);
 }
 
 .timeline-frieze-dot.is-hot {
-  border-color: var(--tblr-red);
-  background: var(--tblr-red-lt);
+  border-color: var(--tblr-danger);
+  background: var(--tblr-danger-lt);
 }
 
 .timeline-frieze-item.active .timeline-frieze-dot {
-  border-color: var(--tblr-red);
+  border-color: var(--tblr-danger);
 }
 
 .timeline-frieze-item.active {
-  border-color: rgba(var(--tblr-red-rgb, 214, 57, 57), 0.35);
-  background: rgba(var(--tblr-red-rgb, 214, 57, 57), 0.08);
+  border-color: rgba(var(--tblr-danger-rgb), 0.35);
+  background: rgba(var(--tblr-danger-rgb), 0.08);
 }
 
 .timeline-frieze-time {
@@ -569,7 +569,7 @@ async function handleBanClick() {
 }
 
 .timeline-group {
-  background: var(--tblr-bg-surface, #ffffff);
+  background: var(--tblr-bg-surface);
 }
 
 .timeline-group-header {
@@ -578,7 +578,7 @@ async function handleBanClick() {
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-  background: var(--tblr-bg-surface-secondary, #f8fafc);
+  background: var(--tblr-bg-surface-secondary);
   border-bottom: 1px solid var(--tblr-border-color);
 }
 
@@ -605,7 +605,7 @@ async function handleBanClick() {
   border: 1px solid var(--tblr-border-color);
   border-radius: 0.6rem;
   padding: 0.5rem;
-  background: var(--tblr-bg-surface, #ffffff);
+  background: var(--tblr-bg-surface);
 }
 
 .timeline-status-group-header {
@@ -626,7 +626,7 @@ async function handleBanClick() {
   border: 1px solid var(--tblr-border-color);
   border-radius: 0.6rem;
   padding: 0.55rem 0.65rem;
-  background: var(--tblr-bg-surface, #ffffff);
+  background: var(--tblr-bg-surface);
 }
 
 .timeline-event-topline {

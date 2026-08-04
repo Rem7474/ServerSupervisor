@@ -319,23 +319,23 @@ function formatUptime(seconds: number | undefined): string {
 
 function cpuColor(pct: number | undefined): string {
   if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-red'
-  if (pct > 70) return 'text-yellow'
-  return 'text-green'
+  if (pct > 90) return 'text-danger'
+  if (pct > 70) return 'text-warning'
+  return 'text-success'
 }
 
 function memColor(pct: number | undefined): string {
   if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-red'
-  if (pct > 75) return 'text-yellow'
-  return 'text-green'
+  if (pct > 90) return 'text-danger'
+  if (pct > 75) return 'text-warning'
+  return 'text-success'
 }
 
 function tempColor(temp: number | undefined): string {
   if (!temp) return 'text-secondary'
-  if (temp >= 85) return 'text-red'
-  if (temp >= 70) return 'text-yellow'
-  return 'text-green'
+  if (temp >= 85) return 'text-danger'
+  if (temp >= 70) return 'text-warning'
+  return 'text-success'
 }
 
 function formatChartTime(timestamp: number | string | undefined): string {

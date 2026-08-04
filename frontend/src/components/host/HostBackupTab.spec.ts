@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
-const { getBackupStatus, getBackupRuns, runBackup, openCommandStream, closeStream, getLastStreamOptions } = vi.hoisted(() => {
+const { getBackupStatus, getBackupRuns, getBackupProfiles, runBackup, openCommandStream, closeStream, getLastStreamOptions } = vi.hoisted(() => {
   let lastStreamOptions: {
     onChunk?: (p: { chunk: string }) => void
     onStatus?: (p: { status: string }) => void
@@ -9,6 +9,7 @@ const { getBackupStatus, getBackupRuns, runBackup, openCommandStream, closeStrea
   return {
     getBackupStatus: vi.fn(),
     getBackupRuns: vi.fn(),
+    getBackupProfiles: vi.fn(),
     runBackup: vi.fn(),
     closeStream: vi.fn(),
     openCommandStream: vi.fn((_commandId: string, options: typeof lastStreamOptions) => {
@@ -19,7 +20,7 @@ const { getBackupStatus, getBackupRuns, runBackup, openCommandStream, closeStrea
 })
 
 vi.mock('../../api', () => ({
-  default: { getBackupStatus, getBackupRuns, runBackup },
+  default: { getBackupStatus, getBackupRuns, getBackupProfiles, runBackup },
   getApiErrorMessage: (e: unknown) => String(e),
 }))
 
@@ -34,10 +35,12 @@ import HostBackupTab from './HostBackupTab.vue'
 function mockEmptyBackend() {
   getBackupStatus.mockResolvedValue({ data: {} })
   getBackupRuns.mockResolvedValue({ data: { runs: [] } })
+  getBackupProfiles.mockResolvedValue({ data: { profiles: [] } })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  getBackupProfiles.mockResolvedValue({ data: { profiles: [] } })
 })
 
 describe('HostBackupTab', () => {

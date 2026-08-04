@@ -72,13 +72,14 @@
 
       <div
         v-else-if="hosts.length === 0"
-        class="card-body text-center text-muted py-5"
+        class="card-body"
       >
-        Aucun proxy host trouvé. Configurez une connexion NPM dans les
-        <router-link to="/settings?tab=integrations">
-          Paramètres → Intégrations
-        </router-link>
-        — les hosts apparaîtront automatiquement après le premier sync.
+        <EmptyState
+          title="Aucun proxy host trouvé"
+          subtitle="Configurez une connexion NPM — les hosts apparaîtront automatiquement après le premier sync."
+          cta-label="Paramètres → Intégrations"
+          cta-to="/settings?tab=integrations"
+        />
       </div>
 
       <div
@@ -288,6 +289,7 @@ import { IconLock, IconAlertTriangle } from '@tabler/icons-vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useNPM } from '../composables/useNPM'
 
 const {
@@ -319,14 +321,14 @@ const expiringCerts = computed(() =>
 )
 
 function uptimeBadge(status: string): string {
-  if (status === 'up') return 'bg-green-lt text-green'
-  if (status === 'down') return 'bg-red-lt text-red'
+  if (status === 'up') return 'bg-success-lt text-success'
+  if (status === 'down') return 'bg-danger-lt text-danger'
   return 'bg-secondary-lt text-secondary'
 }
 
 function sslBadge(days: number): string {
-  if (days <= 7) return 'bg-red-lt text-red'
-  if (days <= 30) return 'bg-yellow-lt text-yellow'
-  return 'bg-green-lt text-green'
+  if (days <= 7) return 'bg-danger-lt text-danger'
+  if (days <= 30) return 'bg-warning-lt text-warning'
+  return 'bg-success-lt text-success'
 }
 </script>

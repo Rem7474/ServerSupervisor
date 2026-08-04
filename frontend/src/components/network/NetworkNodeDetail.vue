@@ -442,7 +442,7 @@ const nodeTypeLabel = computed(() => {
 const typeTagClass = computed(() => {
   const type = props.selectedNode?.type
   if (type === 'host') return 'badge bg-secondary-lt text-secondary'
-  if (type === 'proxmox_guest') return 'badge bg-amber-lt text-amber'
+  if (type === 'proxmox_guest') return 'badge bg-yellow-lt text-yellow'
   if (type === 'service') return 'badge bg-cyan-lt text-cyan'
   if (type === 'port') return 'badge bg-blue-lt text-blue'
   if (type === 'authelia') return 'badge bg-purple-lt text-purple'
@@ -453,9 +453,9 @@ const typeTagClass = computed(() => {
 
 const statusBadgeClass = computed(() => {
   const status = hostData.value?.status || props.selectedNode?.status
-  if (status === 'online') return 'status status-lime'
-  if (status === 'warning') return 'status status-yellow'
-  if (status === 'offline') return 'status status-red'
+  if (status === 'online') return 'status status-success'
+  if (status === 'warning') return 'status status-warning'
+  if (status === 'offline') return 'status status-danger'
   return 'status status-secondary'
 })
 
@@ -523,7 +523,7 @@ function copyUrl(url: string): void {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
-  color: #475569;
+  color: var(--ss-text-subtle-on-dark);
   margin-bottom: 8px;
 }
 

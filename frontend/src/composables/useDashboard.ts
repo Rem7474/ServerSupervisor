@@ -663,23 +663,23 @@ export function useDashboard() {
 
   function cpuColor(pct: number | null | undefined) {
     if (!pct) return 'text-secondary'
-    if (pct > 90) return 'text-red'
-    if (pct > 70) return 'text-yellow'
-    return 'text-green'
+    if (pct > 90) return 'text-danger'
+    if (pct > 70) return 'text-warning'
+    return 'text-success'
   }
 
   function memColor(pct: number | null | undefined) {
     if (!pct) return 'text-secondary'
-    if (pct > 90) return 'text-red'
-    if (pct > 75) return 'text-yellow'
-    return 'text-green'
+    if (pct > 90) return 'text-danger'
+    if (pct > 75) return 'text-warning'
+    return 'text-success'
   }
 
   function diskColor(pct: number | null | undefined) {
     if (pct == null) return 'text-secondary'
-    if (pct > 90) return 'text-red'
-    if (pct > 75) return 'text-yellow'
-    return 'text-green'
+    if (pct > 90) return 'text-danger'
+    if (pct > 75) return 'text-warning'
+    return 'text-success'
   }
 
   function isAgentUpToDate(version: string) {

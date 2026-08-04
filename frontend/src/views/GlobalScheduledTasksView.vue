@@ -138,7 +138,6 @@
       >
         <EmptyState
           :icon="IconClock"
-          :icon-size="40"
           title="Aucune tâche trouvée"
           :subtitle="tasks.length ? 'Modifiez vos filtres.' : canManage ? 'Cliquez sur « Nouvelle tâche » pour commencer.' : 'Aucune tâche configurée.'"
         />
@@ -282,7 +281,7 @@
                 <span
                   v-else-if="!canManage"
                   class="badge"
-                  :class="task.enabled ? 'bg-green-lt' : 'bg-secondary-lt'"
+                  :class="task.enabled ? 'bg-success-lt' : 'bg-secondary-lt'"
                 >
                   {{ task.enabled ? 'Oui' : 'Non' }}
                 </span>
@@ -310,15 +309,21 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-ghost-primary"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="runningId === task.id"
+                    title="Exécuter"
+                    aria-label="Exécuter la tâche maintenant"
                     @click="runNow(task)"
                   >
                     <span
                       v-if="runningId === task.id"
                       class="spinner-border spinner-border-sm"
                     />
-                    <span v-else>Exécuter</span>
+                    <IconPlayerPlay
+                      v-else
+                      :size="16"
+                      class="icon icon-sm"
+                    />
                   </button>
                   <button
                     v-if="canManage"
@@ -643,12 +648,10 @@
               >
                 {{ historyError }}
               </div>
-              <div
+              <EmptyState
                 v-else-if="!executions.length"
-                class="text-center py-5 text-muted"
-              >
-                Aucune exécution enregistrée pour cette tâche.
-              </div>
+                title="Aucune exécution enregistrée pour cette tâche."
+              />
               <div v-else>
                 <table class="table table-vcenter table-hover mb-0">
                   <thead>
@@ -743,8 +746,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { IconClock, IconPencil, IconTrash } from '@tabler/icons-vue'
+import { computed, ref, watch } from 'vue'
+import { IconClock, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
@@ -753,12 +756,12 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DispatchStepEditor from '../components/DispatchStepEditor.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
-import { DISPATCH_MODULES } from '../utils/dispatchStep'
-import type { DispatchOption } from '../utils/dispatchStep'
+import { availableScheduledTaskModules, scheduledTaskActions, scheduledTaskTargetConfig } from '../utils/scheduledTaskDispatch'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 import { useModalChrome } from '../composables/useModalChrome'
 
 const {
+  hostsStore,
   tasks,
   loading,
   error,
@@ -790,7 +793,6 @@ const {
   createSaving,
   createError,
   canManage,
-  moduleActions,
   createNextRun,
   editNextRun,
   hostList,
@@ -801,8 +803,6 @@ const {
   toggleSelectAll,
   clearSelection,
   toggleSort,
-  targetLabel,
-  targetPlaceholder,
   openCreate,
   saveCreate,
   formatDate,
@@ -831,29 +831,27 @@ useModalChrome(createModalRef, () => createModalOpen.value, { onClose: () => { c
 useModalChrome(editModalRef, () => !!editTask.value, { onClose: () => { editTask.value = null } })
 useModalChrome(historyModalRef, () => !!historyTask.value, { onClose: () => { historyTask.value = null } })
 
-// moduleActions/targetLabel/targetPlaceholder are advisory only here (the
-// scheduled-task backend validates the module but not the action string —
-// see root CLAUDE.md), unlike DispatchStepEditor's other caller (Runbooks),
-// so these adapt them to the shared editor's shape rather than the editor
-// enforcing one universal whitelist.
-function scheduledTaskActionsForModule(module: string): DispatchOption[] {
-  return (moduleActions[module] || []).map((a) => ({ value: a, label: a }))
-}
+// The scheduled-task-specific module list/actions/target config live in
+// utils/scheduledTaskDispatch.ts, shared with HostTasksTab.vue's per-host
+// editor so both stay in sync (see that file's doc comment for why restic
+// is scoped here rather than to the shared DISPATCH_MODULES). Narrowed to
+// whichever modules the selected host's agent actually reports as active
+// (collectors) — a host with e.g. collect_docker off shouldn't offer it.
+const scheduledTaskModules = computed(() => {
+  const host = hostsStore.hosts.find((h) => h.id === createForm.value.host_id)
+  return availableScheduledTaskModules(host?.collectors)
+})
+const scheduledTaskActionsForModule = scheduledTaskActions
 
-function scheduledTaskTargetConfig(module: string): { label: string; placeholder?: string } | null {
-  const label = targetLabel(module)
-  return label ? { label, placeholder: targetPlaceholder(module) } : null
-}
-
-// Scheduled tasks are the only DispatchStepEditor caller whose backend scope
-// exceeds DISPATCH_MODULES (validModules in scheduledtask.Service) — restic
-// isn't allowed for runbook steps or alert-rule command triggers, so it stays
-// out of the shared list and is added only here (see DispatchStepEditor's
-// `modules` prop doc).
-const scheduledTaskModules: DispatchOption[] = [
-  ...DISPATCH_MODULES,
-  { value: 'restic', label: 'Restic (backup)' },
-]
+// Reset module/action back to something valid for the newly selected host
+// when the current pick falls outside its available modules.
+watch(() => createForm.value.host_id, () => {
+  if (scheduledTaskModules.value.some((m) => m.value === createForm.value.module)) return
+  const fallback = scheduledTaskModules.value[0]?.value || 'apt'
+  createForm.value.module = fallback
+  createForm.value.action = scheduledTaskActionsForModule(fallback)[0]?.value || ''
+  createForm.value.target = ''
+})
 </script>
 
 <style scoped>

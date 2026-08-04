@@ -356,9 +356,9 @@ function formatUptime(seconds: number): string {
 
 function statusBadgeClass(status: string): string {
   const map: Record<string, string> = {
-    running: 'badge bg-green-lt text-green',
+    running: 'badge bg-success-lt text-success',
     stopped: 'badge bg-secondary-lt text-secondary',
-    paused: 'badge bg-yellow-lt text-yellow',
+    paused: 'badge bg-warning-lt text-warning',
   }
   return map[status] || 'badge bg-secondary-lt text-secondary'
 }

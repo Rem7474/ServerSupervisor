@@ -99,7 +99,7 @@
         </button>
         <button
           type="button"
-          class="btn btn-outline-info ms-2"
+          class="btn btn-outline-secondary ms-2"
           :disabled="testing"
           @click="testForm"
         >
@@ -127,7 +127,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="connections.length === 0">
+          <tr v-if="loading && !connections.length">
+            <td colspan="7">
+              <LoadingSkeleton variant="table" />
+            </td>
+          </tr>
+          <tr v-else-if="connections.length === 0">
             <td colspan="7">
               <EmptyState title="Aucune connexion NPM configurée." />
             </td>
@@ -153,16 +158,16 @@
               >Désactivé</span>
               <span
                 v-else-if="conn.last_error"
-                class="badge bg-red-lt text-red"
+                class="badge bg-danger-lt text-danger"
                 :title="conn.last_error"
               >Erreur</span>
               <span
                 v-else-if="conn.last_success_at"
-                class="badge bg-green-lt text-green"
+                class="badge bg-success-lt text-success"
               >OK</span>
               <span
                 v-else
-                class="badge bg-yellow-lt text-yellow"
+                class="badge bg-warning-lt text-warning"
               >En attente</span>
             </td>
             <td class="text-muted small">
@@ -189,7 +194,7 @@
                 <!-- Refresh -->
                 <button
                   type="button"
-                  class="btn btn-icon btn-sm btn-ghost-info"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Rafraîchir maintenant"
                   @click="refreshNow(conn)"
                 >
@@ -234,6 +239,7 @@ import type { NPMConnection } from '../../types/npm'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 const { confirm } = useConfirmDialog()
 
@@ -253,6 +259,7 @@ interface NPMForm {
 }
 
 const connections = ref<NPMConnection[]>([])
+const loading = ref(false)
 const showForm = ref(false)
 const editingId = ref<string | null>(null)
 const saving = ref(false)
@@ -274,11 +281,14 @@ const emptyForm = (): NPMForm => ({
 const form = ref<NPMForm>(emptyForm())
 
 async function load(): Promise<void> {
+  loading.value = true
   try {
     const res = await npmApi.listConnections()
     connections.value = res.data.connections ?? []
   } catch {
     // silently ignore
+  } finally {
+    loading.value = false
   }
 }
 

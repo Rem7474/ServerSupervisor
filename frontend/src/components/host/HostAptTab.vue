@@ -60,7 +60,7 @@
             <div class="card-body text-center">
               <div
                 class="h2 mb-0"
-                :class="(aptStatus.pending_packages ?? 0) > 0 ? 'text-yellow' : 'text-green'"
+                :class="(aptStatus.pending_packages ?? 0) > 0 ? 'text-warning' : 'text-success'"
               >
                 {{ aptStatus.pending_packages }}
               </div>
@@ -73,7 +73,7 @@
         <div class="col-md-4">
           <div class="card card-sm">
             <div class="card-body text-center">
-              <div class="h2 mb-0 text-red">
+              <div class="h2 mb-0 text-danger">
                 {{ aptStatus.security_updates }}
               </div>
               <div class="text-secondary small">
@@ -166,11 +166,11 @@
         <template v-else>
           <span
             class="badge"
-            :class="uuStatus.enabled ? 'bg-green-lt text-green' : 'bg-secondary-lt text-secondary'"
+            :class="uuStatus.enabled ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
           >{{ uuStatus.enabled ? 'Activé' : 'Désactivé' }}</span>
           <span
             v-if="uuStatus.reboot_required"
-            class="badge bg-orange-lt text-orange"
+            class="badge bg-warning-lt text-warning"
           >Redémarrage requis</span>
         </template>
       </div>
@@ -341,7 +341,7 @@
                   <td>
                     <span
                       class="badge"
-                      :class="run.had_error ? 'bg-red-lt text-red' : 'bg-green-lt text-green'"
+                      :class="run.had_error ? 'bg-danger-lt text-danger' : 'bg-success-lt text-success'"
                     >{{ run.had_error ? 'Erreur' : 'OK' }}</span>
                   </td>
                   <td>

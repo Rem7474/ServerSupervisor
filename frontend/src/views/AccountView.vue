@@ -133,7 +133,7 @@
             <div class="card-header">
               <h3 class="card-title">
                 <IconLock
-                  :size="20"
+                  :size="24"
                   class="icon me-2"
                 />
                 Authentification à deux facteurs
@@ -151,7 +151,7 @@
                 </div>
                 <span
                   class="badge"
-                  :class="profile?.mfa_enabled ? 'bg-green-lt text-green' : 'bg-orange-lt text-orange'"
+                  :class="profile?.mfa_enabled ? 'bg-success-lt text-success' : 'bg-warning-lt text-warning'"
                 >
                   {{ profile?.mfa_enabled ? 'Actif' : 'Inactif' }}
                 </span>
@@ -172,7 +172,7 @@
             <div class="card-header">
               <h3 class="card-title">
                 <IconKey
-                  :size="20"
+                  :size="24"
                   class="icon me-2"
                 />
                 Changer le mot de passe
@@ -310,7 +310,7 @@
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title mb-0">
               <IconClock
-                :size="20"
+                :size="24"
                 class="icon me-2"
               />
               Activité récente
@@ -337,9 +337,12 @@
                 <tr v-if="cmdsLoading">
                   <td
                     colspan="7"
-                    class="text-center text-secondary py-3"
+                    class="py-2"
                   >
-                    Chargement...
+                    <LoadingSkeleton
+                      variant="table"
+                      :lines="4"
+                    />
                   </td>
                 </tr>
                 <tr v-else-if="!myCommands.length">
@@ -404,6 +407,7 @@
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { useAccount } from '../composables/useAccount'
 

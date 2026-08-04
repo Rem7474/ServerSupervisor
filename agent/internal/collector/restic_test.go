@@ -76,6 +76,58 @@ func TestReadResticProfileStatusFile_MissingFile(t *testing.T) {
 	}
 }
 
+func TestListResticProfiles_Nominal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "resticprofile.yaml")
+	content := `version: "1"
+
+global:
+  status-file: /home/user/restic-backups/backup-status.json
+
+files:
+  backup:
+    source:
+      - /home/user/data
+
+db:
+  backup:
+    source:
+      - /home/user/restic-backups/mydb.sql
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	profiles, err := ListResticProfiles(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"db", "files"}
+	if len(profiles) != len(want) || profiles[0] != want[0] || profiles[1] != want[1] {
+		t.Errorf("expected profiles %v (sorted, reserved keys excluded), got %v", want, profiles)
+	}
+}
+
+func TestListResticProfiles_Unconfigured(t *testing.T) {
+	profiles, err := ListResticProfiles("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if profiles != nil {
+		t.Errorf("expected nil profiles when path is unconfigured, got %v", profiles)
+	}
+}
+
+func TestListResticProfiles_MissingFile(t *testing.T) {
+	profiles, err := ListResticProfiles("/nonexistent/resticprofile.yaml")
+	if err != nil {
+		t.Fatalf("expected a missing file to be tolerated, got error: %v", err)
+	}
+	if profiles != nil {
+		t.Errorf("expected nil profiles for a missing file, got %v", profiles)
+	}
+}
+
 func TestParseResticProgressLine_Status(t *testing.T) {
 	line := `{"message_type":"status","percent_done":0.5,"total_files":100,"files_done":50,"total_bytes":2000,"bytes_done":1000,"seconds_elapsed":10,"seconds_remaining":10}`
 	var summary ResticBackupSummary

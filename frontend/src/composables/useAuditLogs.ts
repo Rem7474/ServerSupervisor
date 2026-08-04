@@ -145,7 +145,7 @@ export function useAuditLogs() {
   }
 
   function statusClass(status: string | undefined): string {
-    return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
+    return getStatusBadgeClass(status, 'badge bg-warning-lt text-warning')
   }
 
   function openLogViewer(cmd: RemoteCommand): void {

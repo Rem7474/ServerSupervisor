@@ -29,13 +29,13 @@
             <span class="text-muted small">{{ host.ip_address }}</span>
           </div>
         </div>
-        <span :class="host.status === 'online' ? 'status status-lime' : 'status status-red'">
+        <span :class="host.status === 'online' ? 'status status-success' : 'status status-danger'">
           <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
           <span>{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
         </span>
         <span
           v-if="activeCommand"
-          class="badge bg-blue-lt text-blue d-inline-flex align-items-center gap-1 flex-shrink-0"
+          class="badge bg-primary-lt text-primary d-inline-flex align-items-center gap-1 flex-shrink-0"
         >
           <span
             class="spinner-border spinner-border-sm"
@@ -75,7 +75,7 @@
             </button>
             <button
               type="button"
-              class="btn btn-primary"
+              class="btn btn-outline-primary"
               :disabled="isCmdLoading"
               @click="$emit('run-cmd', 'upgrade')"
             >
@@ -143,11 +143,11 @@
           <div class="col-3">
             <div
               class="text-center p-2 rounded"
-              :class="(aptStatus.pending_packages ?? 0) > 0 ? 'bg-yellow-lt' : 'bg-green-lt'"
+              :class="(aptStatus.pending_packages ?? 0) > 0 ? 'bg-warning-lt' : 'bg-success-lt'"
             >
               <div
                 class="fs-3 fw-bold lh-1 mb-1"
-                :class="(aptStatus.pending_packages ?? 0) > 0 ? 'text-yellow' : 'text-green'"
+                :class="(aptStatus.pending_packages ?? 0) > 0 ? 'text-warning' : 'text-success'"
               >
                 {{ aptStatus.pending_packages ?? 0 }}
               </div>
@@ -159,11 +159,11 @@
           <div class="col-3">
             <div
               class="text-center p-2 rounded"
-              :class="(aptStatus.security_updates ?? 0) > 0 ? 'bg-red-lt' : 'bg-secondary-lt'"
+              :class="(aptStatus.security_updates ?? 0) > 0 ? 'bg-danger-lt' : 'bg-secondary-lt'"
             >
               <div
                 class="fs-3 fw-bold lh-1 mb-1"
-                :class="(aptStatus.security_updates ?? 0) > 0 ? 'text-red' : 'text-secondary'"
+                :class="(aptStatus.security_updates ?? 0) > 0 ? 'text-danger' : 'text-secondary'"
               >
                 {{ aptStatus.security_updates ?? 0 }}
               </div>
@@ -176,13 +176,13 @@
             <div
               class="text-center p-2 rounded"
               :class="cveList.length
-                ? (cveList.some(c => c.severity === 'CRITICAL') ? 'bg-red-lt' : 'bg-orange-lt')
+                ? (cveList.some(c => c.severity === 'CRITICAL') ? 'bg-danger-lt' : 'bg-warning-lt')
                 : 'bg-secondary-lt'"
             >
               <div
                 class="fs-3 fw-bold lh-1 mb-1"
                 :class="cveList.length
-                  ? (cveList.some(c => c.severity === 'CRITICAL') ? 'text-red' : 'text-orange')
+                  ? (cveList.some(c => c.severity === 'CRITICAL') ? 'text-danger' : 'text-warning')
                   : 'text-secondary'"
               >
                 {{ cveList.length }}
@@ -234,7 +234,7 @@
             <div class="d-flex align-items-center justify-content-between mb-2">
               <span class="small fw-semibold text-secondary">
                 Paquets en attente
-                <span class="badge bg-yellow-lt text-yellow ms-1">
+                <span class="badge bg-warning-lt text-warning ms-1">
                   {{ packages.length }}
                 </span>
               </span>
@@ -393,7 +393,7 @@ function statusLabel(status?: string): string {
 }
 
 function statusClass(status: string | undefined): string {
-  return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
+  return getStatusBadgeClass(status, 'badge bg-warning-lt text-warning')
 }
 </script>
 

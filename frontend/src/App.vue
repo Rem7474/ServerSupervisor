@@ -38,7 +38,7 @@
                 v-if="hostsDownCount > 0"
                 class="nav-item d-flex align-items-center"
               >
-                <span class="badge bg-red-lt text-red ms-2 py-2 hosts-down-badge">
+                <span class="badge bg-danger-lt text-danger ms-2 py-2 hosts-down-badge">
                   <IconAlertTriangle class="icon icon-sm me-1" />
                   {{ hostsDownCount }} HORS LIGNE
                 </span>
@@ -414,7 +414,7 @@ onUnmounted(() => {
   z-index: 9999;
   padding: 0.5rem 1rem;
   background: var(--tblr-primary);
-  color: #fff;
+  color: var(--tblr-white);
   border-radius: 0 0 4px 4px;
   font-size: 0.875rem;
   text-decoration: none;
@@ -453,6 +453,22 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--tblr-border-color);
   border-radius: 4px;
+}
+
+/* .btn-outline-secondary's hover fills the button background with
+   --tblr-secondary (Tabler's own --tblr-btn-hover-bg) — without this, the
+   "Rechercher…" label (text-secondary) and the kbd hint above (color:
+   --tblr-secondary too) become the same gray as the fill they now sit on,
+   i.e. invisible text on hover. Force both to the button's own hover
+   foreground token instead. */
+.command-palette-trigger:hover .text-secondary {
+  color: var(--tblr-secondary-fg);
+}
+
+.command-palette-trigger:hover kbd {
+  color: var(--tblr-secondary-fg);
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .app-network-alert {

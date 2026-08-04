@@ -23,9 +23,9 @@
     </div>
     <div
       v-else-if="executions.length === 0"
-      class="card-body text-center text-muted py-5"
+      class="card-body"
     >
-      {{ emptyText }}
+      <EmptyState :title="emptyText" />
     </div>
     <div
       v-else
@@ -89,7 +89,7 @@
                 <router-link
                   v-if="execution.alerts_after_count"
                   to="/alerts?tab=incidents"
-                  class="badge bg-red-lt text-red ms-1 text-decoration-none"
+                  class="badge bg-danger-lt text-danger ms-1 text-decoration-none"
                   :title="`${execution.alerts_after_count} alerte(s) déclenchée(s) sur l'hôte dans les 15 min suivant ce déploiement`"
                 >
                   ⚠ {{ execution.alerts_after_count }}
@@ -215,6 +215,7 @@ import { IconBraces, IconFileText, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import { usePagination } from '../../composables/usePagination'
 import { commandStatusLabel } from '../../utils/commandStatus'
 import { execBadgeColor } from '../../utils/statusClasses'

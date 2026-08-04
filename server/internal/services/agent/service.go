@@ -66,6 +66,7 @@ type Repository interface {
 	InsertDiskHealth(ctx context.Context, healthData []models.DiskHealth) error
 	UpdateHostCustomTasks(ctx context.Context, hostID, tasksJSON string) error
 	UpdateHostTasksConfigYAML(ctx context.Context, hostID, yaml string) error
+	UpdateHostResticProfiles(ctx context.Context, hostID, profilesJSON string) error
 	UpdateHostCollectors(ctx context.Context, hostID, collectorsJSON string) error
 	UpdateHostWebLogs(ctx context.Context, hostID string, report *models.WebLogReport) error
 	InsertWebLogSnapshot(ctx context.Context, hostID string, report *models.WebLogReport) error
@@ -514,6 +515,14 @@ func (s *Service) storeDiskAndMetadata(ctx context.Context, hostID, safeHostID s
 	if report.TasksConfigYAML != "" {
 		if err := s.repo.UpdateHostTasksConfigYAML(ctx, hostID, report.TasksConfigYAML); err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store tasks config YAML for host %s: %v", safeHostID, err))
+		}
+	}
+
+	if report.ResticProfiles != nil {
+		if b, err := json.Marshal(report.ResticProfiles); err == nil {
+			if err := s.repo.UpdateHostResticProfiles(ctx, hostID, string(b)); err != nil {
+				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store restic profiles for host %s: %v", safeHostID, err))
+			}
 		}
 	}
 

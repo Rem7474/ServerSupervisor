@@ -18,12 +18,10 @@
       </div>
     </div>
     <div class="card-body">
-      <div
+      <EmptyState
         v-if="!ipsKnown"
-        class="text-center text-muted py-4"
-      >
-        Aucune adresse IP détectée pour ce guest (agent invité PVE absent ou guest arrêté).
-      </div>
+        title="Aucune adresse IP détectée pour ce guest (agent invité PVE absent ou guest arrêté)."
+      />
       <ExposureDomainsPanel
         v-else
         :exposure="exposure"
@@ -41,6 +39,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../../api'
 import ExposureDomainsPanel from '../security/ExposureDomainsPanel.vue'
+import EmptyState from '../EmptyState.vue'
 import type { HostExposure } from '../../types/host'
 import { getApiErrorMessage } from '../../api/client'
 
