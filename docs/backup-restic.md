@@ -16,32 +16,55 @@ lire un fichier de statut et d'exécuter un script que vous fournissez.
 ## 1. Prérequis sur l'hôte supervisé
 
 1. Installer `restic` ([instructions officielles](https://restic.readthedocs.io/en/stable/020_installation.html)).
-2. Installer `resticprofile` ([instructions officielles](https://creativeprojects.github.io/resticprofile/installation/)).
-3. Initialiser (ou avoir déjà) un dépôt Restic :
    ```bash
-   restic -r /srv/restic-repo init
-   # ou un backend distant : sftp:, s3:, swift:, b2:, rclone:, ...
+   sudo apt install restic
    ```
-4. Choisir un répertoire de travail pour la config, par exemple
-   `/home/user/restic-backups/` — c'est celui utilisé dans les exemples
-   ci-dessous.
+2. Installer `resticprofile` ([instructions officielles](https://creativeprojects.github.io/resticprofile/installation/)).
+   ```bash
+   curl -sfL https://raw.githubusercontent.com/creativeprojects/resticprofile/master/install.sh | sudo sh -s -- -b /usr/local/bin
+   ```
+3. Choisir un répertoire de travail pour la config, par exemple
+   `/home/user/restic-backups/`.
+   ```bash
+   mkdir -p /home/user/restic-backups
+   ```
 
-## 2. `resticconf` — les secrets, jamais transmis au serveur
+## 2. `resticconf`
 
 Créez `/home/user/restic-backups/resticconf`, un fichier shell sourcé
 localement par l'agent avant chaque exécution (jamais lu par le serveur, jamais
 loggé) :
 
 ```bash
-# resticconf — permissions 600, uniquement lisible par l'utilisateur de l'agent
 export RESTIC_REPOSITORY="/srv/restic-repo"
+export RESTIC_CACHE_DIR="/home/user/restic-backups/cache"
 export RESTIC_PASSWORD_FILE="/home/user/restic-backups/restic-password.txt"
 
 # Exemple backend S3 (facultatif selon votre backend) :
 # export AWS_ACCESS_KEY_ID="..."
 # export AWS_SECRET_ACCESS_KEY="..."
 ```
+exemple SwissBackup (Infomaniak) :
+```bash
+export RESTIC_REPOSITORY="swift:sb_project_SBI-XXXX:/nextcloud-aio"
+export RESTIC_CACHE_DIR="/root/restic-backups/cache"
+export RESTIC_PASSWORD_FILE="/home/user/restic-backups/restic-password.txt"
 
+export OS_AUTH_URL="https://swift02-api.cloud.infomaniak.ch/identity/v3"
+export OS_USERNAME="SBI-XXXX"
+export OS_PASSWORD="ton-mot-de-passe-swiss-backup"
+export OS_PROJECT_NAME="sb_project_SBI-XXXX"
+export OS_PROJECT_DOMAIN_NAME="default"
+export OS_USER_DOMAIN_NAME="default"
+export OS_REGION_NAME="RegionOne"
+```
+
+Créez aussi le fichier contenant le mot de passe de chiffrement du dépôt
+restic :
+```bash
+echo "MotDePasseTresLong" > /home/user/restic-backups/restic-password.txt
+```
+Verrouillez les deux fichiers :
 ```bash
 chmod 600 /home/user/restic-backups/resticconf
 chmod 600 /home/user/restic-backups/restic-password.txt
@@ -51,13 +74,22 @@ Seules les variables dont le nom commence par `RESTIC_`, `OS_`, `SWIFT_`,
 `ST_`, `B2_`, `AWS_`, `AZURE_`, `GOOGLE_` ou `RCLONE_` sont transmises par
 l'agent au script (`resticEnvAllowedPrefixes`) — tout le reste (alias shell,
 `PS1`, etc.) présent dans ce fichier est ignoré, jamais transmis au processus
-`run_backup.sh`. Ça inclut `HOME` : un agent lancé en service systemd n'a
-généralement pas cette variable définie, ce qui produit un warning restic
-inoffensif (`unable to open cache: ... neither $XDG_CACHE_HOME nor $HOME
-are defined`, voir §9) — ajoutez `export RESTIC_CACHE_DIR="..."` ici pour le
-faire taire, plutôt que de dépendre de l'environnement de l'agent.
+`run_backup.sh`.
 
-## 3. `resticprofile.yaml` — définir vos profils de sauvegarde
+## 3. Initialiser restic
+On charge le fichier créé à l'étape 2 dans le shell (source),
+ce qui rend les variables RESTIC_REPOSITORY et OS\_\*
+disponibles pour la commande qui suit (restic init) :
+```bash
+source /home/user/restic-backups/resticconf
+restic init
+```
+Résultat attendu : un message avec l'ID du nouveau dépôt. Si erreur
+d'authentification → revérifiez OS_AUTH_URL et OS_PASSWORD dans
+resticconf (l'erreur vient toujours de ce fichier, pas de la commande
+restic init elle-même).
+
+## 4. `resticprofile.yaml` — définir vos profils de sauvegarde
 
 Créez `/home/user/restic-backups/resticprofile.yaml` (un profil par
 périmètre à sauvegarder, par exemple `files` et `db`) :
@@ -70,7 +102,7 @@ global:
   # sans lui l'agent retombe sur `restic snapshots --json`/`stats --json`).
   status-file: /home/user/restic-backups/backup-status.json
 
-files:
+profil_name:
   backup:
     source:
       - /home/user/data
@@ -79,6 +111,7 @@ files:
       - "**/.cache"
     extended-status: true
 
+# autre profil de backup
 db:
   backup:
     run-before: "pg_dump -U postgres mydb > /home/user/restic-backups/mydb.sql"
@@ -86,7 +119,6 @@ db:
       - /home/user/restic-backups/mydb.sql
     extended-status: true
 ```
-
 `extended-status: true` est recommandé pour que le status-file contienne le
 résultat de chaque exécution de profil.
 
@@ -100,12 +132,40 @@ groups:
     - db
 ```
 
-`resticprofile` résout un groupe exactement comme un profil quand on lui
-passe `--name <nom>` — l'agent découvre donc les deux (profils **et**
-groupes) et les propose séparément dans les sélecteurs de l'UI (backup manuel
-et tâche planifiée).
+Exemple pour nextcloud aio :
+```yaml
+version: "1"
 
-## 4. `run_backup.sh` — le script que l'agent exécute
+global:
+  status-file: /home/user/restic-backups/backup-status.json
+
+nextcloud-data:
+  backup:
+    run-before:
+      - "docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:mode --on"
+    source:
+      - /var/lib/docker/volumes/nextcloud_aio_nextcloud_data/_data
+      - /var/lib/docker/volumes/nextcloud_aio_mastercontainer/_data
+    exclude:
+      - "**/.tmp"
+      - "**/cache/*"
+    run-after:
+      - "docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:mode --off"
+    run-after-fail:
+      - "docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:mode --off"
+    extended-status: true
+
+nextcloud-db:
+  backup:
+    run-before: "docker exec nextcloud-aio-database pg_dumpall -U nextcloud > /home/user/restic-backups/nextcloud-db.sql"
+    source:
+      - /home/user/restic-backups/nextcloud-db.sql
+    extended-status: true
+```
+
+
+
+## 5. `run_backup.sh` — le script que l'agent exécute
 
 Créez `/home/user/restic-backups/run_backup.sh`, exécuté par l'agent avec le
 nom du profil en premier argument (vide = profil par défaut de votre script) :
@@ -114,7 +174,7 @@ nom du profil en premier argument (vide = profil par défaut de votre script) :
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROFILE="${1:-files}"
+PROFILE="${1:-profil_name}"
 CONFIG_DIR="/home/user/restic-backups"
 
 exec resticprofile --config "${CONFIG_DIR}/resticprofile.yaml" --name "${PROFILE}" backup --json
@@ -124,22 +184,15 @@ exec resticprofile --config "${CONFIG_DIR}/resticprofile.yaml" --name "${PROFILE
 chmod +x /home/user/restic-backups/run_backup.sh
 ```
 
-Le `--json` est indispensable : c'est ce que l'agent parse pour construire la
-progression en direct (pourcentage, fichiers/octets traités, ETA) et le résumé
-final (`ResticBackupSummary` : snapshot ID, fichiers nouveaux/modifiés,
-volume). `RESTIC_PROGRESS_FPS` est injecté automatiquement par l'agent — pas
-besoin de le fixer vous-même dans le script (restic désactive sa sortie de
-progression par défaut hors TTY, cette variable la force malgré tout).
-
 Testez le script manuellement avant de le brancher à ServerSupervisor :
 
 ```bash
 source /home/user/restic-backups/resticconf
-/home/user/restic-backups/run_backup.sh files
+/home/user/restic-backups/run_backup.sh profil_name
 ```
 
-## 5. Activer la collecte côté agent (`agent.yaml`)
-
+## 6. Activer la collecte côté agent (`agent.yaml`)
+emplacement par défaut : `/etc/serversupervisor/agent.yaml`
 ```yaml
 collect_restic: true
 restic_bin: "/usr/local/bin/restic"
@@ -167,14 +220,14 @@ restic_backup_idle_timeout_minutes: 20
 Seuls des chemins et des indicateurs de fonctionnalité vivent dans
 `agent.yaml` — jamais un secret. Redémarrez l'agent après modification.
 
-## 6. Vérifier le monitoring passif
+## 7. Vérifier le monitoring passif
 
 Au rapport périodique suivant, l'onglet **Sauvegardes** de la fiche hôte doit
 afficher un statut (dernier backup, snapshot, volume) sans qu'aucun backup
 n'ait été déclenché depuis ServerSupervisor — c'est la lecture du status-file
 (ou, à défaut, de `restic snapshots --json`/`restic stats --json`).
 
-## 7. Déclencher un backup manuel depuis l'UI
+## 8. Déclencher un backup manuel depuis l'UI
 
 Sur la fiche hôte, onglet **Sauvegardes**, le bouton **Lancer un backup**
 (visible aux comptes Operator et Admin) dispatche une commande agent
@@ -184,7 +237,7 @@ page reste ouverte. Fermer l'onglet n'interrompt que l'affichage : le backup
 continue côté agent, et le résultat final apparaît au prochain rapport de
 statut.
 
-## 8. Planifier un backup récurrent
+## 9. Planifier un backup récurrent
 
 Il n'y a pas de cron ni de webhook à configurer côté ServerSupervisor. Un
 backup récurrent est une tâche planifiée comme une autre :
@@ -196,7 +249,7 @@ backup récurrent est une tâche planifiée comme une autre :
    `run_backup.sh`.
 4. Choisir la fréquence (cron).
 
-## 9. Dépannage
+## 10. Dépannage
 
 | Symptôme | Cause probable |
 |---|---|
