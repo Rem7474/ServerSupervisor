@@ -2,14 +2,7 @@
 
 Ce guide détaille comment mettre en place la supervision et le déclenchement de
 sauvegardes [Restic](https://restic.net) via [resticprofile](https://creativeprojects.github.io/resticprofile/)
-sur un hôte supervisé par ServerSupervisor, du premier `restic init` jusqu'à la
-planification récurrente dans l'UI.
-
-**Principe important** : ServerSupervisor n'installe rien et ne stocke aucun
-secret. Le binaire `restic`, le dépôt, `resticprofile` et tous les credentials
-(mot de passe du dépôt, clés S3/B2/Swift, identifiants SMTP…) restent
-entièrement sur la machine supervisée, gérés par vous. L'agent se contente de
-lire un fichier de statut et d'exécuter un script que vous fournissez.
+sur un hôte supervisé par ServerSupervisor.
 
 ---
 
@@ -32,8 +25,7 @@ lire un fichier de statut et d'exécuter un script que vous fournissez.
 ## 2. `resticconf`
 
 Créez `/home/user/restic-backups/resticconf`, un fichier shell sourcé
-localement par l'agent avant chaque exécution (jamais lu par le serveur, jamais
-loggé) :
+localement par l'agent avant chaque exécution :
 
 ```bash
 export RESTIC_REPOSITORY="/srv/restic-repo"
@@ -77,22 +69,19 @@ l'agent au script (`resticEnvAllowedPrefixes`) — tout le reste (alias shell,
 `run_backup.sh`.
 
 ## 3. Initialiser restic
-On charge le fichier créé à l'étape 2 dans le shell (source),
-ce qui rend les variables RESTIC_REPOSITORY et OS\_\*
-disponibles pour la commande qui suit (restic init) :
+On charge le fichier créé à l'étape 2 dans le shell, puis on initialise le dépôt restic :
 ```bash
 source /home/user/restic-backups/resticconf
 restic init
 ```
 Résultat attendu : un message avec l'ID du nouveau dépôt. Si erreur
 d'authentification → revérifiez OS_AUTH_URL et OS_PASSWORD dans
-resticconf (l'erreur vient toujours de ce fichier, pas de la commande
-restic init elle-même).
+resticconf.
 
 ## 4. `resticprofile.yaml` — définir vos profils de sauvegarde
 
 Créez `/home/user/restic-backups/resticprofile.yaml` (un profil par
-périmètre à sauvegarder, par exemple `files` et `db`) :
+périmètre à sauvegarder, par exemple `profil_name` et `db`) :
 
 ```yaml
 version: "1"
@@ -128,7 +117,7 @@ un nom unique, exécutés ensemble en une seule invocation :
 ```yaml
 groups:
   full-backup:
-    - files
+    - profil_name
     - db
 ```
 
