@@ -8,7 +8,7 @@
 
     <!-- Sidebar + Main -->
     <div v-if="auth.isAuthenticated">
-      <header class="navbar navbar-expand-md navbar-dark">
+      <header class="navbar navbar-expand-lg navbar-dark">
         <div class="container-xl">
           <button
             class="navbar-toggler"
@@ -524,7 +524,7 @@ onUnmounted(() => {
   transform: rotate(45deg);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 991.98px) {
   .ms-auto.d-flex.align-items-center.gap-2 {
     width: 100%;
     justify-content: space-between;
