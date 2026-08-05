@@ -329,6 +329,17 @@ function download(): void {
   min-height: 0;
 }
 
+/* ProcessesTable/SystemdTable's own .scroll-table (style.css) caps itself at
+   70vh with its own overflow-y — fine as a standalone page table, but nested
+   here inside .console-processes (which is already the scroll container for
+   this panel) it produced a second, inner scrollbar. Let .console-processes
+   be the single scrolling ancestor in this context; the table's sticky
+   header still works, just pinned against the outer scroll instead. */
+.console-processes :deep(.scroll-table) {
+  max-height: none;
+  overflow-y: visible;
+}
+
 .console-output {
   background: var(--ss-panel-solid-darker);
   color: var(--ss-text-on-dark);
