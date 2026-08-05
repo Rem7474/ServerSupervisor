@@ -36,6 +36,8 @@ vi.mock('../api', () => {
       getProxmoxNodeGuestNetworks: vi.fn(ok({})),
       getProxmoxNodeGuestExposure: vi.fn(ok({})),
       getProxmoxNodeServices: ok([]),
+      getProxmoxBackupJobs: vi.fn(ok([])),
+      getProxmoxBackupRuns: vi.fn(ok([])),
     },
   }
 })
@@ -92,7 +94,7 @@ describe('ProxmoxNodeView (characterization)', () => {
 
     const text = wrapper.text()
     expect(text).toContain('pve1')
-    for (const label of ['VMs', 'LXC', 'Stockage', 'Disques', 'Tâches', 'Mises à jour', 'Services', 'Journaux sécurité']) {
+    for (const label of ['VMs', 'LXC', 'Stockage', 'Disques', 'Tâches', 'Sauvegardes', 'Mises à jour', 'Services', 'Journaux sécurité']) {
       expect(text).toContain(label)
     }
   })
@@ -130,5 +132,28 @@ describe('ProxmoxNodeView (characterization)', () => {
 
     expect(apiClient.getProxmoxNodeGuestNetworks).not.toHaveBeenCalled()
     expect(apiClient.getProxmoxNodeGuestExposure).not.toHaveBeenCalled()
+  })
+
+  it('renders the Sauvegardes tab and fetches jobs/runs on nav click', async () => {
+    const wrapper = mount(ProxmoxNodeView, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    const backupsBtn = wrapper.findAll('.proxmox-node-tabs .nav-link').find((b) => b.text().includes('Sauvegardes'))
+    expect(backupsBtn).toBeTruthy()
+    await backupsBtn!.trigger('click')
+
+    expect(apiClient.getProxmoxBackupJobs).toHaveBeenCalled()
+    expect(apiClient.getProxmoxBackupRuns).toHaveBeenCalled()
+  })
+
+  it('fetches backup jobs/runs when landing directly on ?tab=backups, without a click', async () => {
+    routeQuery.current = { tab: 'backups' }
+    mount(ProxmoxNodeView, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    expect(apiClient.getProxmoxBackupJobs).toHaveBeenCalled()
+    expect(apiClient.getProxmoxBackupRuns).toHaveBeenCalled()
   })
 })

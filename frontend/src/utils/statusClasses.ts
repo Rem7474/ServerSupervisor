@@ -61,6 +61,8 @@ const EXECUTION_STATE_MAP: Record<string, string> = {
   completed: 'badge bg-success-lt text-success',
   success:   'badge bg-success-lt text-success',
   succeeded: 'badge bg-success-lt text-success',
+  // Proxmox's own vzdump backup runs report "OK", not "completed"/"success".
+  ok:        'badge bg-success-lt text-success',
   failed:    'badge bg-danger-lt text-danger',
   error:     'badge bg-danger-lt text-danger',
   skipped:   'badge bg-secondary-lt text-secondary',
@@ -73,6 +75,24 @@ export function getExecutionStateClass(
 ): string {
   if (!status) return fallback
   return EXECUTION_STATE_MAP[status.toLowerCase()] ?? fallback
+}
+
+const EXECUTION_STATE_LABELS: Record<string, string> = {
+  pending:   'En attente',
+  running:   'En cours',
+  completed: 'Terminé',
+  success:   'Réussi',
+  succeeded: 'Réussi',
+  ok:        'OK',
+  failed:    'Échoué',
+  error:     'Erreur',
+  skipped:   'Ignoré',
+  cancelled: 'Annulé',
+}
+
+export function getExecutionStateLabel(status: string | null | undefined, fallback?: string): string {
+  if (!status) return fallback ?? ''
+  return EXECUTION_STATE_LABELS[status.toLowerCase()] ?? fallback ?? status
 }
 
 /**

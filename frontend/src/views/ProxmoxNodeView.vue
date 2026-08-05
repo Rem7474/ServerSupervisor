@@ -397,6 +397,16 @@
                 />
               </template>
 
+              <template #backups>
+                <ProxmoxNodeBackupsTab
+                  :jobs="backupJobs"
+                  :runs="nodeBackupRuns"
+                  :loading="backupsLoading"
+                  :error="backupsError"
+                  @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
+                />
+              </template>
+
               <template #updates>
                 <ProxmoxNodeUpdatesTab
                   :pending-updates="node.pending_updates"
@@ -551,6 +561,7 @@ import ProxmoxNodeStorageTab from '../components/proxmox/ProxmoxNodeStorageTab.v
 import ProxmoxNodeTasksTab from '../components/proxmox/ProxmoxNodeTasksTab.vue'
 import ProxmoxNodeUpdatesTab from '../components/proxmox/ProxmoxNodeUpdatesTab.vue'
 import ProxmoxNodeServicesTab from '../components/proxmox/ProxmoxNodeServicesTab.vue'
+import ProxmoxNodeBackupsTab from '../components/proxmox/ProxmoxNodeBackupsTab.vue'
 import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab.vue'
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
 import { useProxmoxNode } from '../composables/useProxmoxNode'
@@ -623,6 +634,11 @@ const {
   svcActionLoading,
   loadServices,
   svcAction,
+  backupJobs,
+  nodeBackupRuns,
+  backupsLoading,
+  backupsError,
+  loadBackups,
   vms,
   lxcs,
   failedTaskCount,
@@ -642,6 +658,10 @@ const securityEventsCount = ref(0)
 
 const azureBadge = 'badge bg-azure-lt text-azure ms-1'
 
+const failedBackupCount = computed(() =>
+  nodeBackupRuns.value.filter((r: { status?: string }) => r.status === 'error').length
+)
+
 const proxmoxTabs = computed<EntityTab[]>(() => [
   { key: 'vms', label: 'VMs', badges: [{ value: vms.value.length, badgeClass: azureBadge }], lazy: true },
   { key: 'lxc', label: 'LXC', badges: [{ value: lxcs.value.length, badgeClass: azureBadge }], lazy: true },
@@ -654,6 +674,12 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
       { value: node.value?.tasks?.length ?? 0, badgeClass: azureBadge },
       ...(failedTaskCount.value > 0 ? [{ value: failedTaskCount.value, badgeClass: 'badge bg-danger text-white ms-1' }] : []),
     ],
+    lazy: true,
+  },
+  {
+    key: 'backups',
+    label: 'Sauvegardes',
+    badges: failedBackupCount.value > 0 ? [{ value: failedBackupCount.value, badgeClass: 'badge bg-danger text-white ms-1' }] : [],
     lazy: true,
   },
   {
@@ -679,6 +705,7 @@ function onTabClick(key: string): void {
   tab.value = key
   if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure() }
   if (key === 'services') loadServices()
+  if (key === 'backups') loadBackups()
 }
 
 function memPct(n: { mem_used?: number; mem_total?: number }): string | number {
