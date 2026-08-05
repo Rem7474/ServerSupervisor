@@ -212,7 +212,7 @@
               </div>
             </td>
             <td>
-              <span :class="stateClass(c.state)">{{ stateLabel(c.state) }}</span>
+              <span :class="getEntityStateClass(c.state)">{{ getEntityStateLabel(c.state) }}</span>
             </td>
             <td class="small">
               <DockerPortBadges
@@ -549,8 +549,8 @@
               {{ inspectTarget.image }}:<code>{{ containerVersion(inspectTarget)?.running_version || inspectTarget.image_tag }}</code>
               <span
                 class="ms-2"
-                :class="stateClass(inspectTarget.state)"
-              >{{ stateLabel(inspectTarget.state) }}</span>
+                :class="getEntityStateClass(inspectTarget.state)"
+              >{{ getEntityStateLabel(inspectTarget.state) }}</span>
             </div>
           </div>
           <button
@@ -731,6 +731,7 @@ import { useModalChrome } from '../../composables/useModalChrome'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 import { usePagination } from '../../composables/usePagination'
 import { getApiErrorMessage } from '../../api/client'
+import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
 
 interface Container {
   id: string
@@ -905,20 +906,6 @@ function isComposeContainer(container: Container): boolean {
   return !!container.labels?.['com.docker.compose.project']
 }
 
-const STATE_LABELS: Record<string, string> = {
-  running: 'En cours',
-  restarting: 'Redémarrage',
-  paused: 'En pause',
-  created: 'Créé',
-  exited: 'Arrêté',
-  dead: 'Mort',
-  removing: 'Suppression',
-}
-
-function stateLabel(state: string | undefined): string {
-  return STATE_LABELS[state || ''] || state || ''
-}
-
 // Groups states by operational severity rather than sorting alphabetically
 // (which interleaved "created"/"dead"/"exited" with no meaningful order).
 const STATE_RANK: Record<string, number> = {
@@ -933,19 +920,6 @@ const STATE_RANK: Record<string, number> = {
 
 function stateRank(state: string | undefined): number {
   return STATE_RANK[state || ''] ?? 5
-}
-
-function stateClass(state: string | undefined): string {
-  const map: Record<string, string> = {
-    running:    'badge bg-success-lt text-success',
-    restarting: 'badge bg-warning-lt text-warning',
-    paused:     'badge bg-warning-lt text-warning',
-    created:    'badge bg-primary-lt text-primary',
-    exited:     'badge bg-secondary-lt text-secondary',
-    dead:       'badge bg-danger-lt text-danger',
-    removing:   'badge bg-warning-lt text-warning',
-  }
-  return map[state || ''] || 'badge bg-secondary-lt text-secondary'
 }
 
 function formatBytes(bytes: number | undefined): string {

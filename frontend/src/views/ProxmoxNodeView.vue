@@ -669,11 +669,12 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
   { key: 'security', label: 'Journaux sécurité', badges: [{ value: securityEventsCount.value, badgeClass: azureBadge }], lazy: true },
 ])
 
-// VMs/LXC and Services fetch their own supporting data lazily, only when the
-// user actually switches to them — not on a tab restored programmatically
-// from a ?tab= deep link (load() sets `tab` directly and has its own,
-// deliberately narrower, initial-load sequencing). Listening to the shell's
-// click emit rather than watching `tab` itself preserves that distinction.
+// VMs/LXC and Services fetch their own supporting data lazily — on a real
+// user click here, or (mirrored) once at mount in useProxmoxNode's load()
+// for a tab restored from a ?tab= deep link. Each loader is itself
+// load-once-per-mount guarded, so triggering it from both places is safe.
+// Listening to the shell's click emit rather than watching `tab` itself
+// avoids re-triggering on every tab.value change load() itself makes.
 function onTabClick(key: string): void {
   tab.value = key
   if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure() }
