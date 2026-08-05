@@ -1,4 +1,4 @@
-# Configurer les sauvegardes Restic — guide de A à Z
+# Configurer les sauvegardes Restic
 
 Ce guide détaille comment mettre en place la supervision et le déclenchement de
 sauvegardes [Restic](https://restic.net) via [resticprofile](https://creativeprojects.github.io/resticprofile/)
