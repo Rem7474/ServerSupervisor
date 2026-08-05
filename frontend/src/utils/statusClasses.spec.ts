@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getEntityStateClass, getEntityStateLabel } from './statusClasses'
+import { getEntityStateClass, getEntityStateLabel, getExecutionStateClass, getExecutionStateLabel } from './statusClasses'
 
 describe('getEntityStateLabel', () => {
   it('translates every known entity state to French', () => {
@@ -26,5 +26,20 @@ describe('getEntityStateLabel', () => {
     expect(getEntityStateLabel('running')).not.toBe('running')
     expect(getEntityStateLabel('stopped')).not.toBe('stopped')
     expect(getEntityStateClass('running')).toBe('badge bg-success-lt text-success')
+  })
+})
+
+describe('getExecutionStateLabel / getExecutionStateClass — "ok" alias', () => {
+  it('treats Proxmox vzdump\'s "OK" status the same as a successful run', () => {
+    // Proxmox backup runs report status "OK", not "completed"/"success" like
+    // every other execution-state consumer in the app.
+    expect(getExecutionStateLabel('OK')).toBe('OK')
+    expect(getExecutionStateClass('OK')).toBe('badge bg-success-lt text-success')
+    expect(getExecutionStateClass('OK')).toBe(getExecutionStateClass('completed'))
+  })
+
+  it('is case-insensitive and falls back to the raw status for an unknown value', () => {
+    expect(getExecutionStateLabel('ok')).toBe('OK')
+    expect(getExecutionStateLabel('weird-status')).toBe('weird-status')
   })
 })
