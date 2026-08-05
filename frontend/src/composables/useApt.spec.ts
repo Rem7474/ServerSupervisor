@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-const { wsMessageHandler, streamOptionsByCommand } = vi.hoisted(() => ({
+const { wsMessageHandler, streamOptionsByCommand, openCommandStream } = vi.hoisted(() => ({
   wsMessageHandler: { current: null as ((payload: unknown) => void) | null },
   streamOptionsByCommand: new Map<string, { onStatus?: (p: { status: string; output?: string }) => void }>(),
+  openCommandStream: vi.fn(),
 }))
 
 vi.mock('./useWebSocket', () => ({
@@ -24,6 +25,7 @@ vi.mock('./useCommandStream', () => ({
   useCommandStream: () => ({
     openCommandStream: (commandId: string, options: { onStatus?: (p: { status: string; output?: string }) => void }) => {
       streamOptionsByCommand.set(commandId, options)
+      openCommandStream(commandId, options)
     },
     closeStream: vi.fn(),
   }),
@@ -65,6 +67,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   streamOptionsByCommand.clear()
   wsMessageHandler.current = null
+  openCommandStream.mockClear()
   vi.useFakeTimers()
 })
 
@@ -125,5 +128,70 @@ describe('useApt — post-command CVE enrichment indicator', () => {
     api.watchCommand({ id: 'cmd-3', action: 'install_uu', status: 'running', output: '' }, HOST)
     streamOptionsByCommand.get('cmd-3')?.onStatus?.({ status: 'completed' })
     expect(api.enrichingHosts.value.h1).toBeUndefined()
+  })
+})
+
+describe('useApt — resume live command tracking on mount', () => {
+  it('resumes watching an already-running command found in the first WS snapshot', () => {
+    const { api } = mountUseApt()
+
+    wsMessageHandler.current?.({
+      type: 'apt',
+      hosts: [HOST],
+      apt_statuses: {},
+      apt_histories: {
+        h1: [{ id: 'cmd-resume', action: 'dist-upgrade', status: 'running', output: '', created_at: new Date().toISOString() }],
+      },
+    })
+
+    expect(openCommandStream).toHaveBeenCalledWith('cmd-resume', expect.anything())
+    expect(api.showConsole.value).toBe(true)
+    expect(api.liveCommand.value?.id).toBe('cmd-resume')
+  })
+
+  it('does not resume-subscribe when the latest command is already terminal', () => {
+    const { api } = mountUseApt()
+
+    wsMessageHandler.current?.({
+      type: 'apt',
+      hosts: [HOST],
+      apt_statuses: {},
+      apt_histories: {
+        h1: [{ id: 'cmd-done', action: 'update', status: 'completed', output: 'ok', created_at: new Date().toISOString() }],
+      },
+    })
+
+    expect(openCommandStream).not.toHaveBeenCalled()
+    expect(api.showConsole.value).toBe(false)
+  })
+
+  it('only checks for a resumable command on the first snapshot, so a console the user closed stays closed', () => {
+    const { api } = mountUseApt()
+
+    wsMessageHandler.current?.({
+      type: 'apt',
+      hosts: [HOST],
+      apt_statuses: {},
+      apt_histories: { h1: [] },
+    })
+    expect(openCommandStream).not.toHaveBeenCalled()
+
+    // A command starts running and the user watches then closes it manually.
+    api.watchCommand({ id: 'cmd-5', action: 'upgrade', status: 'running', output: '' }, HOST)
+    expect(openCommandStream).toHaveBeenCalledTimes(1)
+    api.closeLiveConsole()
+    expect(api.showConsole.value).toBe(false)
+
+    // A later snapshot still reports it running — must not silently reopen it.
+    wsMessageHandler.current?.({
+      type: 'apt',
+      hosts: [HOST],
+      apt_statuses: {},
+      apt_histories: {
+        h1: [{ id: 'cmd-5', action: 'upgrade', status: 'running', output: '', created_at: new Date().toISOString() }],
+      },
+    })
+    expect(openCommandStream).toHaveBeenCalledTimes(1)
+    expect(api.showConsole.value).toBe(false)
   })
 })

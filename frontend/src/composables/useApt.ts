@@ -393,6 +393,16 @@ export function useApt() {
     }
   }
 
+  // A command launched from a previous mount of this page (or by another
+  // tab/session) can still be running server-side when /apt is (re)opened —
+  // the live console's WS stream dies with whatever component instance
+  // opened it (useCommandStream's onUnmounted), so a fresh mount otherwise
+  // shows nothing until it completes. Resume watching it, mirroring
+  // useBackup.ts's loadBackupData() fix. Checked only on the first snapshot
+  // after mount, so a console the user explicitly closed doesn't get
+  // silently reopened by a later snapshot within the same mount.
+  let hasCheckedResume = false
+
   const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<WSAptSnapshot>('/api/v1/ws/apt', (payload) => {
     if (payload.type !== 'apt') return
     // The generated WSAptSnapshot models cve_list as a JSON string, but the
@@ -404,6 +414,20 @@ export function useApt() {
       const cveUpdatedAt = aptStatuses.value[hostId]?.cve_updated_at
       if (cveUpdatedAt && cveUpdatedAt !== enrichingSinceCveUpdatedAt[hostId]) {
         stopEnriching(hostId)
+      }
+    }
+
+    if (!hasCheckedResume) {
+      hasCheckedResume = true
+      if (!showConsole.value) {
+        for (const [hostId, history] of Object.entries(aptHistories.value)) {
+          const latest = history[0]
+          if (latest?.status === 'running') {
+            const host = hosts.value.find((h: Host) => h.id === hostId) || null
+            watchCommand(latest, host)
+            break
+          }
+        }
       }
     }
   }, { debounceMs: 750 })
