@@ -48,6 +48,25 @@ describe('CommandLogPanel', () => {
     expect(wrapper.find('pre.console-output').exists()).toBe(false)
   })
 
+  it('renders a summary card for a completed module=restic/action=run_backup command', () => {
+    const wrapper = mount(CommandLogPanel, {
+      props: {
+        show: true,
+        command: {
+          ...baseCommand,
+          module: 'restic',
+          action: 'run_backup',
+          output: JSON.stringify({ status: 'ok', profile: 'files', duration_sec: 42, snapshot_id: 'abc123' }),
+        },
+      },
+    })
+    expect(wrapper.text()).toContain('abc123')
+    const badges = wrapper.findAll('.badge')
+    expect(badges[badges.length - 1].text()).toBe('ok')
+    expect(wrapper.find('table').exists()).toBe(false)
+    expect(wrapper.find('pre.console-output').exists()).toBe(false)
+  })
+
   it('falls back to raw output for a non-processes module', () => {
     const wrapper = mount(CommandLogPanel, {
       props: {

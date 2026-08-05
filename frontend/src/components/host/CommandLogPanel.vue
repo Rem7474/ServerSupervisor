@@ -147,6 +147,12 @@
               readonly
             />
           </div>
+          <div
+            v-else-if="structuredOutput?.kind === 'restic_backup_summary'"
+            class="console-processes flex-fill p-3"
+          >
+            <ResticBackupSummaryCard :summary="structuredOutput.data" />
+          </div>
           <pre
             v-else
             ref="outputEl"
@@ -182,6 +188,7 @@ import { useDateFormatter } from '../../composables/useDateFormatter'
 import { resolveStructuredOutput } from '../../utils/structuredCommandOutput'
 import ProcessesTable from './ProcessesTable.vue'
 import SystemdTable from './SystemdTable.vue'
+import ResticBackupSummaryCard from './ResticBackupSummaryCard.vue'
 
 interface CommandRecord {
   host_name?: string
