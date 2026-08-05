@@ -7,7 +7,7 @@ import { addToast } from './useGlobalToast'
 import { getApiErrorMessage } from '../api/client'
 import { useStatusBadge } from './useStatusBadge'
 import { commandStatusLabel } from '../utils/commandStatus'
-import { moduleLabel, moduleClass } from '../utils/moduleMeta'
+import { moduleLabel, moduleClass, REMOTE_COMMAND_MODULE_OPTIONS } from '../utils/moduleMeta'
 import { useCommandStream } from './useCommandStream'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
 import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
@@ -431,6 +431,7 @@ export function useAuditLogs() {
     unblockIP,
     moduleLabel,
     moduleClass,
+    moduleFilterOptions: REMOTE_COMMAND_MODULE_OPTIONS,
     statusLabel,
     cmdLabel,
     formatDuration,

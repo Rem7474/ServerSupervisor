@@ -131,7 +131,7 @@
               {{ g.name || '—' }}
             </router-link>
           </td>
-          <td><span :class="guestStatusClass(g.status)">{{ g.status }}</span></td>
+          <td><span :class="getEntityStateClass(g.status)">{{ getEntityStateLabel(g.status) }}</span></td>
           <td>
             <span
               v-if="guestNetworksLoading"
@@ -285,6 +285,7 @@ import EmptyState from '../EmptyState.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { GuestPowerAction } from '../../composables/useProxmoxGuestActions'
 import { compareValues } from '../../utils/sort'
+import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
 
 type Guest = Record<string, any>
 type LinkMap = Record<string, any>
@@ -400,15 +401,6 @@ const sortedGuests = computed(() => {
   })
   return list
 })
-
-function guestStatusClass(status: string): string {
-  const map: Record<string, string> = {
-    running: 'badge bg-success-lt text-success',
-    stopped: 'badge bg-secondary-lt text-secondary',
-    paused: 'badge bg-warning-lt text-warning',
-  }
-  return map[status] ?? 'badge bg-secondary-lt text-secondary'
-}
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'

@@ -16,7 +16,7 @@
           :options="resticOptionGroups"
           empty-label="Profil (défaut)"
           placeholder="Profil (défaut)"
-          style="min-width: 160px"
+          style="min-width: 160px; width: auto"
           :disabled="backupLoading === 'run' || liveStatus === 'running'"
           :title="resticGroups.length ? 'Un groupe lance plusieurs profils en une seule exécution.' : undefined"
         />

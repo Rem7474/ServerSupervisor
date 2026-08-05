@@ -300,6 +300,21 @@ export function useHostDetail() {
       if (d.disk_health) diskHealth.value = d.disk_health
       if (d.command_history) cmdHistory.value = d.command_history
       if (d.latest_agent_version) latestAgentVersion.value = d.latest_agent_version
+
+      // A command (apt/UU/agent update) can still be running from before
+      // this view last mounted — the live console's WS stream dies with
+      // whatever component instance opened it (useCommandStream's
+      // onUnmounted), so a fresh mount otherwise shows nothing for an
+      // in-progress command until the next full data reload. Resume
+      // watching it, mirroring useBackup.ts's loadBackupData() fix.
+      // Guarded on showConsole so this never fires mid-way through this
+      // same instance's own already-open console.
+      if (!showConsole.value) {
+        const latest = cmdHistory.value[0]
+        if (latest?.status === 'running') {
+          openCommand(latest)
+        }
+      }
     } catch {
       // Non-critical — WS will populate live data
     }
