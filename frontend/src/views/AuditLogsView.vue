@@ -97,23 +97,12 @@
                   <option value="">
                     Tous les modules
                   </option>
-                  <option value="apt">
-                    APT
-                  </option>
-                  <option value="docker">
-                    Docker
-                  </option>
-                  <option value="systemd">
-                    Systemd
-                  </option>
-                  <option value="journal">
-                    Journal
-                  </option>
-                  <option value="processes">
-                    Processus
-                  </option>
-                  <option value="custom">
-                    Custom
+                  <option
+                    v-for="opt in moduleFilterOptions"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
+                    {{ opt.label }}
                   </option>
                 </select>
               </div>
@@ -381,6 +370,7 @@ const {
   unblockIP,
   moduleLabel,
   moduleClass,
+  moduleFilterOptions,
   statusLabel,
   cmdLabel,
   formatDuration,
