@@ -51,7 +51,11 @@ Seules les variables dont le nom commence par `RESTIC_`, `OS_`, `SWIFT_`,
 `ST_`, `B2_`, `AWS_`, `AZURE_`, `GOOGLE_` ou `RCLONE_` sont transmises par
 l'agent au script (`resticEnvAllowedPrefixes`) — tout le reste (alias shell,
 `PS1`, etc.) présent dans ce fichier est ignoré, jamais transmis au processus
-`run_backup.sh`.
+`run_backup.sh`. Ça inclut `HOME` : un agent lancé en service systemd n'a
+généralement pas cette variable définie, ce qui produit un warning restic
+inoffensif (`unable to open cache: ... neither $XDG_CACHE_HOME nor $HOME
+are defined`, voir §9) — ajoutez `export RESTIC_CACHE_DIR="..."` ici pour le
+faire taire, plutôt que de dépendre de l'environnement de l'agent.
 
 ## 3. `resticprofile.yaml` — définir vos profils de sauvegarde
 
@@ -202,6 +206,7 @@ backup récurrent est une tâche planifiée comme une autre :
 | Pas de progression en direct pendant un backup en cours | `restic_enable_progress: false`, ou le script n'appelle pas `restic`/`resticprofile` avec `--json` |
 | Backup coupé alors qu'il semblait actif | Aucune ligne `--json` reçue pendant plus de `restic_backup_idle_timeout_minutes` — vérifier que le script ne reste pas bloqué sur une étape sans sortie (ex. `run-before` long et silencieux) |
 | Statut passif absent alors que le script fonctionne en manuel | `restic_status_file_path` ne pointe pas vers le `status-file` déclaré dans `resticprofile.yaml`, ou `extended-status` non activé sur le profil |
+| `unable to open cache: unable to locate cache directory: neither $XDG_CACHE_HOME nor $HOME are defined` dans les logs, backup par ailleurs fonctionnel | `HOME` n'est pas transmis par l'agent au processus restic (seules les variables `RESTIC_`/`OS_`/`SWIFT_`/`ST_`/`B2_`/`AWS_`/`AZURE_`/`GOOGLE_`/`RCLONE_` de `resticconf` le sont — voir §2), et un agent lancé en service systemd n'a généralement pas `HOME` défini par défaut. Sans effet sur l'upload vers le backend (le cache local n'est qu'une optimisation) mais facile à faire taire : ajoutez `export RESTIC_CACHE_DIR="/home/user/restic-backups/cache"` dans `resticconf` (créez le dossier au préalable) — `RESTIC_CACHE_DIR` est bien transmis puisqu'il commence par `RESTIC_` |
 
 ## Pour aller plus loin
 
