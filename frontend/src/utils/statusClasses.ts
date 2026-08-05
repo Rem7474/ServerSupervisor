@@ -31,6 +31,28 @@ export function getEntityStateClass(
   return ENTITY_STATE_MAP[state.toLowerCase()] ?? fallback
 }
 
+// French labels for the same entity states — kept alongside the class map so
+// a badge's color and text can't drift apart the way they previously did
+// (Docker showed "En cours" for a running container, Proxmox showed the raw
+// "running" for the exact same concept on a guest).
+const ENTITY_STATE_LABELS: Record<string, string> = {
+  online:     'En ligne',
+  offline:    'Hors ligne',
+  running:    'En cours',
+  restarting: 'Redémarrage',
+  paused:     'En pause',
+  created:    'Créé',
+  exited:     'Arrêté',
+  dead:       'Mort',
+  removing:   'Suppression',
+  stopped:    'Arrêté',
+}
+
+export function getEntityStateLabel(state: string | null | undefined, fallback?: string): string {
+  if (!state) return fallback ?? ''
+  return ENTITY_STATE_LABELS[state.toLowerCase()] ?? fallback ?? state
+}
+
 // ─── Execution / command states ───────────────────────────────────────────────
 
 const EXECUTION_STATE_MAP: Record<string, string> = {

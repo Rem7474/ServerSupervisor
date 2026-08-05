@@ -6,6 +6,8 @@ import { createPinia, setActivePinia } from 'pinia'
 // timers and no late-resolving async touches a torn-down component.
 enableAutoUnmount(afterEach)
 
+const { routeQuery } = vi.hoisted(() => ({ routeQuery: { current: {} as Record<string, string> } }))
+
 vi.mock('../api', () => {
   const ok = (data: unknown = {}) => async () => ({ data })
   return {
@@ -31,14 +33,15 @@ vi.mock('../api', () => {
       getProxmoxNodeCpuTempHistory: ok([]),
       getProxmoxNodeFanRPMHistory: ok([]),
       getProxmoxNodes: ok([]),
-      getProxmoxNodeGuestNetworks: ok({}),
+      getProxmoxNodeGuestNetworks: vi.fn(ok({})),
+      getProxmoxNodeGuestExposure: vi.fn(ok({})),
       getProxmoxNodeServices: ok([]),
     },
   }
 })
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { id: 'node-1' }, query: {} }),
+  useRoute: () => ({ params: { id: 'node-1' }, query: routeQuery.current }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
 
@@ -70,6 +73,7 @@ const mountOpts = {
 describe('ProxmoxNodeView (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    routeQuery.current = {}
     // ProxmoxNodeGuestsTab (mounted for the vms/lxc tabs) calls useAuthStore()
     // for its admin-only guest power-action buttons.
     setActivePinia(createPinia())
@@ -102,5 +106,29 @@ describe('ProxmoxNodeView (characterization)', () => {
     expect(disksBtn).toBeTruthy()
     await disksBtn!.trigger('click')
     expect(disksBtn!.classes()).toContain('active')
+  })
+
+  it('fetches guest networks/exposure (IP, domains) when landing directly on ?tab=lxc, without a click', async () => {
+    // Regression test: a hard refresh / direct link restores the tab via
+    // useProxmoxNode's load(), a different code path than the nav-click
+    // handler that used to be the only place these two loaders were
+    // triggered from — the IP/domains columns silently stayed empty.
+    routeQuery.current = { tab: 'lxc' }
+    mount(ProxmoxNodeView, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    expect(apiClient.getProxmoxNodeGuestNetworks).toHaveBeenCalledWith('node-1')
+    expect(apiClient.getProxmoxNodeGuestExposure).toHaveBeenCalledWith('node-1')
+  })
+
+  it('does not fetch guest networks/exposure when landing on an unrelated tab', async () => {
+    routeQuery.current = { tab: 'storage' }
+    mount(ProxmoxNodeView, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    expect(apiClient.getProxmoxNodeGuestNetworks).not.toHaveBeenCalled()
+    expect(apiClient.getProxmoxNodeGuestExposure).not.toHaveBeenCalled()
   })
 })

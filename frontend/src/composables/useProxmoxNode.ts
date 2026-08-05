@@ -168,6 +168,15 @@ export function useProxmoxNode() {
       loadLiveStatus()
       loadRRD('hour')
       loadPeerNodes()
+      // A tab restored from a ?tab= deep link (page refresh / direct link)
+      // never goes through the shell's click handler (ProxmoxNodeView's
+      // onTabClick) — the only other place these lazy per-tab loaders were
+      // triggered from — so VMs/LXC's per-guest network/exposure info (IP,
+      // domains) and the Services list silently stayed empty after a hard
+      // refresh landing directly on one of those tabs. Mirror onTabClick's
+      // own logic here for whichever tab was actually restored.
+      if (tab.value === 'vms' || tab.value === 'lxc') { loadGuestNetworks(); loadGuestExposure() }
+      else if (tab.value === 'services') loadServices()
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, 'Erreur lors du chargement.')
     } finally {

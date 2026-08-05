@@ -54,7 +54,7 @@
             <h2 class="page-title mb-0">
               {{ guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}` }}
             </h2>
-            <span :class="statusBadgeClass(guest.status)">{{ guest.status }}</span>
+            <span :class="getEntityStateClass(guest.status)">{{ getEntityStateLabel(guest.status) }}</span>
             <span class="badge bg-azure-lt text-azure">{{ guest.guest_type.toUpperCase() }}</span>
             <template v-if="guestLink?.host_id">
               <MetricsSourceBadge source="proxmox" />
@@ -272,6 +272,7 @@ import PageRefreshBar from '../components/PageRefreshBar.vue'
 import GuestExposureCard from '../components/proxmox/GuestExposureCard.vue'
 import { useAuthStore } from '../stores/auth'
 import { useProxmoxGuest } from '../composables/useProxmoxGuest'
+import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses'
 import type { ChartOptions, TooltipItem } from 'chart.js'
 
 const route = useRoute()
@@ -354,14 +355,6 @@ function formatUptime(seconds: number): string {
   return `${m}m`
 }
 
-function statusBadgeClass(status: string): string {
-  const map: Record<string, string> = {
-    running: 'badge bg-success-lt text-success',
-    stopped: 'badge bg-secondary-lt text-secondary',
-    paused: 'badge bg-warning-lt text-warning',
-  }
-  return map[status] || 'badge bg-secondary-lt text-secondary'
-}
 </script>
 
 <style scoped>
