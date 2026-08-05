@@ -7,6 +7,7 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { useWebSocket } from './useWebSocket'
 import type { WSHostSnapshot } from '../types/ws'
 import { useAuthStore } from '../stores/auth'
+import { confirmAptCommand } from '../utils/aptConfirm'
 
 // AnyRecord is the raw shape of an untyped JSON payload received over WebSocket
 // or HTTP. The composable keeps it loose because the consuming components
@@ -254,17 +255,8 @@ export function useHostDetail() {
   )
 
   async function sendAptCmd(command: string) {
-    // `apt update` ne fait que rafraîchir l'index des paquets — non destructif,
-    // contrairement à upgrade/dist-upgrade qui restent confirmés.
-    if (command !== 'update') {
-      const confirmed = await dialog.confirm({
-        title: `apt ${command}`,
-        message: `Exécuter sur : ${host.value?.hostname}`,
-        variant: command === 'dist-upgrade' ? 'danger' : 'warning',
-      })
-
-      if (!confirmed) return
-    }
+    const confirmed = await confirmAptCommand(command, host.value?.hostname || hostId)
+    if (!confirmed) return
 
     aptCmdLoading.value = command
     try {

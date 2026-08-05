@@ -54,6 +54,20 @@
           />
           Actualisation des données…
         </span>
+        <span
+          v-if="uuStatus?.reboot_required"
+          class="badge bg-warning-lt text-warning flex-shrink-0"
+          title="Redémarrage requis après une mise à jour automatique (unattended-upgrades)"
+        >
+          Redémarrage requis
+        </span>
+        <span
+          v-if="agentOutdated"
+          class="badge bg-primary-lt text-primary flex-shrink-0"
+          :title="`Agent ${host.agent_version || '?'} — version ${latestAgentVersion} disponible`"
+        >
+          Agent obsolète
+        </span>
         <button
           v-if="activeCommand"
           type="button"
@@ -223,6 +237,28 @@
 
         <!-- Détail extensible -->
         <template v-if="expanded">
+          <!-- Mises à jour automatiques (résumé) -->
+          <div
+            v-if="uuStatus"
+            class="mt-3 d-flex align-items-center gap-2 flex-wrap small"
+          >
+            <span class="fw-semibold text-secondary">Mises à jour automatiques :</span>
+            <span
+              v-if="!uuStatus.installed"
+              class="badge bg-secondary-lt text-secondary"
+            >Non installé</span>
+            <template v-else>
+              <span
+                class="badge"
+                :class="uuStatus.enabled ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
+              >{{ uuStatus.enabled ? 'Activé' : 'Désactivé' }}</span>
+              <span
+                v-if="uuStatus.last_run_at"
+                class="text-secondary"
+              >Dernière exécution {{ formatDate(uuStatus.last_run_at) }}</span>
+            </template>
+          </div>
+
           <!-- CVE -->
           <div
             v-if="cveList.length"
@@ -323,6 +359,7 @@ import CVEList from './CVEList.vue'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useStatusBadge } from '../../composables/useStatusBadge'
 import type { Host } from '../../types/host'
+import type { UnattendedUpgradesDB } from '../../types/ws'
 
 interface CveInfo { severity?: string; [key: string]: unknown }
 interface AptStatusView {
@@ -352,6 +389,9 @@ const props = defineProps<{
   canRunApt: boolean
   cmdLoading: string | null | undefined
   enriching?: boolean
+  uuStatus?: UnattendedUpgradesDB | undefined
+  agentOutdated?: boolean
+  latestAgentVersion?: string
 }>()
 
 defineEmits<{

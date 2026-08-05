@@ -66,10 +66,16 @@ type WSNetworkSnapshot struct {
 
 // WSAptSnapshot is broadcast on the apt endpoint (type "apt").
 type WSAptSnapshot struct {
-	Type         string                     `json:"type"`
-	Hosts        []Host                     `json:"hosts"`
-	AptStatuses  map[string]*AptStatus      `json:"apt_statuses"`
-	AptHistories map[string][]RemoteCommand `json:"apt_histories"`
+	Type         string                           `json:"type"`
+	Hosts        []Host                           `json:"hosts"`
+	AptStatuses  map[string]*AptStatus            `json:"apt_statuses"`
+	AptHistories map[string][]RemoteCommand       `json:"apt_histories"`
+	UUStatuses   map[string]*UnattendedUpgradesDB `json:"uu_statuses"`
+	// LatestAgentVersion is the currently resolved latest agent release (same
+	// source as GetHostComplete's latest_agent_version) — surfaced here too so
+	// the fleet-wide /apt page can flag out-of-date agents without a separate
+	// per-host request for every host.
+	LatestAgentVersion string `json:"latest_agent_version"`
 }
 
 // ===== Live command stream (GET /api/v1/ws/commands/stream/:id) =====

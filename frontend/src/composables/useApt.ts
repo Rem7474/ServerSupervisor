@@ -2,8 +2,9 @@ import { ref, onUnmounted, computed } from 'vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from './useWebSocket'
-import type { WSAptSnapshot } from '../types/ws'
+import type { WSAptSnapshot, UnattendedUpgradesDB } from '../types/ws'
 import { useConfirmDialog } from './useConfirmDialog'
+import { confirmAptCommand } from '../utils/aptConfirm'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { addToast } from './useGlobalToast'
 import { useCommandStream } from './useCommandStream'
@@ -16,9 +17,20 @@ interface AptStatusView {
   pending_packages?: number
   security_updates?: number
   cve_list?: CveInfo[]
+  package_list?: unknown
   updated_at?: string
   cve_updated_at?: string
   [key: string]: unknown
+}
+
+function parseJsonArray<T = unknown>(value: unknown): T[] {
+  if (!value) return []
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value
+    return Array.isArray(parsed) ? (parsed as T[]) : []
+  } catch {
+    return []
+  }
 }
 interface AptCommand {
   id: string
@@ -60,7 +72,10 @@ export function useApt() {
   const hostExpanded = ref<Record<string, boolean>>({})
   const aptStatuses = ref<Record<string, AptStatusView>>({})
   const aptHistories = ref<Record<string, AptCommand[]>>({})
+  const uuStatuses = ref<Record<string, UnattendedUpgradesDB | undefined>>({})
+  const latestAgentVersion = ref('')
   const hostCmdLoading = ref<Record<string, string | null>>({})
+  const bulkAgentUpdateLoading = ref(false)
 
   // ── Enrichissement CVE en arrière-plan (post-commande) ──────────────────────
   // After an apt update/upgrade/dist-upgrade command completes, the agent still
@@ -144,7 +159,13 @@ export function useApt() {
     { value: 'all', label: 'Tous' },
     { value: 'critical', label: 'CVE critiques' },
     { value: 'security', label: 'Sécu > 0' },
+    { value: 'reboot', label: 'Redémarrage requis' },
+    { value: 'outdated_agent', label: 'Agent obsolète' },
   ]
+
+  function isAgentOutdated(host: Host): boolean {
+    return !!host.agent_version && !!latestAgentVersion.value && host.agent_version !== latestAgentVersion.value
+  }
 
   const filteredHosts = computed(() => {
     let list = [...hosts.value]
@@ -154,7 +175,14 @@ export function useApt() {
       list = list.filter((h: Host) => {
         const primary = (h.name || h.hostname || '').toLowerCase()
         const secondary = (h.hostname || '').toLowerCase()
-        return primary.includes(q) || secondary.includes(q) || (h.ip_address || '').includes(q)
+        if (primary.includes(q) || secondary.includes(q) || (h.ip_address || '').includes(q)) return true
+        // Also match a package name or CVE id, so "I heard about CVE-2024-XXXX,
+        // which hosts does it affect?" doesn't require expanding every card.
+        const status = aptStatuses.value[h.id]
+        const packages = parseJsonArray<string>(status?.package_list)
+        if (packages.some((pkg) => pkg.toLowerCase().includes(q))) return true
+        const cves = status?.cve_list || []
+        return cves.some((c) => (c.id ? String(c.id).toLowerCase().includes(q) : false))
       })
     }
 
@@ -165,6 +193,10 @@ export function useApt() {
       })
     } else if (hostQuickFilter.value === 'security') {
       list = list.filter((h: Host) => (aptStatuses.value[h.id]?.security_updates || 0) > 0)
+    } else if (hostQuickFilter.value === 'reboot') {
+      list = list.filter((h: Host) => !!uuStatuses.value[h.id]?.reboot_required)
+    } else if (hostQuickFilter.value === 'outdated_agent') {
+      list = list.filter((h: Host) => isAgentOutdated(h))
     }
 
     list.sort((a: Host, b: Host) => {
@@ -270,18 +302,8 @@ export function useApt() {
   async function runAptCmdForHost(host: Host, command: string): Promise<void> {
     if (!canRunApt.value) return
 
-    // `apt update` ne fait que rafraîchir l'index des paquets — non destructif,
-    // contrairement à upgrade/dist-upgrade qui restent confirmés.
-    if (command !== 'update') {
-      const confirmed = await confirmBulkAction(
-        `apt ${command}`,
-        1,
-        command === 'dist-upgrade'
-          ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${host.name || host.hostname} ?`
-          : `Exécuter sur : ${host.name || host.hostname} ?`
-      )
-      if (!confirmed) return
-    }
+    const confirmed = await confirmAptCommand(command, host.name || host.hostname || host.id)
+    if (!confirmed) return
 
     hostCmdLoading.value = { ...hostCmdLoading.value, [host.id]: command }
     try {
@@ -330,18 +352,8 @@ export function useApt() {
       .map((h: Host) => h.name || h.hostname)
       .join(', ')
 
-    // `apt update` ne fait que rafraîchir l'index des paquets — non destructif,
-    // contrairement à upgrade/dist-upgrade qui restent confirmés.
-    if (command !== 'update') {
-      const confirmed = await confirmBulkAction(
-        `apt ${command}`,
-        selectedHosts.value.length,
-        command === 'dist-upgrade'
-          ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
-          : `Exécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
-      )
-      if (!confirmed) return
-    }
+    const confirmed = await confirmAptCommand(command, hostnames || 'les hôtes sélectionnés', selectedHosts.value.length)
+    if (!confirmed) return
 
     aptBulkLoading.value = command
     try {
@@ -393,6 +405,49 @@ export function useApt() {
     }
   }
 
+  // ── Mise à jour des agents ────────────────────────────────────────────────────
+  // Reuses the same per-host endpoint as the host-detail "Mettre à jour l'agent"
+  // button (TriggerAgentUpdate), fired in parallel across every selected host
+  // whose reported agent_version differs from latestAgentVersion. The server
+  // already guards "already up to date" / "update already in progress" per
+  // host (apperr.Conflict), so it's safe to fire even if the selection is a
+  // mix of outdated/up-to-date hosts — outdatedSelectedHosts filters most of
+  // that out client-side anyway, to keep the confirmation message accurate.
+  const outdatedSelectedHosts = computed(() =>
+    hosts.value.filter((h: Host) => selectedHosts.value.includes(h.id) && isAgentOutdated(h))
+  )
+
+  async function bulkAgentUpdate(): Promise<void> {
+    const targets = outdatedSelectedHosts.value
+    if (targets.length === 0) return
+
+    const hostnames = targets.map((h: Host) => h.name || h.hostname).join(', ')
+    const confirmed = await confirmBulkAction(
+      'Mettre à jour les agents',
+      targets.length,
+      `Déployer la version ${latestAgentVersion.value} sur : ${hostnames}. L'agent sera redémarré pendant l'opération sur chaque hôte.`
+    )
+    if (!confirmed) return
+
+    bulkAgentUpdateLoading.value = true
+    try {
+      const results = await Promise.allSettled(targets.map((h: Host) => apiClient.updateHostAgent(h.id)))
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length
+      const failed = results.length - succeeded
+      if (failed === 0) {
+        addToast(`Mise à jour lancée sur ${succeeded} agent${succeeded > 1 ? 's' : ''}`, 'success', 7000)
+      } else {
+        addToast(
+          `${succeeded} agent(s) lancé(s), ${failed} échec(s)`,
+          failed === results.length ? 'error' : 'warning',
+          7000
+        )
+      }
+    } finally {
+      bulkAgentUpdateLoading.value = false
+    }
+  }
+
   // A command launched from a previous mount of this page (or by another
   // tab/session) can still be running server-side when /apt is (re)opened —
   // the live console's WS stream dies with whatever component instance
@@ -410,6 +465,8 @@ export function useApt() {
     hosts.value = (payload.hosts || []) as Host[]
     aptStatuses.value = (payload.apt_statuses || {}) as unknown as Record<string, AptStatusView>
     aptHistories.value = (payload.apt_histories || {}) as unknown as Record<string, AptCommand[]>
+    uuStatuses.value = payload.uu_statuses || {}
+    latestAgentVersion.value = payload.latest_agent_version || ''
     for (const hostId of Object.keys(enrichingHosts.value)) {
       const cveUpdatedAt = aptStatuses.value[hostId]?.cve_updated_at
       if (cveUpdatedAt && cveUpdatedAt !== enrichingSinceCveUpdatedAt[hostId]) {
@@ -443,6 +500,8 @@ export function useApt() {
     hostExpanded,
     aptStatuses,
     aptHistories,
+    uuStatuses,
+    latestAgentVersion,
     hostCmdLoading,
     enrichingHosts,
     auth,
@@ -460,10 +519,14 @@ export function useApt() {
     hostSortDir,
     hostFilterOptions,
     filteredHosts,
+    isAgentOutdated,
+    outdatedSelectedHosts,
+    bulkAgentUpdateLoading,
     watchCommand,
     closeLiveConsole,
     runAptCmdForHost,
     bulkAptCmd,
+    bulkAgentUpdate,
     wsStatus,
     wsError,
     retryCount,

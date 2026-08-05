@@ -59,7 +59,7 @@
             type="checkbox"
             class="form-check-input"
           >
-          <span class="form-check-label">Sélectionner tous les hôtes</span>
+          <span class="form-check-label">{{ selectAllLabel }}</span>
         </label>
         <div class="ms-auto d-flex flex-wrap gap-2">
           <template v-if="canRunApt && selectedCount > 0">
@@ -103,8 +103,22 @@
               apt dist-upgrade ({{ selectedCount }})
             </button>
           </template>
+          <button
+            v-if="canRunApt && outdatedCount > 0"
+            type="button"
+            class="btn btn-outline-primary btn-sm"
+            :disabled="agentUpdateLoading"
+            @click="$emit('agent-update-cmd')"
+          >
+            <span
+              v-if="agentUpdateLoading"
+              class="spinner-border spinner-border-sm me-1"
+              role="status"
+            />
+            Mettre à jour les agents ({{ outdatedCount }})
+          </button>
           <span
-            v-else-if="selectedCount === 0"
+            v-if="selectedCount === 0"
             class="text-secondary small align-self-center"
           >Sélectionner des hôtes pour les actions groupées</span>
         </div>
@@ -114,18 +128,23 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import DataToolbar from '../common/DataToolbar.vue'
 import { IconSortAscending, IconSortDescending } from '@tabler/icons-vue'
 
-defineProps<{
+const props = defineProps<{
   filterOptions: { value: string, label: string }[]
   canRunApt: boolean
   selectedCount: number
   bulkLoading: string | null
+  filteredCount: number
+  outdatedCount: number
+  agentUpdateLoading: boolean
 }>()
 
 defineEmits<{
   (e: 'bulk-cmd', command: string): void
+  (e: 'agent-update-cmd'): void
 }>()
 
 const search = defineModel<string>('search', { required: true })
@@ -133,6 +152,17 @@ const quickFilter = defineModel<string>('quickFilter', { required: true })
 const sortKey = defineModel<'name' | 'pending' | 'security' | 'cve'>('sortKey', { required: true })
 const sortDir = defineModel<'asc' | 'desc'>('sortDir', { required: true })
 const allSelected = defineModel<boolean>('allSelected', { required: true })
+
+// "Sélectionner tous les hôtes" is misleading once a search/filtre reduces
+// the visible list — the checkbox only ever selects the filtered subset
+// (see useApt.ts's selectAll), so say so explicitly rather than implying a
+// fleet-wide selection right before a bulk action like dist-upgrade.
+const isFiltered = computed(() => !!search.value.trim() || quickFilter.value !== 'all')
+const selectAllLabel = computed(() =>
+  isFiltered.value
+    ? `Sélectionner les ${props.filteredCount} hôte${props.filteredCount > 1 ? 's' : ''} affiché${props.filteredCount > 1 ? 's' : ''}`
+    : 'Sélectionner tous les hôtes'
+)
 </script>
 
 <style scoped>

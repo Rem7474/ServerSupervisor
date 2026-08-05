@@ -50,7 +50,11 @@
       :can-run-apt="canRunApt"
       :selected-count="selectedHosts.length"
       :bulk-loading="aptBulkLoading"
+      :filtered-count="filteredHosts.length"
+      :outdated-count="outdatedSelectedHosts.length"
+      :agent-update-loading="bulkAgentUpdateLoading"
       @bulk-cmd="bulkAptCmd"
+      @agent-update-cmd="bulkAgentUpdate"
     />
 
     <div class="side-layout">
@@ -93,6 +97,9 @@
               :can-run-apt="canRunApt"
               :cmd-loading="hostCmdLoading[host.id]"
               :enriching="!!enrichingHosts[host.id]"
+              :uu-status="uuStatuses[host.id]"
+              :agent-outdated="isAgentOutdated(host)"
+              :latest-agent-version="latestAgentVersion"
               @update:selected="val => toggleSelected(host.id, val)"
               @update:expanded="val => hostExpanded[host.id] = val"
               @run-cmd="cmd => runAptCmdForHost(host, cmd)"
@@ -117,6 +124,7 @@
     <AptScheduleModal
       :host="scheduleHost"
       @close="scheduleHost = null"
+      @created="onScheduleCreated"
     />
   </div>
 </template>
@@ -131,6 +139,7 @@ import AptToolbar from '../components/apt/AptToolbar.vue'
 import AptHostCard from '../components/apt/AptHostCard.vue'
 import AptScheduleModal from '../components/apt/AptScheduleModal.vue'
 import { useApt } from '../composables/useApt'
+import { addToast } from '../composables/useGlobalToast'
 
 const {
   hosts,
@@ -138,6 +147,8 @@ const {
   hostExpanded,
   aptStatuses,
   aptHistories,
+  uuStatuses,
+  latestAgentVersion,
   hostCmdLoading,
   enrichingHosts,
   canRunApt,
@@ -154,15 +165,23 @@ const {
   hostSortDir,
   hostFilterOptions,
   filteredHosts,
+  isAgentOutdated,
+  outdatedSelectedHosts,
+  bulkAgentUpdateLoading,
   watchCommand,
   closeLiveConsole,
   runAptCmdForHost,
   bulkAptCmd,
+  bulkAgentUpdate,
   wsStatus,
   wsError,
   retryCount,
   dataStaleAlert,
   reconnect,
 } = useApt()
+
+function onScheduleCreated(): void {
+  addToast('Tâche planifiée créée', 'success')
+}
 </script>
 
