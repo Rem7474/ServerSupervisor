@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useCommandStream } from './useCommandStream'
-import type { CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
+import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
 
 interface BackupRun {
   id: string
@@ -73,6 +73,27 @@ export function useBackup(hostId: string) {
       backupRuns.value = runsRes.data?.runs || []
       resticProfiles.value = profilesRes.data?.profiles || []
       resticGroups.value = groupsRes.data?.groups || []
+
+      // A backup can still be running from before this component last
+      // mounted (the user left the Sauvegardes tab mid-backup, or a
+      // scheduled task started one while the tab was closed) — the WS
+      // stream subscription driving the live progress bar dies with
+      // whatever component instance opened it (stopWatchingLiveBackup on
+      // unmount), so a fresh mount otherwise shows no progress at all for
+      // an in-progress run until it happens to finish. Resume watching it.
+      // Guarded on liveStatus === 'idle' so this never fires mid-way
+      // through this same instance's own already-tracked run: handleRunBackup
+      // sets liveStatus before its own loadBackupData call, and the
+      // post-completion reload below already left liveStatus non-idle.
+      const latest = backupStatus.value?.latest_run
+      if (liveStatus.value === 'idle' && latest?.status === 'running' && latest.command_id) {
+        liveStatus.value = 'running'
+        openCommandStream(latest.command_id, {
+          onInit: handleStreamInit,
+          onChunk: handleStreamChunk,
+          onStatus: handleStreamStatus,
+        })
+      }
     } catch {
       // non-critical — the tab still renders with empty state
     }
@@ -82,6 +103,23 @@ export function useBackup(hostId: string) {
     liveStatus.value = 'idle'
     liveProgress.value = null
     liveLogLines.value = []
+  }
+
+  // Only relevant when resuming an in-progress run (see loadBackupData):
+  // the server only fills `output` for an *already-terminal* command — for
+  // one still running, it's empty and the live view just picks up from
+  // whatever chunk/status arrives next. Covers the edge case where the run
+  // finished in the gap between our REST reload and the stream connecting.
+  function handleStreamInit(payload: CommandStreamInitMsg): void {
+    if (payload.status === 'completed' || payload.status === 'failed') {
+      liveStatus.value = payload.status
+      if (payload.output) liveLogLines.value.push(payload.output)
+      window.setTimeout(() => {
+        void loadBackupData()
+      }, 1200)
+    } else {
+      liveStatus.value = 'running'
+    }
   }
 
   function handleStreamChunk(payload: CommandStreamChunkMsg): void {
