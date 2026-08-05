@@ -2048,6 +2048,14 @@ export interface WSAptSnapshot {
   hosts: Host[];
   apt_statuses: { [key: string]: AptStatus | undefined};
   apt_histories: { [key: string]: RemoteCommand[]};
+  uu_statuses: { [key: string]: UnattendedUpgradesDB | undefined};
+  /**
+   * LatestAgentVersion is the currently resolved latest agent release (same
+   * source as GetHostComplete's latest_agent_version) — surfaced here too so
+   * the fleet-wide /apt page can flag out-of-date agents without a separate
+   * per-host request for every host.
+   */
+  latest_agent_version: string;
 }
 /**
  * WSCommandStreamInit is the first message sent on connect: the command's current

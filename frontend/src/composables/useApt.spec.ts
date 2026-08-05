@@ -29,15 +29,19 @@ vi.mock('./useCommandStream', () => ({
   }),
 }))
 
+const { updateHostAgent } = vi.hoisted(() => ({ updateHostAgent: vi.fn() }))
+
 vi.mock('../api', () => ({
-  default: { sendAptCommand: vi.fn() },
+  default: { sendAptCommand: vi.fn(), updateHostAgent },
   getApiErrorMessage: (e: unknown) => String(e),
 }))
 
 import { useApt } from './useApt'
+import { useConfirmDialog } from './useConfirmDialog'
 import type { Host } from '../types/host'
 
 const HOST: Host = { id: 'h1', name: 'web-01' } as Host
+const HOST2: Host = { id: 'h2', name: 'db-01' } as Host
 
 function mountUseApt() {
   let api!: ReturnType<typeof useApt>
@@ -61,10 +65,30 @@ function emitAptSnapshot(hostId: string, cveUpdatedAt: string | undefined, updat
   })
 }
 
+interface FullSnapshotOverrides {
+  hosts?: Host[]
+  aptStatuses?: Record<string, unknown>
+  uuStatuses?: Record<string, unknown>
+  latestAgentVersion?: string
+}
+
+function emitFullAptSnapshot(overrides: FullSnapshotOverrides = {}) {
+  wsMessageHandler.current?.({
+    type: 'apt',
+    hosts: overrides.hosts || [HOST, HOST2],
+    apt_statuses: overrides.aptStatuses || {},
+    apt_histories: {},
+    uu_statuses: overrides.uuStatuses || {},
+    latest_agent_version: overrides.latestAgentVersion || '',
+  })
+}
+
 beforeEach(() => {
   setActivePinia(createPinia())
   streamOptionsByCommand.clear()
   wsMessageHandler.current = null
+  updateHostAgent.mockClear()
+  updateHostAgent.mockResolvedValue({ data: {} })
   vi.useFakeTimers()
 })
 
@@ -125,5 +149,114 @@ describe('useApt — post-command CVE enrichment indicator', () => {
     api.watchCommand({ id: 'cmd-3', action: 'install_uu', status: 'running', output: '' }, HOST)
     streamOptionsByCommand.get('cmd-3')?.onStatus?.({ status: 'completed' })
     expect(api.enrichingHosts.value.h1).toBeUndefined()
+  })
+})
+
+describe('useApt — extended search + reboot/outdated-agent filters', () => {
+  it('search also matches a pending package name across the fleet', () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({
+      aptStatuses: {
+        h1: { package_list: JSON.stringify(['nginx', 'curl']) },
+        h2: { package_list: JSON.stringify(['postgresql']) },
+      },
+    })
+    api.hostSearch.value = 'curl'
+    expect(api.filteredHosts.value.map((h) => h.id)).toEqual(['h1'])
+  })
+
+  it('search also matches a CVE id, case-insensitively', () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({
+      aptStatuses: {
+        h1: { cve_list: [{ id: 'CVE-2024-1234', severity: 'HIGH' }] },
+        h2: { cve_list: [] },
+      },
+    })
+    api.hostSearch.value = 'cve-2024-1234'
+    expect(api.filteredHosts.value.map((h) => h.id)).toEqual(['h1'])
+  })
+
+  it('the "reboot" quick filter shows only hosts with reboot_required', () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({
+      uuStatuses: {
+        h1: { installed: true, enabled: true, reboot_required: true },
+        h2: { installed: true, enabled: true, reboot_required: false },
+      },
+    })
+    api.hostQuickFilter.value = 'reboot'
+    expect(api.filteredHosts.value.map((h) => h.id)).toEqual(['h1'])
+  })
+
+  it('the "outdated_agent" quick filter shows only hosts whose agent_version differs from latest', () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({
+      hosts: [
+        { ...HOST, agent_version: '1.0.0' } as Host,
+        { ...HOST2, agent_version: '2.0.0' } as Host,
+      ],
+      latestAgentVersion: '2.0.0',
+    })
+    api.hostQuickFilter.value = 'outdated_agent'
+    expect(api.filteredHosts.value.map((h) => h.id)).toEqual(['h1'])
+  })
+
+  it('does not flag any host as outdated before latestAgentVersion has arrived', () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({ hosts: [{ ...HOST, agent_version: '1.0.0' } as Host], latestAgentVersion: '' })
+    expect(api.isAgentOutdated(api.hosts.value[0])).toBe(false)
+  })
+})
+
+describe('useApt — bulk agent update', () => {
+  it('updates only the selected AND outdated hosts, after confirmation', async () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({
+      hosts: [
+        { ...HOST, agent_version: '1.0.0' } as Host,
+        { ...HOST2, agent_version: '2.0.0' } as Host,
+      ],
+      latestAgentVersion: '2.0.0',
+    })
+    api.selectedHosts.value = ['h1', 'h2']
+    expect(api.outdatedSelectedHosts.value.map((h) => h.id)).toEqual(['h1'])
+
+    const dialog = useConfirmDialog()
+    const updatePromise = api.bulkAgentUpdate()
+    dialog.onConfirm()
+    await updatePromise
+
+    expect(updateHostAgent).toHaveBeenCalledTimes(1)
+    expect(updateHostAgent).toHaveBeenCalledWith('h1')
+  })
+
+  it('does nothing when no selected host is outdated', async () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({
+      hosts: [{ ...HOST, agent_version: '2.0.0' } as Host],
+      latestAgentVersion: '2.0.0',
+    })
+    api.selectedHosts.value = ['h1']
+
+    await api.bulkAgentUpdate()
+
+    expect(updateHostAgent).not.toHaveBeenCalled()
+  })
+
+  it('does not update anything when the confirmation is cancelled', async () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({
+      hosts: [{ ...HOST, agent_version: '1.0.0' } as Host],
+      latestAgentVersion: '2.0.0',
+    })
+    api.selectedHosts.value = ['h1']
+
+    const dialog = useConfirmDialog()
+    const updatePromise = api.bulkAgentUpdate()
+    dialog.onCancel()
+    await updatePromise
+
+    expect(updateHostAgent).not.toHaveBeenCalled()
   })
 })

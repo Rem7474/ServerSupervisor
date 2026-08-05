@@ -65,7 +65,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}, bus))
-	wsH := ws.NewWSHandler(db, cfg, notifHub, bus)
+	wsH := ws.NewWSHandler(db, cfg, notifHub, bus, func() string {
+		return handlers.ResolveLatestAgentVersion(cfg)
+	})
 	dispatcher.SetAgentPusher(wsH.GetAgentHub())
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub, bus)
 	aptH := handlers.NewAptHandler(aptsvc.NewService(db, dispatcher), db)

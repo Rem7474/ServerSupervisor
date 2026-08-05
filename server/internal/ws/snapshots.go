@@ -272,6 +272,7 @@ func (h *WSHandler) sendAptSnapshot(ctx context.Context, conn *websocket.Conn, l
 
 	aptStatuses := map[string]*models.AptStatus{}
 	aptHistories := map[string][]models.RemoteCommand{}
+	uuStatuses := map[string]*models.UnattendedUpgradesDB{}
 
 	for _, host := range hosts {
 		status, err := h.db.GetAptStatus(ctx, host.ID)
@@ -282,13 +283,19 @@ func (h *WSHandler) sendAptSnapshot(ctx context.Context, conn *websocket.Conn, l
 		if err == nil {
 			aptHistories[host.ID] = hist
 		}
+		uu, err := h.db.GetUUStatus(ctx, host.ID)
+		if err == nil {
+			uuStatuses[host.ID] = uu
+		}
 	}
 
 	payload := &models.WSAptSnapshot{
-		Type:         "apt",
-		Hosts:        hosts,
-		AptStatuses:  aptStatuses,
-		AptHistories: aptHistories,
+		Type:               "apt",
+		Hosts:              hosts,
+		AptStatuses:        aptStatuses,
+		AptHistories:       aptHistories,
+		UUStatuses:         uuStatuses,
+		LatestAgentVersion: h.latestAgentVersion(),
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil

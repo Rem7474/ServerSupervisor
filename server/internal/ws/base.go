@@ -63,14 +63,15 @@ const (
 )
 
 type WSHandler struct {
-	db        *database.DB
-	cfg       *config.Config
-	streamHub *CommandStreamHub
-	notifHub  *NotificationHub
-	agentHub  *AgentHub
-	events    *events.Bus
-	ipConns   map[string]int
-	ipConnsMu sync.Mutex
+	db                 *database.DB
+	cfg                *config.Config
+	streamHub          *CommandStreamHub
+	notifHub           *NotificationHub
+	agentHub           *AgentHub
+	events             *events.Bus
+	latestAgentVersion func() string
+	ipConns            map[string]int
+	ipConnsMu          sync.Mutex
 
 	// Shared, short-lived cache of the dashboard snapshot payload. The payload is
 	// identical for every client (no per-user filtering), so it is computed once
@@ -85,15 +86,16 @@ type wsAuthMessage struct {
 	Token string `json:"token"`
 }
 
-func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub, bus *events.Bus) *WSHandler {
+func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub, bus *events.Bus, latestAgentVersion func() string) *WSHandler {
 	return &WSHandler{
-		db:        db,
-		cfg:       cfg,
-		streamHub: NewCommandStreamHub(),
-		notifHub:  notifHub,
-		agentHub:  NewAgentHub(),
-		events:    bus,
-		ipConns:   make(map[string]int),
+		db:                 db,
+		cfg:                cfg,
+		streamHub:          NewCommandStreamHub(),
+		notifHub:           notifHub,
+		agentHub:           NewAgentHub(),
+		events:             bus,
+		latestAgentVersion: latestAgentVersion,
+		ipConns:            make(map[string]int),
 	}
 }
 
