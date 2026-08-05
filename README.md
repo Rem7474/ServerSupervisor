@@ -124,13 +124,13 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 ### 1. Déployer le serveur
 
 ```bash
-git clone <repo-url> && cd ServerSupervisor
+git clone https://github.com/Rem7474/ServerSupervisor.git && cd ServerSupervisor
 cp .env.example .env
 # Éditer .env avec vos valeurs (JWT_SECRET, ADMIN_PASSWORD, etc.)
 docker compose up -d
 ```
 
-Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin` par défaut, **à changer**).
+Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin` par défaut).
 
 ### 2. Enregistrer un hôte
 
@@ -198,7 +198,6 @@ sudo dnf install -y lm_sensors       # si collect_cpu_temperature: true
 Notes:
 - Pour Docker, l'utilisateur du service agent doit avoir accès au socket Docker (groupe `docker` ou équivalent).
 - Sur certains environnements virtualisés, la température CPU peut être absente même avec `lm-sensors`.
-- Si `collect_cpu_temperature` est désactivé, aucun prérequis capteur n'est nécessaire.
 
 #### Via les releases GitHub (manuel)
 
