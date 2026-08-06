@@ -75,6 +75,7 @@ export function useHostDetail() {
   const uuRuns = ref<AnyRecord[] | null>(null)
   const uuLoading = ref('')
   const uuForm = ref<AnyRecord | null>(null)
+  const uuFormSyncedSnapshot = ref<string | null>(null)
 
   const proxmoxLink = ref<AnyRecord | null>(null)
   const linkSaving = ref(false)
@@ -143,7 +144,7 @@ export function useHostDetail() {
   function syncUUFormFromStatus(status: AnyRecord | null): void {
     if (!status) return
     const cfg = (status.config ?? {}) as Record<string, unknown>
-    uuForm.value = {
+    const next = {
       enabled: status.enabled ?? false,
       config: {
         security_only: cfg.security_only ?? true,
@@ -152,6 +153,16 @@ export function useHostDetail() {
         remove_unused: cfg.remove_unused ?? false,
       },
     }
+    uuForm.value = next
+    uuFormSyncedSnapshot.value = JSON.stringify(next)
+  }
+
+  // True when the form still matches the last value it was synced from — i.e. the user
+  // hasn't started editing it yet, so it's safe to overwrite with a fresher live status
+  // without clobbering an in-progress edit.
+  function isUUFormUntouched(): boolean {
+    if (!uuForm.value) return true
+    return uuFormSyncedSnapshot.value === JSON.stringify(uuForm.value)
   }
 
   function openCommand(rawCmd: AnyRecord) {
@@ -240,7 +251,11 @@ export function useHostDetail() {
       aptStatus.value = asRecord(payload.apt_status)
       if ('uu_status' in payload) {
         uuStatus.value = asRecord(payload.uu_status)
-        if (!uuForm.value) {
+        // The "Activé" badge always reflects uuStatus (assigned above, live). Only
+        // re-sync the editable form when the user hasn't started editing it, so the
+        // badge and the toggle can't drift apart, but an in-progress edit survives a
+        // live update.
+        if (isUUFormUntouched()) {
           syncUUFormFromStatus(uuStatus.value)
         }
       }
