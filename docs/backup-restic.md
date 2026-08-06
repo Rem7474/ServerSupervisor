@@ -152,7 +152,7 @@ nextcloud-db:
     extended-status: true
 ```
 Exemple pour Immich :
-```
+```yaml
 version: "1"
 
 global:
