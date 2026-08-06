@@ -91,6 +91,14 @@
               @toggle="toggleSort('uptime')"
             />
           </th>
+          <th>
+            <SortableHeader
+              label="Dernière sauvegarde"
+              :active="sortKey === 'last_backup'"
+              :direction="sortDir"
+              @toggle="toggleSort('last_backup')"
+            />
+          </th>
           <th v-if="showTags">
             <SortableHeader
               label="Tags"
@@ -187,6 +195,23 @@
           <td>{{ formatBytes(g.mem_usage) }}</td>
           <td>{{ formatBytes(g.disk_alloc) }}</td>
           <td>{{ g.status === 'running' ? formatUptime(g.uptime) : '—' }}</td>
+          <td>
+            <span
+              v-if="!lastBackupFor(g)"
+              class="text-muted"
+            >—</span>
+            <template v-else>
+              <span
+                class="badge me-1"
+                :class="lastBackupBadgeClass(lastBackupFor(g))"
+              >{{ lastBackupLabel(lastBackupFor(g)) }}</span>
+              <RelativeTime
+                v-if="lastBackupFor(g)?.start_time"
+                :date="lastBackupFor(g).start_time"
+                class="small text-muted"
+              />
+            </template>
+          </td>
           <td v-if="showTags">
             <template v-if="g.tags">
               <span
@@ -282,6 +307,7 @@ import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import GuestLinkCell from './GuestLinkCell.vue'
 import EmptyState from '../EmptyState.vue'
+import RelativeTime from '../RelativeTime.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { GuestPowerAction } from '../../composables/useProxmoxGuestActions'
 import { compareValues } from '../../utils/sort'
@@ -297,6 +323,7 @@ const props = defineProps<{
   guestNetworksLoading?: boolean
   guestExposure?: Record<string, any>
   guestExposureLoading?: boolean
+  backupRunsByVmid?: Record<number, any>
   links: LinkMap
   peerNodes: Guest[]
   nodeId: string
@@ -324,12 +351,32 @@ const idLabel = computed(() => (props.kind === 'vm' ? 'VMID' : 'CT ID'))
 const cpuSuffix = computed(() => (props.kind === 'vm' ? ' vCPU' : ''))
 const emptyText = computed(() => (props.kind === 'vm' ? 'Aucune VM sur ce nœud.' : 'Aucun conteneur LXC sur ce nœud.'))
 const colspan = computed(() => {
-  const base = (props.kind === 'vm' ? 12 : 11) + 1 // +1 for the Domaines column
+  const base = (props.kind === 'vm' ? 12 : 11) + 2 // +1 Domaines, +1 Dernière sauvegarde
   return showActionsCol.value ? base + 1 : base
 })
 
 function actionLoadingFor(guest: Guest): GuestPowerAction | null {
   return props.actionLoading?.[guest.id] ?? null
+}
+
+function lastBackupFor(guest: Guest): any {
+  return props.backupRunsByVmid?.[guest.vmid] ?? null
+}
+
+function lastBackupLabel(run: any): string {
+  if (!run) return '—'
+  if (run.status === 'running') return 'En cours'
+  if (run.exit_status === 'OK' || run.status === 'OK') return 'OK'
+  if (run.exit_status) return String(run.exit_status)
+  return String(run.status || '—')
+}
+
+function lastBackupBadgeClass(run: any): string {
+  if (!run) return 'bg-secondary-lt text-secondary'
+  if (run.status === 'running') return 'bg-primary-lt text-primary'
+  if (run.exit_status === 'OK' || run.status === 'OK') return 'bg-success-lt text-success'
+  if (run.exit_status) return 'bg-danger-lt text-danger'
+  return 'bg-secondary-lt text-secondary'
 }
 
 const sortKey = ref('vmid')
@@ -394,6 +441,7 @@ const sortedGuests = computed(() => {
       case 'mem_used': return compareValues(a.mem_usage, b.mem_usage, sortDir.value)
       case 'disk_alloc': return compareValues(a.disk_alloc, b.disk_alloc, sortDir.value)
       case 'uptime': return compareValues(a.status === 'running' ? a.uptime : -1, b.status === 'running' ? b.uptime : -1, sortDir.value)
+      case 'last_backup': return compareValues(lastBackupFor(a)?.start_time || '', lastBackupFor(b)?.start_time || '', sortDir.value)
       case 'tags': return compareValues(a.tags || '', b.tags || '', sortDir.value)
       case 'linked_host': return compareValues(linkedHostLabel(a), linkedHostLabel(b), sortDir.value)
       default: return 0

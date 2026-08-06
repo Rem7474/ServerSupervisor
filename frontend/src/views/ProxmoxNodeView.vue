@@ -353,6 +353,7 @@
                   :guest-networks-loading="guestNetworksLoading"
                   :guest-exposure="guestExposure"
                   :guest-exposure-loading="guestExposureLoading"
+                  :backup-runs-by-vmid="backupRunsByVmid"
                   :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
@@ -373,6 +374,7 @@
                   :guest-networks-loading="guestNetworksLoading"
                   :guest-exposure="guestExposure"
                   :guest-exposure-loading="guestExposureLoading"
+                  :backup-runs-by-vmid="backupRunsByVmid"
                   :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
@@ -431,6 +433,14 @@
 
               <template #storage>
                 <ProxmoxNodeStorageTab :storages="node.storages || []" />
+              </template>
+
+              <template #backups>
+                <ProxmoxNodeBackupsTab
+                  :runs="backupRuns"
+                  :loading="backupRunsLoading"
+                  @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
+                />
               </template>
             </EntityTabShell>
 
@@ -553,6 +563,7 @@ import ProxmoxNodeUpdatesTab from '../components/proxmox/ProxmoxNodeUpdatesTab.v
 import ProxmoxNodeServicesTab from '../components/proxmox/ProxmoxNodeServicesTab.vue'
 import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab.vue'
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
+import ProxmoxNodeBackupsTab from '../components/proxmox/ProxmoxNodeBackupsTab.vue'
 import { useProxmoxNode } from '../composables/useProxmoxNode'
 import { useModalChrome } from '../composables/useModalChrome'
 
@@ -626,6 +637,10 @@ const {
   vms,
   lxcs,
   failedTaskCount,
+  backupRuns,
+  backupRunsLoading,
+  backupRunsByVmid,
+  loadBackupRuns,
   confirmGuestLink,
   ignoreGuestLink,
   goToHost,
@@ -663,6 +678,7 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
     lazy: true,
   },
   { key: 'services', label: 'Services', lazy: true },
+  { key: 'backups', label: 'Sauvegarde', badges: [{ value: backupRuns.value.length, badgeClass: azureBadge }], lazy: true },
   // Labeled "Journaux sécurité" (not "Sécurité") to avoid colliding with
   // HostDetailView's "Permissions" tab — same word previously used on both,
   // unrelated content (PVE syslog auth-failure search here vs. per-host RBAC there).
@@ -677,8 +693,9 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
 // avoids re-triggering on every tab.value change load() itself makes.
 function onTabClick(key: string): void {
   tab.value = key
-  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure() }
+  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackupRuns() }
   if (key === 'services') loadServices()
+  if (key === 'backups') loadBackupRuns()
 }
 
 function memPct(n: { mem_used?: number; mem_total?: number }): string | number {
