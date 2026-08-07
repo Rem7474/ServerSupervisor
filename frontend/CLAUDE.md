@@ -86,6 +86,13 @@ Don't use `red`/`green`/`yellow` for a state (they duplicate `danger`/`success`/
 - Loading: `<LoadingSkeleton>` for a first-load of a zone whose shape is known (table, KPI strip, chart); `spinner-border` only for a punctual action (button in flight, per-row action) — never both in the same view for the same zone.
 - Actions column: `text-end`, last column, `btn-icon btn-sm` buttons.
 
+### Clickable inline text
+
+A cross-page audit found at least 6 different ad-hoc conventions for "this text is a link" (plain, `fw-semibold`, `fw-medium`, a badge styled as a link, `btn btn-link`, and — the one actual bug, not just a style choice — a bare `<a>` with no class at all, which keeps the browser's native underline-on-hover instead of the app's own hover treatment). Two rules going forward:
+
+- Always `text-decoration-none` — never a bare `<a>`/clickable span with no class. This is the one part that's an actual bug (native underline) rather than a judgment call.
+- Weight carries meaning: `fw-medium text-decoration-none` when the text *is* the row/card's primary entity (a host/guest/domain name that identifies what the row is about — table-cell identifier links and `btn-link`-styled identifier buttons alike, e.g. `ExposureDomainsPanel.vue`'s domain name). Plain `text-decoration-none` (no weight) for a secondary/contextual reference or action link that isn't the row's subject (e.g. a "voir" link inside a KPI card pointing at another tab).
+
 ### Modals
 
 There is no `AppModal.vue` and none is planned as a big-bang migration — see `composables/useModalChrome.ts` (ESC handling with a top-of-stack-only dispatch, scroll lock, focus trap) instead, wired into each modal's own existing markup with ~4 lines of script. It replaced `useModalFocusTrap.ts`, which had a latent bug: it bound its listener in `onMounted` while every consumer stays mounted and toggles an inner `v-if`, so the trap never actually engaged. If a *new* modal is being added and its markup would clearly benefit from a shared header/body/footer shell, that's the point to introduce `AppModal.vue` — additively, for new modals only, built on top of `useModalChrome`. Don't retrofit it onto `DomainDetailsModal.vue`/`IPTimelineModal.vue` — those are full-screen drawers built from a Tabler `.card`, not `.modal`/`.modal-dialog`/`.modal-content`, and forcing them into a modal shell would be the wrong abstraction, not a consistency fix.

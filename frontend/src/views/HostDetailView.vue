@@ -323,7 +323,7 @@
                       {{ aptStatus?.security_updates || 0 }} sécurité
                       <a
                         href="#"
-                        class="ms-1"
+                        class="ms-1 text-decoration-none"
                         @click.prevent="activeTab = 'apt'"
                       >voir</a>
                     </div>
@@ -343,7 +343,7 @@
                       en cours
                       <a
                         href="#"
-                        class="ms-1"
+                        class="ms-1 text-decoration-none"
                         @click.prevent="activeTab = 'docker'"
                       >voir</a>
                     </div>
@@ -362,6 +362,7 @@
                     <div class="text-secondary small">
                       <a
                         href="#"
+                        class="text-decoration-none"
                         @click.prevent="activeTab = 'planifiees'"
                       >voir</a>
                     </div>
@@ -380,6 +381,7 @@
                     <div class="text-secondary small">
                       <a
                         href="#"
+                        class="text-decoration-none"
                         @click.prevent="activeTab = 'commandes'"
                       >voir</a>
                     </div>

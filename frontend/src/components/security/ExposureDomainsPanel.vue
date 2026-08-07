@@ -110,7 +110,7 @@
               <td>
                 <button
                   type="button"
-                  class="btn btn-link btn-sm p-0 font-monospace small text-decoration-none"
+                  class="btn btn-link btn-sm p-0 font-monospace small fw-medium text-decoration-none"
                   title="Voir le détail des requêtes/menaces pour ce domaine"
                   @click="openDomain(d.domain_name)"
                 >
