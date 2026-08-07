@@ -4,7 +4,7 @@
     <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
       <button
         type="button"
-        class="btn btn-outline-secondary"
+        class="btn btn-sm btn-outline-secondary"
         :disabled="aptRefreshing"
         @click="emit('refresh-apt')"
       >
