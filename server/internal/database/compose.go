@@ -44,7 +44,7 @@ func (db *DB) UpsertComposeProjects(ctx context.Context, hostID string, projects
 // GetComposeProjectsByHost returns compose projects for a specific host
 func (db *DB) GetComposeProjectsByHost(ctx context.Context, hostID string) ([]models.ComposeProject, error) {
 	rows, err := db.conn.QueryContext(ctx, `
-		SELECT cp.id, cp.host_id, COALESCE(h.hostname, ''), cp.name,
+		SELECT cp.id, cp.host_id, COALESCE(h.name, ''), cp.name,
 		       cp.working_dir, cp.config_file, cp.services, cp.raw_config, cp.updated_at
 		FROM compose_projects cp
 		LEFT JOIN hosts h ON h.id = cp.host_id
@@ -61,7 +61,7 @@ func (db *DB) GetComposeProjectsByHost(ctx context.Context, hostID string) ([]mo
 // GetAllComposeProjects returns all compose projects across all hosts
 func (db *DB) GetAllComposeProjects(ctx context.Context) ([]models.ComposeProject, error) {
 	rows, err := db.conn.QueryContext(ctx, `
-		SELECT cp.id, cp.host_id, COALESCE(h.hostname, ''), cp.name,
+		SELECT cp.id, cp.host_id, COALESCE(h.name, ''), cp.name,
 		       cp.working_dir, cp.config_file, cp.services, cp.raw_config, cp.updated_at
 		FROM compose_projects cp
 		LEFT JOIN hosts h ON h.id = cp.host_id

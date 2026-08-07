@@ -214,6 +214,7 @@ type ProxmoxGuestLink struct {
 	HostName     string `json:"host_name,omitempty"`
 	HostHostname string `json:"host_hostname,omitempty"`
 	// Live metrics from the Proxmox guest (populated on list/get)
+	CPUAlloc  float64 `json:"cpu_alloc"`
 	CPUUsage  float64 `json:"cpu_usage"`
 	MemAlloc  int64   `json:"mem_alloc"`
 	MemUsage  int64   `json:"mem_usage"`

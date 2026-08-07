@@ -336,26 +336,43 @@
       </div>
       <div
         v-if="form.docker_scope.scope_mode === 'container' && form.docker_scope.host_id"
-        class="col-md-4"
+        class="col-md-8"
       >
-        <label class="form-label required">Container</label>
-        <select
-          v-model="form.docker_scope.container_id"
-          class="form-select"
+        <label class="form-label required">Container(s)</label>
+        <div
+          v-if="(selectedDockerHost?.containers || []).length === 0"
+          class="form-hint"
         >
-          <option value="">
-            Sélectionner...
-          </option>
-          <option
+          Aucun container sur cet hôte.
+        </div>
+        <div
+          v-else
+          class="border rounded p-2 d-flex flex-wrap gap-2 docker-container-checklist"
+        >
+          <label
             v-for="c in selectedDockerHost?.containers || []"
             :key="c.id"
-            :value="c.id"
+            class="form-check form-check-inline mb-0"
           >
-            {{ c.name }} <template v-if="c.state !== 'running'">
-              ({{ c.state }})
-            </template>
-          </option>
-        </select>
+            <input
+              type="checkbox"
+              class="form-check-input"
+              :checked="form.docker_scope.container_ids.includes(c.id)"
+              @change="toggleContainer(c.id, ($event.target as HTMLInputElement).checked)"
+            >
+            <span class="form-check-label">
+              {{ c.name }} <template v-if="c.state !== 'running'">
+                ({{ c.state }})
+              </template>
+            </span>
+          </label>
+        </div>
+        <div
+          v-if="form.docker_scope.container_ids.length === 0"
+          class="text-warning small mt-1"
+        >
+          Sélectionnez au moins un container.
+        </div>
       </div>
       <div
         v-if="form.metric === 'docker_compose_degraded_services' && form.docker_scope.host_id"
@@ -476,12 +493,24 @@ const selectedDockerHost = computed(() =>
 
 function onDockerHostChange(): void {
   props.form.docker_scope.container_id = ''
+  props.form.docker_scope.container_ids = []
   props.form.docker_scope.project_name = ''
 }
 
 function onDockerScopeModeChange(): void {
   props.form.docker_scope.container_id = ''
+  props.form.docker_scope.container_ids = []
   props.form.docker_scope.project_name = ''
+}
+
+function toggleContainer(containerId: string, checked: boolean): void {
+  const ids = props.form.docker_scope.container_ids
+  if (checked) {
+    if (!ids.includes(containerId)) ids.push(containerId)
+  } else {
+    const idx = ids.indexOf(containerId)
+    if (idx >= 0) ids.splice(idx, 1)
+  }
 }
 </script>
 
@@ -521,6 +550,11 @@ function onDockerScopeModeChange(): void {
 .metric-icon {
   font-size: 1.2rem;
   line-height: 1;
+}
+
+.docker-container-checklist {
+  max-height: 12rem;
+  overflow-y: auto;
 }
 
 .metric-label {

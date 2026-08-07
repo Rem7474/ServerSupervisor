@@ -494,6 +494,16 @@ onUnmounted(() => {
   z-index: 1035;
 }
 
+/* Same root cause as .command-palette-trigger above: .btn-outline-secondary's
+   hover fills the button background with --tblr-secondary, but the avatar's
+   .bg-secondary-lt sets its own text color to --tblr-secondary with
+   !important — so the "AD" initials stay the same gray as the fill they now
+   sit on and disappear on hover. Force it to the button's own hover
+   foreground token instead. */
+.user-menu > .btn:hover .avatar {
+  color: var(--tblr-secondary-fg) !important;
+}
+
 .nav-item.dropdown .dropdown-menu {
   position: absolute;
   top: calc(100% + 4px);

@@ -165,6 +165,55 @@ func TestReceiveReport_PersistsMetricsDockerDisk(t *testing.T) {
 	}
 }
 
+// Regression test: a periodic report that caught a new unattended-upgrades
+// run (agent-side) attaches a fresh AptStatus snapshot — this must update
+// apt_status.pending_packages immediately, the same way a live-dispatched
+// "apt update"/"upgrade" command's CommandResult.AptStatus already does,
+// instead of leaving a stale count until someone manually runs apt update.
+//
+// security_updates/cve_list are deliberately NOT asserted here: exactly like
+// the live-dispatch path, this fast/partial upsert never touches them (see
+// UpsertAptPendingPackages) — they're refreshed by a separate, slower
+// CVE-enriched pass the agent pushes out-of-band via POST /apt-status, not
+// through this report endpoint, so it's outside this test's reach.
+func TestReceiveReport_UpdatesAptStatusFromPeriodicReport(t *testing.T) {
+	const hostID = "host-ingest-uu"
+	r, db := newAgentReportRouter(t, hostID)
+	seedHost(t, db, hostID)
+	ctx := context.Background()
+
+	w := postReport(t, r, models.AgentReport{
+		AgentVersion: "1.0.0",
+		Metrics:      &models.SystemMetrics{CPUUsagePercent: 1, Hostname: "test-host"},
+		UnattendedUpgrades: &models.UnattendedUpgradesStatus{
+			Installed: true,
+			Enabled:   true,
+			NewRuns: []models.UURun{
+				{RunAt: time.Now(), Packages: []string{"openssl"}},
+			},
+		},
+		AptStatus: &models.AptStatus{
+			PendingPackages: 3,
+			PackageList:     `["a","b","c"]`,
+		},
+		Timestamp: time.Now(),
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	status, err := db.GetAptStatus(ctx, hostID)
+	if err != nil {
+		t.Fatalf("get apt status: %v", err)
+	}
+	if status == nil {
+		t.Fatal("apt status not persisted")
+	}
+	if status.PendingPackages != 3 {
+		t.Errorf("pending_packages = %d, want 3", status.PendingPackages)
+	}
+}
+
 func TestReceiveReport_ReturnsPendingCommands(t *testing.T) {
 	const hostID = "host-ingest-2"
 	r, db := newAgentReportRouter(t, hostID)

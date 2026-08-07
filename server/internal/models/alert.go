@@ -32,12 +32,32 @@ type ProxmoxMetricScope struct {
 // HostID is always required. ContainerID or ProjectName are required for their respective modes.
 // WarnStates and CritStates are used by docker_container_state to select which container states trigger each severity.
 type DockerMetricScope struct {
-	ScopeMode   string   `json:"scope_mode"`
-	HostID      string   `json:"host_id"`
-	ContainerID string   `json:"container_id,omitempty"` // DB UUID of docker_containers row
-	ProjectName string   `json:"project_name,omitempty"` // compose project name
-	WarnStates  []string `json:"warn_states,omitempty"`  // container states triggering warn
-	CritStates  []string `json:"crit_states,omitempty"`  // container states triggering crit
+	ScopeMode string `json:"scope_mode"`
+	HostID    string `json:"host_id"`
+	// ContainerID is the legacy single-container field, kept for rules saved
+	// before multi-container selection existed. New rules are written to
+	// ContainerIDs instead — see EffectiveContainerIDs for the read-time
+	// migration that lets both shapes keep working unmodified.
+	ContainerID  string   `json:"container_id,omitempty"`  // DB UUID of docker_containers row
+	ContainerIDs []string `json:"container_ids,omitempty"` // DB UUIDs of docker_containers rows
+	ProjectName  string   `json:"project_name,omitempty"`  // compose project name
+	WarnStates   []string `json:"warn_states,omitempty"`   // container states triggering warn
+	CritStates   []string `json:"crit_states,omitempty"`   // container states triggering crit
+}
+
+// EffectiveContainerIDs returns the containers a "container" scope_mode rule
+// actually applies to: ContainerIDs when set (current shape), else a
+// single-element slice built from the legacy ContainerID field so a rule
+// saved before multi-select existed keeps matching exactly the one container
+// it always did, with no migration/backfill needed. Nil for neither set.
+func (s *DockerMetricScope) EffectiveContainerIDs() []string {
+	if len(s.ContainerIDs) > 0 {
+		return s.ContainerIDs
+	}
+	if s.ContainerID != "" {
+		return []string{s.ContainerID}
+	}
+	return nil
 }
 
 type AlertSourceType string

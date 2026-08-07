@@ -53,6 +53,15 @@ type Report struct {
 	Metrics            *collector.SystemMetrics            `json:"metrics"`
 	Docker             *DockerPayload                      `json:"docker"`
 	UnattendedUpgrades *collector.UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`
+	// AptStatus is only set when this report caught a new unattended-upgrades
+	// run (UnattendedUpgrades.NewRuns non-empty) — a cheap CollectAPTFast()
+	// snapshot so the pending-package count reflects what UU just installed,
+	// instead of staying at whatever the last live-dispatched `apt
+	// update`/`upgrade` command left it at (or 0, if none ever ran). The
+	// slower CVE-enriched security_updates/cve_list refresh is triggered
+	// alongside this (see reporter.Send) but pushed separately and
+	// out-of-band via SendAptStatus, same as after a live-dispatched command.
+	AptStatus *collector.AptStatus `json:"apt_status,omitempty"`
 	WebLogs            *collector.WebLogReport             `json:"web_logs,omitempty"`
 	DockerNetworks     []collector.DockerNetwork           `json:"docker_networks,omitempty"`   // Network topology data
 	ComposeProjects    []collector.ComposeProject          `json:"compose_projects,omitempty"`  // Docker Compose projects

@@ -55,6 +55,14 @@
           Actualisation des données…
         </span>
         <span
+          v-if="uuStatus?.installed"
+          class="badge flex-shrink-0"
+          :class="uuStatus.enabled ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
+          title="Mises à jour automatiques (unattended-upgrades)"
+        >
+          MAJ auto {{ uuStatus.enabled ? 'activées' : 'désactivées' }}
+        </span>
+        <span
           v-if="uuStatus?.reboot_required"
           class="badge bg-warning-lt text-warning flex-shrink-0"
           title="Redémarrage requis après une mise à jour automatique (unattended-upgrades)"

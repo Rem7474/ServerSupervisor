@@ -61,6 +61,12 @@ type HostTimelineEvent struct {
 	Status    string    `json:"status,omitempty"`
 	Severity  string    `json:"severity,omitempty"`
 	Module    string    `json:"module,omitempty"`
+	// User is the acting username, straight from audit_logs.username /
+	// remote_commands.triggered_by — "system" for an automated trigger
+	// (scheduled task, alert rule, release tracker), same convention already
+	// used elsewhere for triggered_by (e.g. AptHostCard.vue). Empty for
+	// incident-type events, which have no user concept.
+	User string `json:"user,omitempty"`
 }
 
 // ========== Audit Log (APT & Admin Actions) ==========

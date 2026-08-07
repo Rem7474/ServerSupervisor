@@ -90,13 +90,13 @@ func (db *DB) GetDockerContainers(ctx context.Context, hostID string) ([]models.
 
 func (db *DB) GetAllDockerContainers(ctx context.Context) ([]models.DockerContainer, error) {
 	rows, err := db.conn.QueryContext(ctx, 
-		`SELECT dc.id, dc.host_id, h.hostname, dc.container_id, dc.name, dc.image, dc.image_tag, dc.image_id, dc.image_digest,
+		`SELECT dc.id, dc.host_id, h.name, dc.container_id, dc.name, dc.image, dc.image_tag, dc.image_id, dc.image_digest,
 		 dc.state, dc.status, dc.created, dc.ports, dc.labels,
 		 COALESCE(dc.env_vars::text, '{}'), COALESCE(dc.volumes::text, '[]'), COALESCE(dc.networks::text, '[]'),
 		 COALESCE(dc.net_rx_bytes, 0), COALESCE(dc.net_tx_bytes, 0), dc.updated_at
 		 FROM docker_containers dc
 		 JOIN hosts h ON dc.host_id = h.id
-		 ORDER BY h.hostname, dc.name`,
+		 ORDER BY h.name, dc.name`,
 	)
 	if err != nil {
 		return nil, err

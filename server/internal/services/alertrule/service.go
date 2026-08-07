@@ -285,9 +285,11 @@ func (s *Service) validateDockerScope(ctx context.Context, scope *models.DockerM
 	if ok, _ := s.repo.HostExists(ctx, scope.HostID); !ok {
 		return apperr.Validation("Hôte introuvable pour ce scope Docker.")
 	}
-	if scope.ScopeMode == "container" && scope.ContainerID != "" {
-		if ok, _ := s.repo.DockerContainerExists(ctx, scope.ContainerID, scope.HostID); !ok {
-			return apperr.Validation("Container Docker introuvable pour ce scope.")
+	if scope.ScopeMode == "container" {
+		for _, id := range scope.EffectiveContainerIDs() {
+			if ok, _ := s.repo.DockerContainerExists(ctx, id, scope.HostID); !ok {
+				return apperr.Validation("Container Docker introuvable pour ce scope.")
+			}
 		}
 	}
 	if scope.ScopeMode == "compose_project" && scope.ProjectName != "" {

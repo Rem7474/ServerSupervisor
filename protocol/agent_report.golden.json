@@ -91,6 +91,14 @@
       }
     ]
   },
+  "apt_status": {
+    "last_update": "2024-01-02T03:04:05Z",
+    "last_upgrade": "2024-01-02T03:04:05Z",
+    "pending_packages": 7,
+    "package_list": "contract",
+    "security_updates": 7,
+    "cve_list": "contract"
+  },
   "web_logs": {
     "source": "contract",
     "traffic": {

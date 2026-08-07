@@ -7,17 +7,25 @@ import (
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/models"
 )
 
 type fakeRepo struct {
 	deletedAudit int64
 	auditActions []string
+	setCalls     map[string]string
 }
 
 func (fakeRepo) GetAllSettings(context.Context) (map[string]string, error) {
 	return map[string]string{}, nil
 }
-func (fakeRepo) SetSetting(context.Context, string, string) error        { return nil }
+func (f *fakeRepo) SetSetting(_ context.Context, key, value string) error {
+	if f.setCalls == nil {
+		f.setCalls = map[string]string{}
+	}
+	f.setCalls[key] = value
+	return nil
+}
 func (fakeRepo) UpdateMetricsRetentionPolicy(context.Context, int) error { return nil }
 func (fakeRepo) CleanupTrackerTagDigests(context.Context, int) (int64, error) {
 	return 3, nil
@@ -78,6 +86,47 @@ func TestCleanupAuditLogs_ReturnsCountAndAudits(t *testing.T) {
 	}
 	if len(repo.auditActions) != 1 || repo.auditActions[0] != "cleanup_audit_logs" {
 		t.Errorf("expected a cleanup_audit_logs audit entry, got %v", repo.auditActions)
+	}
+}
+
+// Regression test: saving one settings tab (e.g. Rétention, which only sends
+// metrics_retention_days/audit_retention_days) must not blank SMTP/notification
+// config a different tab had previously saved, just because this request's
+// SMTP/notification fields decode to their Go zero value.
+func TestUpdate_PartialRequestDoesNotBlankSMTPOrNotificationFields(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := newSvc(repo, &config.Config{})
+
+	svc.Update(context.Background(), models.SettingsUpdateRequest{MetricsRetentionDays: 30}, "alice", "1.2.3.4")
+
+	for _, key := range []string{"smtp_host", "smtp_user", "smtp_pass", "smtp_from", "smtp_to", "ntfy_url", "github_token"} {
+		if _, ok := repo.setCalls[key]; ok {
+			t.Errorf("Update wrote %q from a request that never provided it — would blank a previously saved value", key)
+		}
+	}
+	if repo.setCalls["metrics_retention_days"] != "30" {
+		t.Errorf("metrics_retention_days = %q, want 30", repo.setCalls["metrics_retention_days"])
+	}
+}
+
+func TestUpdate_SavesProvidedSMTPFields(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := newSvc(repo, &config.Config{})
+
+	svc.Update(context.Background(), models.SettingsUpdateRequest{
+		SMTPHost: "smtp.example.com",
+		SMTPUser: "alice",
+		SMTPPass: "secret",
+	}, "alice", "1.2.3.4")
+
+	if repo.setCalls["smtp_host"] != "smtp.example.com" {
+		t.Errorf("smtp_host = %q, want smtp.example.com", repo.setCalls["smtp_host"])
+	}
+	if repo.setCalls["smtp_user"] != "alice" {
+		t.Errorf("smtp_user = %q, want alice", repo.setCalls["smtp_user"])
+	}
+	if repo.setCalls["smtp_pass"] != "secret" {
+		t.Errorf("smtp_pass = %q, want secret", repo.setCalls["smtp_pass"])
 	}
 }
 

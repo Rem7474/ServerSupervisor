@@ -36,7 +36,14 @@ export interface ProxmoxMetricScope {
 export interface DockerMetricScope {
   scope_mode: string;
   host_id: string;
+  /**
+   * ContainerID is the legacy single-container field, kept for rules saved
+   * before multi-container selection existed. New rules are written to
+   * ContainerIDs instead — see EffectiveContainerIDs for the read-time
+   * migration that lets both shapes keep working unmodified.
+   */
   container_id?: string; // DB UUID of docker_containers row
+  container_ids?: string[]; // DB UUIDs of docker_containers rows
   project_name?: string; // compose project name
   warn_states?: string[]; // container states triggering warn
   crit_states?: string[]; // container states triggering crit
@@ -397,6 +404,14 @@ export interface HostTimelineEvent {
   status?: string;
   severity?: string;
   module?: string;
+  /**
+   * User is the acting username, straight from audit_logs.username /
+   * remote_commands.triggered_by — "system" for an automated trigger
+   * (scheduled task, alert rule, release tracker), same convention already
+   * used elsewhere for triggered_by (e.g. AptHostCard.vue). Empty for
+   * incident-type events, which have no user concept.
+   */
+  user?: string;
 }
 export interface AuditLog {
   id: number /* int64 */;
@@ -436,7 +451,7 @@ export interface AttentionItem {
 export interface DockerContainer {
   id: string;
   host_id: string;
-  hostname: string; // Host's hostname for display
+  hostname: string; // Host's ServerSupervisor display name (hosts.name) — not the raw agent-reported system hostname
   container_id: string;
   name: string;
   image: string;
@@ -463,7 +478,7 @@ export interface DockerReport {
 export interface ComposeProject {
   id: string;
   host_id: string;
-  hostname: string;
+  hostname: string; // Host's ServerSupervisor display name (hosts.name), same convention as DockerContainer.Hostname
   name: string;
   working_dir: string;
   config_file: string;
@@ -1215,6 +1230,7 @@ export interface ProxmoxGuestLink {
   /**
    * Live metrics from the Proxmox guest (populated on list/get)
    */
+  cpu_alloc: number /* float64 */;
   cpu_usage: number /* float64 */;
   mem_alloc: number /* int64 */;
   mem_usage: number /* int64 */;
@@ -1295,6 +1311,12 @@ export interface AgentReport {
   metrics?: SystemMetrics;
   docker?: DockerReport;
   unattended_upgrades?: UnattendedUpgradesStatus;
+  /**
+   * AptStatus mirrors CommandResult.AptStatus's shape and purpose, but for a
+   * periodic report that caught a new unattended-upgrades run rather than a
+   * live-dispatched apt command — see agent/internal/reporter's AptStatus doc.
+   */
+  apt_status?: AptStatus;
   web_logs?: WebLogReport;
   docker_networks?: DockerNetwork[];
   compose_projects?: ComposeProject[];

@@ -69,13 +69,13 @@ func (db *DB) ListAlertProxmoxDisks(ctx context.Context) ([]models.AlertScopeOpt
 }
 
 // ListAlertDockerScopeHosts returns the hosts that currently have Docker
-// containers (id + hostname), for the Docker alert scope selector.
+// containers (id + display name), for the Docker alert scope selector.
 func (db *DB) ListAlertDockerScopeHosts(ctx context.Context) ([]models.AlertScopeOption, error) {
 	return db.scopeOptions(ctx, `
-		SELECT DISTINCT dc.host_id, h.hostname
+		SELECT DISTINCT dc.host_id, h.name
 		FROM docker_containers dc
 		JOIN hosts h ON h.id = dc.host_id
-		ORDER BY h.hostname`)
+		ORDER BY h.name`)
 }
 
 // ===== Proxmox scope test-target label parts (for the rule test preview) =====

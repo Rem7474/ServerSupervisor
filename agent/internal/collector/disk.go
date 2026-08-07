@@ -448,12 +448,12 @@ func CollectDiskHealth() ([]DiskHealth, error) {
 // only when at least one disk returns a real SMART status (PASSED/FAILED).
 func CheckSMARTAvailability() (ok bool, detail string) {
 	if _, err := exec.LookPath("smartctl"); err != nil {
-		return false, "smartctl not found — install smartmontools (e.g. apt install smartmontools) or set collect_smart: false"
+		return false, "smartctl introuvable — installez smartmontools (ex. apt install smartmontools) ou passez collect_smart: false"
 	}
 
 	devices, _ := findPhysicalDisks()
 	if len(devices) == 0 {
-		return false, "no physical block devices accessible — expected inside an LXC/unprivileged container; SMART needs bare-metal or a VM with disk passthrough"
+		return false, "aucun périphérique disque physique accessible — normal dans un conteneur LXC/non privilégié ; SMART nécessite du bare-metal ou une VM avec passthrough disque"
 	}
 
 	readable := 0
@@ -464,10 +464,10 @@ func CheckSMARTAvailability() (ok bool, detail string) {
 		}
 	}
 	if readable == 0 {
-		return false, fmt.Sprintf("smartctl found %d device(s) but could not read SMART data from any of them (insufficient privileges or virtualized disks?)", len(devices))
+		return false, fmt.Sprintf("smartctl a trouvé %d périphérique(s) mais n'a pu lire les données SMART d'aucun d'entre eux (privilèges insuffisants ou disques virtualisés ?)", len(devices))
 	}
 
-	return true, fmt.Sprintf("%d disk(s) readable", readable)
+	return true, fmt.Sprintf("%d disque(s) lisible(s)", readable)
 }
 
 // findPhysicalDisks trouve tous les disques physiques (sd*, nvme*, vd*)

@@ -183,6 +183,7 @@ func (s *Service) HostTimeline(ctx context.Context, hostID string, limit int) ([
 			Title:     humaniseAuditAction(l.Action),
 			Detail:    truncate(l.Details, 120),
 			Status:    l.Status,
+			User:      l.Username,
 		})
 	}
 	for _, c := range cmds {
@@ -198,6 +199,7 @@ func (s *Service) HostTimeline(ctx context.Context, hostID string, limit int) ([
 			Detail:    truncate(c.Output, 120),
 			Status:    c.Status,
 			Module:    c.Module,
+			User:      c.TriggeredBy,
 		})
 	}
 	for _, inc := range incidents {

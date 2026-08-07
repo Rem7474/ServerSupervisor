@@ -458,6 +458,19 @@ func (s *Service) storeContainersAndPackages(ctx context.Context, hostID, safeHo
 		}
 	}
 
+	if report.AptStatus != nil {
+		report.AptStatus.HostID = hostID
+		// Partial, not UpsertAptStatus — same reasoning as the live-dispatch
+		// command-result path above: this is a fast, CVE-free snapshot, and a
+		// full upsert would wipe security_updates/cve_list back to 0/"[]" until
+		// the next out-of-band CVE-enriched refresh lands.
+		if err := s.repo.UpsertAptPendingPackages(ctx, report.AptStatus); err != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update APT status after UU run for host %s: %v", safeHostID, err))
+		} else {
+			s.bus.Publish(events.TopicApt)
+		}
+	}
+
 	if report.DockerNetworks != nil {
 		dbNetworks := make([]models.DockerNetwork, 0, len(report.DockerNetworks))
 		for _, n := range report.DockerNetworks {

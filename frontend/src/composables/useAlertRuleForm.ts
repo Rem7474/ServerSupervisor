@@ -52,7 +52,11 @@ interface ProxmoxScope {
 export interface DockerScope {
   scope_mode: string   // 'host' | 'container' | 'compose_project'
   host_id: string
+  // container_id is the legacy single-container field (still accepted by the
+  // server for rules saved before multi-select existed). The form only ever
+  // reads/writes container_ids now — see hydrateFormFromRule's migration.
   container_id: string
+  container_ids: string[]
   project_name: string
   warn_states: string[]  // container states triggering warn alert (docker_container_state)
   crit_states: string[]  // container states triggering crit alert (docker_container_state)
@@ -149,6 +153,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       scope_mode: 'host',
       host_id: '',
       container_id: '',
+      container_ids: [],
       project_name: '',
       warn_states: [],
       crit_states: [],
@@ -206,6 +211,16 @@ export function useAlertRuleForm(): AlertRuleFormApi {
         scope_mode: dscope.scope_mode || 'host',
         host_id: dscope.host_id || '',
         container_id: dscope.container_id || '',
+        // Transparent migration: a rule saved before multi-select existed
+        // only has the legacy singular container_id — surface it as a
+        // one-element array so the checkbox list opens with it pre-checked,
+        // same effective scope as before, no data rewrite needed.
+        container_ids:
+          dscope.container_ids && dscope.container_ids.length > 0
+            ? dscope.container_ids
+            : dscope.container_id
+              ? [dscope.container_id]
+              : [],
         project_name: dscope.project_name || '',
         warn_states: dscope.warn_states || [],
         crit_states: dscope.crit_states || [],
@@ -267,6 +282,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       } else if (form.value.metric === 'docker_compose_degraded_services') {
         form.value.docker_scope.scope_mode = 'compose_project'
         form.value.docker_scope.container_id = ''
+        form.value.docker_scope.container_ids = []
         form.value.operator = '>='
         form.value.threshold_warn = 1
         form.value.threshold_crit = 1

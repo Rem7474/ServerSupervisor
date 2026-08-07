@@ -24,6 +24,14 @@ import (
 // permanently stop all future reporting.
 const collectionTimeout = 25 * time.Second
 
+// postUUAptRefreshTimeout bounds the detached full CollectAPT(true) call
+// triggered after a new unattended-upgrades run — same rationale and value as
+// the dispatcher's aptStatusRefreshTimeout for a live-dispatched apt command:
+// on a fresh host with a large pending-package backlog, the per-package
+// security/CVE lookups are sequential subprocess + network calls that could
+// otherwise run for tens of minutes.
+const postUUAptRefreshTimeout = 5 * time.Minute
+
 // Reporter builds and sends periodic host reports.
 type Reporter struct {
 	cfg         *config.Config
@@ -56,6 +64,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		diskMetrics      []collector.DiskMetrics
 		diskHealth       []collector.DiskHealth
 		uuData           *collector.UnattendedUpgradesStatus
+		aptStatus        *collector.AptStatus
 		webLogs          *collector.WebLogReport
 		resticStatus     *collector.ResticStatus
 		resticProfiles   []string
@@ -114,6 +123,36 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 	go func() {
 		defer wg.Done()
 		uuData = collector.CollectUnattendedUpgrades()
+		// A UU run just installed packages autonomously — the pending/security
+		// counts the UI shows (last refreshed by a live-dispatched apt
+		// update/upgrade, if any, or never) are now stale. Mirrors
+		// dispatcher/handler_apt.go's post-command refresh exactly: a fast,
+		// CVE-free CollectAPTFast snapshot bundled into this same report so
+		// the pending-package count updates the instant the report lands
+		// (below), plus a detached full CollectAPT(true) pushed out-of-band
+		// via SendAptStatus so security_updates/cve_list catch up too, same as
+		// after a live-dispatched apt command.
+		if r.cfg.CollectAPT && len(uuData.NewRuns) > 0 {
+			if status, err := collector.CollectAPTFast(ctx); err != nil {
+				slog.Warn("post-UU fast apt status refresh failed", "err", err)
+			} else {
+				aptStatus = status
+			}
+			go func() {
+				collectCtx, cancel := context.WithTimeout(context.Background(), postUUAptRefreshTimeout)
+				defer cancel()
+				apt, err := collector.CollectAPT(collectCtx, true)
+				if err != nil {
+					slog.Warn("post-UU CVE-enriched apt status refresh failed", "err", err)
+					return
+				}
+				sendCtx, sendCancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer sendCancel()
+				if err := s.SendAptStatus(sendCtx, apt); err != nil {
+					slog.Warn("post-UU apt status push failed", "err", err)
+				}
+			}()
+		}
 	}()
 
 	wg.Add(1)
@@ -233,6 +272,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		Metrics:            collectedMetrics,
 		Docker:             dockerData,
 		UnattendedUpgrades: uuData,
+		AptStatus:          aptStatus,
 		WebLogs:            webLogs,
 		DockerNetworks:     dockerNetworks,
 		ComposeProjects:    composeProjects,

@@ -109,13 +109,34 @@ func (s *Service) Update(ctx context.Context, req models.SettingsUpdateRequest, 
 	save := func(key, value string) {
 		_ = s.repo.SetSetting(ctx, key, value)
 	}
-	save("smtp_host", req.SMTPHost)
-	save("smtp_user", req.SMTPUser)
-	save("smtp_pass", req.SMTPPass)
-	save("smtp_from", req.SMTPFrom)
-	save("smtp_to", req.SMTPTo)
-	save("ntfy_url", req.NtfyURL)
-	save("github_token", req.GitHubToken)
+	// Guarded like every other field below (SMTPPort, SMTPTLS, retention days,
+	// the threat weights): SettingsUpdateRequest's own doc comment states only
+	// non-zero/non-nil fields are persisted, but these string fields were
+	// missing that guard — so saving one settings tab (e.g. Rétention, which
+	// only sends metrics_retention_days/audit_retention_days) silently blanked
+	// SMTP/notification config that a *different* tab had saved, since the
+	// omitted fields decode to "" and were written unconditionally.
+	if req.SMTPHost != "" {
+		save("smtp_host", req.SMTPHost)
+	}
+	if req.SMTPUser != "" {
+		save("smtp_user", req.SMTPUser)
+	}
+	if req.SMTPPass != "" {
+		save("smtp_pass", req.SMTPPass)
+	}
+	if req.SMTPFrom != "" {
+		save("smtp_from", req.SMTPFrom)
+	}
+	if req.SMTPTo != "" {
+		save("smtp_to", req.SMTPTo)
+	}
+	if req.NtfyURL != "" {
+		save("ntfy_url", req.NtfyURL)
+	}
+	if req.GitHubToken != "" {
+		save("github_token", req.GitHubToken)
+	}
 
 	if req.SMTPPort > 0 {
 		save("smtp_port", strconv.Itoa(req.SMTPPort))
