@@ -78,7 +78,7 @@
                 class="badge bg-secondary-lt text-secondary ms-1 small"
               >{{ ev.module }}</span>
             </div>
-            <div class="d-flex gap-1 flex-shrink-0">
+            <div class="d-flex gap-1 flex-shrink-0 align-items-center">
               <span
                 v-if="ev.severity"
                 class="badge"
@@ -89,6 +89,19 @@
                 class="badge"
                 :class="statusBadge(ev.status)"
               >{{ ev.status }}</span>
+              <button
+                v-if="ev.type === 'command'"
+                type="button"
+                class="btn btn-icon btn-sm btn-ghost-secondary"
+                title="Voir les logs"
+                aria-label="Voir les logs"
+                @click="emit('watch-command', ev)"
+              >
+                <IconList
+                  :size="16"
+                  class="icon icon-sm"
+                />
+              </button>
             </div>
           </div>
           <div
@@ -109,7 +122,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { IconClipboard, IconTerminal2, IconAlertTriangle } from '@tabler/icons-vue'
+import { IconClipboard, IconTerminal2, IconAlertTriangle, IconList } from '@tabler/icons-vue'
 import api from '../../api'
 import type { HostTimelineEvent } from '../../types/audit'
 import RelativeTime from '../RelativeTime.vue'
@@ -119,6 +132,10 @@ import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 
 const props = defineProps<{ hostId: string }>()
+
+const emit = defineEmits<{
+  (e: 'watch-command', ev: HostTimelineEvent): void
+}>()
 
 const TYPE_FILTERS = [
   { value: '', label: 'Tout' },
@@ -196,6 +213,14 @@ onMounted(() => {
   startRefreshTimer()
 })
 onUnmounted(stopRefreshTimer)
+
+// Lets a caller (the "Commandes récentes" KPI card, since this tab absorbed
+// the standalone Commandes tab) jump straight to the command-type filter.
+function filterCommands(): void {
+  typeFilter.value = 'command'
+}
+
+defineExpose({ filterCommands })
 </script>
 
 <style scoped>

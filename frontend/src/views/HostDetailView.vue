@@ -382,7 +382,7 @@
                       <a
                         href="#"
                         class="text-decoration-none"
-                        @click.prevent="activeTab = 'commandes'"
+                        @click.prevent="goToTimelineCommands"
                       >voir</a>
                     </div>
                   </div>
@@ -517,13 +517,6 @@
             />
           </template>
 
-          <template #commandes>
-            <HostCommandsTab
-              :commands="(cmdHistory as any)"
-              @watch-command="(openCommand as any)"
-            />
-          </template>
-
           <template #exposition>
             <HostExposureTab
               :host-id="hostId"
@@ -563,7 +556,11 @@
           </template>
 
           <template #timeline>
-            <HostTimelineTab :host-id="hostId" />
+            <HostTimelineTab
+              ref="timelineRef"
+              :host-id="hostId"
+              @watch-command="(openCommand as any)"
+            />
           </template>
 
           <!-- Security tab: Per-host permissions (admin only) -->
@@ -747,7 +744,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import { useModalChrome } from '../composables/useModalChrome'
@@ -761,7 +758,6 @@ import HostProcessesPanel from '../components/host/HostProcessesPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import HostAptTab from '../components/host/HostAptTab.vue'
 import HostBackupTab from '../components/host/HostBackupTab.vue'
-import HostCommandsTab from '../components/host/HostCommandsTab.vue'
 import HostDiagnosticsBanner from '../components/host/HostDiagnosticsBanner.vue'
 import EntityTabShell from '../components/EntityTabShell.vue'
 import type { EntityTab } from '../components/EntityTabShell.vue'
@@ -852,6 +848,16 @@ const {
 const permModalRef = ref<HTMLElement | null>(null)
 useModalChrome(permModalRef, () => addPermModal.value, { onClose: () => { addPermModal.value = false } })
 
+// "Commandes récentes" KPI card jumps to the Timeline tab pre-filtered to
+// command-type events — the Timeline tab absorbed the standalone Commandes
+// tab (same underlying remote_commands data, Timeline already merged it in
+// as one of its type filters plus richer context).
+const timelineRef = ref<{ filterCommands: () => void } | null>(null)
+function goToTimelineCommands(): void {
+  activeTab.value = 'timeline'
+  nextTick(() => timelineRef.value?.filterCommands())
+}
+
 // Local SMART is unreadable inside an LXC/VM. When the host has no local disk
 // health but is linked to Proxmox, we surface the hosting node's disk health
 // instead of an empty SMART card.
@@ -911,11 +917,6 @@ const hostTabs = computed<EntityTab[]>(() => {
           : [],
     },
     { key: 'backup', label: 'Sauvegardes' },
-    {
-      key: 'commandes',
-      label: 'Commandes',
-      badges: cmdHistory.value.length ? [{ value: cmdHistory.value.length, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
-    },
     {
       key: 'exposition',
       label: 'Exposition',

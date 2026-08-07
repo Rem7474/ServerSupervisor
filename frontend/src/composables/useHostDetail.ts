@@ -11,7 +11,7 @@ import { confirmAptCommand } from '../utils/aptConfirm'
 
 // AnyRecord is the raw shape of an untyped JSON payload received over WebSocket
 // or HTTP. The composable keeps it loose because the consuming components
-// (HostDockerTab, HostAptTab, HostCommandsTab, …) narrow via their own typed
+// (HostDockerTab, HostAptTab, HostTimelineTab, …) narrow via their own typed
 // props (Container, VersionComparison, Command, UURun, UUForm) — bridged with
 // `as any` casts at template boundaries. Tightening here would require
 // matching every downstream prop shape; that's a follow-up refactor.
@@ -48,9 +48,11 @@ export function useHostDetail() {
   const dialog = useConfirmDialog()
   const canRunApt = computed(() => auth.canManage)
 
-  const activeTab = ref<string>(
-    typeof route.query.tab === 'string' ? route.query.tab : 'overview'
-  )
+  // 'commandes' redirects to 'timeline' (its type filter now covers the same
+  // remote_commands data) so a pre-existing bookmark/link to the removed
+  // standalone tab still lands somewhere meaningful instead of a blank pane.
+  const requestedTab = typeof route.query.tab === 'string' ? route.query.tab : 'overview'
+  const activeTab = ref<string>(requestedTab === 'commandes' ? 'timeline' : requestedTab)
 
   watch(activeTab, (tab) => {
     router.replace({ query: { ...route.query, tab } })
