@@ -69,7 +69,12 @@
             type="email"
             class="form-control"
             placeholder="admin@example.com"
+            aria-describedby="smtp-to-hint"
           >
+          <small
+            id="smtp-to-hint"
+            class="form-hint"
+          >Destinataire par défaut, utilisé par toute alerte dont le champ "Destinataire(s) email" est laissé vide.</small>
         </div>
         <div class="col-12">
           <label class="form-check">
