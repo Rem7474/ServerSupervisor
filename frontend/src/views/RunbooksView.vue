@@ -23,11 +23,11 @@
         <div class="col-auto ms-auto">
           <button
             type="button"
-            class="btn btn-primary"
+            class="btn btn-primary btn-sm"
             @click="startAdd"
           >
             <IconPlus
-              :size="16"
+              :size="14"
               class="icon me-1"
             />
             Nouveau runbook

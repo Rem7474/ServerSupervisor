@@ -16,17 +16,25 @@
         >
           <button
             type="button"
-            class="btn btn-outline-primary"
+            class="btn btn-outline-primary btn-sm"
             @click="panelRef?.openCreateCert()"
           >
-            + Certificat SSL
+            <IconPlus
+              :size="14"
+              class="icon me-1"
+            />
+            Certificat SSL
           </button>
           <button
             type="button"
-            class="btn btn-primary"
+            class="btn btn-primary btn-sm"
             @click="panelRef?.openCreateProbe()"
           >
-            + Nouvelle sonde
+            <IconPlus
+              :size="14"
+              class="icon me-1"
+            />
+            Nouvelle sonde
           </button>
         </div>
       </div>
@@ -38,6 +46,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { IconPlus } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import MonitoringOverviewPanel from '../components/monitoring/MonitoringOverviewPanel.vue'
 
