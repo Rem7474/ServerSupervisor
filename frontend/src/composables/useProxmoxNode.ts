@@ -22,10 +22,6 @@ export function useProxmoxNode() {
     router.replace({ query: { ...route.query, tab: t } })
   })
 
-  const guestLinks = ref<Record<string, any>>({})
-  const linkMsg = ref('')
-  const linkMsgOk = ref(false)
-
   const sensorSourceCandidates = ref<any[]>([])
   const sensorSourceHostId = ref('')
   const sensorSourceLoading = ref(false)
@@ -142,16 +138,6 @@ export function useProxmoxNode() {
     backupRuns.value.filter((r) => r.node_name === node.value?.node_name)
   )
 
-  // Keyed view of nodeBackupRuns for the guest-list "Dernière sauvegarde"
-  // column (ProxmoxNodeGuestsTab) — same underlying loadBackups() data the
-  // "Sauvegarde" tab renders as a table, just indexed by vmid for an O(1)
-  // per-row lookup instead of scanning the array per guest.
-  const nodeBackupRunsByVmid = computed(() => {
-    const map: Record<number, ProxmoxBackupRun> = {}
-    for (const r of nodeBackupRuns.value) map[r.vmid] = r
-    return map
-  })
-
   const vms = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'vm') ?? [])
   const lxcs = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'lxc') ?? [])
 
@@ -187,7 +173,6 @@ export function useProxmoxNode() {
       node.value = res.data
       sensorSourceHostId.value = node.value?.cpu_temp_source_host_id || node.value?.fan_rpm_source_host_id || ''
       await loadSensorSourceCandidates()
-      await loadGuestLinks()
       // fire-and-forget: live status + RRD charts + peer nodes load in parallel
       loadLiveStatus()
       loadRRD('hour')
@@ -311,22 +296,6 @@ export function useProxmoxNode() {
     }
   }
 
-  async function refreshNodeSensorSource() {
-    try {
-      const res = await api.getProxmoxNode(String(route.params.id))
-      const n = res.data || {}
-      if (node.value) {
-        node.value.cpu_temp_source_host_id = n.cpu_temp_source_host_id || ''
-        node.value.cpu_temp_source_host_name = n.cpu_temp_source_host_name || ''
-        node.value.fan_rpm_source_host_id = n.fan_rpm_source_host_id || ''
-        node.value.fan_rpm_source_host_name = n.fan_rpm_source_host_name || ''
-      }
-      sensorSourceHostId.value = n.cpu_temp_source_host_id || n.fan_rpm_source_host_id || ''
-    } catch {
-      // non-bloquant
-    }
-  }
-
   async function saveSensorSource() {
     sensorSourceSaving.value = true
     sensorSourceMsg.value = ''
@@ -352,69 +321,6 @@ export function useProxmoxNode() {
       sensorSourceSaving.value = false
       setTimeout(() => { sensorSourceMsg.value = '' }, 4000)
     }
-  }
-
-  async function loadGuestLinks(): Promise<void> {
-    const guests = node.value?.guests ?? []
-    if (guests.length === 0) return
-    try {
-      const res = await api.getProxmoxLinks()
-      const guestIds = new Set(guests.map((g: any) => g.id))
-      const map: Record<string, any> = {}
-      for (const link of res.data ?? []) {
-        if (guestIds.has(link.guest_id)) {
-          map[link.guest_id] = link
-        }
-      }
-      guestLinks.value = map
-    } catch {
-      guestLinks.value = {}
-    }
-  }
-
-  function linkForGuest(g: any): any {
-    return guestLinks.value[g.id] ?? null
-  }
-
-  async function confirmGuestLink(g: any): Promise<void> {
-    const link = linkForGuest(g)
-    if (!link) return
-    try {
-      const res = await api.updateProxmoxLink(link.id, { status: 'confirmed' })
-      guestLinks.value = { ...guestLinks.value, [g.id]: res.data }
-      await loadSensorSourceCandidates()
-      await refreshNodeSensorSource()
-      showMsg(`[${g.name}] Lien confirmé.`, true)
-    } catch (e: unknown) {
-      showMsg(getApiErrorMessage(e, 'Erreur.'), false)
-    }
-  }
-
-  async function ignoreGuestLink(g: any): Promise<void> {
-    const link = linkForGuest(g)
-    if (!link) return
-    try {
-      await api.deleteProxmoxLink(link.id)
-      const m = { ...guestLinks.value }
-      delete m[g.id]
-      guestLinks.value = m
-      showMsg(`[${g.name}] Suggestion ignorée.`, true)
-    } catch (e: unknown) {
-      showMsg(getApiErrorMessage(e, 'Erreur.'), false)
-    }
-  }
-
-  // Guests linked to a ServerSupervisor host already get their domain/IP
-  // correlation for free from that host's own Exposition tab (same IP, same
-  // GetHostExposure query) — land there directly instead of the overview tab.
-  function goToHost(link: any): void {
-    if (link?.host_id) router.push(`/hosts/${link.host_id}?tab=exposition`)
-  }
-
-  function showMsg(msg: string, ok: boolean): void {
-    linkMsg.value = msg
-    linkMsgOk.value = ok
-    setTimeout(() => { linkMsg.value = '' }, 4000)
   }
 
   async function loadRRD(timeframe: string = rrdTimeframe.value): Promise<void> {
@@ -716,9 +622,6 @@ export function useProxmoxNode() {
     loading,
     error,
     tab,
-    guestLinks,
-    linkMsg,
-    linkMsgOk,
     sensorSourceCandidates,
     sensorSourceHostId,
     sensorSourceLoading,
@@ -779,16 +682,12 @@ export function useProxmoxNode() {
     backupJobs,
     backupRuns,
     nodeBackupRuns,
-    nodeBackupRunsByVmid,
     backupsLoading,
     backupsError,
     loadBackups,
     vms,
     lxcs,
     failedTaskCount,
-    confirmGuestLink,
-    ignoreGuestLink,
-    goToHost,
     guestActionLoading: guestActions.actionLoading,
     handleGuestAction,
   }

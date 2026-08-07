@@ -129,6 +129,7 @@ type PVEGuest struct {
 	Mem     int64   `json:"mem"`    // current used bytes
 	MaxMem  int64   `json:"maxmem"` // allocated bytes
 	MaxDisk int64   `json:"maxdisk,omitempty"`
+	Disk    int64   `json:"disk,omitempty"` // actual used bytes — reliable for LXC, usually 0 for a QEMU VM without guest agent
 	Tags    string  `json:"tags,omitempty"`
 	Uptime  int64   `json:"uptime,omitempty"`
 	// Present only when fetched via /cluster/resources

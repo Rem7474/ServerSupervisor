@@ -1051,6 +1051,7 @@ export interface ProxmoxGuest {
   mem_alloc: number /* int64 */;
   mem_usage: number /* int64 */;
   disk_alloc: number /* int64 */;
+  disk_usage: number /* int64 */;
   tags: string;
   uptime: number /* int64 */;
   last_seen_at: string;
@@ -1217,6 +1218,8 @@ export interface ProxmoxGuestLink {
   cpu_usage: number /* float64 */;
   mem_alloc: number /* int64 */;
   mem_usage: number /* int64 */;
+  disk_alloc: number /* int64 */;
+  disk_usage: number /* int64 */;
 }
 /**
  * ProxmoxGuestLinkRequest is the body for POST /proxmox/links.

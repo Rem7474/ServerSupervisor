@@ -204,10 +204,21 @@
         <template v-if="proxmoxLink.status === 'confirmed' && proxmoxLink.metrics_source !== 'agent'">
           <div class="d-flex align-items-center gap-3 ms-2 border-start ps-3">
             <div class="text-muted small">
-              CPU <strong class="text-body">{{ ((proxmoxLink.cpu_usage ?? 0) * 100).toFixed(1) }}%</strong>
+              CPU <strong :class="getMetricColorClass((proxmoxLink.cpu_usage ?? 0) * 100)">{{ ((proxmoxLink.cpu_usage ?? 0) * 100).toFixed(1) }}%</strong>
             </div>
             <div class="text-muted small">
-              RAM <strong class="text-body">{{ formatBytesLink(proxmoxLink.mem_usage) }}</strong> / {{ formatBytesLink(proxmoxLink.mem_alloc) }}
+              RAM
+              <strong
+                v-if="linkRamPct != null"
+                :class="getMetricColorClass(linkRamPct)"
+              >{{ linkRamPct.toFixed(1) }}%</strong>
+              <span class="text-body">({{ formatBytesLink(proxmoxLink.mem_usage) }} / {{ formatBytesLink(proxmoxLink.mem_alloc) }})</span>
+            </div>
+            <div
+              v-if="linkDiskPct != null"
+              class="text-muted small"
+            >
+              Disque <strong :class="getMetricColorClass(linkDiskPct)">{{ linkDiskPct.toFixed(1) }}%</strong>
             </div>
           </div>
         </template>
@@ -774,6 +785,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import BadgePill from '../components/common/BadgePill.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
+import { getMetricColorClass } from '../utils/metricColor'
 
 const {
   auth,
@@ -883,6 +895,21 @@ const dockerRunningCount = computed(() =>
 
 const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
 const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
+
+// CPU/RAM/disk % for the linked guest's live metrics, colored with the same
+// shared thresholds as the dashboard/Proxmox views (see metricColor.ts) —
+// mirrors ProxmoxGuestView's own KPI cards for the same guest.
+const linkRamPct = computed(() => {
+  const link = proxmoxLink.value
+  if (!link?.mem_alloc) return null
+  return (link.mem_usage / link.mem_alloc) * 100
+})
+
+const linkDiskPct = computed(() => {
+  const link = proxmoxLink.value
+  if (!link?.disk_alloc) return null
+  return (link.disk_usage / link.disk_alloc) * 100
+})
 
 // Fed by HostExposureTab's @loaded emit — the tab mounts eagerly (Host's
 // tabs use v-show, not lazy), so this is already populated before the user

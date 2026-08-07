@@ -45,15 +45,7 @@
           </th>
           <th>
             <SortableHeader
-              label="CPU alloué"
-              :active="sortKey === 'cpu_alloc'"
-              :direction="sortDir"
-              @toggle="toggleSort('cpu_alloc')"
-            />
-          </th>
-          <th>
-            <SortableHeader
-              label="CPU utilisé"
+              label="CPU"
               :active="sortKey === 'cpu_used'"
               :direction="sortDir"
               @toggle="toggleSort('cpu_used')"
@@ -61,15 +53,7 @@
           </th>
           <th>
             <SortableHeader
-              label="RAM allouée"
-              :active="sortKey === 'mem_alloc'"
-              :direction="sortDir"
-              @toggle="toggleSort('mem_alloc')"
-            />
-          </th>
-          <th>
-            <SortableHeader
-              label="RAM utilisée"
+              label="RAM"
               :active="sortKey === 'mem_used'"
               :direction="sortDir"
               @toggle="toggleSort('mem_used')"
@@ -78,41 +62,9 @@
           <th>
             <SortableHeader
               label="Disque"
-              :active="sortKey === 'disk_alloc'"
+              :active="sortKey === 'disk_used'"
               :direction="sortDir"
-              @toggle="toggleSort('disk_alloc')"
-            />
-          </th>
-          <th>
-            <SortableHeader
-              label="Uptime"
-              :active="sortKey === 'uptime'"
-              :direction="sortDir"
-              @toggle="toggleSort('uptime')"
-            />
-          </th>
-          <th>
-            <SortableHeader
-              label="Dernière sauvegarde"
-              :active="sortKey === 'last_backup'"
-              :direction="sortDir"
-              @toggle="toggleSort('last_backup')"
-            />
-          </th>
-          <th v-if="showTags">
-            <SortableHeader
-              label="Tags"
-              :active="sortKey === 'tags'"
-              :direction="sortDir"
-              @toggle="toggleSort('tags')"
-            />
-          </th>
-          <th>
-            <SortableHeader
-              label="Hôte lié"
-              :active="sortKey === 'linked_host'"
-              :direction="sortDir"
-              @toggle="toggleSort('linked_host')"
+              @toggle="toggleSort('disk_used')"
             />
           </th>
           <th v-if="showActionsCol" />
@@ -145,19 +97,10 @@
               v-if="guestNetworksLoading"
               class="text-muted small"
             >…</span>
-            <template v-else-if="guestNetworks[g.vmid]?.length">
-              <div
-                v-for="iface in guestNetworks[g.vmid]"
-                :key="iface.name"
-                class="small lh-sm"
-              >
-                <span class="text-muted me-1">{{ iface.name }}</span>
-                <span
-                  v-for="ip in iface.ips.filter((i: string) => !i.startsWith('fe80'))"
-                  :key="ip"
-                >{{ ip.split('/')[0] }}</span>
-              </div>
-            </template>
+            <span
+              v-else-if="guestPrimaryIp(g)"
+              class="small"
+            >{{ guestPrimaryIp(g) }}</span>
             <span
               v-else
               class="text-muted"
@@ -189,45 +132,28 @@
               class="text-muted"
             >—</span>
           </td>
-          <td>{{ g.cpu_alloc }}{{ cpuSuffix }}</td>
-          <td>{{ (g.cpu_usage * 100).toFixed(1) }}%</td>
-          <td>{{ formatBytes(g.mem_alloc) }}</td>
-          <td>{{ formatBytes(g.mem_usage) }}</td>
-          <td>{{ formatBytes(g.disk_alloc) }}</td>
-          <td>{{ g.status === 'running' ? formatUptime(g.uptime) : '—' }}</td>
+          <td>
+            <span :class="getMetricColorClass(g.cpu_usage * 100)">{{ (g.cpu_usage * 100).toFixed(1) }}%</span>
+          </td>
           <td>
             <span
-              v-if="!lastBackupFor(g)"
+              v-if="ramPct(g) != null"
+              :class="getMetricColorClass(ramPct(g))"
+            >{{ ramPct(g)!.toFixed(1) }}%</span>
+            <span
+              v-else
               class="text-muted"
             >—</span>
-            <template v-else>
-              <span
-                class="badge me-1"
-                :class="lastBackupBadgeClass(lastBackupFor(g))"
-              >{{ lastBackupLabel(lastBackupFor(g)) }}</span>
-              <RelativeTime
-                v-if="lastBackupFor(g)?.start_time"
-                :date="lastBackupFor(g).start_time"
-                class="small text-muted"
-              />
-            </template>
-          </td>
-          <td v-if="showTags">
-            <template v-if="g.tags">
-              <span
-                v-for="tag in g.tags.split(';').filter(Boolean)"
-                :key="tag"
-                class="badge bg-blue-lt text-blue me-1"
-              >{{ tag.trim() }}</span>
-            </template>
           </td>
           <td>
-            <GuestLinkCell
-              :link="linkForGuest(g)"
-              @confirm="emit('confirm-link', g)"
-              @ignore="emit('ignore-link', g)"
-              @go="emit('go-host', linkForGuest(g))"
-            />
+            <span
+              v-if="diskPct(g) != null"
+              :class="getMetricColorClass(diskPct(g))"
+            >{{ diskPct(g)!.toFixed(1) }}%</span>
+            <span
+              v-else
+              class="text-muted"
+            >—</span>
           </td>
           <td v-if="showActionsCol">
             <div class="d-flex align-items-center gap-1">
@@ -305,16 +231,14 @@
 import { computed, ref } from 'vue'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
-import GuestLinkCell from './GuestLinkCell.vue'
 import EmptyState from '../EmptyState.vue'
-import RelativeTime from '../RelativeTime.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { GuestPowerAction } from '../../composables/useProxmoxGuestActions'
 import { compareValues } from '../../utils/sort'
 import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
+import { getMetricColorClass } from '../../utils/metricColor'
 
 type Guest = Record<string, any>
-type LinkMap = Record<string, any>
 
 const props = defineProps<{
   kind: 'vm' | 'lxc'
@@ -323,24 +247,18 @@ const props = defineProps<{
   guestNetworksLoading?: boolean
   guestExposure?: Record<string, any>
   guestExposureLoading?: boolean
-  backupRunsByVmid?: Record<number, any>
-  links: LinkMap
   peerNodes: Guest[]
   nodeId: string
   actionLoading?: Record<string, GuestPowerAction | undefined>
 }>()
 
 const emit = defineEmits<{
-  (e: 'confirm-link', guest: Guest): void
-  (e: 'ignore-link', guest: Guest): void
-  (e: 'go-host', link: any): void
   (e: 'migrate', guest: Guest): void
   (e: 'guest-action', guest: Guest, action: GuestPowerAction): void
 }>()
 
 const auth = useAuthStore()
 
-const showTags = computed(() => props.kind === 'vm')
 const showMigrate = computed(() => props.kind === 'vm')
 // Migrate is open to any authenticated user (PVE-token-scoped, see the
 // Proxmox integration note in root CLAUDE.md), so the VM tab already shows
@@ -348,35 +266,11 @@ const showMigrate = computed(() => props.kind === 'vm')
 // tab only gains the column for admins — it never had a migrate button.
 const showActionsCol = computed(() => showMigrate.value || auth.isAdmin)
 const idLabel = computed(() => (props.kind === 'vm' ? 'VMID' : 'CT ID'))
-const cpuSuffix = computed(() => (props.kind === 'vm' ? ' vCPU' : ''))
 const emptyText = computed(() => (props.kind === 'vm' ? 'Aucune VM sur ce nœud.' : 'Aucun conteneur LXC sur ce nœud.'))
-const colspan = computed(() => {
-  const base = (props.kind === 'vm' ? 12 : 11) + 2 // +1 Domaines, +1 Dernière sauvegarde
-  return showActionsCol.value ? base + 1 : base
-})
+const colspan = computed(() => (showActionsCol.value ? 9 : 8))
 
 function actionLoadingFor(guest: Guest): GuestPowerAction | null {
   return props.actionLoading?.[guest.id] ?? null
-}
-
-function lastBackupFor(guest: Guest): any {
-  return props.backupRunsByVmid?.[guest.vmid] ?? null
-}
-
-function lastBackupLabel(run: any): string {
-  if (!run) return '—'
-  if (run.status === 'running') return 'En cours'
-  if (run.exit_status === 'OK' || run.status === 'OK') return 'OK'
-  if (run.exit_status) return String(run.exit_status)
-  return String(run.status || '—')
-}
-
-function lastBackupBadgeClass(run: any): string {
-  if (!run) return 'bg-secondary-lt text-secondary'
-  if (run.status === 'running') return 'bg-primary-lt text-primary'
-  if (run.exit_status === 'OK' || run.status === 'OK') return 'bg-success-lt text-success'
-  if (run.exit_status) return 'bg-danger-lt text-danger'
-  return 'bg-secondary-lt text-secondary'
 }
 
 const sortKey = ref('vmid')
@@ -391,14 +285,13 @@ function toggleSort(key: string) {
   sortDir.value = 'asc'
 }
 
-function linkForGuest(g: Guest) {
-  return props.links[g.id] ?? null
-}
-
+// Only the ethX interface(s) are shown here — full interface/IP detail
+// (including non-eth interfaces) lives on the guest's own detail page.
 function guestPrimaryIp(guest: Guest): string {
   const ifaces = props.guestNetworks?.[guest.vmid]
   if (!Array.isArray(ifaces)) return ''
-  for (const iface of ifaces) {
+  const ethIfaces = ifaces.filter((iface) => /^eth\d+$/i.test(iface?.name ?? ''))
+  for (const iface of ethIfaces) {
     const ips = Array.isArray(iface?.ips) ? iface.ips : []
     const first = ips.find((ip: string) => typeof ip === 'string' && !ip.startsWith('fe80'))
     if (first) return first.split('/')[0]
@@ -406,10 +299,14 @@ function guestPrimaryIp(guest: Guest): string {
   return ''
 }
 
-function linkedHostLabel(guest: Guest): string {
-  const link = linkForGuest(guest)
-  if (!link) return ''
-  return link.host_hostname || link.host_name || ''
+function ramPct(guest: Guest): number | null {
+  if (!guest.mem_alloc) return null
+  return ((guest.mem_usage ?? 0) / guest.mem_alloc) * 100
+}
+
+function diskPct(guest: Guest): number | null {
+  if (!guest.disk_alloc) return null
+  return ((guest.disk_usage ?? 0) / guest.disk_alloc) * 100
 }
 
 // Flattens the guest's NPM exposure (map keyed by vmid, see useProxmoxNode's
@@ -435,40 +332,12 @@ const sortedGuests = computed(() => {
       case 'status': return compareValues(a.status || '', b.status || '', sortDir.value)
       case 'ip': return compareValues(guestPrimaryIp(a), guestPrimaryIp(b), sortDir.value)
       case 'domains': return compareValues(guestDomains(a).length, guestDomains(b).length, sortDir.value)
-      case 'cpu_alloc': return compareValues(a.cpu_alloc, b.cpu_alloc, sortDir.value)
       case 'cpu_used': return compareValues(a.cpu_usage, b.cpu_usage, sortDir.value)
-      case 'mem_alloc': return compareValues(a.mem_alloc, b.mem_alloc, sortDir.value)
-      case 'mem_used': return compareValues(a.mem_usage, b.mem_usage, sortDir.value)
-      case 'disk_alloc': return compareValues(a.disk_alloc, b.disk_alloc, sortDir.value)
-      case 'uptime': return compareValues(a.status === 'running' ? a.uptime : -1, b.status === 'running' ? b.uptime : -1, sortDir.value)
-      case 'last_backup': return compareValues(lastBackupFor(a)?.start_time || '', lastBackupFor(b)?.start_time || '', sortDir.value)
-      case 'tags': return compareValues(a.tags || '', b.tags || '', sortDir.value)
-      case 'linked_host': return compareValues(linkedHostLabel(a), linkedHostLabel(b), sortDir.value)
+      case 'mem_used': return compareValues(ramPct(a) ?? -1, ramPct(b) ?? -1, sortDir.value)
+      case 'disk_used': return compareValues(diskPct(a) ?? -1, diskPct(b) ?? -1, sortDir.value)
       default: return 0
     }
   })
   return list
 })
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return '0 B'
-  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
-  let i = 0
-  let v = bytes
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024
-    i++
-  }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
-}
-
-function formatUptime(seconds: number): string {
-  if (!seconds) return '—'
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}j ${h}h`
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
 </script>

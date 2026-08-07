@@ -58,11 +58,11 @@ func TestBuildIPInventory(t *testing.T) {
 	nodeID := nodes[0].ID
 
 	// Guest A: linked (confirmed) to app-host.
-	if err := db.UpsertProxmoxGuest(ctx, connID, "pve1", "vm", 100, "app-vm", "running", 2, 0.1, 4096, 1024, 20000, 3600, ""); err != nil {
+	if err := db.UpsertProxmoxGuest(ctx, connID, "pve1", "vm", 100, "app-vm", "running", 2, 0.1, 4096, 1024, 20000, 0, 3600, ""); err != nil {
 		t.Fatalf("upsert guest A: %v", err)
 	}
 	// Guest B: no link.
-	if err := db.UpsertProxmoxGuest(ctx, connID, "pve1", "lxc", 200, "db-vm", "running", 1, 0.05, 2048, 512, 10000, 3600, ""); err != nil {
+	if err := db.UpsertProxmoxGuest(ctx, connID, "pve1", "lxc", 200, "db-vm", "running", 1, 0.05, 2048, 512, 10000, 0, 3600, ""); err != nil {
 		t.Fatalf("upsert guest B: %v", err)
 	}
 	guests, err := db.ListProxmoxGuests(ctx, connID, "", "")
