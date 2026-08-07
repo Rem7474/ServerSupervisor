@@ -3,7 +3,14 @@ import { useRoute } from 'vue-router'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
-import type { UptimeProbe, UptimeStats } from '../types/generated'
+import dayjs from '../utils/dayjs'
+import type { UptimeProbe, UptimeStats, UptimeHistoryBucket } from '../types/generated'
+
+// 1h/24h windows are dense enough that only the time-of-day matters; wider
+// windows (7j/30j) need the date too or every bucket label looks identical.
+function formatBucketLabel(bucketStart: string, windowHours: number): string {
+  return dayjs(bucketStart).format(windowHours > 24 ? 'DD/MM HH:mm' : 'HH:mm:ss')
+}
 
 interface ProbeResult {
   id: string | number
@@ -34,14 +41,8 @@ interface ResultGroup {
 
 const PROBE_REFRESH_SEC = 30
 
-// Uptime Kuma itself pairs a fixed-length "last N pings" heartbeat bar with a
-// separately selectable uptime-% window — the bar isn't re-bucketed per
-// window (that would need server-side time-bucketing this API doesn't have),
-// only the % figure is. HEARTBEAT_BAR_SIZE caps how many of the most recent
-// `results` render as bars, independent of statsWindow.
-const HEARTBEAT_BAR_SIZE = 50
-
 export const STATS_WINDOWS = [
+  { hours: 1, label: '1h' },
   { hours: 24, label: '24h' },
   { hours: 168, label: '7j' },
   { hours: 720, label: '30j' },
@@ -59,9 +60,10 @@ export function useUptimeProbeDetail(probeIdOverride?: string) {
   const probe = ref<UptimeProbe | null>(null)
   const results = ref<ProbeResult[]>([])
   const stats = ref<UptimeStats | null>(null)
+  const buckets = ref<UptimeHistoryBucket[]>([])
   const loading = ref(false)
   const error = ref('')
-  const statsWindow = ref<number>(24)
+  const statsWindow = ref<number>(1)
   const statsLoading = ref(false)
 
   const groupedResults = computed<ResultGroup[]>(() => {
@@ -102,13 +104,12 @@ export function useUptimeProbeDetail(probeIdOverride?: string) {
   })
 
   const chartData = computed(() => {
-    if (!results.value.length) return null
-    const ordered = [...results.value].reverse()
+    if (!buckets.value.length) return null
     return {
-      labels: ordered.map((r) => new Date(r.checked_at).toLocaleTimeString()),
+      labels: buckets.value.map((b) => formatBucketLabel(b.bucket_start, statsWindow.value)),
       datasets: [{
-        label: 'Latence ms',
-        data: ordered.map((r) => r.success ? r.latency_ms : null),
+        label: 'Latence moy. ms',
+        data: buckets.value.map((b) => b.up_checks > 0 ? Math.round(b.avg_latency_ms) : null),
         borderColor: '#2fb344',
         backgroundColor: 'rgba(47,179,68,0.15)',
         fill: true,
@@ -134,24 +135,25 @@ export function useUptimeProbeDetail(probeIdOverride?: string) {
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
 
-  // Oldest-first (Uptime Kuma convention: reading left-to-right ends on "now")
-  // slice of the most recent checks, for the heartbeat bar.
-  const heartbeatBar = computed<ProbeResult[]>(() =>
-    [...results.value].reverse().slice(-HEARTBEAT_BAR_SIZE)
-  )
+  // Bucket-based availability bar, oldest-first (reading left-to-right ends on
+  // "now") — scales with statsWindow instead of always showing the last few
+  // minutes' worth of raw checks.
+  const heartbeatBar = computed<UptimeHistoryBucket[]>(() => buckets.value)
 
   async function fetchAll(): Promise<void> {
     loading.value = true
     error.value = ''
     try {
-      const [pr, hr, sr] = await Promise.all([
+      const [pr, hr, sr, br] = await Promise.all([
         api.getUptimeProbe(probeId, signal),
         api.getUptimeHistory(probeId, 200, signal),
         api.getUptimeStats(probeId, statsWindow.value, signal),
+        api.getUptimeHistoryBuckets(probeId, statsWindow.value, signal),
       ])
       probe.value = pr.data
       results.value = hr.data?.results || []
       stats.value = sr.data
+      buckets.value = br.data?.buckets || []
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       if (isApiAbort(e)) return
@@ -161,15 +163,19 @@ export function useUptimeProbeDetail(probeIdOverride?: string) {
     }
   }
 
-  // Only re-fetches Stats (the % uptime figure) — the heartbeat bar and
-  // history table are independent of the selected window (see HEARTBEAT_BAR_SIZE).
+  // Re-fetches Stats (the % uptime figure) and the bucketed availability/latency
+  // data together — both are scoped to the same selected window.
   async function setStatsWindow(hours: number): Promise<void> {
     if (hours === statsWindow.value) return
     statsWindow.value = hours
     statsLoading.value = true
     try {
-      const sr = await api.getUptimeStats(probeId, hours, signal)
+      const [sr, br] = await Promise.all([
+        api.getUptimeStats(probeId, hours, signal),
+        api.getUptimeHistoryBuckets(probeId, hours, signal),
+      ])
       stats.value = sr.data
+      buckets.value = br.data?.buckets || []
     } catch (e: unknown) {
       if (isApiAbort(e)) return
       error.value = getApiErrorMessage(e, 'Impossible de charger les statistiques')

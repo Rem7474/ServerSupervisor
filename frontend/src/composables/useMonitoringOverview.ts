@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useUptimeProbes } from './useUptimeProbes'
 import { useSslCertificates } from './useSslCertificates'
 import { usePagination } from './usePagination'
@@ -61,6 +61,18 @@ export function useMonitoringOverview() {
     return rows
   })
 
+  const search = ref('')
+  const filteredRows = computed(() => {
+    const q = search.value.trim().toLowerCase()
+    if (!q) return mergedRows.value
+    return mergedRows.value.filter((r) =>
+      r.name.toLowerCase().includes(q) ||
+      r.npmProxyHostDomain?.toLowerCase().includes(q) ||
+      r.probe?.target.toLowerCase().includes(q) ||
+      r.cert?.host.toLowerCase().includes(q)
+    )
+  })
+
   type RowCol = 'name' | 'status' | 'uptime' | 'ssl_days' | 'last_checked'
   const rowSort = ref<{ col: RowCol; dir: 'asc' | 'desc' }>({ col: 'status', dir: 'asc' })
 
@@ -73,7 +85,7 @@ export function useMonitoringOverview() {
   }
 
   const sortedRows = computed(() => {
-    const arr = [...mergedRows.value]
+    const arr = [...filteredRows.value]
     const { col, dir } = rowSort.value
     const m = dir === 'asc' ? 1 : -1
     arr.sort((a, b) => {
@@ -121,9 +133,13 @@ export function useMonitoringOverview() {
     totalPages: rowTotalPages,
     pagedItems: pagedRows,
     setPage: setRowPage,
+    resetPage: resetRowPage,
   } = usePagination({ items: sortedRows, pageSize: PAGE_SIZE })
 
+  watch(search, () => resetRowPage())
+
   const totalMonitored = computed(() => mergedRows.value.length)
+  const filteredCount = computed(() => filteredRows.value.length)
 
   async function checkRowNow(row: MonitoringRow): Promise<void> {
     await Promise.all([
@@ -157,6 +173,8 @@ export function useMonitoringOverview() {
     downCount: uptime.downCount,
     expiringCount: ssl.expiringCount,
     totalMonitored,
+    filteredCount,
+    search,
     rowSort,
     toggleRowSort,
     pagedRows,

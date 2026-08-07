@@ -1517,6 +1517,19 @@ export interface UptimeStats {
   p95_latency_ms: number /* int */;
 }
 /**
+ * UptimeHistoryBucket is one fixed-width time slice of a probe's results over a
+ * selected window, used to render the availability bar and latency chart at a
+ * resolution proportional to the selected window (1h/24h/7j/30j) instead of a
+ * fixed "last N checks" that only ever reflects the most recent few minutes.
+ */
+export interface UptimeHistoryBucket {
+  bucket_start: string;
+  total_checks: number /* int */;
+  up_checks: number /* int */;
+  down_checks: number /* int */;
+  avg_latency_ms: number /* float64 */;
+}
+/**
  * SSLCertificate represents a monitored TLS endpoint and its last check result.
  */
 export interface SSLCertificate {

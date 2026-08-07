@@ -237,6 +237,51 @@ func (db *DB) GetUptimeStats(ctx context.Context, probeID string, windowHours in
 	return stats, nil
 }
 
+// GetUptimeHistoryBuckets aggregates results over the given window into a fixed
+// number of equal-width time buckets, so the availability bar / latency chart can
+// scale with the selected window (1h/24h/7j/30j) instead of a fixed "last N
+// checks" slice that never moves past the last few minutes regardless of window.
+func (db *DB) GetUptimeHistoryBuckets(ctx context.Context, probeID string, windowHours int, buckets int) ([]models.UptimeHistoryBucket, error) {
+	if windowHours <= 0 {
+		windowHours = 24
+	}
+	if buckets <= 0 {
+		buckets = 50
+	}
+	bucketSeconds := float64(windowHours) * 3600 / float64(buckets)
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT
+		    to_timestamp(floor(extract(epoch from checked_at) / $2) * $2) AS bucket_start,
+		    COUNT(*) AS total,
+		    COUNT(*) FILTER (WHERE success) AS up,
+		    COUNT(*) FILTER (WHERE NOT success) AS down,
+		    AVG(latency_ms) FILTER (WHERE success) AS avg_lat
+		 FROM uptime_probe_results
+		 WHERE probe_id = $1
+		   AND checked_at >= NOW() - ($3 || ' hours')::interval
+		 GROUP BY bucket_start
+		 ORDER BY bucket_start ASC`,
+		probeID, bucketSeconds, windowHours)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []models.UptimeHistoryBucket
+	for rows.Next() {
+		var b models.UptimeHistoryBucket
+		var avgLatency sql.NullFloat64
+		if err := rows.Scan(&b.BucketStart, &b.TotalChecks, &b.UpChecks, &b.DownChecks, &avgLatency); err != nil {
+			return nil, err
+		}
+		if avgLatency.Valid {
+			b.AvgLatencyMs = avgLatency.Float64
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
 // CountDownProbes returns how many enabled probes are currently in the "down" state.
 // Used by the alert engine for the global "uptime_down_count" metric.
 func (db *DB) CountDownProbes(ctx context.Context) (int, error) {

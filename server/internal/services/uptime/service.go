@@ -25,8 +25,14 @@ type Repository interface {
 	DeleteUptimeProbe(ctx context.Context, id string) error
 	GetUptimeProbeResults(ctx context.Context, probeID string, limit int) ([]models.UptimeProbeResult, error)
 	GetUptimeStats(ctx context.Context, probeID string, windowHours int) (*models.UptimeStats, error)
+	GetUptimeHistoryBuckets(ctx context.Context, probeID string, windowHours int, buckets int) ([]models.UptimeHistoryBucket, error)
 	RecordUptimeProbeResult(ctx context.Context, r models.UptimeProbeResult) error
 }
+
+// HistoryBucketCount is the fixed number of time slices returned by HistoryBuckets,
+// regardless of the selected window — the availability bar / latency chart render
+// at this resolution whether the window is 1h or 30j.
+const HistoryBucketCount = 50
 
 // ProbeRunner executes a probe once and returns its result. Injected so tests can
 // avoid real network I/O; defaults to synthetic.RunOnce.
@@ -139,6 +145,19 @@ func (s *Service) History(ctx context.Context, id string, limit int) ([]models.U
 // Stats returns aggregated uptime/latency over a window.
 func (s *Service) Stats(ctx context.Context, id string, hours int) (*models.UptimeStats, error) {
 	return s.repo.GetUptimeStats(ctx, id, hours)
+}
+
+// HistoryBuckets returns HistoryBucketCount time-bucketed aggregates over the
+// given window (never nil), for the availability bar / latency chart.
+func (s *Service) HistoryBuckets(ctx context.Context, id string, hours int) ([]models.UptimeHistoryBucket, error) {
+	buckets, err := s.repo.GetUptimeHistoryBuckets(ctx, id, hours, HistoryBucketCount)
+	if err != nil {
+		return nil, err
+	}
+	if buckets == nil {
+		buckets = []models.UptimeHistoryBucket{}
+	}
+	return buckets, nil
 }
 
 // CheckNow runs the probe immediately, records the result and returns it.
