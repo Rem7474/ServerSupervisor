@@ -22,8 +22,9 @@
           :class="{ 'is-open': isOpen }"
         />
       </h3>
-      <div class="card-options text-secondary small">
-        Suivi via <router-link
+      <div class="card-options text-secondary small gap-1">
+        <span>Suivi via</span>
+        <router-link
           to="/git-webhooks"
           @click.stop
         >
