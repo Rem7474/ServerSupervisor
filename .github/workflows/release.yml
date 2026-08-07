@@ -290,14 +290,12 @@ jobs:
 
             ### 🐳 Image Docker
 
-            **Serveur** (inclut frontend intégré) :
+            **Serveur** :
             ```bash
             docker pull ${{ needs.meta.outputs.image }}:${{ needs.meta.outputs.version }}
             ```
 
             ### 📦 Binaires agent
-
-            L'agent doit tourner **nativement** sur le système supervisé (accès à `docker`, `apt`, etc.).
 
             | Plateforme | Fichier |
             |-----------|---------|

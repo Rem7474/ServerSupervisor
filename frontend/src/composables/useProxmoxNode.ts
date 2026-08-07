@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
+import type { ProxmoxBackupJob, ProxmoxBackupRun } from '../types/proxmox'
 
 export function useProxmoxNode() {
   const route = useRoute()
@@ -128,34 +129,31 @@ export function useProxmoxNode() {
   const svcActionOk = ref(false)
   const svcActionLoading = ref<Record<string, string | null>>({})
 
-  const vms = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'vm') ?? [])
-  const lxcs = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'lxc') ?? [])
+  // backups — job configs are connection-scoped (a vzdump job can target VMs
+  // across several nodes of the same cluster), so backupJobs is left
+  // unfiltered; backupRuns is one row per VM and does carry node_name, so
+  // nodeBackupRuns below narrows it to guests actually on this node.
+  const backupJobs = ref<ProxmoxBackupJob[]>([])
+  const backupRuns = ref<ProxmoxBackupRun[]>([])
+  const backupsLoading = ref(false)
+  const backupsError = ref('')
 
-  // "Dernier résultat par VM" — the backend (poller/db/service/handler/route)
-  // already derives this from vzdump tasks; only the frontend consumer was
-  // missing. Same lazy/load-once-per-mount pattern as guestNetworks/guestExposure
-  // above, feeding both the guest-list column and the node's "Sauvegarde" tab.
-  const backupRuns = ref<any[]>([])
-  const backupRunsLoading = ref(false)
+  const nodeBackupRuns = computed(() =>
+    backupRuns.value.filter((r) => r.node_name === node.value?.node_name)
+  )
 
-  async function loadBackupRuns(): Promise<void> {
-    if (backupRunsLoading.value || backupRuns.value.length > 0) return
-    const connectionId = node.value?.connection_id
-    const nodeName = node.value?.node_name
-    if (!connectionId) return
-    backupRunsLoading.value = true
-    try {
-      const res = await api.getProxmoxBackupRuns(connectionId)
-      backupRuns.value = (res.data ?? []).filter((r: any) => r.node_name === nodeName)
-    } catch { /* non-bloquant */ }
-    finally { backupRunsLoading.value = false }
-  }
-
-  const backupRunsByVmid = computed(() => {
-    const map: Record<number, any> = {}
-    for (const r of backupRuns.value) map[r.vmid] = r
+  // Keyed view of nodeBackupRuns for the guest-list "Dernière sauvegarde"
+  // column (ProxmoxNodeGuestsTab) — same underlying loadBackups() data the
+  // "Sauvegarde" tab renders as a table, just indexed by vmid for an O(1)
+  // per-row lookup instead of scanning the array per guest.
+  const nodeBackupRunsByVmid = computed(() => {
+    const map: Record<number, ProxmoxBackupRun> = {}
+    for (const r of nodeBackupRuns.value) map[r.vmid] = r
     return map
   })
+
+  const vms = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'vm') ?? [])
+  const lxcs = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'lxc') ?? [])
 
   // Re-fetches only the guest statuses after a start/shutdown/reboot — a full
   // load() also re-triggers sensor/live-status/RRD/peer-node fetches and
@@ -181,7 +179,7 @@ export function useProxmoxNode() {
     error.value = ''
     try {
       const requestedTab = String(route.query.tab || '')
-      const validTabs = ['vms', 'lxc', 'storage', 'disks', 'tasks', 'updates', 'services', 'security', 'backups']
+      const validTabs = ['vms', 'lxc', 'storage', 'disks', 'tasks', 'backups', 'updates', 'services', 'security']
       if (validTabs.includes(requestedTab)) {
         tab.value = requestedTab
       }
@@ -201,9 +199,9 @@ export function useProxmoxNode() {
       // domains) and the Services list silently stayed empty after a hard
       // refresh landing directly on one of those tabs. Mirror onTabClick's
       // own logic here for whichever tab was actually restored.
-      if (tab.value === 'vms' || tab.value === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackupRuns() }
+      if (tab.value === 'vms' || tab.value === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackups() }
       else if (tab.value === 'services') loadServices()
-      else if (tab.value === 'backups') loadBackupRuns()
+      else if (tab.value === 'backups') loadBackups()
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, 'Erreur lors du chargement.')
     } finally {
@@ -621,6 +619,25 @@ export function useProxmoxNode() {
     }
   }
 
+  async function loadBackups(): Promise<void> {
+    if (backupsLoading.value || backupJobs.value.length > 0 || backupRuns.value.length > 0) return
+    backupsLoading.value = true
+    backupsError.value = ''
+    try {
+      const connectionId = node.value?.connection_id
+      const [jobsRes, runsRes] = await Promise.all([
+        api.getProxmoxBackupJobs(connectionId),
+        api.getProxmoxBackupRuns(connectionId),
+      ])
+      backupJobs.value = jobsRes.data ?? []
+      backupRuns.value = runsRes.data ?? []
+    } catch (e: unknown) {
+      backupsError.value = getApiErrorMessage(e, 'Erreur lors du chargement des sauvegardes.')
+    } finally {
+      backupsLoading.value = false
+    }
+  }
+
   async function svcAction(name: string, action: string): Promise<void> {
     svcActionMsg.value = ''
     svcActionLoading.value[name] = action
@@ -759,13 +776,16 @@ export function useProxmoxNode() {
     svcActionLoading,
     loadServices,
     svcAction,
+    backupJobs,
+    backupRuns,
+    nodeBackupRuns,
+    nodeBackupRunsByVmid,
+    backupsLoading,
+    backupsError,
+    loadBackups,
     vms,
     lxcs,
     failedTaskCount,
-    backupRuns,
-    backupRunsLoading,
-    backupRunsByVmid,
-    loadBackupRuns,
     confirmGuestLink,
     ignoreGuestLink,
     goToHost,

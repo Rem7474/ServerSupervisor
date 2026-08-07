@@ -353,7 +353,7 @@
                   :guest-networks-loading="guestNetworksLoading"
                   :guest-exposure="guestExposure"
                   :guest-exposure-loading="guestExposureLoading"
-                  :backup-runs-by-vmid="backupRunsByVmid"
+                  :backup-runs-by-vmid="nodeBackupRunsByVmid"
                   :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
@@ -374,7 +374,7 @@
                   :guest-networks-loading="guestNetworksLoading"
                   :guest-exposure="guestExposure"
                   :guest-exposure-loading="guestExposureLoading"
-                  :backup-runs-by-vmid="backupRunsByVmid"
+                  :backup-runs-by-vmid="nodeBackupRunsByVmid"
                   :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
@@ -395,6 +395,16 @@
                 <ProxmoxNodeTasksTab
                   :tasks="node.tasks || []"
                   :active-upid="activeUpid"
+                  @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
+                />
+              </template>
+
+              <template #backups>
+                <ProxmoxNodeBackupsTab
+                  :jobs="backupJobs"
+                  :runs="nodeBackupRuns"
+                  :loading="backupsLoading"
+                  :error="backupsError"
                   @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
                 />
               </template>
@@ -433,14 +443,6 @@
 
               <template #storage>
                 <ProxmoxNodeStorageTab :storages="node.storages || []" />
-              </template>
-
-              <template #backups>
-                <ProxmoxNodeBackupsTab
-                  :runs="backupRuns"
-                  :loading="backupRunsLoading"
-                  @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
-                />
               </template>
             </EntityTabShell>
 
@@ -561,9 +563,9 @@ import ProxmoxNodeStorageTab from '../components/proxmox/ProxmoxNodeStorageTab.v
 import ProxmoxNodeTasksTab from '../components/proxmox/ProxmoxNodeTasksTab.vue'
 import ProxmoxNodeUpdatesTab from '../components/proxmox/ProxmoxNodeUpdatesTab.vue'
 import ProxmoxNodeServicesTab from '../components/proxmox/ProxmoxNodeServicesTab.vue'
+import ProxmoxNodeBackupsTab from '../components/proxmox/ProxmoxNodeBackupsTab.vue'
 import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab.vue'
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
-import ProxmoxNodeBackupsTab from '../components/proxmox/ProxmoxNodeBackupsTab.vue'
 import { useProxmoxNode } from '../composables/useProxmoxNode'
 import { useModalChrome } from '../composables/useModalChrome'
 
@@ -634,13 +636,15 @@ const {
   svcActionLoading,
   loadServices,
   svcAction,
+  backupJobs,
+  nodeBackupRuns,
+  nodeBackupRunsByVmid,
+  backupsLoading,
+  backupsError,
+  loadBackups,
   vms,
   lxcs,
   failedTaskCount,
-  backupRuns,
-  backupRunsLoading,
-  backupRunsByVmid,
-  loadBackupRuns,
   confirmGuestLink,
   ignoreGuestLink,
   goToHost,
@@ -657,6 +661,10 @@ const securityEventsCount = ref(0)
 
 const azureBadge = 'badge bg-azure-lt text-azure ms-1'
 
+const failedBackupCount = computed(() =>
+  nodeBackupRuns.value.filter((r: { status?: string }) => r.status === 'error').length
+)
+
 const proxmoxTabs = computed<EntityTab[]>(() => [
   { key: 'vms', label: 'VMs', badges: [{ value: vms.value.length, badgeClass: azureBadge }], lazy: true },
   { key: 'lxc', label: 'LXC', badges: [{ value: lxcs.value.length, badgeClass: azureBadge }], lazy: true },
@@ -672,13 +680,18 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
     lazy: true,
   },
   {
+    key: 'backups',
+    label: 'Sauvegardes',
+    badges: failedBackupCount.value > 0 ? [{ value: failedBackupCount.value, badgeClass: 'badge bg-danger text-white ms-1' }] : [],
+    lazy: true,
+  },
+  {
     key: 'updates',
     label: 'Mises à jour',
     badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-warning-lt text-warning' }] : [],
     lazy: true,
   },
   { key: 'services', label: 'Services', lazy: true },
-  { key: 'backups', label: 'Sauvegarde', badges: [{ value: backupRuns.value.length, badgeClass: azureBadge }], lazy: true },
   // Labeled "Journaux sécurité" (not "Sécurité") to avoid colliding with
   // HostDetailView's "Permissions" tab — same word previously used on both,
   // unrelated content (PVE syslog auth-failure search here vs. per-host RBAC there).
@@ -693,9 +706,9 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
 // avoids re-triggering on every tab.value change load() itself makes.
 function onTabClick(key: string): void {
   tab.value = key
-  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackupRuns() }
+  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackups() }
   if (key === 'services') loadServices()
-  if (key === 'backups') loadBackupRuns()
+  if (key === 'backups') loadBackups()
 }
 
 function memPct(n: { mem_used?: number; mem_total?: number }): string | number {

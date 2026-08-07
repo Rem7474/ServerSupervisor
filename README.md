@@ -80,7 +80,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **Liaison guest↔hôte** : détection automatique par nom, confirmation manuelle, sélection de la source de métriques (agent / proxmox / auto)
 - UPSERT en base à chaque cycle + nettoyage automatique des ressources disparues
 - Vue globale `/proxmox` : cartes de synthèse (connexions, nœuds, VMs, LXC, stockage) + alertes de santé + tableau des nœuds
-- Vue détail `/proxmox/nodes/:id` : stats nœud + onglets VMs / LXC / Stockage / Disques / Tâches / Mises à jour
+- Vue détail `/proxmox/nodes/:id` : stats nœud + onglets VMs / LXC / Stockage / Disques / Tâches / Sauvegardes / Mises à jour / Services / Journaux sécurité
 - Configuration dans **Paramètres** : ajout/édition/suppression de connexions, bouton **Tester** (sans sauvegarder), déclenchement manuel d'un poll
 - Sécurité : `token_secret` stocké en base, jamais retourné au frontend ; `insecure_skip_verify` désactivé par défaut
 
@@ -124,13 +124,13 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 ### 1. Déployer le serveur
 
 ```bash
-git clone <repo-url> && cd ServerSupervisor
+git clone https://github.com/Rem7474/ServerSupervisor.git && cd ServerSupervisor
 cp .env.example .env
 # Éditer .env avec vos valeurs (JWT_SECRET, ADMIN_PASSWORD, etc.)
 docker compose up -d
 ```
 
-Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin` par défaut, **à changer**).
+Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin` par défaut).
 
 ### 2. Enregistrer un hôte
 
@@ -198,7 +198,6 @@ sudo dnf install -y lm_sensors       # si collect_cpu_temperature: true
 Notes:
 - Pour Docker, l'utilisateur du service agent doit avoir accès au socket Docker (groupe `docker` ou équivalent).
 - Sur certains environnements virtualisés, la température CPU peut être absente même avec `lm-sensors`.
-- Si `collect_cpu_temperature` est désactivé, aucun prérequis capteur n'est nécessaire.
 
 #### Via les releases GitHub (manuel)
 
@@ -254,42 +253,7 @@ sudo systemctl enable --now serversupervisor-agent
 sudo journalctl -u serversupervisor-agent -f
 ```
 
-### 4. Superviser un cluster Proxmox VE
-
-1. Dans Proxmox, créer un token API avec les permissions minimales en lecture :
-   ```
-   # Rôle lecture seule (nœuds, VMs, LXC, stockage, disques)
-   pveum role add SSAuditor -privs "Datastore.Audit Sys.Audit VM.Audit"
-   pveum user add supervision@pve
-   pveum aclmod / -user supervision@pve -role SSAuditor
-   pveum user token add supervision@pve monitoring --privsep 0
-   ```
-   Copier le `token ID` (ex : `supervision@pve!monitoring`) et le `secret` affiché.
-
-   > **Mises à jour apt (optionnel)** : l'endpoint `/nodes/{node}/apt/update` requiert `Sys.Modify`.
-   > Si vous souhaitez voir les paquets en attente et rafraîchir le cache depuis le dashboard,
-   > ajoutez ce privilege au rôle ou créez un second rôle complémentaire :
-   > ```
-   > pveum role modify SSAuditor -privs "Datastore.Audit Sys.Audit Sys.Modify VM.Audit"
-   > ```
-   > **Important** : si votre token a "Privilege Separation" activé (coché par défaut à la création),
-   > les permissions doivent être assignées **directement au token** et pas seulement à l'utilisateur :
-   > ```
-   > pveum aclmod / -token supervision@pve!monitoring -role SSAuditor
-   > ```
-
-2. Dans ServerSupervisor → **Paramètres** → carte **Proxmox VE** → **Ajouter une connexion** :
-   - Nom : label interne (ex : `Cluster prod`)
-   - URL API : `https://pve.example.com:8006/api2/json`
-   - Token ID : `supervision@pve!monitoring`
-   - Token secret : le secret copié
-   - Cocher **Ignorer TLS** uniquement si le certificat est auto-signé
-
-3. Cliquer **Tester la connexion** pour valider, puis **Créer**.
-
-4. La première collecte démarre automatiquement. L'entrée **Proxmox** apparaît dans la navigation.
-
-### 5. Suivre des repos GitHub
+### 4. Suivre des repos GitHub
 
 1. Dashboard → **Git / Automatisation** → onglet **Suivi de releases**
 2. Ajouter un repo (ex: `home-assistant` / `core`)

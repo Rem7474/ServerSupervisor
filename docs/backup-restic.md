@@ -1,4 +1,4 @@
-# Configurer les sauvegardes Restic — guide de A à Z
+# Configurer les sauvegardes Restic
 
 Ce guide détaille comment mettre en place la supervision et le déclenchement de
 sauvegardes [Restic](https://restic.net) via [resticprofile](https://creativeprojects.github.io/resticprofile/)
@@ -151,7 +151,62 @@ nextcloud-db:
       - /home/user/restic-backups/nextcloud-db.sql
     extended-status: true
 ```
+Exemple pour Immich :
+```yaml
+version: "1"
 
+global:
+  status-file: /home/user/restic-backups/backup-status.json
+
+groups:
+  full-immich-backup:
+    - immich-library
+    - immich-upload
+    - immich-profile
+    - immich-db
+
+immich-library:
+  backup:
+    run-before:
+      - "docker exec immich_server immich-admin enable-maintenance-mode"
+    source:
+      - /UPLOAD_LOCATION/library
+    run-after:
+      - "docker exec immich_server immich-admin disable-maintenance-mode"
+    run-after-fail:
+      - "docker exec immich_server immich-admin disable-maintenance-mode"
+    extended-status: true
+
+immich-upload:
+  backup:
+    run-before:
+      - "docker exec immich_server immich-admin enable-maintenance-mode"
+    source:
+      - /UPLOAD_LOCATION/upload
+    run-after:
+      - "docker exec immich_server immich-admin disable-maintenance-mode"
+    run-after-fail:
+      - "docker exec immich_server immich-admin disable-maintenance-mode"
+    extended-status: true
+
+immich-profile:
+  backup:
+    run-before:
+      - "docker exec immich_server immich-admin enable-maintenance-mode"
+    source:
+      - /UPLOAD_LOCATION/profile
+    run-after:
+      - "docker exec immich_server immich-admin disable-maintenance-mode"
+    run-after-fail:
+      - "docker exec immich_server immich-admin disable-maintenance-mode"
+    extended-status: true
+
+immich-db:
+  backup:
+    source:
+      - /UPLOAD_LOCATION/backups
+    extended-status: true
+```
 
 
 ## 5. `run_backup.sh` — le script que l'agent exécute
