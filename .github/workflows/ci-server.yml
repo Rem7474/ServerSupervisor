@@ -69,7 +69,17 @@ jobs:
       - name: Build
         run: go build -v ./...
 
+      # Ryuk (testcontainers' cleanup sidecar) has a long-standing reaper
+      # synchronization race when several packages spin up containers in
+      # parallel (testcontainers/testcontainers-go#2172) — it sporadically
+      # tears down another package's still-in-use Postgres container mid-run,
+      # failing every DB test after it with "connection refused". GH Actions
+      # runners are destroyed after the job anyway, so Ryuk's leaked-resource
+      # cleanup buys nothing here; disabling it is the maintainer-endorsed
+      # workaround for ephemeral CI.
       - name: Run tests
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
         run: go test -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage
