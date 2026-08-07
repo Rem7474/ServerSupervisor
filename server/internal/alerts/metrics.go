@@ -161,13 +161,11 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 		}
 		return 0.0, true
 	case "docker_compose_degraded_services":
-		// host.ID is "docker:compose:<host-id>:<project-name>"; value = declared - running service count.
-		rest := strings.TrimPrefix(host.ID, "docker:compose:")
-		idx := strings.Index(rest, ":")
-		if idx < 0 {
+		// value = declared - running service count.
+		hostID, projectName, ok := parseDockerComposeScopeID(host.ID)
+		if !ok {
 			return 0, false
 		}
-		hostID, projectName := rest[:idx], rest[idx+1:]
 		declared, running, err := db.GetDockerComposeServiceCounts(ctx, hostID, projectName)
 		if err != nil {
 			return 0, false
@@ -217,6 +215,21 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 		return float64(days), true
 	}
 	return 0, false
+}
+
+// parseDockerComposeScopeID splits the engine's synthetic compose-scope host
+// ID, "docker:compose:<host-id>:<project-name>" (built in engine.go's
+// buildDockerEvaluationTargets), back into its host ID and project name. Used
+// both to resolve the metric (here) and to resolve the remediation command's
+// target (notify.go's triggerAlertCommand) — keep both in sync if this ID
+// format ever changes.
+func parseDockerComposeScopeID(scopeID string) (hostID, projectName string, ok bool) {
+	rest := strings.TrimPrefix(scopeID, "docker:compose:")
+	idx := strings.Index(rest, ":")
+	if idx < 0 {
+		return "", "", false
+	}
+	return rest[:idx], rest[idx+1:], true
 }
 
 func resolveProxmoxStoragePercent(ctx context.Context, db *database.DB, rule models.AlertRule) float64 {

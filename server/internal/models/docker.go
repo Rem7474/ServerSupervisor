@@ -7,7 +7,7 @@ import "time"
 type DockerContainer struct {
 	ID          string            `json:"id" db:"id"`
 	HostID      string            `json:"host_id" db:"host_id"`
-	Hostname    string            `json:"hostname" db:"hostname"` // Host's hostname for display
+	Hostname    string            `json:"hostname" db:"hostname"` // Host's ServerSupervisor display name (hosts.name) — not the raw agent-reported system hostname
 	ContainerID string            `json:"container_id" db:"container_id"`
 	Name        string            `json:"name" db:"name"`
 	Image       string            `json:"image" db:"image"`
@@ -38,7 +38,7 @@ type DockerReport struct {
 type ComposeProject struct {
 	ID         string    `json:"id" db:"id"`
 	HostID     string    `json:"host_id" db:"host_id"`
-	Hostname   string    `json:"hostname" db:"hostname"`
+	Hostname   string    `json:"hostname" db:"hostname"` // Host's ServerSupervisor display name (hosts.name), same convention as DockerContainer.Hostname
 	Name       string    `json:"name" db:"name"`
 	WorkingDir string    `json:"working_dir" db:"working_dir"`
 	ConfigFile string    `json:"config_file" db:"config_file"`

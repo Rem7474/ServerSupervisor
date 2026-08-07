@@ -51,8 +51,18 @@ function isTerminalStatus(status: string): boolean {
  */
 export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCommandStreamApi {
   let activeStream: WebSocket | null = null
+  // Set right before any deliberate close (closeStream() itself, or a
+  // terminal-status auto-close) so ws.onclose can tell that apart from an
+  // unexpected drop (network blip, server restart) that should reconnect
+  // instead of leaving the stream — and whatever console is showing it —
+  // silently stuck on stale output. Mirrors useWebSocket.ts's manualClose.
+  let manualClose = false
+  let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let retryCount = 0
 
   function closeStream(): void {
+    manualClose = true
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
     if (!activeStream) return
     activeStream.onopen = null
     activeStream.onmessage = null
@@ -67,6 +77,13 @@ export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCo
     return `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${commandId}`
   }
 
+  // Exponential backoff (4s, 8s, 16s, capped at 30s) — same formula and
+  // increment-before-delay order as useWebSocket.ts, for a consistent
+  // reconnect feel across the app.
+  function retryDelay(): number {
+    return Math.min(2000 * Math.pow(2, retryCount), 30000)
+  }
+
   function openCommandStream(commandId: string, options: CommandStreamOptions = {}): WebSocket {
     const {
       onInit,
@@ -79,6 +96,7 @@ export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCo
     } = options
 
     closeStream()
+    manualClose = false
 
     const ws = new WebSocket(createStreamUrl(commandId))
     activeStream = ws
@@ -95,6 +113,7 @@ export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCo
 
     ws.onopen = (): void => {
       if (activeStream !== ws) return
+      retryCount = 0
       // The session cookie attached by the browser to the WebSocket upgrade
       // authenticates the connection; no in-band auth message is needed.
       // resolveToken stays callable for backwards compatibility with older
@@ -109,6 +128,11 @@ export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCo
         if (typeof parsed !== 'object' || parsed === null) return
         const payload = parsed as CommandStreamMessage
         if (payload.type === 'cmd_stream_init') {
+          // A reconnect lands here too — the server always answers a fresh
+          // subscription with the command's current full status + buffered
+          // output (server/internal/ws/endpoints.go), so this one message is
+          // what actually "catches up" a console left stale by a dropped
+          // connection.
           onInit?.(payload)
           scheduleTerminalClose(payload.status)
         } else if (payload.type === 'cmd_stream') {
@@ -124,17 +148,35 @@ export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCo
 
     ws.onerror = (): void => {
       if (activeStream !== ws) return
-      // Close before calling the error callback so the dead socket doesn't
-      // linger. closeStream() nullifies all handlers first, so onclose won't
-      // fire a second time after this.
-      closeStream()
+      // Deliberately don't touch activeStream/handlers or call close() here —
+      // a WebSocket error is always followed by a close event, and onclose
+      // below owns all teardown plus the reconnect decision. Clearing
+      // activeStream here too would make onclose see wasCurrent=false and
+      // skip reconnecting.
       onError?.(new Error('WebSocket error'))
     }
 
-    ws.onclose = (): void => {
+    ws.onclose = (event: CloseEvent): void => {
       const wasCurrent = activeStream === ws
       if (wasCurrent) activeStream = null
-      onClose?.()
+
+      // 1002/1008 (origin/policy rejection) and 4001 (custom auth error) mean
+      // retrying is pointless — it'll keep failing the same way. Same
+      // carve-out as useWebSocket.ts.
+      const nonRetryable = event.code === 1002 || event.code === 1008 || event.code === 4001
+      if (manualClose || nonRetryable || !wasCurrent) {
+        onClose?.()
+        return
+      }
+
+      // Unexpected drop: reconnect to the same command instead of surfacing
+      // this as "closed" — the caller's callbacks (and whatever console is
+      // rendering them) keep working transparently once the new connection's
+      // cmd_stream_init message lands.
+      retryCount++
+      retryTimer = setTimeout(() => {
+        openCommandStream(commandId, options)
+      }, retryDelay())
     }
 
     return ws

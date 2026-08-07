@@ -227,3 +227,83 @@ func TestEvaluateAlerts_NoIncidentBelowThreshold(t *testing.T) {
 		t.Error("did not expect an incident for a metric below the threshold")
 	}
 }
+
+// TestBuildDockerTestTargets_MultiContainerScope confirms a "specific
+// containers" scope evaluates every selected container, not just one — the
+// alert engine used to only ever build a target for a single ContainerID.
+func TestBuildDockerTestTargets_MultiContainerScope(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-docker-1"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "docker-host", Hostname: "docker-host", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+
+	containers := []models.DockerContainer{
+		{ID: "c-web", ContainerID: "web123", Name: "web", Image: "nginx", ImageTag: "1.27", State: "running"},
+		{ID: "c-db", ContainerID: "db123", Name: "db", Image: "postgres", ImageTag: "16", State: "running"},
+	}
+	if err := db.UpsertDockerContainers(ctx, hostID, containers); err != nil {
+		t.Fatalf("seed containers: %v", err)
+	}
+
+	rule := models.AlertRule{
+		SourceType: "docker",
+		Metric:     "docker_container_state",
+		DockerScope: &models.DockerMetricScope{
+			ScopeMode:    "container",
+			HostID:       hostID,
+			ContainerIDs: []string{"c-web", "c-db"},
+		},
+	}
+
+	targets := alerts.BuildDockerTestTargets(ctx, db, rule)
+	if len(targets) != 2 {
+		t.Fatalf("targets = %d, want 2 (one per selected container): %+v", len(targets), targets)
+	}
+	gotIDs := map[string]bool{}
+	for _, tg := range targets {
+		gotIDs[tg.ID] = true
+	}
+	if !gotIDs["docker:container:c-web"] || !gotIDs["docker:container:c-db"] {
+		t.Errorf("targets = %+v, want one for each of c-web and c-db", targets)
+	}
+}
+
+// TestBuildDockerTestTargets_LegacySingleContainerScope confirms a rule saved
+// before multi-select existed (ContainerID only, ContainerIDs empty) still
+// evaluates its one container unchanged.
+func TestBuildDockerTestTargets_LegacySingleContainerScope(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-docker-2"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "docker-host", Hostname: "docker-host", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+	if err := db.UpsertDockerContainers(ctx, hostID, []models.DockerContainer{
+		{ID: "c-web", ContainerID: "web123", Name: "web", Image: "nginx", ImageTag: "1.27", State: "running"},
+	}); err != nil {
+		t.Fatalf("seed container: %v", err)
+	}
+
+	rule := models.AlertRule{
+		SourceType: "docker",
+		Metric:     "docker_container_state",
+		DockerScope: &models.DockerMetricScope{
+			ScopeMode:   "container",
+			HostID:      hostID,
+			ContainerID: "c-web",
+		},
+	}
+
+	targets := alerts.BuildDockerTestTargets(ctx, db, rule)
+	if len(targets) != 1 || targets[0].ID != "docker:container:c-web" {
+		t.Fatalf("targets = %+v, want exactly one for docker:container:c-web", targets)
+	}
+}

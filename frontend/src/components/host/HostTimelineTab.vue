@@ -113,6 +113,7 @@
           </div>
           <div class="text-muted small mt-1">
             <RelativeTime :date="ev.timestamp" />
+            <span v-if="ev.user">· {{ ev.user }}</span>
           </div>
         </div>
       </div>

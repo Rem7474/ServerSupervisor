@@ -322,13 +322,18 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 			ctTarget = c.Name
 		}
 	} else if strings.HasPrefix(host.ID, "docker:compose:") {
-		// Compose-level alerts: dispatch to the host embedded in the ID.
-		rest := strings.TrimPrefix(host.ID, "docker:compose:")
-		if idx := strings.Index(rest, ":"); idx >= 0 {
-			targetHostID = rest[:idx]
-		} else {
+		// Compose-level alerts: dispatch to the embedded host, and — if no
+		// explicit target — use the project name: a compose_* action needs
+		// `docker compose -p <project>`, so leaving ctTarget empty here
+		// silently ran it against no project at all.
+		hostID, projectName, ok := parseDockerComposeScopeID(host.ID)
+		if !ok {
 			slog.WarnContext(ctx, "alerts: command_trigger skipped — malformed docker:compose host ID", slog.Int64("rule_id", rule.ID), slog.String("host_id", host.ID))
 			return nil
+		}
+		targetHostID = hostID
+		if ctTarget == "" {
+			ctTarget = projectName
 		}
 	}
 

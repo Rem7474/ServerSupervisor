@@ -18,6 +18,10 @@ type fakeRepo struct {
 	deleted    bool
 	hostExists bool
 	allHosts   []models.Host
+	// missingContainerID, when set, makes DockerContainerExists report that
+	// one specific container ID doesn't exist — every other ID still "exists"
+	// (defaults to true otherwise, matching the old unconditional behavior).
+	missingContainerID string
 }
 
 func (f *fakeRepo) ListAlertRulesAPI(context.Context) ([]models.AlertRule, error) { return nil, nil }
@@ -34,8 +38,8 @@ func (f *fakeRepo) UpdateAlertRule(_ context.Context, r *models.AlertRule) error
 }
 func (f *fakeRepo) DeleteAlertRule(context.Context, int64) error     { f.deleted = true; return nil }
 func (f *fakeRepo) HostExists(context.Context, string) (bool, error) { return f.hostExists, nil }
-func (f *fakeRepo) DockerContainerExists(context.Context, string, string) (bool, error) {
-	return true, nil
+func (f *fakeRepo) DockerContainerExists(_ context.Context, containerID, _ string) (bool, error) {
+	return containerID != f.missingContainerID, nil
 }
 func (f *fakeRepo) ComposeProjectExists(context.Context, string, string) (bool, error) {
 	return true, nil
@@ -172,6 +176,64 @@ func TestValidateDockerScope_MissingHost(t *testing.T) {
 	err := svc.ValidateDockerScope(context.Background(), &models.DockerMetricScope{HostID: "h1"})
 	if status(err) != 400 {
 		t.Errorf("missing host should be 400, got %v", err)
+	}
+}
+
+func TestValidateDockerScope_MultiContainer(t *testing.T) {
+	svc := newSvc(&fakeRepo{hostExists: true})
+	scope := &models.DockerMetricScope{
+		HostID:       "h1",
+		ScopeMode:    "container",
+		ContainerIDs: []string{"c1", "c2", "c3"},
+	}
+	if err := svc.ValidateDockerScope(context.Background(), scope); err != nil {
+		t.Errorf("all containers exist, expected no error, got %v", err)
+	}
+}
+
+func TestValidateDockerScope_MultiContainer_OneMissingFails(t *testing.T) {
+	svc := newSvc(&fakeRepo{hostExists: true, missingContainerID: "c2"})
+	scope := &models.DockerMetricScope{
+		HostID:       "h1",
+		ScopeMode:    "container",
+		ContainerIDs: []string{"c1", "c2", "c3"},
+	}
+	err := svc.ValidateDockerScope(context.Background(), scope)
+	if status(err) != 400 {
+		t.Errorf("one missing container among several should be 400, got %v", err)
+	}
+}
+
+func TestValidateDockerScope_LegacyContainerIDStillValidated(t *testing.T) {
+	svc := newSvc(&fakeRepo{hostExists: true, missingContainerID: "c1"})
+	scope := &models.DockerMetricScope{HostID: "h1", ScopeMode: "container", ContainerID: "c1"}
+	if status(svc.ValidateDockerScope(context.Background(), scope)) != 400 {
+		t.Error("a rule saved before multi-select existed (ContainerID only) must still be validated")
+	}
+}
+
+func TestDockerMetricScope_EffectiveContainerIDs(t *testing.T) {
+	tests := []struct {
+		name  string
+		scope models.DockerMetricScope
+		want  []string
+	}{
+		{"prefers ContainerIDs when set", models.DockerMetricScope{ContainerID: "legacy", ContainerIDs: []string{"a", "b"}}, []string{"a", "b"}},
+		{"falls back to legacy ContainerID", models.DockerMetricScope{ContainerID: "legacy"}, []string{"legacy"}},
+		{"nil when neither is set", models.DockerMetricScope{}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.scope.EffectiveContainerIDs()
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("got %v, want %v", got, tt.want)
+				}
+			}
+		})
 	}
 }
 

@@ -431,16 +431,21 @@ func buildDockerEvaluationTargets(ctx context.Context, db *database.DB, rule mod
 			}
 			return targets
 		case "container":
-			c, err := db.GetDockerContainerByID(ctx, scope.ContainerID)
-			if err != nil || c == nil {
-				return nil
+			ids := scope.EffectiveContainerIDs()
+			targets := make([]models.Host, 0, len(ids))
+			for _, id := range ids {
+				c, err := db.GetDockerContainerByID(ctx, id)
+				if err != nil || c == nil {
+					continue
+				}
+				targets = append(targets, models.Host{
+					ID:       "docker:container:" + c.ID,
+					Name:     c.Name + " (" + c.Image + ":" + c.ImageTag + ")",
+					Status:   "online",
+					LastSeen: time.Now(),
+				})
 			}
-			return []models.Host{{
-				ID:       "docker:container:" + c.ID,
-				Name:     c.Name + " (" + c.Image + ":" + c.ImageTag + ")",
-				Status:   "online",
-				LastSeen: time.Now(),
-			}}
+			return targets
 		}
 	case "docker_compose_degraded_services":
 		return []models.Host{{

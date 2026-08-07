@@ -11,16 +11,19 @@ import (
 )
 
 type fakeRepo struct {
-	cmd    *models.RemoteCommand
-	cmdErr error
-	total  int64
+	cmd       *models.RemoteCommand
+	cmdErr    error
+	total     int64
+	logs      []models.AuditLog
+	cmds      []models.RemoteCommand
+	incidents []database.AlertIncidentWithRule
 }
 
 func (f *fakeRepo) GetAuditLogs(context.Context, int, int) ([]models.AuditLog, error) {
 	return nil, nil
 }
 func (f *fakeRepo) GetAuditLogsByHost(context.Context, string, int) ([]models.AuditLog, error) {
-	return nil, nil
+	return f.logs, nil
 }
 func (f *fakeRepo) GetAuditLogsByUser(context.Context, string, int) ([]models.AuditLog, error) {
 	return nil, nil
@@ -36,10 +39,10 @@ func (f *fakeRepo) GetRemoteCommandByID(context.Context, string) (*models.Remote
 }
 func (f *fakeRepo) CancelRemoteCommand(context.Context, string) (bool, error) { return true, nil }
 func (f *fakeRepo) GetRecentCommandsByHost(context.Context, string, int) ([]models.RemoteCommand, error) {
-	return nil, nil
+	return f.cmds, nil
 }
 func (f *fakeRepo) GetAlertIncidentsByHost(context.Context, string, int) ([]database.AlertIncidentWithRule, error) {
-	return nil, nil
+	return f.incidents, nil
 }
 
 func TestCommand_NotFoundMapsToAppErr(t *testing.T) {
@@ -59,6 +62,41 @@ func TestLogs_NeverNil(t *testing.T) {
 	}
 	if got == nil {
 		t.Error("Logs must return a non-nil slice")
+	}
+}
+
+func TestHostTimeline_IncludesTriggeringUser(t *testing.T) {
+	repo := &fakeRepo{
+		logs: []models.AuditLog{
+			{ID: 1, Action: "run_apt_command", Username: "alice", Status: "success"},
+		},
+		cmds: []models.RemoteCommand{
+			{ID: "cmd-1", Module: "apt", Action: "upgrade", Status: "completed", TriggeredBy: "bob"},
+			{ID: "cmd-2", Module: "apt", Action: "update", Status: "completed", TriggeredBy: "system"},
+		},
+	}
+	svc := NewService(repo)
+
+	events, err := svc.HostTimeline(context.Background(), "h1", 50)
+	if err != nil {
+		t.Fatalf("HostTimeline: %v", err)
+	}
+	if len(events) != 3 {
+		t.Fatalf("got %d events, want 3", len(events))
+	}
+
+	byID := map[string]models.HostTimelineEvent{}
+	for _, e := range events {
+		byID[e.ID] = e
+	}
+	if got := byID["1"].User; got != "alice" {
+		t.Errorf("audit event User = %q, want alice", got)
+	}
+	if got := byID["cmd-1"].User; got != "bob" {
+		t.Errorf("manually-triggered command event User = %q, want bob", got)
+	}
+	if got := byID["cmd-2"].User; got != "system" {
+		t.Errorf("automated command event User = %q, want system", got)
 	}
 }
 

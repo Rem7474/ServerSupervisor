@@ -109,7 +109,7 @@ func (db *DB) GetProxmoxGuestLink(ctx context.Context, id string) (*models.Proxm
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
 		       h.name, h.hostname,
-		       g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.disk_usage
+		       g.cpu_alloc, g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.disk_usage
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g ON g.id = l.guest_id
 		JOIN hosts           h ON h.id = l.host_id
@@ -118,7 +118,7 @@ func (db *DB) GetProxmoxGuestLink(ctx context.Context, id string) (*models.Proxm
 		&l.ID, &l.GuestID, &l.HostID, &l.Status, &l.MetricsSource, &l.CreatedAt, &l.UpdatedAt,
 		&l.GuestName, &l.GuestType, &l.NodeName, &l.VMID,
 		&l.HostName, &l.HostHostname,
-		&l.CPUUsage, &l.MemAlloc, &l.MemUsage, &l.DiskAlloc, &l.DiskUsage,
+		&l.CPUAlloc, &l.CPUUsage, &l.MemAlloc, &l.MemUsage, &l.DiskAlloc, &l.DiskUsage,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -133,7 +133,7 @@ func (db *DB) GetProxmoxGuestLinkByGuest(ctx context.Context, guestID string) (*
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
 		       h.name, h.hostname,
-		       g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.disk_usage
+		       g.cpu_alloc, g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.disk_usage
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g ON g.id = l.guest_id
 		JOIN hosts           h ON h.id = l.host_id
@@ -142,7 +142,7 @@ func (db *DB) GetProxmoxGuestLinkByGuest(ctx context.Context, guestID string) (*
 		&l.ID, &l.GuestID, &l.HostID, &l.Status, &l.MetricsSource, &l.CreatedAt, &l.UpdatedAt,
 		&l.GuestName, &l.GuestType, &l.NodeName, &l.VMID,
 		&l.HostName, &l.HostHostname,
-		&l.CPUUsage, &l.MemAlloc, &l.MemUsage, &l.DiskAlloc, &l.DiskUsage,
+		&l.CPUAlloc, &l.CPUUsage, &l.MemAlloc, &l.MemUsage, &l.DiskAlloc, &l.DiskUsage,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -157,7 +157,7 @@ func (db *DB) GetProxmoxGuestLinkByHost(ctx context.Context, hostID string) (*mo
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
 		       h.name, h.hostname,
-		       g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.disk_usage
+		       g.cpu_alloc, g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.disk_usage
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g ON g.id = l.guest_id
 		JOIN hosts           h ON h.id = l.host_id
@@ -168,7 +168,7 @@ func (db *DB) GetProxmoxGuestLinkByHost(ctx context.Context, hostID string) (*mo
 		&l.ID, &l.GuestID, &l.HostID, &l.Status, &l.MetricsSource, &l.CreatedAt, &l.UpdatedAt,
 		&l.GuestName, &l.GuestType, &l.NodeName, &l.VMID,
 		&l.HostName, &l.HostHostname,
-		&l.CPUUsage, &l.MemAlloc, &l.MemUsage, &l.DiskAlloc, &l.DiskUsage,
+		&l.CPUAlloc, &l.CPUUsage, &l.MemAlloc, &l.MemUsage, &l.DiskAlloc, &l.DiskUsage,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -182,7 +182,7 @@ func (db *DB) ListProxmoxGuestLinks(ctx context.Context, status string) ([]model
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
 		       h.name, h.hostname,
-		       g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.disk_usage
+		       g.cpu_alloc, g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.disk_usage
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g ON g.id = l.guest_id
 		JOIN hosts           h ON h.id = l.host_id`
@@ -304,7 +304,7 @@ func scanGuestLinks(rows *sql.Rows) ([]models.ProxmoxGuestLink, error) {
 			&l.ID, &l.GuestID, &l.HostID, &l.Status, &l.MetricsSource, &l.CreatedAt, &l.UpdatedAt,
 			&l.GuestName, &l.GuestType, &l.NodeName, &l.VMID,
 			&l.HostName, &l.HostHostname,
-			&l.CPUUsage, &l.MemAlloc, &l.MemUsage, &l.DiskAlloc, &l.DiskUsage,
+			&l.CPUAlloc, &l.CPUUsage, &l.MemAlloc, &l.MemUsage, &l.DiskAlloc, &l.DiskUsage,
 		); err != nil {
 			return nil, err
 		}

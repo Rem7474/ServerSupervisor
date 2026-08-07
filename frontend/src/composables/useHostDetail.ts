@@ -121,6 +121,11 @@ export function useHostDetail() {
     return {
       ...m,
       cpu_usage_percent: cpuPct,
+      // cpu_cores otherwise keeps whatever the agent last reported — stale or
+      // 0 once metrics_source=proxmox tells the agent to stop sending metrics
+      // entirely (skip_metrics). cpu_alloc is a float (LXC can have fractional
+      // vCPU limits); rounded since the CORES display expects a whole number.
+      cpu_cores: Math.round(asNumber(link.cpu_alloc, 0)),
       memory_used: memUsed,
       memory_total: memTotal,
       memory_percent: memTotal > 0 ? (memUsed / memTotal) * 100 : 0,
@@ -374,7 +379,19 @@ export function useHostDetail() {
   async function handleUUConfigure(form: AnyRecord) {
     uuLoading.value = 'configure'
     try {
-      await apiClient.updateUU(hostId, form as { enabled: boolean; config: object })
+      const res = await apiClient.updateUU(hostId, form as { enabled: boolean; config: object })
+      // ConfigureUU dispatches two agent commands (configure_uu, then
+      // toggle_uu) and returns immediately with status "pending" — the change
+      // isn't actually applied yet. Awaiting the dispatch HTTP round-trip
+      // alone (the previous behaviour) cleared the spinner and reloaded from
+      // the DB before the agent had run either command, so the reload just
+      // wrote the still-stale server state straight back over the form the
+      // user had just edited — the toggle/labels "reverting". Track both
+      // commands to their real terminal state first (standalone, no console
+      // popup — see usePendingCommand's doc comment), same as
+      // handleUUInstall/handleUURunNow already do.
+      const commandIds = (res.data?.command_ids ?? []) as string[]
+      await Promise.all(commandIds.map((id) => pendingCommand.track(id)))
       await loadUUData()
     } catch (e: unknown) {
       await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })

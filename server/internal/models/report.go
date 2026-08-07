@@ -55,6 +55,10 @@ type AgentReport struct {
 	Metrics            *SystemMetrics            `json:"metrics,omitempty"`
 	Docker             *DockerReport             `json:"docker,omitempty"`
 	UnattendedUpgrades *UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`
+	// AptStatus mirrors CommandResult.AptStatus's shape and purpose, but for a
+	// periodic report that caught a new unattended-upgrades run rather than a
+	// live-dispatched apt command — see agent/internal/reporter's AptStatus doc.
+	AptStatus *AptStatus `json:"apt_status,omitempty"`
 	WebLogs            *WebLogReport             `json:"web_logs,omitempty"`
 	DockerNetworks     []DockerNetwork           `json:"docker_networks,omitempty"`
 	ComposeProjects    []ComposeProject          `json:"compose_projects,omitempty"`

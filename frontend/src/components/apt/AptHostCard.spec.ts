@@ -41,6 +41,28 @@ describe('AptHostCard', () => {
     expect(upToDate.text()).not.toContain('Agent obsolète')
   })
 
+  it('shows the unattended-upgrades on/off badge in the always-visible header, even collapsed', () => {
+    const enabled = mountCard({
+      expanded: false,
+      uuStatus: { installed: true, enabled: true, reboot_required: false, last_run_packages: 3, config: UU_CONFIG },
+    })
+    expect(enabled.text()).toContain('MAJ auto activées')
+
+    const disabled = mountCard({
+      expanded: false,
+      uuStatus: { installed: true, enabled: false, reboot_required: false, last_run_packages: 3, config: UU_CONFIG },
+    })
+    expect(disabled.text()).toContain('MAJ auto désactivées')
+  })
+
+  it('does not show the on/off badge when unattended-upgrades is not installed', () => {
+    const wrapper = mountCard({
+      expanded: false,
+      uuStatus: { installed: false, enabled: false, reboot_required: false, last_run_packages: 0, config: UU_CONFIG },
+    })
+    expect(wrapper.text()).not.toContain('MAJ auto')
+  })
+
   it('shows a condensed unattended-upgrades summary when expanded', () => {
     const wrapper = mountCard({
       expanded: true,
