@@ -523,9 +523,18 @@ export function useProxmoxNode() {
   }
 
 
+  let pollResolve: (() => void) | null = null
+
   function stopPolling(): void {
     if (pollTimer) clearTimeout(pollTimer)
     pollTimer = null
+    // Unblock any caller awaiting startPollingTask's returned promise (e.g. a
+    // button's loading state) if the poll is torn down before the task
+    // actually reached a terminal state (console closed, a new task started).
+    if (pollResolve) {
+      pollResolve()
+      pollResolve = null
+    }
   }
 
   function closeConsole(): void {
@@ -535,7 +544,13 @@ export function useProxmoxNode() {
     activeUpid.value = null
   }
 
-  async function startPollingTask(upid: string, { action = '', label = '' }: { action?: string; label?: string } = {}): Promise<void> {
+  // Returns a promise that resolves once the PVE task reaches a terminal
+  // state (TASK OK/ERROR) — or the poll is torn down early (see stopPolling)
+  // — so a caller can await the real task duration for its own loading state,
+  // not just the initial dispatch. Still fire-and-forget-safe: callers that
+  // don't need that (e.g. the tasks tab's "view logs" action) can ignore the
+  // returned promise exactly as before.
+  function startPollingTask(upid: string, { action = '', label = '' }: { action?: string; label?: string } = {}): Promise<void> {
     stopPolling()
     activeUpid.value = upid
     liveTask.value = {
@@ -548,22 +563,30 @@ export function useProxmoxNode() {
     }
     showConsole.value = true
 
-    const poll = async (): Promise<void> => {
-      try {
-        const res = await api.getProxmoxTaskLog(String(route.params.id), upid)
-        const lines = (res.data ?? []).map((l: any) => l.t).join('\n')
-        const lastLine = res.data?.[res.data.length - 1]?.t ?? ''
-        const done = lastLine.startsWith('TASK OK') || lastLine.startsWith('TASK ERROR')
-        const status = done
-          ? (lastLine.startsWith('TASK OK') ? 'completed' : 'failed')
-          : 'running'
-        liveTask.value = { ...liveTask.value, output: lines, status }
-        if (!done) pollTimer = setTimeout(poll, 2000)
-      } catch {
-        pollTimer = setTimeout(poll, 3000)
+    return new Promise<void>((resolve) => {
+      pollResolve = resolve
+      const poll = async (): Promise<void> => {
+        try {
+          const res = await api.getProxmoxTaskLog(String(route.params.id), upid)
+          const lines = (res.data ?? []).map((l: any) => l.t).join('\n')
+          const lastLine = res.data?.[res.data.length - 1]?.t ?? ''
+          const done = lastLine.startsWith('TASK OK') || lastLine.startsWith('TASK ERROR')
+          const status = done
+            ? (lastLine.startsWith('TASK OK') ? 'completed' : 'failed')
+            : 'running'
+          liveTask.value = { ...liveTask.value, output: lines, status }
+          if (!done) {
+            pollTimer = setTimeout(poll, 2000)
+          } else if (pollResolve) {
+            pollResolve = null
+            resolve()
+          }
+        } catch {
+          pollTimer = setTimeout(poll, 3000)
+        }
       }
-    }
-    await poll()
+      poll()
+    })
   }
 
   async function triggerAptRefresh(): Promise<void> {
@@ -606,7 +629,7 @@ export function useProxmoxNode() {
       const upid = res.data?.upid
       svcActionMsg.value = upid ? `${action} ${name} lancé — logs en cours…` : `${action} ${name} lancé.`
       svcActionOk.value = true
-      if (upid) startPollingTask(upid, { action: `service ${action}`, label: name })
+      if (upid) await startPollingTask(upid, { action: `service ${action}`, label: name })
       else setTimeout(() => loadServices(), 2000)
     } catch (e: unknown) {
       svcActionMsg.value = getApiErrorMessage(e, `Erreur lors de ${action} ${name}.`)

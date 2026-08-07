@@ -83,6 +83,7 @@ import SystemdTable from './SystemdTable.vue'
 import type { SystemdService } from './SystemdTable.vue'
 import apiClient, { getApiErrorMessage } from '../../api'
 import { useCommandStream } from '../../composables/useCommandStream'
+import { usePendingCommand } from '../../composables/usePendingCommand'
 import { useLocalStorage } from '../../composables/useLocalStorage'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
@@ -106,6 +107,7 @@ const actionPending = ref<Record<string, string | null>>({})
 const filter = useLocalStorage(`host-systemd-filter:${props.hostId}`, 'active')
 const STREAM_TIMEOUT_MS = 60000
 const { collectCommandOutput } = useCommandStream()
+const pendingCommand = usePendingCommand()
 
 const filteredServices = computed(() => {
   if (filter.value === 'all') return services.value
@@ -155,6 +157,7 @@ async function runAction(serviceName: string, action: string): Promise<void> {
       module: 'systemd',
       target: serviceName,
     })
+    await pendingCommand.track(res.data.command_id)
   } catch (e) {
     error.value = getApiErrorMessage(e, `Impossible d'exécuter systemctl ${action}`)
   } finally {

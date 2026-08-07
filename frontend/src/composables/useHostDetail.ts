@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useHostCommandConsole } from './useHostCommandConsole'
 import { useCommandStream } from './useCommandStream'
+import { usePendingCommand } from './usePendingCommand'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useWebSocket } from './useWebSocket'
 import type { WSHostSnapshot } from '../types/ws'
@@ -142,6 +143,7 @@ export function useHostDetail() {
 
   const { liveCommand, showConsole, openCommand: _openCommand, closeConsole, updateCommand } = useHostCommandConsole()
   const { openCommandStream, closeStream } = useCommandStream()
+  const pendingCommand = usePendingCommand()
 
   function syncUUFormFromStatus(status: AnyRecord | null): void {
     if (!status) return
@@ -282,6 +284,7 @@ export function useHostDetail() {
         const cmd = response.data.commands[0]
         if (cmd.command_id) {
           openCommand({ id: cmd.command_id, module: 'apt', action: command, status: 'pending', output: '' })
+          await pendingCommand.track(cmd.command_id)
         }
       }
     } catch (e: unknown) {
@@ -359,6 +362,7 @@ export function useHostDetail() {
       const commandId = res.data?.command_id
       if (commandId) {
         openCommand({ id: commandId, module: 'apt', action: 'install_uu', status: 'pending', output: '' })
+        await pendingCommand.track(commandId)
       }
     } catch (e: unknown) {
       await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
@@ -386,6 +390,7 @@ export function useHostDetail() {
       const commandId = res.data?.command_id
       if (commandId) {
         openCommand({ id: commandId, module: 'apt', action: 'run_uu', status: 'pending', output: '' })
+        await pendingCommand.track(commandId)
       }
     } catch (e: unknown) {
       await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
@@ -450,6 +455,7 @@ export function useHostDetail() {
           status: 'pending',
           output: '',
         })
+        await pendingCommand.track(commandId)
       }
     } catch (e: unknown) {
       await dialog.confirm({

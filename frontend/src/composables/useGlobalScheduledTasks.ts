@@ -6,6 +6,7 @@ import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import api from '../api'
 import { isManualOnly, describeCron, nextCronRun, MANUAL_SENTINEL } from '../utils/cron'
 import { useConfirmDialog } from './useConfirmDialog'
+import { usePendingCommand } from './usePendingCommand'
 import type { ScheduledTaskWithHost, ScheduledTaskExecution } from '../types/task'
 import { getApiErrorMessage } from '../api/client'
 import { getExecutionStateClass } from '../utils/statusClasses'
@@ -53,6 +54,7 @@ export function useGlobalScheduledTasks() {
   const auth = useAuthStore()
   const hostsStore = useHostsStore()
   const dialog = useConfirmDialog()
+  const pendingCommand = usePendingCommand()
 
   const tasks = ref<ScheduledTaskWithHost[]>([])
   const loading = ref(false)
@@ -332,6 +334,7 @@ export function useGlobalScheduledTasks() {
       const { data } = await api.runScheduledTask(String(task.id))
       addToast(`${task.name} déclenchée — commande ${data.command_id}`, 'success')
       await loadTasks()
+      await pendingCommand.track(data.command_id)
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, 'Erreur')
     } finally {
