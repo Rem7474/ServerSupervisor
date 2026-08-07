@@ -3,7 +3,7 @@ import apiClient, { getApiErrorMessage } from '../api'
 import { useCommandStream } from './useCommandStream'
 import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
 
-interface BackupRun {
+export interface BackupRun {
   id: string
   host_id: string
   profile?: string

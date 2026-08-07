@@ -514,6 +514,7 @@
             <HostBackupTab
               :host-id="hostId"
               :can-run="canRunApt"
+              @watch-run="watchBackupRun"
             />
           </template>
 
@@ -856,6 +857,21 @@ const timelineRef = ref<{ filterCommands: () => void } | null>(null)
 function goToTimelineCommands(): void {
   activeTab.value = 'timeline'
   nextTick(() => timelineRef.value?.filterCommands())
+}
+
+// Sauvegardes tab's run-history table had no way to see a run's detailed
+// output, unlike every other module (apt/docker/systemd/runbooks/trackers/
+// webhooks) that already reuses this same console for its own "Logs" action.
+function watchBackupRun(run: { command_id?: string; profile?: string; status?: string }): void {
+  if (!run.command_id) return
+  openCommand({
+    id: run.command_id,
+    module: 'restic',
+    action: 'run_backup',
+    target: run.profile || '',
+    status: 'completed',
+    output: '',
+  })
 }
 
 // Local SMART is unreadable inside an LXC/VM. When the host has no local disk
