@@ -143,6 +143,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { IconDeviceDesktop } from '@tabler/icons-vue'
+import { getMetricColorClass } from '../../utils/metricColor'
 
 interface ClusterNode {
   id: string | number
@@ -190,30 +191,20 @@ const clusterRamPct = computed(() => {
   return (totalMemUsed.value / totalMemTotal.value) * 100
 })
 
-const clusterCpuColor = computed(() => pctColor(clusterCpuPct.value))
-const clusterRamColor = computed(() => pctColor(clusterRamPct.value))
+const clusterCpuColor = computed(() => getMetricColorClass(clusterCpuPct.value))
+const clusterRamColor = computed(() => getMetricColorClass(clusterRamPct.value))
 
 function nodRamPct(node: ClusterNode): number {
   if (!node.mem_total) return 0
   return ((node.mem_used || 0) / node.mem_total) * 100
 }
 
-function pctColor(pct: number): string {
-  if (pct > 90) return 'text-danger'
-  if (pct > 70) return 'text-warning'
-  return 'text-success'
-}
-
 function cpuBarColor(pct: number): string {
-  if (pct > 90) return 'bg-danger'
-  if (pct > 70) return 'bg-warning'
-  return 'bg-primary'
+  return getMetricColorClass(pct, 'bg')
 }
 
 function ramBarColor(pct: number): string {
-  if (pct > 90) return 'bg-danger'
-  if (pct > 75) return 'bg-warning'
-  return 'bg-success'
+  return getMetricColorClass(pct, 'bg')
 }
 
 function formatBytes(bytes: number): string {

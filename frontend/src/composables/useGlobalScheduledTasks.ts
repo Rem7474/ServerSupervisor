@@ -6,6 +6,9 @@ import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import api from '../api'
 import { isManualOnly, describeCron, nextCronRun, MANUAL_SENTINEL } from '../utils/cron'
 import { useConfirmDialog } from './useConfirmDialog'
+import { usePendingCommand } from './usePendingCommand'
+import { useHostCommandConsole } from './useHostCommandConsole'
+import { useCommandStream } from './useCommandStream'
 import type { ScheduledTaskWithHost, ScheduledTaskExecution } from '../types/task'
 import { getApiErrorMessage } from '../api/client'
 import { getExecutionStateClass } from '../utils/statusClasses'
@@ -32,10 +35,6 @@ function durationSec(start: string, end: string): string {
   return (ms / 1000).toFixed(1)
 }
 
-function firstLine(output: string | undefined): string {
-  return (output || '').split('\n')[0].trim()
-}
-
 function updatePayloadFor(t: ScheduledTaskWithHost, overrides: Partial<{ enabled: boolean }> = {}) {
   return {
     name: t.name,
@@ -53,6 +52,7 @@ export function useGlobalScheduledTasks() {
   const auth = useAuthStore()
   const hostsStore = useHostsStore()
   const dialog = useConfirmDialog()
+  const pendingCommand = usePendingCommand()
 
   const tasks = ref<ScheduledTaskWithHost[]>([])
   const loading = ref(false)
@@ -82,7 +82,47 @@ export function useGlobalScheduledTasks() {
   const executions = ref<ScheduledTaskExecution[]>([])
   const historyLoading = ref(false)
   const historyError = ref('')
-  const expandedId = ref<string | number | null>(null)
+
+  // Executions are remote_commands rows themselves (see ScheduledTaskExecution's
+  // doc comment) — reuse the same console/CommandLogPanel pattern every other
+  // module (apt/docker/systemd/runbooks/trackers/webhooks) already converged
+  // on for "Logs", instead of the inline expand/collapse this view used to
+  // have as its own one-off.
+  const { liveCommand, showConsole, openCommand, closeConsole, updateCommand } = useHostCommandConsole()
+  const { openCommandStream, closeStream: closeExecutionStream } = useCommandStream()
+
+  function watchExecution(task: ScheduledTaskWithHost | null, ex: ScheduledTaskExecution): void {
+    openCommand({
+      id: ex.id,
+      host_name: task?.host_name,
+      module: 'scheduled_task',
+      action: task?.name || '',
+      status: ex.status,
+      output: ex.output || '',
+    })
+    openCommandStream(String(ex.id), {
+      onInit: (p) => {
+        const current = liveCommand.value
+        if (!current) return
+        updateCommand({ ...current, status: p.status, output: p.output || current.output })
+      },
+      onChunk: (p) => {
+        const current = liveCommand.value
+        if (!current) return
+        updateCommand({ ...current, output: (current.output || '') + (p.chunk || '') })
+      },
+      onStatus: (p) => {
+        const current = liveCommand.value
+        if (!current) return
+        updateCommand({ ...current, status: p.status })
+      },
+    })
+  }
+
+  function closeExecutionConsole(): void {
+    closeExecutionStream()
+    closeConsole()
+  }
 
   const createModalOpen = ref(false)
   const createForm = ref(emptyCreateForm())
@@ -270,7 +310,6 @@ export function useGlobalScheduledTasks() {
   async function openHistory(task: ScheduledTaskWithHost): Promise<void> {
     historyTask.value = task
     executions.value = []
-    expandedId.value = null
     historyError.value = ''
     historyLoading.value = true
     try {
@@ -332,6 +371,7 @@ export function useGlobalScheduledTasks() {
       const { data } = await api.runScheduledTask(String(task.id))
       addToast(`${task.name} déclenchée — commande ${data.command_id}`, 'success')
       await loadTasks()
+      await pendingCommand.track(data.command_id)
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, 'Erreur')
     } finally {
@@ -417,7 +457,10 @@ export function useGlobalScheduledTasks() {
     executions,
     historyLoading,
     historyError,
-    expandedId,
+    liveCommand,
+    showConsole,
+    watchExecution,
+    closeExecutionConsole,
     createModalOpen,
     createForm,
     createManualOnly,
@@ -440,7 +483,6 @@ export function useGlobalScheduledTasks() {
     statusBadge,
     commandStatusLabel,
     durationSec,
-    firstLine,
     isManualOnly,
     describeCron,
     openEdit,

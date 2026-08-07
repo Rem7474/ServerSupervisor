@@ -111,7 +111,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 			for _, vm := range vms {
 				if err := s.db.UpsertProxmoxGuest(ctx,
 					conn.ID, n.Node, "vm", vm.VMID, vm.Name, vm.Status,
-					vm.CPUs, vm.CPU, vm.MaxMem, vm.Mem, vm.MaxDisk, vm.Uptime, vm.Tags,
+					vm.CPUs, vm.CPU, vm.MaxMem, vm.Mem, vm.MaxDisk, vm.Disk, vm.Uptime, vm.Tags,
 				); err != nil {
 					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert vm %d: %v", conn.Name, n.Node, vm.VMID, err))
 					continue
@@ -134,7 +134,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 			for _, lxc := range lxcs {
 				if err := s.db.UpsertProxmoxGuest(ctx,
 					conn.ID, n.Node, "lxc", lxc.VMID, lxc.Name, lxc.Status,
-					lxc.CPUs, lxc.CPU, lxc.MaxMem, lxc.Mem, lxc.MaxDisk, lxc.Uptime, lxc.Tags,
+					lxc.CPUs, lxc.CPU, lxc.MaxMem, lxc.Mem, lxc.MaxDisk, lxc.Disk, lxc.Uptime, lxc.Tags,
 				); err != nil {
 					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert lxc %d: %v", conn.Name, n.Node, lxc.VMID, err))
 					continue

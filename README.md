@@ -2,6 +2,21 @@
 
 Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker, mises à jour APT, services systemd, tâches planifiées, suivi des releases GitHub, supervision Proxmox VE via API et monitoring synthétique (sondes uptime, certificats SSL, intégration Nginx Proxy Manager).
 
+## Guides détaillés
+
+Ce README couvre l'installation et donne une vue d'ensemble de chaque
+fonctionnalité. Pour une intégration qui demande une vraie procédure de
+configuration côté service tiers, un guide dédié va plus loin (dépannage
+inclus) :
+
+| Guide | Sujet |
+|---|---|
+| [docs/proxmox.md](docs/proxmox.md) | Connecter un cluster Proxmox VE (token API, permissions, actions en écriture) |
+| [docs/npm.md](docs/npm.md) | Connecter Nginx Proxy Manager (sync, monitoring auto par proxy host) |
+| [docs/git-webhooks-releases.md](docs/git-webhooks-releases.md) | Webhooks Git et suivi de releases GitHub/GitLab/Gitea/Docker |
+| [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md) | Runbooks multi-étapes vs tâches planifiées par hôte |
+| [docs/backup-restic.md](docs/backup-restic.md) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
+
 ## Architecture
 
 ```
@@ -57,39 +72,78 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **APT** : gestion centralisée des mises à jour avec actions groupées et console live streamée
 - **Détail hôte** : exécution à distance de commandes systemd (start/stop/restart/enable/disable), logs journalctl streamés, snapshot des processus — directement depuis la page hôte
 - **Streaming commandes** : affichage en temps réel de la sortie des commandes longues via WebSocket
-- **Versions** : suivi des releases GitHub et comparaison avec les images Docker en cours
+- **Versions** : suivi des releases GitHub/GitLab/Gitea et des digests d'images Docker, notification ou déclenchement automatique (script ou `compose pull && up -d`) — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
+- **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
+- **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
 - **Monitoring** : sondes HTTP/TCP synthétiques (uptime) et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
-- **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus ou custom), déclenchement manuel immédiat, historique des exécutions
+- **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
 - **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
 - **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, corrélation CrowdSec si activée côté agent), stats trafic web sur `/traffic`, menaces web sur `/threats`
 - **UI cohérente** : barres de recherche/filtres/tri harmonisées sur les vues principales (Docker, APT, Audit)
 - **Proxmox VE** : supervision de l'infrastructure de virtualisation via API Proxmox (sans agent sur l'hyperviseur) — nœuds, VMs QEMU, conteneurs LXC, stockage ; polling configurable par connexion
-- **NPM (Nginx Proxy Manager)** : connexion à une ou plusieurs instances NPM, import sélectif de proxy hosts, création automatique des sondes uptime/certificats SSL correspondants, activation du monitoring par host
+- **NPM (Nginx Proxy Manager)** : connexion à une ou plusieurs instances NPM, tous les proxy hosts existants apparaissent après le premier sync, création automatique des sondes uptime/certificats SSL correspondants, activation du monitoring par host
 
 ### Proxmox VE (supervision sans agent)
-- Connexion à un ou plusieurs clusters / nœuds Proxmox via l'API REST officielle (token API)
-- Collecte périodique configurable : nœuds (CPU, RAM, uptime, version PVE), VMs QEMU, conteneurs LXC, pools de stockage
-- **Disques physiques** : liste, modèle, type (SSD/HDD/NVMe), santé SMART, usure SSD (`Sys.Audit` requis)
-- **Mises à jour apt** : compteur de paquets en attente (pending/security), rafraîchissement du cache depuis le dashboard (`Sys.Modify` requis)
-- **Tâches récentes** : 50 dernières tâches par nœud (vzdump, migration, création VM…)
-- **Sauvegardes** : jobs configurés + dernier résultat de backup par VM (issu des tâches vzdump)
-- **Liaison guest↔hôte** : détection automatique par nom, confirmation manuelle, sélection de la source de métriques (agent / proxmox / auto)
-- UPSERT en base à chaque cycle + nettoyage automatique des ressources disparues
-- Vue globale `/proxmox` : cartes de synthèse (connexions, nœuds, VMs, LXC, stockage) + alertes de santé + tableau des nœuds
-- Vue détail `/proxmox/nodes/:id` : stats nœud + onglets VMs / LXC / Stockage / Disques / Tâches / Sauvegardes / Mises à jour / Services / Journaux sécurité
-- Configuration dans **Paramètres** : ajout/édition/suppression de connexions, bouton **Tester** (sans sauvegarder), déclenchement manuel d'un poll
-- Sécurité : `token_secret` stocké en base, jamais retourné au frontend ; `insecure_skip_verify` désactivé par défaut
+
+Connexion à un ou plusieurs clusters/nœuds Proxmox via l'API REST officielle
+(token API, sans rien installer sur l'hyperviseur) : collecte périodique des
+nœuds, VMs QEMU, conteneurs LXC, stockage, disques physiques (S.M.A.R.T.),
+tâches récentes et résultats de sauvegarde vzdump — avec liaison optionnelle
+à un hôte déjà supervisé par agent. Vue globale `/proxmox` + vue détail
+`/proxmox/nodes/:id` (onglets VMs / LXC / Stockage / Disques / Tâches /
+Sauvegardes / Mises à jour / Services / Journaux sécurité). `token_secret`
+stocké en base, jamais renvoyé au frontend.
+
+Guide complet (création du token PVE, permissions en écriture, posture
+admin vs authentifié par action, dépannage) : **[docs/proxmox.md](docs/proxmox.md)**.
 
 ### NPM (Nginx Proxy Manager)
-- Connexion à une ou plusieurs instances [Nginx Proxy Manager](https://nginxproxymanager.com/) via son API REST (identity + secret)
-- Import sélectif des proxy hosts existants (modal à cocher) — pas de découverte automatique périodique ; seul un rafraîchissement léger (`npm_enabled`, `last_seen_at`) tourne en arrière-plan sur les hosts déjà importés
-- Pour chaque proxy host importé : création automatique d'une sonde uptime HTTP et d'un certificat SSL suivi (voir Monitoring), avec un interrupteur maître + deux sous-interrupteurs (uptime / SSL) par host
-- Vue `/npm` : gestion des connexions (admin) + liste des proxy hosts importés
-- Sécurité : `secret` stocké en base, jamais retourné au frontend (même modèle que le `token_secret` Proxmox)
+
+Connexion à une ou plusieurs instances [Nginx Proxy Manager](https://nginxproxymanager.com/)
+via son API (identité + mot de passe, pas de jeton à portée restreinte) :
+tous les proxy hosts existants apparaissent automatiquement après le
+premier sync (pas d'import sélectif), avec création à la demande d'une
+sonde uptime HTTP et d'un certificat SSL suivi par host, et désactivation
+en cascade de leur supervision si le host est supprimé/désactivé côté NPM
+ou si la connexion elle-même est supprimée. Vue `/npm` : gestion des
+connexions (admin) + liste des proxy hosts importés.
+
+Guide complet (authentification, cadence de sync réelle, sémantique des
+interrupteurs de monitoring, dépannage) : **[docs/npm.md](docs/npm.md)**.
+
+### Git Webhooks & Suivi de releases
+
+Deux façons de réagir à un événement Git : le **suivi de releases**
+interroge périodiquement GitHub/GitLab/Gitea ou un registre Docker (modèle
+pull, notification seule ou déclenchement d'une tâche/`compose pull && up -d`,
+avec réconciliation de dérive optionnelle en mode Compose) ; un **webhook
+Git** est appelé directement par votre plateforme à chaque push/tag/release
+(modèle push, endpoint public authentifié par HMAC/token selon le
+provider). Les deux peuvent déclencher la même [tâche custom](#tâches-custom-tasksyaml)
+sur un hôte, avec le contexte du commit injecté en variables d'environnement.
+
+Guide complet (création d'un tracker, configuration du webhook côté
+plateforme, vérification de signature par provider, dépannage) :
+**[docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)**.
+
+### Runbooks & Tâches planifiées
+
+Deux mécanismes de dispatch de commandes agent, à ne pas confondre : un
+**runbook** (admin uniquement) enchaîne plusieurs étapes sur plusieurs
+hôtes en un seul déclenchement manuel, avec une whitelist d'actions
+strictement revalidée côté serveur ; une **tâche planifiée** cible un seul
+hôte sur un cron, avec une liste d'actions seulement indicative (non
+validée côté serveur au-delà du module) — seul le déclenchement manuel
+(`run`) est vérifié Operator+ par hôte, la création/modification/
+suppression n'a aujourd'hui aucun contrôle de rôle côté API (voir le
+guide).
+
+Guide complet (whitelist par module, tableau comparatif runbook vs tâche
+planifiée, dépannage) : **[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)**.
 
 ### Agent
 - Collecte automatique : CPU, RAM, disques, réseau, uptime
@@ -259,6 +313,10 @@ sudo journalctl -u serversupervisor-agent -f
 2. Ajouter un repo (ex: `home-assistant` / `core`)
 3. Optionnel : associer un nom d'image Docker pour la comparaison automatique
 4. Le serveur vérifie les nouvelles releases toutes les 15 minutes
+
+Pour un webhook déclenché en temps réel par un push (plutôt que ce polling
+15 min), ou pour un tracker Docker en mode Compose avec réconciliation de
+dérive : voir le guide complet **[docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)**.
 
 ---
 
@@ -567,6 +625,8 @@ Variables d'environnement injectées automatiquement par un Git Webhook :
 
 Supervision optionnelle des sauvegardes [Restic](https://restic.net)/[resticprofile](https://creativeprojects.github.io/resticprofile/) sur les hôtes supervisés. Le toolkit Restic (binaire, `resticconf`, `run_backup.sh`, `resticprofile.yaml`) doit déjà être installé et configuré sur la machine — ServerSupervisor ne l'installe pas et ne stocke **jamais** ses credentials (mot de passe du dépôt, clés Swift/S3/B2, identifiants SMTP) : ils restent dans `resticconf` sur l'hôte, lu localement par l'agent et jamais transmis au serveur.
 
+Guide complet (installation, `resticprofile.yaml`, exemples Nextcloud AIO/Immich, dépannage) : **[docs/backup-restic.md](docs/backup-restic.md)**.
+
 #### Activer la collecte (`agent.yaml`)
 
 ```yaml
@@ -738,6 +798,8 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | `POST` | `/api/v1/ssl/certificates/:id/check-now` | Vérification immédiate | Admin |
 
 #### NPM (Nginx Proxy Manager)
+> Guide complet : [docs/npm.md](docs/npm.md)
+
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/npm/connections` | Liste des connexions NPM (sans secrets) | Authentifié |
@@ -760,6 +822,8 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | `DELETE` | `/api/v1/users/:id` | Supprimer un utilisateur |
 
 #### Git Webhooks & Suivi de releases
+> Guide complet : [docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)
+
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET/POST` | `/api/v1/webhooks/git` | Webhooks Git | Admin |
@@ -773,16 +837,37 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | `POST` | `/api/v1/release-trackers/:id/run` | Déclencher manuellement | Admin |
 | `GET` | `/api/v1/release-trackers/:id/executions` | Historique exécutions | Admin |
 
+#### Runbooks
+> Guide complet : [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)
+
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET/POST` | `/api/v1/runbooks` | Lister / créer un runbook | Admin |
+| `GET/PATCH/DELETE` | `/api/v1/runbooks/:id` | Détail / modification / suppression | Admin |
+| `POST` | `/api/v1/runbooks/:id/run` | Dispatcher la première étape | Admin |
+| `GET` | `/api/v1/runbooks/:id/executions` | Historique des exécutions | Admin |
+| `GET` | `/api/v1/runbooks/:id/executions/:execution_id` | Détail d'une exécution | Admin |
+
 #### Tâches planifiées
+> Guide complet : [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)
+
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/scheduled-tasks` | Lister les tâches d'un hôte | Authentifié |
-| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Operator+ |
-| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Operator+ |
-| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Operator+ |
-| `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ |
+| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Authentifié* |
+| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Authentifié* |
+| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Authentifié* |
+| `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ (vérifié par hôte) |
+
+> \* Contrairement à `run` (qui vérifie l'accès Operator+ sur l'hôte
+> ciblé), la création/modification/suppression n'a **aucune vérification
+> de rôle côté API** à ce jour — seul le dashboard masque ces actions pour
+> un compte `viewer`. Voir [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
+> pour le détail.
 
 #### Proxmox VE
+> Guide complet : [docs/proxmox.md](docs/proxmox.md)
+
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/proxmox/summary` | Compteurs globaux (nœuds, VMs, LXC, stockage) | Authentifié |

@@ -8,6 +8,7 @@ import { confirmAptCommand } from '../utils/aptConfirm'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { addToast } from './useGlobalToast'
 import { useCommandStream } from './useCommandStream'
+import { usePendingCommand } from './usePendingCommand'
 import type { Host } from '../types/host'
 
 // API-facing shapes (the server transforms the Go AptStatus.cve_list JSON
@@ -147,6 +148,7 @@ export function useApt() {
   const showConsole = ref(false)
   const liveCommand = ref<LiveCommand | null>(null)
   const { openCommandStream, closeStream } = useCommandStream()
+  const pendingCommand = usePendingCommand()
   const aptBulkLoading = ref<string | null>(null)
 
   // ── Filtres / tri des hôtes ───────────────────────────────────────────────────
@@ -329,6 +331,9 @@ export function useApt() {
           { id: launched[0].command_id!, action: command, status: launched[0].status || 'pending', output: '' },
           host
         )
+        // Keeps this host's card spinner up for the real command duration,
+        // not just the dispatch round-trip.
+        await pendingCommand.track(launched[0].command_id)
       } else if (failed.length > 0) {
         await dialog.confirm({
           title: 'Erreur',
@@ -394,6 +399,10 @@ export function useApt() {
           : `apt ${command} — aucune commande lancée`
         addToast(msg, failed.length > 0 ? 'warning' : 'success', 7000)
       }
+
+      // Keep the toolbar button spinning for the real duration of every
+      // launched command, not just the dispatch round-trip above.
+      await Promise.all(launchedCommands.map((item: AptCommandResult) => pendingCommand.track(item.command_id)))
     } catch (e) {
       await dialog.confirm({
         title: 'Erreur',
@@ -443,6 +452,14 @@ export function useApt() {
           7000
         )
       }
+      // Keep the toolbar button spinning until every launched agent update
+      // actually finishes (or fails/times out), not just until every dispatch
+      // request has been acked.
+      await Promise.all(
+        results
+          .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof apiClient.updateHostAgent>>> => r.status === 'fulfilled')
+          .map((r) => pendingCommand.track(r.value.data?.command_id))
+      )
     } finally {
       bulkAgentUpdateLoading.value = false
     }

@@ -108,7 +108,27 @@ func (s *Service) DeleteConnection(ctx context.Context, id string) error {
 	if _, err := s.GetConnection(ctx, id); err != nil {
 		return err
 	}
+	// npm_proxy_hosts cascades on delete, but the SSL certs / uptime probes it
+	// links to only get their FK SET NULL — left as-is they'd stay enabled
+	// forever as orphans the SSL/uptime background workers keep checking with
+	// no UI path back to them. Disable them first.
+	if hosts, err := s.repo.ListNPMProxyHosts(ctx, id); err == nil {
+		s.disableLinkedMonitoring(ctx, hosts)
+	}
 	return s.repo.DeleteNPMConnection(ctx, id)
+}
+
+// disableLinkedMonitoring disables the uptime probe / SSL certificate linked
+// to each given proxy host, without touching the proxy host row itself.
+func (s *Service) disableLinkedMonitoring(ctx context.Context, hosts []models.NPMProxyHost) {
+	for _, h := range hosts {
+		if h.UptimeProbeID != nil {
+			_ = s.repo.SetUptimeProbeEnabled(ctx, *h.UptimeProbeID, false)
+		}
+		if h.SSLCertificateID != nil {
+			_ = s.repo.SetSSLCertificateEnabled(ctx, *h.SSLCertificateID, false)
+		}
+	}
 }
 
 // ─── Test ────────────────────────────────────────────────────────────────────
@@ -123,7 +143,6 @@ func (s *Service) TestConnection(ctx context.Context, apiURL, identity, secret s
 	_, err = s.listFn(ctx, apiURL, token)
 	return err
 }
-
 
 // ─── Global proxy host list ──────────────────────────────────────────────────
 
@@ -325,7 +344,9 @@ func (s *Service) RefreshSync(ctx context.Context, connectionID string) error {
 	}
 
 	falseVal := false
+	seenNPMIDs := make(map[int]bool, len(hosts))
 	for _, h := range hosts {
+		seenNPMIDs[h.ID] = true
 		stored, err := s.repo.UpsertNPMProxyHost(ctx, models.NPMProxyHost{
 			ConnectionID: connectionID,
 			NPMID:        h.ID,
@@ -345,6 +366,26 @@ func (s *Service) RefreshSync(ctx context.Context, connectionID string) error {
 			})
 		}
 	}
+
+	// A host that has been deleted from NPM outright (not just toggled off)
+	// never appears in `hosts` at all, so the loop above never sees it. Left
+	// alone, its linked cert/probe stay enabled and become invisible orphans
+	// (see DeleteConnection above for the same underlying gap). Cascade
+	// monitoring off for any previously-imported host missing from this sync.
+	if existing, err := s.repo.ListNPMProxyHosts(ctx, connectionID); err == nil {
+		var stale []models.NPMProxyHost
+		for _, h := range existing {
+			if !seenNPMIDs[h.NPMID] && h.MonitoringEnabled {
+				stale = append(stale, h)
+			}
+		}
+		for _, h := range stale {
+			_, _ = s.UpdateProxyHostMonitoring(ctx, h.ID, models.NPMProxyHostUpdateRequest{
+				MonitoringEnabled: &falseVal,
+			})
+		}
+	}
+
 	return s.repo.UpdateNPMConnectionSuccess(ctx, connectionID)
 }
 

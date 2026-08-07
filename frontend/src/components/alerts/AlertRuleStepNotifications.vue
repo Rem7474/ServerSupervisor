@@ -110,7 +110,7 @@
       <small
         id="smtp-hint"
         class="form-hint"
-      >Séparez plusieurs emails par des virgules</small>
+      >Séparez plusieurs emails par des virgules. Laisser vide pour utiliser le destinataire global (Réglages > SMTP).</small>
     </div>
 
     <div

@@ -353,13 +353,9 @@
                   :guest-networks-loading="guestNetworksLoading"
                   :guest-exposure="guestExposure"
                   :guest-exposure-loading="guestExposureLoading"
-                  :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
                   :action-loading="guestActionLoading"
-                  @confirm-link="confirmGuestLink"
-                  @ignore-link="ignoreGuestLink"
-                  @go-host="goToHost"
                   @migrate="openMigrateModal($event, 'vm')"
                   @guest-action="handleGuestAction"
                 />
@@ -373,13 +369,9 @@
                   :guest-networks-loading="guestNetworksLoading"
                   :guest-exposure="guestExposure"
                   :guest-exposure-loading="guestExposureLoading"
-                  :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
                   :action-loading="guestActionLoading"
-                  @confirm-link="confirmGuestLink"
-                  @ignore-link="ignoreGuestLink"
-                  @go-host="goToHost"
                   @migrate="openMigrateModal($event, 'lxc')"
                   @guest-action="handleGuestAction"
                 />
@@ -443,14 +435,6 @@
                 <ProxmoxNodeStorageTab :storages="node.storages || []" />
               </template>
             </EntityTabShell>
-
-            <!-- Link action feedback -->
-            <div
-              v-if="linkMsg"
-              class="card-footer py-2"
-            >
-              <span :class="['small', linkMsgOk ? 'text-success' : 'text-danger']">{{ linkMsg }}</span>
-            </div>
           </div>
         </div> <!-- /side-main -->
         <CommandLogPanel
@@ -566,6 +550,7 @@ import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
 import { useProxmoxNode } from '../composables/useProxmoxNode'
 import { useModalChrome } from '../composables/useModalChrome'
+import { getMetricColorClass } from '../utils/metricColor'
 
 const route = useRoute()
 
@@ -574,9 +559,6 @@ const {
   loading,
   error,
   tab,
-  guestLinks,
-  linkMsg,
-  linkMsgOk,
   sensorSourceCandidates,
   sensorSourceHostId,
   sensorSourceLoading,
@@ -642,9 +624,6 @@ const {
   vms,
   lxcs,
   failedTaskCount,
-  confirmGuestLink,
-  ignoreGuestLink,
-  goToHost,
   guestActionLoading,
   handleGuestAction,
 } = useProxmoxNode()
@@ -703,7 +682,7 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
 // avoids re-triggering on every tab.value change load() itself makes.
 function onTabClick(key: string): void {
   tab.value = key
-  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure() }
+  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackups() }
   if (key === 'services') loadServices()
   if (key === 'backups') loadBackups()
 }
@@ -714,9 +693,7 @@ function memPct(n: { mem_used?: number; mem_total?: number }): string | number {
 }
 
 function cpuColor(usage: number): string {
-  if (usage > 0.85) return 'bg-danger'
-  if (usage > 0.6) return 'bg-warning'
-  return 'bg-success'
+  return getMetricColorClass(usage * 100, 'bg')
 }
 
 function tempColor(temp: number | undefined): string {
@@ -728,18 +705,12 @@ function tempColor(temp: number | undefined): string {
 
 function ramColor(used: number, total: number): string {
   if (!total) return 'bg-secondary'
-  const pct = used / total
-  if (pct > 0.85) return 'bg-danger'
-  if (pct > 0.6) return 'bg-warning'
-  return 'bg-success'
+  return getMetricColorClass((used / total) * 100, 'bg')
 }
 
 function storageColor(used: number, total: number): string {
   if (!total) return 'bg-secondary'
-  const pct = used / total
-  if (pct > 0.85) return 'bg-danger'
-  if (pct > 0.6) return 'bg-warning'
-  return 'bg-primary'
+  return getMetricColorClass((used / total) * 100, 'bg')
 }
 
 function formatBytes(bytes: number | undefined): string {

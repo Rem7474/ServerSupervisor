@@ -67,6 +67,7 @@ type ProxmoxGuest struct {
 	MemAlloc     int64     `json:"mem_alloc"`
 	MemUsage     int64     `json:"mem_usage"`
 	DiskAlloc    int64     `json:"disk_alloc"`
+	DiskUsage    int64     `json:"disk_usage"`
 	Tags         string    `json:"tags"`
 	Uptime       int64     `json:"uptime"`
 	LastSeenAt   time.Time `json:"last_seen_at"`
@@ -213,9 +214,11 @@ type ProxmoxGuestLink struct {
 	HostName     string `json:"host_name,omitempty"`
 	HostHostname string `json:"host_hostname,omitempty"`
 	// Live metrics from the Proxmox guest (populated on list/get)
-	CPUUsage float64 `json:"cpu_usage"`
-	MemAlloc int64   `json:"mem_alloc"`
-	MemUsage int64   `json:"mem_usage"`
+	CPUUsage  float64 `json:"cpu_usage"`
+	MemAlloc  int64   `json:"mem_alloc"`
+	MemUsage  int64   `json:"mem_usage"`
+	DiskAlloc int64   `json:"disk_alloc"`
+	DiskUsage int64   `json:"disk_usage"`
 }
 
 // ProxmoxGuestLinkRequest is the body for POST /proxmox/links.

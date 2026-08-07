@@ -21,11 +21,11 @@
           <button
             v-if="alertsTab === 'rules' && auth.isAdmin"
             type="button"
-            class="btn btn-primary"
+            class="btn btn-primary btn-sm"
             @click="startAddAlert"
           >
             <IconPlus
-              :size="24"
+              :size="14"
               class="icon me-1"
             />
             Nouvelle alerte

@@ -181,6 +181,7 @@
                 <th>Volume</th>
                 <th>Déclencheur</th>
                 <th>Erreur</th>
+                <th class="text-end" />
               </tr>
             </thead>
             <tbody>
@@ -216,6 +217,21 @@
                 >
                   {{ run.error_message || '—' }}
                 </td>
+                <td class="text-end">
+                  <button
+                    v-if="run.command_id"
+                    type="button"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
+                    title="Voir les logs"
+                    aria-label="Voir les logs"
+                    @click="emit('watch-run', run)"
+                  >
+                    <IconList
+                      :size="16"
+                      class="icon icon-sm"
+                    />
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -233,12 +249,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { IconExternalLink } from '@tabler/icons-vue'
+import { IconExternalLink, IconList } from '@tabler/icons-vue'
 import dayjs from '../../utils/dayjs'
 import EmptyState from '../EmptyState.vue'
 import RestrictedSelect from '../RestrictedSelect.vue'
 import type { OptionGroup } from '../RestrictedSelect.vue'
 import { useBackup } from '../../composables/useBackup'
+import type { BackupRun } from '../../composables/useBackup'
 import { RESTIC_BACKUP_DOC_URL as configDocURL } from '../../utils/docLinks'
 
 const props = withDefaults(defineProps<{
@@ -247,6 +264,10 @@ const props = withDefaults(defineProps<{
 }>(), {
   canRun: false,
 })
+
+const emit = defineEmits<{
+  (e: 'watch-run', run: BackupRun): void
+}>()
 
 const {
   backupStatus,

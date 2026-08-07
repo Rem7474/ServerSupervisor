@@ -460,9 +460,12 @@ onUnmounted(() => {
    "Rechercher…" label (text-secondary) and the kbd hint above (color:
    --tblr-secondary too) become the same gray as the fill they now sit on,
    i.e. invisible text on hover. Force both to the button's own hover
-   foreground token instead. */
+   foreground token instead. Needs !important: Tabler's own .text-secondary
+   utility sets color with !important, so a plain override here is silently
+   discarded — verified live that without it the "Rechercher…" label stays
+   the same dim gray on hover while only the kbd badge brightens. */
 .command-palette-trigger:hover .text-secondary {
-  color: var(--tblr-secondary-fg);
+  color: var(--tblr-secondary-fg) !important;
 }
 
 .command-palette-trigger:hover kbd {

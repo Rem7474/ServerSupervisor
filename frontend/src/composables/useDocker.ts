@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from './useConfirmDialog'
 import { addToast } from './useGlobalToast'
 import { useCommandStream } from './useCommandStream'
+import { usePendingCommand } from './usePendingCommand'
 import apiClient from '../api'
 import type { DockerContainer, ComposeProject, VersionComparison } from '../types/docker'
 import { getApiErrorMessage } from '../api/client'
@@ -39,6 +40,7 @@ export function useDocker() {
   const dockerLiveCmd = ref<DockerLiveCmd | null>(null)
 
   const { openCommandStream, closeStream: closeDockerStream } = useCommandStream()
+  const pendingCommand = usePendingCommand()
 
   const hostMap = computed<Record<string, string>>(() => {
     const map: Record<string, string> = {}
@@ -73,6 +75,7 @@ export function useDocker() {
     try {
       const res = await apiClient.sendDockerCommand(hostId, name, action)
       connectDockerStream(res.data.command_id, hostId, name, action)
+      await pendingCommand.track(res.data.command_id)
     } catch (err: unknown) {
       if (originalContainer) {
         const prevState = originalContainer.state
@@ -119,6 +122,13 @@ export function useDocker() {
           6000
         )
       }
+      // Keep the bulk-action button spinning until every dispatched command
+      // actually finishes, not just until every dispatch request is acked.
+      await Promise.all(
+        results
+          .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof apiClient.sendDockerCommand>>> => r.status === 'fulfilled')
+          .map((r) => pendingCommand.track(r.value.data?.command_id))
+      )
     } finally {
       bulkActionLoading.value = false
     }
@@ -141,6 +151,7 @@ export function useDocker() {
     try {
       const res = await apiClient.sendDockerCommand(hostId, name, action, workingDir)
       connectDockerStream(res.data.command_id, hostId, name, action)
+      await pendingCommand.track(res.data.command_id)
     } catch (err: unknown) {
       addToast(getApiErrorMessage(err, 'Erreur Docker'), 'error', 6000)
     } finally {

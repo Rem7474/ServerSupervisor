@@ -22,9 +22,11 @@
             :size="24"
             class="icon mb-2 text-warning icon-lg"
           />
-          <h3>{{ dialog.title.value }}</h3>
+          <h3 class="modal-confirm-text">
+            {{ dialog.title.value }}
+          </h3>
           <div
-            class="text-secondary"
+            class="text-secondary modal-confirm-text"
             style="white-space: pre-line;"
           >
             {{ dialog.message.value }}
@@ -34,7 +36,7 @@
             v-if="dialog.requiredText.value"
             class="mt-3 text-start"
           >
-            <div class="text-secondary small mb-1">
+            <div class="text-secondary small mb-1 modal-confirm-text">
               Tapez <strong class="text-body">{{ dialog.requiredText.value }}</strong> pour confirmer :
             </div>
             <input
@@ -52,7 +54,7 @@
           <div class="w-100 d-flex gap-2">
             <button
               type="button"
-              class="btn link-secondary w-100"
+              class="btn link-secondary w-100 modal-confirm-text"
               @click="handleCancel"
             >
               {{ dialog.cancelLabel.value }}
@@ -60,7 +62,7 @@
             <button
               type="button"
               :disabled="!!dialog.requiredText.value && typedText !== dialog.requiredText.value"
-              :class="['btn', 'w-100', dialog.destructive.value || dialog.variant.value === 'danger' ? 'btn-danger' : 'btn-warning']"
+              :class="['btn', 'w-100', 'modal-confirm-text', dialog.destructive.value || dialog.variant.value === 'danger' ? 'btn-danger' : 'btn-warning']"
               @click="tryConfirm"
             >
               {{ dialog.okLabel.value }}
@@ -109,3 +111,18 @@ function handleCancel(): void {
   dialog.onCancel()
 }
 </script>
+
+<style scoped>
+/* A long unbroken token (FQDN, UUID, a comma-joined hostname list for a bulk
+   action) has no natural break point and can overflow the modal's fixed
+   380px (.modal-sm) width — wrap it instead, on the message, the "type to
+   confirm" text and both button labels alike. Buttons need the extra
+   white-space override: Tabler's .btn forces `white-space: nowrap`, so
+   overflow-wrap/word-break alone don't do anything on button text — it's
+   exactly what let a long okLabel overflow past the button/modal edge. */
+.modal-confirm-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+</style>

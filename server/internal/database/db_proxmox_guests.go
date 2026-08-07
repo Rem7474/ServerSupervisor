@@ -10,12 +10,12 @@ import (
 )
 
 // UpsertProxmoxGuest inserts or updates a VM/LXC record.
-func (db *DB) UpsertProxmoxGuest(ctx context.Context, connectionID, nodeName, guestType string, vmid int, name, status string, cpuAlloc, cpuUsage float64, memAlloc, memUsage, diskAlloc, uptime int64, tags string) error {
+func (db *DB) UpsertProxmoxGuest(ctx context.Context, connectionID, nodeName, guestType string, vmid int, name, status string, cpuAlloc, cpuUsage float64, memAlloc, memUsage, diskAlloc, diskUsage, uptime int64, tags string) error {
 	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_guests
 		    (connection_id, node_name, guest_type, vmid, name, status,
-		     cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, tags, uptime, last_seen_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
+		     cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, disk_usage, tags, uptime, last_seen_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())
 		ON CONFLICT (connection_id, node_name, vmid) DO UPDATE SET
 		    guest_type  = EXCLUDED.guest_type,
 		    name        = EXCLUDED.name,
@@ -25,11 +25,12 @@ func (db *DB) UpsertProxmoxGuest(ctx context.Context, connectionID, nodeName, gu
 		    mem_alloc   = EXCLUDED.mem_alloc,
 		    mem_usage   = EXCLUDED.mem_usage,
 		    disk_alloc  = EXCLUDED.disk_alloc,
+		    disk_usage  = EXCLUDED.disk_usage,
 		    tags        = EXCLUDED.tags,
 		    uptime      = EXCLUDED.uptime,
 		    last_seen_at = NOW()`,
 		connectionID, nodeName, guestType, vmid, name, status,
-		cpuAlloc, cpuUsage, memAlloc, memUsage, diskAlloc, tags, uptime,
+		cpuAlloc, cpuUsage, memAlloc, memUsage, diskAlloc, diskUsage, tags, uptime,
 	)
 	return err
 }
@@ -38,7 +39,7 @@ func (db *DB) UpsertProxmoxGuest(ctx context.Context, connectionID, nodeName, gu
 func (db *DB) ListProxmoxGuestsByNode(ctx context.Context, connectionID, nodeName string) ([]models.ProxmoxGuest, error) {
 	rows, err := db.conn.QueryContext(ctx, `
 		SELECT id, connection_id, node_name, guest_type, vmid, name, status,
-		       cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, tags, uptime, last_seen_at
+		       cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, disk_usage, tags, uptime, last_seen_at
 		FROM proxmox_guests
 		WHERE connection_id=$1 AND node_name=$2
 		ORDER BY guest_type, vmid`, connectionID, nodeName)
@@ -53,7 +54,7 @@ func (db *DB) ListProxmoxGuestsByNode(ctx context.Context, connectionID, nodeNam
 // Pass empty strings to skip filters.
 func (db *DB) ListProxmoxGuests(ctx context.Context, connectionID, guestType, status string) ([]models.ProxmoxGuest, error) {
 	q := `SELECT id, connection_id, node_name, guest_type, vmid, name, status,
-		         cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, tags, uptime, last_seen_at
+		         cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, disk_usage, tags, uptime, last_seen_at
 		  FROM proxmox_guests WHERE 1=1`
 	args := []interface{}{}
 	n := 1
@@ -87,11 +88,11 @@ func (db *DB) GetProxmoxGuestByID(ctx context.Context, id string) (*models.Proxm
 	var g models.ProxmoxGuest
 	err := db.conn.QueryRowContext(ctx, `
 		SELECT id, connection_id, node_name, guest_type, vmid, name, status,
-		       cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, tags, uptime, last_seen_at
+		       cpu_alloc, cpu_usage, mem_alloc, mem_usage, disk_alloc, disk_usage, tags, uptime, last_seen_at
 		FROM proxmox_guests WHERE id=$1`, id,
 	).Scan(
 		&g.ID, &g.ConnectionID, &g.NodeName, &g.GuestType, &g.VMID, &g.Name, &g.Status,
-		&g.CPUAlloc, &g.CPUUsage, &g.MemAlloc, &g.MemUsage, &g.DiskAlloc, &g.Tags, &g.Uptime,
+		&g.CPUAlloc, &g.CPUUsage, &g.MemAlloc, &g.MemUsage, &g.DiskAlloc, &g.DiskUsage, &g.Tags, &g.Uptime,
 		&g.LastSeenAt,
 	)
 	if err != nil {
@@ -106,7 +107,7 @@ func scanGuests(rows *sql.Rows) ([]models.ProxmoxGuest, error) {
 		var g models.ProxmoxGuest
 		if err := rows.Scan(
 			&g.ID, &g.ConnectionID, &g.NodeName, &g.GuestType, &g.VMID, &g.Name, &g.Status,
-			&g.CPUAlloc, &g.CPUUsage, &g.MemAlloc, &g.MemUsage, &g.DiskAlloc, &g.Tags, &g.Uptime,
+			&g.CPUAlloc, &g.CPUUsage, &g.MemAlloc, &g.MemUsage, &g.DiskAlloc, &g.DiskUsage, &g.Tags, &g.Uptime,
 			&g.LastSeenAt,
 		); err != nil {
 			return nil, err

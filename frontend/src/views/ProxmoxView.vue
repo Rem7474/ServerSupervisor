@@ -489,6 +489,7 @@ import PageRefreshBar from '../components/PageRefreshBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useProxmox } from '../composables/useProxmox'
+import { getMetricColorClass } from '../utils/metricColor'
 import type { ProxmoxNode } from '../types/proxmox'
 
 const auth = useAuthStore()
@@ -528,31 +529,21 @@ function memPct(node: ProxmoxNode): string | number {
 }
 
 function cpuColor(usage: number): string {
-  if (usage > 0.85) return 'bg-danger'
-  if (usage > 0.6) return 'bg-warning'
-  return 'bg-success'
+  return getMetricColorClass(usage * 100, 'bg')
 }
 
 function ramColor(used: number, total: number): string {
   if (!total) return 'bg-secondary'
-  const pct = used / total
-  if (pct > 0.85) return 'bg-danger'
-  if (pct > 0.6) return 'bg-warning'
-  return 'bg-success'
+  return getMetricColorClass((used / total) * 100, 'bg')
 }
 
 function cpuTextColor(usage: number): string {
-  if (usage > 0.85) return 'text-danger'
-  if (usage > 0.6) return 'text-warning'
-  return 'text-success'
+  return getMetricColorClass(usage * 100)
 }
 
 function ramTextColor(used: number, total: number): string {
   if (!total) return 'text-secondary'
-  const pct = used / total
-  if (pct > 0.85) return 'text-danger'
-  if (pct > 0.6) return 'text-warning'
-  return 'text-success'
+  return getMetricColorClass((used / total) * 100)
 }
 
 function formatBytes(bytes: number | undefined): string {

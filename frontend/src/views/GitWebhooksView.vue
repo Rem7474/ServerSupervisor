@@ -14,22 +14,22 @@
           <button
             v-if="activeTab === 'trackers'"
             type="button"
-            class="btn btn-outline-primary"
+            class="btn btn-outline-primary btn-sm"
             @click="showDiscoverModal = true"
           >
             <IconSearch
-              :size="16"
+              :size="14"
               class="icon me-1"
             />
             Découvrir
           </button>
           <button
             type="button"
-            class="btn btn-primary"
+            class="btn btn-primary btn-sm"
             @click="activeTab === 'webhooks' ? openCreateWebhook() : openCreateTracker()"
           >
             <IconPlus
-              :size="16"
+              :size="14"
               class="icon me-1"
             />
             {{ activeTab === 'webhooks' ? 'Nouveau webhook' : 'Nouveau tracker' }}

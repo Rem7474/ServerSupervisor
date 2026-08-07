@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useHostCommandConsole } from './useHostCommandConsole'
 import { useCommandStream } from './useCommandStream'
+import { usePendingCommand } from './usePendingCommand'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useWebSocket } from './useWebSocket'
 import type { WSHostSnapshot } from '../types/ws'
@@ -11,7 +12,7 @@ import { confirmAptCommand } from '../utils/aptConfirm'
 
 // AnyRecord is the raw shape of an untyped JSON payload received over WebSocket
 // or HTTP. The composable keeps it loose because the consuming components
-// (HostDockerTab, HostAptTab, HostCommandsTab, …) narrow via their own typed
+// (HostDockerTab, HostAptTab, HostTimelineTab, …) narrow via their own typed
 // props (Container, VersionComparison, Command, UURun, UUForm) — bridged with
 // `as any` casts at template boundaries. Tightening here would require
 // matching every downstream prop shape; that's a follow-up refactor.
@@ -48,9 +49,11 @@ export function useHostDetail() {
   const dialog = useConfirmDialog()
   const canRunApt = computed(() => auth.canManage)
 
-  const activeTab = ref<string>(
-    typeof route.query.tab === 'string' ? route.query.tab : 'overview'
-  )
+  // 'commandes' redirects to 'timeline' (its type filter now covers the same
+  // remote_commands data) so a pre-existing bookmark/link to the removed
+  // standalone tab still lands somewhere meaningful instead of a blank pane.
+  const requestedTab = typeof route.query.tab === 'string' ? route.query.tab : 'overview'
+  const activeTab = ref<string>(requestedTab === 'commandes' ? 'timeline' : requestedTab)
 
   watch(activeTab, (tab) => {
     router.replace({ query: { ...route.query, tab } })
@@ -75,6 +78,7 @@ export function useHostDetail() {
   const uuRuns = ref<AnyRecord[] | null>(null)
   const uuLoading = ref('')
   const uuForm = ref<AnyRecord | null>(null)
+  const uuFormSyncedSnapshot = ref<string | null>(null)
 
   const proxmoxLink = ref<AnyRecord | null>(null)
   const linkSaving = ref(false)
@@ -139,11 +143,12 @@ export function useHostDetail() {
 
   const { liveCommand, showConsole, openCommand: _openCommand, closeConsole, updateCommand } = useHostCommandConsole()
   const { openCommandStream, closeStream } = useCommandStream()
+  const pendingCommand = usePendingCommand()
 
   function syncUUFormFromStatus(status: AnyRecord | null): void {
     if (!status) return
     const cfg = (status.config ?? {}) as Record<string, unknown>
-    uuForm.value = {
+    const next = {
       enabled: status.enabled ?? false,
       config: {
         security_only: cfg.security_only ?? true,
@@ -152,6 +157,16 @@ export function useHostDetail() {
         remove_unused: cfg.remove_unused ?? false,
       },
     }
+    uuForm.value = next
+    uuFormSyncedSnapshot.value = JSON.stringify(next)
+  }
+
+  // True when the form still matches the last value it was synced from — i.e. the user
+  // hasn't started editing it yet, so it's safe to overwrite with a fresher live status
+  // without clobbering an in-progress edit.
+  function isUUFormUntouched(): boolean {
+    if (!uuForm.value) return true
+    return uuFormSyncedSnapshot.value === JSON.stringify(uuForm.value)
   }
 
   function openCommand(rawCmd: AnyRecord) {
@@ -240,7 +255,11 @@ export function useHostDetail() {
       aptStatus.value = asRecord(payload.apt_status)
       if ('uu_status' in payload) {
         uuStatus.value = asRecord(payload.uu_status)
-        if (!uuForm.value) {
+        // The "Activé" badge always reflects uuStatus (assigned above, live). Only
+        // re-sync the editable form when the user hasn't started editing it, so the
+        // badge and the toggle can't drift apart, but an in-progress edit survives a
+        // live update.
+        if (isUUFormUntouched()) {
           syncUUFormFromStatus(uuStatus.value)
         }
       }
@@ -265,6 +284,7 @@ export function useHostDetail() {
         const cmd = response.data.commands[0]
         if (cmd.command_id) {
           openCommand({ id: cmd.command_id, module: 'apt', action: command, status: 'pending', output: '' })
+          await pendingCommand.track(cmd.command_id)
         }
       }
     } catch (e: unknown) {
@@ -342,6 +362,7 @@ export function useHostDetail() {
       const commandId = res.data?.command_id
       if (commandId) {
         openCommand({ id: commandId, module: 'apt', action: 'install_uu', status: 'pending', output: '' })
+        await pendingCommand.track(commandId)
       }
     } catch (e: unknown) {
       await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
@@ -369,6 +390,7 @@ export function useHostDetail() {
       const commandId = res.data?.command_id
       if (commandId) {
         openCommand({ id: commandId, module: 'apt', action: 'run_uu', status: 'pending', output: '' })
+        await pendingCommand.track(commandId)
       }
     } catch (e: unknown) {
       await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
@@ -433,6 +455,7 @@ export function useHostDetail() {
           status: 'pending',
           output: '',
         })
+        await pendingCommand.track(commandId)
       }
     } catch (e: unknown) {
       await dialog.confirm({

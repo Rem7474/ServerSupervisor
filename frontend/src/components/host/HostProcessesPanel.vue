@@ -18,7 +18,7 @@
             v-if="loading"
             class="spinner-border spinner-border-sm me-1"
           />
-          {{ loading ? 'Chargement...' : (processes.length ? 'Actualiser' : 'Charger') }}
+          {{ loading ? 'Chargement...' : (processes.length ? 'Actualiser les processus' : 'Charger les processus') }}
         </button>
       </div>
     </div>
@@ -44,7 +44,7 @@
       class="card-body"
     >
       <div class="text-secondary small">
-        Cliquez sur "Charger" pour afficher les processus actifs de cet hôte.
+        Cliquez sur "Charger les processus" pour afficher les processus actifs de cet hôte.
       </div>
     </div>
     <div

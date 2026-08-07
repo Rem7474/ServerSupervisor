@@ -72,6 +72,8 @@ Use the semantic names for anything that carries a state meaning — not the raw
 
 Don't use `red`/`green`/`yellow` for a state (they duplicate `danger`/`success`/`warning` in name only). Don't use `orange` for a warning — `text-orange`/`bg-orange-lt` is `#f76707`, a genuinely different hue from `warning`/`yellow` (`#f59f00`), so mixing them makes the same severity render in two colors. Don't use `azure` as the accent color — `bg-azure-lt` (`#4299e1`) is a near-duplicate of `primary`/`blue` (`#066fd1`); reserve `azure` (and other palette names like `purple`, `teal`, `cyan`) for neutral categorical tagging, not state. Never hardcode a hex value in a component's `<style>` block — the `--ss-*` tokens in `style.css:71-124` exist for exactly the slate surfaces/status colors Tabler doesn't provide; add to that block instead.
 
+**CPU/RAM/disk usage percentages** are a distinct case from the discrete-state colors above — a continuous value crossing thresholds, not a fixed status. `utils/metricColor.ts`'s `getMetricColorClass(pct, variant)` is the single source of truth (green `< 75 %`, yellow `75-90 %`, red `> 90 %`, matching the dashboard's own legend) — pass `variant: 'text'` for a `<span>`/KPI value or `'bg'` for a progress-bar fill. Introduced when harmonizing the Proxmox views (`ProxmoxClusterCard.vue`, `ProxmoxView.vue`, `ProxmoxNodeView.vue`, `ProxmoxNodeGuestsTab.vue`, `ProxmoxGuestView.vue`, `HostDetailView.vue`'s linked-guest panel), which had each grown their own slightly different thresholds (70/90, 60/85, …) over time. Use it for any new CPU/RAM/disk percentage display instead of another one-off threshold function — don't use `getEntityStateClass`/`statusClasses.ts` for this (those are for discrete on/off/running-style states, not a swept metric).
+
 ### Icons
 
 `@tabler/icons-vue` exclusively — no other icon set, no ad-hoc inline `<svg>` except genuine dataviz (network graphs, maps). Four size tiers via the `:size` prop: **14** (inside a `btn-sm`/badge), **16** (default inline/table icon), **24** (card-header icon), **48** (empty-state icon). Don't introduce 18/20/32/36/40 — they're unjustified intermediates. Default `stroke-width` (2) everywhere except large decorative empty-state icons (1.5). One action = one icon everywhere: `IconTrash` = delete, `IconPencil` = edit, `IconRefresh` = restart, `IconReload` = reload (a distinct action from restart — don't conflate the two icons), `IconCopy` = copy, `IconPlayerPlay`/`IconPlayerStop` = start/stop.
@@ -85,6 +87,13 @@ Don't use `red`/`green`/`yellow` for a state (they duplicate `danger`/`success`/
 - Empty state: `<EmptyState>` (wrapped in `<tr><td :colspan="N">` when inside a `<tbody>`), never an ad-hoc `<div class="text-center text-muted">`.
 - Loading: `<LoadingSkeleton>` for a first-load of a zone whose shape is known (table, KPI strip, chart); `spinner-border` only for a punctual action (button in flight, per-row action) — never both in the same view for the same zone.
 - Actions column: `text-end`, last column, `btn-icon btn-sm` buttons.
+
+### Clickable inline text
+
+A cross-page audit found at least 6 different ad-hoc conventions for "this text is a link" (plain, `fw-semibold`, `fw-medium`, a badge styled as a link, `btn btn-link`, and — the one actual bug, not just a style choice — a bare `<a>` with no class at all, which keeps the browser's native underline-on-hover instead of the app's own hover treatment). Two rules going forward:
+
+- Always `text-decoration-none` — never a bare `<a>`/clickable span with no class. This is the one part that's an actual bug (native underline) rather than a judgment call.
+- Weight carries meaning: `fw-medium text-decoration-none` when the text *is* the row/card's primary entity (a host/guest/domain name that identifies what the row is about — table-cell identifier links and `btn-link`-styled identifier buttons alike, e.g. `ExposureDomainsPanel.vue`'s domain name). Plain `text-decoration-none` (no weight) for a secondary/contextual reference or action link that isn't the row's subject (e.g. a "voir" link inside a KPI card pointing at another tab).
 
 ### Modals
 

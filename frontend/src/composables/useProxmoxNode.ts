@@ -22,10 +22,6 @@ export function useProxmoxNode() {
     router.replace({ query: { ...route.query, tab: t } })
   })
 
-  const guestLinks = ref<Record<string, any>>({})
-  const linkMsg = ref('')
-  const linkMsgOk = ref(false)
-
   const sensorSourceCandidates = ref<any[]>([])
   const sensorSourceHostId = ref('')
   const sensorSourceLoading = ref(false)
@@ -177,7 +173,6 @@ export function useProxmoxNode() {
       node.value = res.data
       sensorSourceHostId.value = node.value?.cpu_temp_source_host_id || node.value?.fan_rpm_source_host_id || ''
       await loadSensorSourceCandidates()
-      await loadGuestLinks()
       // fire-and-forget: live status + RRD charts + peer nodes load in parallel
       loadLiveStatus()
       loadRRD('hour')
@@ -189,7 +184,7 @@ export function useProxmoxNode() {
       // domains) and the Services list silently stayed empty after a hard
       // refresh landing directly on one of those tabs. Mirror onTabClick's
       // own logic here for whichever tab was actually restored.
-      if (tab.value === 'vms' || tab.value === 'lxc') { loadGuestNetworks(); loadGuestExposure() }
+      if (tab.value === 'vms' || tab.value === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackups() }
       else if (tab.value === 'services') loadServices()
       else if (tab.value === 'backups') loadBackups()
     } catch (e: unknown) {
@@ -301,22 +296,6 @@ export function useProxmoxNode() {
     }
   }
 
-  async function refreshNodeSensorSource() {
-    try {
-      const res = await api.getProxmoxNode(String(route.params.id))
-      const n = res.data || {}
-      if (node.value) {
-        node.value.cpu_temp_source_host_id = n.cpu_temp_source_host_id || ''
-        node.value.cpu_temp_source_host_name = n.cpu_temp_source_host_name || ''
-        node.value.fan_rpm_source_host_id = n.fan_rpm_source_host_id || ''
-        node.value.fan_rpm_source_host_name = n.fan_rpm_source_host_name || ''
-      }
-      sensorSourceHostId.value = n.cpu_temp_source_host_id || n.fan_rpm_source_host_id || ''
-    } catch {
-      // non-bloquant
-    }
-  }
-
   async function saveSensorSource() {
     sensorSourceSaving.value = true
     sensorSourceMsg.value = ''
@@ -342,69 +321,6 @@ export function useProxmoxNode() {
       sensorSourceSaving.value = false
       setTimeout(() => { sensorSourceMsg.value = '' }, 4000)
     }
-  }
-
-  async function loadGuestLinks(): Promise<void> {
-    const guests = node.value?.guests ?? []
-    if (guests.length === 0) return
-    try {
-      const res = await api.getProxmoxLinks()
-      const guestIds = new Set(guests.map((g: any) => g.id))
-      const map: Record<string, any> = {}
-      for (const link of res.data ?? []) {
-        if (guestIds.has(link.guest_id)) {
-          map[link.guest_id] = link
-        }
-      }
-      guestLinks.value = map
-    } catch {
-      guestLinks.value = {}
-    }
-  }
-
-  function linkForGuest(g: any): any {
-    return guestLinks.value[g.id] ?? null
-  }
-
-  async function confirmGuestLink(g: any): Promise<void> {
-    const link = linkForGuest(g)
-    if (!link) return
-    try {
-      const res = await api.updateProxmoxLink(link.id, { status: 'confirmed' })
-      guestLinks.value = { ...guestLinks.value, [g.id]: res.data }
-      await loadSensorSourceCandidates()
-      await refreshNodeSensorSource()
-      showMsg(`[${g.name}] Lien confirmé.`, true)
-    } catch (e: unknown) {
-      showMsg(getApiErrorMessage(e, 'Erreur.'), false)
-    }
-  }
-
-  async function ignoreGuestLink(g: any): Promise<void> {
-    const link = linkForGuest(g)
-    if (!link) return
-    try {
-      await api.deleteProxmoxLink(link.id)
-      const m = { ...guestLinks.value }
-      delete m[g.id]
-      guestLinks.value = m
-      showMsg(`[${g.name}] Suggestion ignorée.`, true)
-    } catch (e: unknown) {
-      showMsg(getApiErrorMessage(e, 'Erreur.'), false)
-    }
-  }
-
-  // Guests linked to a ServerSupervisor host already get their domain/IP
-  // correlation for free from that host's own Exposition tab (same IP, same
-  // GetHostExposure query) — land there directly instead of the overview tab.
-  function goToHost(link: any): void {
-    if (link?.host_id) router.push(`/hosts/${link.host_id}?tab=exposition`)
-  }
-
-  function showMsg(msg: string, ok: boolean): void {
-    linkMsg.value = msg
-    linkMsgOk.value = ok
-    setTimeout(() => { linkMsg.value = '' }, 4000)
   }
 
   async function loadRRD(timeframe: string = rrdTimeframe.value): Promise<void> {
@@ -511,9 +427,18 @@ export function useProxmoxNode() {
   }
 
 
+  let pollResolve: (() => void) | null = null
+
   function stopPolling(): void {
     if (pollTimer) clearTimeout(pollTimer)
     pollTimer = null
+    // Unblock any caller awaiting startPollingTask's returned promise (e.g. a
+    // button's loading state) if the poll is torn down before the task
+    // actually reached a terminal state (console closed, a new task started).
+    if (pollResolve) {
+      pollResolve()
+      pollResolve = null
+    }
   }
 
   function closeConsole(): void {
@@ -523,7 +448,13 @@ export function useProxmoxNode() {
     activeUpid.value = null
   }
 
-  async function startPollingTask(upid: string, { action = '', label = '' }: { action?: string; label?: string } = {}): Promise<void> {
+  // Returns a promise that resolves once the PVE task reaches a terminal
+  // state (TASK OK/ERROR) — or the poll is torn down early (see stopPolling)
+  // — so a caller can await the real task duration for its own loading state,
+  // not just the initial dispatch. Still fire-and-forget-safe: callers that
+  // don't need that (e.g. the tasks tab's "view logs" action) can ignore the
+  // returned promise exactly as before.
+  function startPollingTask(upid: string, { action = '', label = '' }: { action?: string; label?: string } = {}): Promise<void> {
     stopPolling()
     activeUpid.value = upid
     liveTask.value = {
@@ -536,22 +467,30 @@ export function useProxmoxNode() {
     }
     showConsole.value = true
 
-    const poll = async (): Promise<void> => {
-      try {
-        const res = await api.getProxmoxTaskLog(String(route.params.id), upid)
-        const lines = (res.data ?? []).map((l: any) => l.t).join('\n')
-        const lastLine = res.data?.[res.data.length - 1]?.t ?? ''
-        const done = lastLine.startsWith('TASK OK') || lastLine.startsWith('TASK ERROR')
-        const status = done
-          ? (lastLine.startsWith('TASK OK') ? 'completed' : 'failed')
-          : 'running'
-        liveTask.value = { ...liveTask.value, output: lines, status }
-        if (!done) pollTimer = setTimeout(poll, 2000)
-      } catch {
-        pollTimer = setTimeout(poll, 3000)
+    return new Promise<void>((resolve) => {
+      pollResolve = resolve
+      const poll = async (): Promise<void> => {
+        try {
+          const res = await api.getProxmoxTaskLog(String(route.params.id), upid)
+          const lines = (res.data ?? []).map((l: any) => l.t).join('\n')
+          const lastLine = res.data?.[res.data.length - 1]?.t ?? ''
+          const done = lastLine.startsWith('TASK OK') || lastLine.startsWith('TASK ERROR')
+          const status = done
+            ? (lastLine.startsWith('TASK OK') ? 'completed' : 'failed')
+            : 'running'
+          liveTask.value = { ...liveTask.value, output: lines, status }
+          if (!done) {
+            pollTimer = setTimeout(poll, 2000)
+          } else if (pollResolve) {
+            pollResolve = null
+            resolve()
+          }
+        } catch {
+          pollTimer = setTimeout(poll, 3000)
+        }
       }
-    }
-    await poll()
+      poll()
+    })
   }
 
   async function triggerAptRefresh(): Promise<void> {
@@ -613,7 +552,7 @@ export function useProxmoxNode() {
       const upid = res.data?.upid
       svcActionMsg.value = upid ? `${action} ${name} lancé — logs en cours…` : `${action} ${name} lancé.`
       svcActionOk.value = true
-      if (upid) startPollingTask(upid, { action: `service ${action}`, label: name })
+      if (upid) await startPollingTask(upid, { action: `service ${action}`, label: name })
       else setTimeout(() => loadServices(), 2000)
     } catch (e: unknown) {
       svcActionMsg.value = getApiErrorMessage(e, `Erreur lors de ${action} ${name}.`)
@@ -683,9 +622,6 @@ export function useProxmoxNode() {
     loading,
     error,
     tab,
-    guestLinks,
-    linkMsg,
-    linkMsgOk,
     sensorSourceCandidates,
     sensorSourceHostId,
     sensorSourceLoading,
@@ -752,9 +688,6 @@ export function useProxmoxNode() {
     vms,
     lxcs,
     failedTaskCount,
-    confirmGuestLink,
-    ignoreGuestLink,
-    goToHost,
     guestActionLoading: guestActions.actionLoading,
     handleGuestAction,
   }

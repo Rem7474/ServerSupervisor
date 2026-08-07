@@ -56,18 +56,20 @@
             </h2>
             <span :class="getEntityStateClass(guest.status)">{{ getEntityStateLabel(guest.status) }}</span>
             <span class="badge bg-azure-lt text-azure">{{ guest.guest_type.toUpperCase() }}</span>
-            <template v-if="guestLink?.host_id">
-              <MetricsSourceBadge source="proxmox" />
-              <router-link
-                :to="`/hosts/${guestLink.host_id}`"
-                class="ms-1"
-              >
-                {{ guestLink.host_hostname || guestLink.host_name }}
-              </router-link>
-            </template>
+            <GuestLinkCell
+              v-if="guestLink && guestLink.status !== 'ignored'"
+              :link="guestLink"
+              @confirm="confirmLink"
+              @ignore="ignoreLink"
+              @go="goToHostLink"
+            />
+            <span
+              v-if="linkMsg"
+              :class="['small', linkMsgOk ? 'text-success' : 'text-danger']"
+            >{{ linkMsg }}</span>
           </div>
           <div class="text-secondary">
-            Nœud {{ guest.node_name }} · VMID {{ guest.vmid }}
+            Nœud {{ guest.node_name }} · VMID {{ guest.vmid }} · Uptime {{ formatUptime(guest.uptime) }}
           </div>
         </div>
         <div
@@ -136,22 +138,16 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                CPU alloué
+                CPU
               </div>
-              <div class="h2 mt-2 mb-0">
-                {{ guest.cpu_alloc }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">
-                CPU utilisé
-              </div>
-              <div class="h2 mt-2 mb-0">
+              <div
+                class="h2 mt-2 mb-0"
+                :class="getMetricColorClass(guest.cpu_usage * 100)"
+              >
                 {{ (guest.cpu_usage * 100).toFixed(1) }}%
+              </div>
+              <div class="text-secondary small">
+                {{ guest.cpu_alloc }} vCPU alloués
               </div>
             </div>
           </div>
@@ -162,11 +158,14 @@
               <div class="subheader">
                 RAM
               </div>
-              <div class="h2 mt-2 mb-0">
-                {{ formatBytes(guest.mem_usage) }}
+              <div
+                class="h2 mt-2 mb-0"
+                :class="ramPct != null ? getMetricColorClass(ramPct) : 'text-secondary'"
+              >
+                {{ ramPct != null ? ramPct.toFixed(1) + '%' : '—' }}
               </div>
               <div class="text-secondary small">
-                / {{ formatBytes(guest.mem_alloc) }}
+                {{ formatBytes(guest.mem_usage) }} / {{ formatBytes(guest.mem_alloc) }}
               </div>
             </div>
           </div>
@@ -177,12 +176,70 @@
               <div class="subheader">
                 Disque
               </div>
-              <div class="h2 mt-2 mb-0">
-                {{ formatBytes(guest.disk_alloc) }}
+              <div
+                class="h2 mt-2 mb-0"
+                :class="diskPct != null ? getMetricColorClass(diskPct) : 'text-secondary'"
+              >
+                {{ diskPct != null ? diskPct.toFixed(1) + '%' : '—' }}
               </div>
               <div class="text-secondary small">
-                Uptime {{ formatUptime(guest.uptime) }}
+                {{ formatBytes(guest.disk_usage) }} / {{ formatBytes(guest.disk_alloc) }}
               </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card card-sm h-100">
+            <div class="card-body">
+              <div class="subheader">
+                IP
+              </div>
+              <div class="h2 mt-2 mb-0">
+                {{ guestPrimaryIp || '—' }}
+              </div>
+              <a
+                href="#"
+                class="text-decoration-none small"
+                @click.prevent="showNetworkDetail = !showNetworkDetail"
+              >{{ showNetworkDetail ? 'Masquer le détail réseau' : 'Voir le détail réseau' }}</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="showNetworkDetail"
+        class="card mb-4"
+      >
+        <div class="card-header">
+          <h3 class="card-title mb-0">
+            Interfaces réseau
+          </h3>
+        </div>
+        <div class="card-body">
+          <span
+            v-if="guestNetworksLoading"
+            class="text-muted small"
+          >Chargement…</span>
+          <EmptyState
+            v-else-if="guestNetworks.length === 0"
+            title="Aucune interface réseau détectée pour ce guest."
+          />
+          <div
+            v-else
+            class="d-flex flex-column gap-2"
+          >
+            <div
+              v-for="iface in guestNetworks"
+              :key="iface.name"
+              class="d-flex align-items-center gap-2"
+            >
+              <span class="badge bg-secondary-lt text-secondary">{{ iface.name }}</span>
+              <span
+                v-for="ip in iface.ips"
+                :key="ip"
+                class="small font-monospace"
+              >{{ ip }}</span>
             </div>
           </div>
         </div>
@@ -263,19 +320,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, defineAsyncComponent, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
-import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import GuestExposureCard from '../components/proxmox/GuestExposureCard.vue'
+import GuestLinkCell from '../components/proxmox/GuestLinkCell.vue'
 import { useAuthStore } from '../stores/auth'
 import { useProxmoxGuest } from '../composables/useProxmoxGuest'
 import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses'
+import { getMetricColorClass } from '../utils/metricColor'
 import type { ChartOptions, TooltipItem } from 'chart.js'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 
 const {
@@ -292,7 +352,46 @@ const {
   changeRange,
   actionLoading,
   performGuestAction,
+  guestNetworks,
+  guestNetworksLoading,
+  linkMsg,
+  linkMsgOk,
+  confirmLink,
+  ignoreLink,
 } = useProxmoxGuest()
+
+const showNetworkDetail = ref(false)
+
+// Guests linked to a ServerSupervisor host already get their domain/IP
+// correlation for free from that host's own Exposition tab (same IP, same
+// GetHostExposure query) — land there directly instead of the guest's own
+// page, mirroring useProxmoxNode's goToHost.
+function goToHostLink(): void {
+  if (guestLink.value?.host_id) router.push(`/hosts/${guestLink.value.host_id}?tab=exposition`)
+}
+
+const ramPct = computed(() => {
+  if (!guest.value?.mem_alloc) return null
+  return (guest.value.mem_usage / guest.value.mem_alloc) * 100
+})
+
+const diskPct = computed(() => {
+  if (!guest.value?.disk_alloc) return null
+  return (guest.value.disk_usage / guest.value.disk_alloc) * 100
+})
+
+// Only ethX interfaces feed the KPI card — same convention as
+// ProxmoxNodeGuestsTab's IP column; the collapsible section below shows
+// every interface regardless of name.
+const guestPrimaryIp = computed(() => {
+  const ethIfaces = guestNetworks.value.filter((iface) => /^eth\d+$/i.test(iface?.name ?? ''))
+  for (const iface of ethIfaces) {
+    const ips = Array.isArray(iface?.ips) ? iface.ips : []
+    const first = ips.find((ip) => typeof ip === 'string' && !ip.startsWith('fe80'))
+    if (first) return first.split('/')[0]
+  }
+  return ''
+})
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([

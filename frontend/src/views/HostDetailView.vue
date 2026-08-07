@@ -204,10 +204,21 @@
         <template v-if="proxmoxLink.status === 'confirmed' && proxmoxLink.metrics_source !== 'agent'">
           <div class="d-flex align-items-center gap-3 ms-2 border-start ps-3">
             <div class="text-muted small">
-              CPU <strong class="text-body">{{ ((proxmoxLink.cpu_usage ?? 0) * 100).toFixed(1) }}%</strong>
+              CPU <strong :class="getMetricColorClass((proxmoxLink.cpu_usage ?? 0) * 100)">{{ ((proxmoxLink.cpu_usage ?? 0) * 100).toFixed(1) }}%</strong>
             </div>
             <div class="text-muted small">
-              RAM <strong class="text-body">{{ formatBytesLink(proxmoxLink.mem_usage) }}</strong> / {{ formatBytesLink(proxmoxLink.mem_alloc) }}
+              RAM
+              <strong
+                v-if="linkRamPct != null"
+                :class="getMetricColorClass(linkRamPct)"
+              >{{ linkRamPct.toFixed(1) }}%</strong>
+              <span class="text-body">({{ formatBytesLink(proxmoxLink.mem_usage) }} / {{ formatBytesLink(proxmoxLink.mem_alloc) }})</span>
+            </div>
+            <div
+              v-if="linkDiskPct != null"
+              class="text-muted small"
+            >
+              Disque <strong :class="getMetricColorClass(linkDiskPct)">{{ linkDiskPct.toFixed(1) }}%</strong>
             </div>
           </div>
         </template>
@@ -323,7 +334,7 @@
                       {{ aptStatus?.security_updates || 0 }} sécurité
                       <a
                         href="#"
-                        class="ms-1"
+                        class="ms-1 text-decoration-none"
                         @click.prevent="activeTab = 'apt'"
                       >voir</a>
                     </div>
@@ -343,7 +354,7 @@
                       en cours
                       <a
                         href="#"
-                        class="ms-1"
+                        class="ms-1 text-decoration-none"
                         @click.prevent="activeTab = 'docker'"
                       >voir</a>
                     </div>
@@ -362,6 +373,7 @@
                     <div class="text-secondary small">
                       <a
                         href="#"
+                        class="text-decoration-none"
                         @click.prevent="activeTab = 'planifiees'"
                       >voir</a>
                     </div>
@@ -380,7 +392,8 @@
                     <div class="text-secondary small">
                       <a
                         href="#"
-                        @click.prevent="activeTab = 'commandes'"
+                        class="text-decoration-none"
+                        @click.prevent="goToTimelineCommands"
                       >voir</a>
                     </div>
                   </div>
@@ -512,13 +525,7 @@
             <HostBackupTab
               :host-id="hostId"
               :can-run="canRunApt"
-            />
-          </template>
-
-          <template #commandes>
-            <HostCommandsTab
-              :commands="(cmdHistory as any)"
-              @watch-command="(openCommand as any)"
+              @watch-run="watchBackupRun"
             />
           </template>
 
@@ -561,7 +568,11 @@
           </template>
 
           <template #timeline>
-            <HostTimelineTab :host-id="hostId" />
+            <HostTimelineTab
+              ref="timelineRef"
+              :host-id="hostId"
+              @watch-command="(openCommand as any)"
+            />
           </template>
 
           <!-- Security tab: Per-host permissions (admin only) -->
@@ -745,7 +756,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import { useModalChrome } from '../composables/useModalChrome'
@@ -759,7 +770,6 @@ import HostProcessesPanel from '../components/host/HostProcessesPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import HostAptTab from '../components/host/HostAptTab.vue'
 import HostBackupTab from '../components/host/HostBackupTab.vue'
-import HostCommandsTab from '../components/host/HostCommandsTab.vue'
 import HostDiagnosticsBanner from '../components/host/HostDiagnosticsBanner.vue'
 import EntityTabShell from '../components/EntityTabShell.vue'
 import type { EntityTab } from '../components/EntityTabShell.vue'
@@ -775,6 +785,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import BadgePill from '../components/common/BadgePill.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
+import { getMetricColorClass } from '../utils/metricColor'
 
 const {
   auth,
@@ -850,6 +861,31 @@ const {
 const permModalRef = ref<HTMLElement | null>(null)
 useModalChrome(permModalRef, () => addPermModal.value, { onClose: () => { addPermModal.value = false } })
 
+// "Commandes récentes" KPI card jumps to the Timeline tab pre-filtered to
+// command-type events — the Timeline tab absorbed the standalone Commandes
+// tab (same underlying remote_commands data, Timeline already merged it in
+// as one of its type filters plus richer context).
+const timelineRef = ref<{ filterCommands: () => void } | null>(null)
+function goToTimelineCommands(): void {
+  activeTab.value = 'timeline'
+  nextTick(() => timelineRef.value?.filterCommands())
+}
+
+// Sauvegardes tab's run-history table had no way to see a run's detailed
+// output, unlike every other module (apt/docker/systemd/runbooks/trackers/
+// webhooks) that already reuses this same console for its own "Logs" action.
+function watchBackupRun(run: { command_id?: string; profile?: string; status?: string }): void {
+  if (!run.command_id) return
+  openCommand({
+    id: run.command_id,
+    module: 'restic',
+    action: 'run_backup',
+    target: run.profile || '',
+    status: 'completed',
+    output: '',
+  })
+}
+
 // Local SMART is unreadable inside an LXC/VM. When the host has no local disk
 // health but is linked to Proxmox, we surface the hosting node's disk health
 // instead of an empty SMART card.
@@ -859,6 +895,21 @@ const dockerRunningCount = computed(() =>
 
 const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
 const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
+
+// CPU/RAM/disk % for the linked guest's live metrics, colored with the same
+// shared thresholds as the dashboard/Proxmox views (see metricColor.ts) —
+// mirrors ProxmoxGuestView's own KPI cards for the same guest.
+const linkRamPct = computed(() => {
+  const link = proxmoxLink.value
+  if (!link?.mem_alloc) return null
+  return (link.mem_usage / link.mem_alloc) * 100
+})
+
+const linkDiskPct = computed(() => {
+  const link = proxmoxLink.value
+  if (!link?.disk_alloc) return null
+  return (link.disk_usage / link.disk_alloc) * 100
+})
 
 // Fed by HostExposureTab's @loaded emit — the tab mounts eagerly (Host's
 // tabs use v-show, not lazy), so this is already populated before the user
@@ -909,11 +960,6 @@ const hostTabs = computed<EntityTab[]>(() => {
           : [],
     },
     { key: 'backup', label: 'Sauvegardes' },
-    {
-      key: 'commandes',
-      label: 'Commandes',
-      badges: cmdHistory.value.length ? [{ value: cmdHistory.value.length, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
-    },
     {
       key: 'exposition',
       label: 'Exposition',

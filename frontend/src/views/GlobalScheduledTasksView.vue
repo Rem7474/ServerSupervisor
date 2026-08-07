@@ -660,14 +660,13 @@
                       <th>Statut</th>
                       <th>Durée</th>
                       <th>Déclenché par</th>
-                      <th>Sortie</th>
+                      <th class="text-end" />
                     </tr>
                   </thead>
                   <tbody>
                     <tr
                       v-for="ex in executions"
                       :key="ex.id"
-                      :class="expandedId === ex.id ? 'table-active' : ''"
                     >
                       <td class="text-nowrap">
                         {{ formatDate(ex.created_at) }}
@@ -683,44 +682,19 @@
                         >—</span>
                       </td>
                       <td>{{ ex.triggered_by || '—' }}</td>
-                      <td style="max-width:400px">
-                        <div
-                          v-if="!ex.output"
-                          class="text-muted small"
+                      <td class="text-end">
+                        <button
+                          type="button"
+                          class="btn btn-icon btn-sm btn-ghost-secondary"
+                          title="Voir les logs"
+                          aria-label="Voir les logs"
+                          @click="watchExecution(historyTask, ex)"
                         >
-                          —
-                        </div>
-                        <template v-else>
-                          <div
-                            v-if="expandedId !== ex.id"
-                            class="d-flex align-items-center gap-2"
-                          >
-                            <span
-                              class="text-truncate small font-monospace"
-                              style="max-width:300px"
-                            >{{ firstLine(ex.output) }}</span>
-                            <button
-                              type="button"
-                              class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
-                              @click="expandedId = ex.id"
-                            >
-                              Voir tout
-                            </button>
-                          </div>
-                          <div v-else>
-                            <pre
-                              class="mb-1 small"
-                              style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"
-                            >{{ ex.output }}</pre>
-                            <button
-                              type="button"
-                              class="btn btn-sm btn-ghost-secondary"
-                              @click="expandedId = null"
-                            >
-                              Réduire
-                            </button>
-                          </div>
-                        </template>
+                          <IconList
+                            :size="16"
+                            class="icon icon-sm"
+                          />
+                        </button>
                       </td>
                     </tr>
                   </tbody>
@@ -742,12 +716,22 @@
       </div>
       <div class="modal-backdrop fade show" />
     </template>
+
+    <CommandLogPanel
+      :command="(liveCommand as any)"
+      :show="showConsole"
+      title="Logs de l'exécution"
+      empty-text="Aucune console active"
+      wrapper-class="side-panel"
+      @open="showConsole = true"
+      @close="closeExecutionConsole"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconClock, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
+import { IconClock, IconList, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
@@ -756,6 +740,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DispatchStepEditor from '../components/DispatchStepEditor.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { availableScheduledTaskModules, scheduledTaskActions, scheduledTaskTargetConfig } from '../utils/scheduledTaskDispatch'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 import { useModalChrome } from '../composables/useModalChrome'
@@ -786,7 +771,10 @@ const {
   executions,
   historyLoading,
   historyError,
-  expandedId,
+  liveCommand,
+  showConsole,
+  watchExecution,
+  closeExecutionConsole,
   createModalOpen,
   createForm,
   createManualOnly,
@@ -809,7 +797,6 @@ const {
   statusBadge,
   commandStatusLabel,
   durationSec,
-  firstLine,
   isManualOnly,
   describeCron,
   openEdit,
