@@ -121,93 +121,13 @@ groups:
     - db
 ```
 
-Exemple pour nextcloud aio :
-```yaml
-version: "1"
+### Exemples par application
 
-global:
-  status-file: /home/user/restic-backups/backup-status.json
+Deux recettes complètes (profils + groupe + bascule maintenance) pour des
+applications auto-hébergées courantes :
 
-nextcloud-data:
-  backup:
-    run-before:
-      - "docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:mode --on"
-    source:
-      - /var/lib/docker/volumes/nextcloud_aio_nextcloud_data/_data
-      - /var/lib/docker/volumes/nextcloud_aio_mastercontainer/_data
-    exclude:
-      - "**/.tmp"
-      - "**/cache/*"
-    run-after:
-      - "docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:mode --off"
-    run-after-fail:
-      - "docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:mode --off"
-    extended-status: true
-
-nextcloud-db:
-  backup:
-    run-before: "docker exec nextcloud-aio-database pg_dumpall -U nextcloud > /home/user/restic-backups/nextcloud-db.sql"
-    source:
-      - /home/user/restic-backups/nextcloud-db.sql
-    extended-status: true
-```
-Exemple pour Immich :
-```yaml
-version: "1"
-
-global:
-  status-file: /home/user/restic-backups/backup-status.json
-
-groups:
-  full-immich-backup:
-    - immich-library
-    - immich-upload
-    - immich-profile
-    - immich-db
-
-immich-library:
-  backup:
-    run-before:
-      - "docker exec immich_server immich-admin enable-maintenance-mode"
-    source:
-      - /UPLOAD_LOCATION/library
-    run-after:
-      - "docker exec immich_server immich-admin disable-maintenance-mode"
-    run-after-fail:
-      - "docker exec immich_server immich-admin disable-maintenance-mode"
-    extended-status: true
-
-immich-upload:
-  backup:
-    run-before:
-      - "docker exec immich_server immich-admin enable-maintenance-mode"
-    source:
-      - /UPLOAD_LOCATION/upload
-    run-after:
-      - "docker exec immich_server immich-admin disable-maintenance-mode"
-    run-after-fail:
-      - "docker exec immich_server immich-admin disable-maintenance-mode"
-    extended-status: true
-
-immich-profile:
-  backup:
-    run-before:
-      - "docker exec immich_server immich-admin enable-maintenance-mode"
-    source:
-      - /UPLOAD_LOCATION/profile
-    run-after:
-      - "docker exec immich_server immich-admin disable-maintenance-mode"
-    run-after-fail:
-      - "docker exec immich_server immich-admin disable-maintenance-mode"
-    extended-status: true
-
-immich-db:
-  backup:
-    source:
-      - /UPLOAD_LOCATION/backups
-    extended-status: true
-```
-
+- [Nextcloud AIO](restic-examples/nextcloud-aio.md)
+- [Immich](restic-examples/immich.md)
 
 ## 5. `run_backup.sh` — le script que l'agent exécute
 
