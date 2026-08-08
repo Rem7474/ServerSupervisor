@@ -70,17 +70,31 @@ func scanBackupRun(scan func(dest ...any) error) (*models.BackupRun, error) {
 	return &r, nil
 }
 
-// CreateBackupRun inserts a new backup run and returns it.
+// CreateBackupRun inserts a new backup run and returns it. Persists every
+// mutable field on r, not just the placeholder ones TriggerBackup sets —
+// HandleCommandCompletion's insert branch (taken when a scheduled task
+// dispatched the command directly, bypassing TriggerBackup's "running"
+// placeholder row) passes a fully-populated run straight from the agent's
+// terminal result, and previously had its duration/volume/etc. silently
+// dropped because this INSERT only wrote the 6 placeholder columns.
 func (db *DB) CreateBackupRun(ctx context.Context, r models.BackupRun) (*models.BackupRun, error) {
 	status := r.Status
 	if status == "" {
 		status = "running"
 	}
 	row := db.conn.QueryRowContext(ctx, `
-		INSERT INTO backup_runs (host_id, profile, command_id, triggered_by, status, started_at)
-		VALUES ($1,$2,$3,$4,$5,$6)
+		INSERT INTO backup_runs (
+			host_id, profile, command_id, triggered_by, status, started_at,
+			finished_at, duration_sec, progress_percent, files_done, files_total,
+			bytes_done, bytes_total, snapshot_id, snapshot_time, repo_size_bytes,
+			error_message, raw_summary
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		RETURNING `+backupRunColumns,
 		r.HostID, r.Profile, r.CommandID, r.TriggeredBy, status, r.StartedAt,
+		r.FinishedAt, r.DurationSec, r.ProgressPercent, r.FilesDone, r.FilesTotal,
+		r.BytesDone, r.BytesTotal, r.SnapshotID, r.SnapshotTime, r.RepoSizeBytes,
+		r.ErrorMessage, r.RawSummary,
 	)
 	out, err := scanBackupRun(row.Scan)
 	if err != nil {
