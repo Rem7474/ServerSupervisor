@@ -311,6 +311,54 @@ export interface AlertRuleUpdate {
 }
 
 //////////
+// source: audit.go
+
+/**
+ * Audit log categories (ROADMAP.md item #13: per-category retention +
+ * export). Low-maintenance by design — action is free text with no strict
+ * enum anywhere else (any CreateAuditLog caller can pass a new string), so
+ * CategorizeAuditAction buckets by a handful of known prefixes/exact matches
+ * and defaults everything else to "command" rather than requiring every new
+ * action string to be taught to a growing switch statement.
+ */
+export const AuditCategoryAlert = "alert";
+/**
+ * Audit log categories (ROADMAP.md item #13: per-category retention +
+ * export). Low-maintenance by design — action is free text with no strict
+ * enum anywhere else (any CreateAuditLog caller can pass a new string), so
+ * CategorizeAuditAction buckets by a handful of known prefixes/exact matches
+ * and defaults everything else to "command" rather than requiring every new
+ * action string to be taught to a growing switch statement.
+ */
+export const AuditCategorySettings = "settings";
+/**
+ * Audit log categories (ROADMAP.md item #13: per-category retention +
+ * export). Low-maintenance by design — action is free text with no strict
+ * enum anywhere else (any CreateAuditLog caller can pass a new string), so
+ * CategorizeAuditAction buckets by a handful of known prefixes/exact matches
+ * and defaults everything else to "command" rather than requiring every new
+ * action string to be taught to a growing switch statement.
+ */
+export const AuditCategoryAuth = "auth";
+/**
+ * Audit log categories (ROADMAP.md item #13: per-category retention +
+ * export). Low-maintenance by design — action is free text with no strict
+ * enum anywhere else (any CreateAuditLog caller can pass a new string), so
+ * CategorizeAuditAction buckets by a handful of known prefixes/exact matches
+ * and defaults everything else to "command" rather than requiring every new
+ * action string to be taught to a growing switch statement.
+ */
+export const AuditCategoryCommand = "command";
+/**
+ * AuditCategory describes one bucket for the retention-settings UI and the
+ * audit log browser's category filter.
+ */
+export interface AuditCategory {
+  key: string;
+  label: string;
+}
+
+//////////
 // source: auth.go
 
 export interface LoginRequest {
@@ -477,6 +525,12 @@ export interface AuditLog {
   details: string; // JSON payload (command output, new privileges, etc.)
   status: string; // pending, completed, failed
   created_at: string;
+  /**
+   * Category is computed once at write time by CategorizeAuditAction (see
+   * models/audit.go) — drives per-category retention and the audit log
+   * browser's filter.
+   */
+  category: string;
 }
 
 //////////
@@ -1506,6 +1560,15 @@ export interface SettingsUpdateRequest {
   github_token: string;
   metrics_retention_days: number /* int */;
   audit_retention_days: number /* int */;
+  /**
+   * AuditRetentionDaysByCategory, when non-nil, replaces the whole map
+   * (not a per-key merge) — same semantics as the rest of this struct's
+   * "send what you mean the new state to be" fields. A category omitted
+   * here falls back to AuditRetentionDays. Keys are models.AuditCategories'
+   * Key values; an unknown key or a non-positive value is dropped, not
+   * rejected — see Service.Update.
+   */
+  audit_retention_days_by_category?: { [key: string]: number /* int */};
   threat_weight_wordpress?: number /* float64 */;
   threat_weight_adminpanel?: number /* float64 */;
   threat_weight_pathtraversal?: number /* float64 */;

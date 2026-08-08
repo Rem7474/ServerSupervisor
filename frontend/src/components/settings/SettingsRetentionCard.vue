@@ -23,8 +23,8 @@
           Politique de rétention TimescaleDB pour system_metrics et disk_metrics
         </div>
       </div>
-      <div class="mb-0">
-        <label class="form-label">Logs audit (jours)</label>
+      <div class="mb-3">
+        <label class="form-label">Logs audit — par défaut (jours)</label>
         <input
           v-model.number="form.auditRetentionDays"
           type="number"
@@ -37,7 +37,37 @@
           id="audit-retention-hint"
           class="form-hint"
         >
-          Entrées d'audit plus anciennes que ce seuil sont supprimées
+          Entrées d'audit plus anciennes que ce seuil sont supprimées — s'applique à toute
+          catégorie sans valeur spécifique ci-dessous
+        </div>
+      </div>
+      <div
+        v-if="auditCategories.length > 0"
+        class="mb-0"
+      >
+        <label class="form-label">Logs audit — par catégorie (jours, optionnel)</label>
+        <div class="row g-2">
+          <div
+            v-for="cat in auditCategories"
+            :key="cat.key"
+            class="col-6 col-md-3"
+          >
+            <div class="input-group input-group-flat">
+              <span class="input-group-text">{{ cat.label }}</span>
+              <input
+                type="number"
+                class="form-control"
+                min="1"
+                max="3650"
+                :placeholder="String(form.auditRetentionDays)"
+                :value="form.auditRetentionDaysByCategory[cat.key] ?? ''"
+                @input="onCategoryDaysInput(cat.key, ($event.target as HTMLInputElement).value)"
+              >
+            </div>
+          </div>
+        </div>
+        <div class="form-hint">
+          Laisser vide pour utiliser la valeur par défaut ci-dessus
         </div>
       </div>
     </div>
@@ -65,15 +95,18 @@
 interface RetentionForm {
   metricsRetentionDays: number
   auditRetentionDays: number
+  auditRetentionDaysByCategory: Record<string, number>
 }
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   form: RetentionForm
+  auditCategories?: { key: string; label: string }[]
   authIsAdmin?: boolean
   savingRetention?: boolean
   retentionSaveMsg?: string
   retentionSaveOk?: boolean
 }>(), {
+  auditCategories: () => [],
   authIsAdmin: false,
   savingRetention: false,
   retentionSaveMsg: '',
@@ -83,5 +116,19 @@ withDefaults(defineProps<{
 defineEmits<{
   (e: 'save'): void
 }>()
+
+// A blank input removes the category's override (falls back to the default
+// above) rather than persisting 0/NaN — v-model.number can't express "no
+// value" cleanly here since 0 is falsy but a real (invalid) retention value.
+function onCategoryDaysInput(key: string, raw: string): void {
+  if (raw === '') {
+    delete props.form.auditRetentionDaysByCategory[key]
+    return
+  }
+  const n = Number(raw)
+  if (Number.isFinite(n) && n > 0) {
+    props.form.auditRetentionDaysByCategory[key] = n
+  }
+}
 </script>
 

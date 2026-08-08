@@ -314,6 +314,7 @@ func registerAPTRoutes(g *gin.RouterGroup, h *handlers.AptHandler) {
 
 func registerAuditRoutes(g *gin.RouterGroup, h *handlers.AuditHandler) {
 	g.GET("/audit/logs", h.GetAuditLogs)
+	g.GET("/audit/logs/export", h.ExportAuditLogs)
 	g.GET("/audit/logs/me", h.GetMyAuditLogs)
 	g.GET("/audit/logs/host/:host_id", h.GetAuditLogsByHost)
 	g.GET("/audit/logs/user/:username", h.GetAuditLogsByUser)

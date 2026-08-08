@@ -22,7 +22,7 @@ import (
 // command-history methods use the database package's query types (CommandFilter,
 // RemoteCommandWithHost), so they appear here too.
 type Repository interface {
-	GetAuditLogs(ctx context.Context, limit, offset int) ([]models.AuditLog, error)
+	GetAuditLogs(ctx context.Context, limit, offset int, f database.AuditLogFilter) ([]models.AuditLog, error)
 	GetAuditLogsByHost(ctx context.Context, hostID string, limit int) ([]models.AuditLog, error)
 	GetAuditLogsByUser(ctx context.Context, username string, limit int) ([]models.AuditLog, error)
 	GetAllRemoteCommands(ctx context.Context, limit, offset int, f database.CommandFilter) ([]database.RemoteCommandWithHost, error)
@@ -42,9 +42,25 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-// Logs returns a page of audit logs (never nil).
-func (s *Service) Logs(ctx context.Context, limit, offset int) ([]models.AuditLog, error) {
-	logs, err := s.repo.GetAuditLogs(ctx, limit, offset)
+// Logs returns a filtered page of audit logs (never nil).
+func (s *Service) Logs(ctx context.Context, limit, offset int, f database.AuditLogFilter) ([]models.AuditLog, error) {
+	logs, err := s.repo.GetAuditLogs(ctx, limit, offset, f)
+	if err != nil {
+		return nil, err
+	}
+	return nonNilLogs(logs), nil
+}
+
+// maxExportRows bounds a single CSV export — large enough for any realistic
+// admin-triggered export, small enough that an unfiltered export can't
+// silently try to stream the entire table.
+const maxExportRows = 20000
+
+// Export returns every audit log matching f, up to maxExportRows, oldest
+// omitted first (newest-first order, same as Logs) — the caller (the CSV
+// handler) doesn't paginate.
+func (s *Service) Export(ctx context.Context, f database.AuditLogFilter) ([]models.AuditLog, error) {
+	logs, err := s.repo.GetAuditLogs(ctx, maxExportRows, 0, f)
 	if err != nil {
 		return nil, err
 	}

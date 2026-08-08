@@ -1,9 +1,17 @@
 import { api } from './client'
 import type { AuditLog, RemoteCommand, RemoteCommandWithHost, HostTimelineEvent } from '../types/audit'
 
+export interface AuditLogFilters {
+  category?: string
+  from?: string
+  to?: string
+}
+
 export const auditApi = {
-  getAuditLogs: (page?: number, limit?: number) =>
-    api.get<{ logs: AuditLog[], page: number, limit: number }>('/v1/audit/logs', { params: { page: page ?? 1, limit: limit ?? 50 } }),
+  getAuditLogs: (page?: number, limit?: number, filters?: AuditLogFilters) =>
+    api.get<{ logs: AuditLog[], page: number, limit: number }>('/v1/audit/logs', { params: { page: page ?? 1, limit: limit ?? 50, ...filters } }),
+  exportAuditLogs: (filters?: AuditLogFilters) =>
+    api.get('/v1/audit/logs/export', { params: filters, responseType: 'blob' }),
   getMyAuditLogs: (limit?: number) => api.get<AuditLog[]>('/v1/audit/logs/me', { params: { limit: limit ?? 10 } }),
   getAuditLogsByHost: (hostId: string, limit?: number) =>
     api.get<AuditLog[]>(`/v1/audit/logs/host/${hostId}`, { params: { limit: limit ?? 100 } }),

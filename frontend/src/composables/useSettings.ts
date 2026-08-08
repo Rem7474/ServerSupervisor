@@ -24,6 +24,10 @@ export function useSettings() {
     tlsEnabled: false,
     metricsRetentionDays: 30,
     auditRetentionDays: 90,
+    // auditCategories comes from the server (models.AuditCategories()) so the
+    // per-category retention form below never needs its own hardcoded list —
+    // a category added server-side just shows up here on next load.
+    auditCategories: [] as { key: string; label: string }[],
     smtpConfigured: false,
     smtpHost: '',
     smtpPort: 587,
@@ -51,6 +55,9 @@ export function useSettings() {
     githubToken: '',
     metricsRetentionDays: 30,
     auditRetentionDays: 90,
+    // Keyed by category (see settings.auditCategories); a category absent
+    // here falls back to auditRetentionDays server-side.
+    auditRetentionDaysByCategory: {} as Record<string, number>,
     // Threat-detection weights — defaults mirror threatdetect.DefaultWeights()
     // server-side; overwritten by fetchSettings() once the real config loads.
     threatWeightWordpress: 2,
@@ -130,6 +137,8 @@ export function useSettings() {
         form.value.githubToken = s.githubToken || ''
         form.value.metricsRetentionDays = s.metricsRetentionDays || 30
         form.value.auditRetentionDays = s.auditRetentionDays || 90
+        settings.value.auditCategories = s.auditCategories || []
+        form.value.auditRetentionDaysByCategory = { ...(s.auditRetentionDaysByCategory || {}) }
         form.value.threatWeightWordpress = s.threatWeightWordPress ?? 2
         form.value.threatWeightAdminpanel = s.threatWeightAdminPanel ?? 3
         form.value.threatWeightPathtraversal = s.threatWeightPathTraversal ?? 5
@@ -206,6 +215,7 @@ export function useSettings() {
       await apiClient.updateSettings({
         metrics_retention_days: form.value.metricsRetentionDays,
         audit_retention_days: form.value.auditRetentionDays,
+        audit_retention_days_by_category: form.value.auditRetentionDaysByCategory,
       })
       retentionSaveOk.value = true
       retentionSaveMsg.value = 'Rétention enregistrée'

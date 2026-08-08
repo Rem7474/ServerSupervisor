@@ -49,6 +49,19 @@
           Connexions
         </a>
       </li>
+      <li
+        v-if="auth.role === 'admin'"
+        class="nav-item"
+      >
+        <a
+          class="nav-link"
+          :class="{ active: activeTab === 'journal' }"
+          href="#"
+          @click.prevent="switchToJournal"
+        >
+          Journal
+        </a>
+      </li>
     </ul>
 
     <!-- ── Commandes tab ────────────────────────────────────────────────────── -->
@@ -312,13 +325,160 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Journal tab (raw audit_logs, admin only) ───────────────────────── -->
+    <div v-show="activeTab === 'journal'">
+      <div class="card">
+        <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <h3 class="card-title mb-0">
+            Journal d'audit
+          </h3>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            :disabled="journalExporting"
+            @click="exportJournal"
+          >
+            <span
+              v-if="journalExporting"
+              class="spinner-border spinner-border-sm me-1"
+            />
+            <IconDownload
+              v-else
+              :size="14"
+              class="icon me-1"
+            />
+            Exporter CSV
+          </button>
+        </div>
+        <div class="card-body border-bottom py-3">
+          <div class="row g-2">
+            <div class="col-6 col-md-3">
+              <select
+                v-model="journalCategoryFilter"
+                class="form-select form-select-sm"
+              >
+                <option
+                  v-for="opt in JOURNAL_CATEGORY_OPTIONS"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+            <div class="col-6 col-md-3">
+              <input
+                v-model="journalFrom"
+                type="date"
+                class="form-control form-control-sm"
+                aria-label="Depuis"
+              >
+            </div>
+            <div class="col-6 col-md-3">
+              <input
+                v-model="journalTo"
+                type="date"
+                class="form-control form-control-sm"
+                aria-label="Jusqu'à"
+              >
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive scroll-table">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Catégorie</th>
+                <th>Action</th>
+                <th>Utilisateur</th>
+                <th>Hôte</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="journalLoading">
+                <td
+                  colspan="6"
+                  class="py-2"
+                >
+                  <LoadingSkeleton
+                    variant="table"
+                    :lines="5"
+                  />
+                </td>
+              </tr>
+              <tr v-else-if="!journalLogs.length">
+                <td colspan="6">
+                  <EmptyState title="Aucune entrée dans le journal d'audit" />
+                </td>
+              </tr>
+              <tr
+                v-for="log in journalLogs"
+                :key="log.id"
+              >
+                <td class="text-secondary small">
+                  {{ formatDate(log.created_at) }}
+                </td>
+                <td>
+                  <span class="badge bg-secondary-lt text-secondary">{{ log.category }}</span>
+                </td>
+                <td>
+                  <code class="small">{{ log.action }}</code>
+                </td>
+                <td class="text-secondary small">
+                  {{ log.username || '—' }}
+                </td>
+                <td>
+                  <router-link
+                    v-if="log.host_id"
+                    :to="`/hosts/${log.host_id}`"
+                    class="text-decoration-none"
+                  >
+                    {{ log.host_name || log.host_id }}
+                  </router-link>
+                  <span v-else>—</span>
+                </td>
+                <td>
+                  <span :class="statusClass(log.status)">{{ statusLabel(log.status) }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-footer d-flex align-items-center justify-content-between">
+          <div class="text-secondary small">
+            Page {{ journalPage }}
+          </div>
+          <div class="d-flex gap-2">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              :disabled="journalPage <= 1"
+              @click="selectJournalPage(journalPage - 1)"
+            >
+              Précédent
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              :disabled="!journalHasMore"
+              @click="selectJournalPage(journalPage + 1)"
+            >
+              Suivant
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IconList, IconX } from '@tabler/icons-vue'
+import { IconDownload, IconList, IconX } from '@tabler/icons-vue'
 import { useDateFormatter } from '../composables/useDateFormatter'
-import { useAuditLogs } from '../composables/useAuditLogs'
+import { useAuditLogs, JOURNAL_CATEGORY_OPTIONS } from '../composables/useAuditLogs'
 import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -336,6 +496,17 @@ const {
   activeTab,
   switchToCommandes,
   switchToConnexions,
+  switchToJournal,
+  journalLogs,
+  journalPage,
+  journalLoading,
+  journalExporting,
+  journalHasMore,
+  journalCategoryFilter,
+  journalFrom,
+  journalTo,
+  selectJournalPage,
+  exportJournal,
   cmdsPage,
   cmdsTotal,
   cmdsLoading,

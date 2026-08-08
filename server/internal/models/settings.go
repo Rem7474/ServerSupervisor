@@ -18,6 +18,13 @@ type SettingsUpdateRequest struct {
 	GitHubToken          string `json:"github_token"`
 	MetricsRetentionDays int    `json:"metrics_retention_days"`
 	AuditRetentionDays   int    `json:"audit_retention_days"`
+	// AuditRetentionDaysByCategory, when non-nil, replaces the whole map
+	// (not a per-key merge) — same semantics as the rest of this struct's
+	// "send what you mean the new state to be" fields. A category omitted
+	// here falls back to AuditRetentionDays. Keys are models.AuditCategories'
+	// Key values; an unknown key or a non-positive value is dropped, not
+	// rejected — see Service.Update.
+	AuditRetentionDaysByCategory map[string]int `json:"audit_retention_days_by_category,omitempty"`
 
 	ThreatWeightWordPress        *float64 `json:"threat_weight_wordpress"`
 	ThreatWeightAdminPanel       *float64 `json:"threat_weight_adminpanel"`

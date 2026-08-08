@@ -68,7 +68,7 @@ seule décision qui change l'ordre de grandeur de l'effort à venir.
 | **Configuration** | Settings globaux en DB, override par variables d'env, cartes settings par domaine | Correcte | Bonne | Pas d'export/import config-as-code, pas de versionning des règles d'alerte | — |
 | **Auth / rôles** | JWT + refresh tokens, MFA TOTP/WebAuthn, RBAC 3 niveaux (admin/operator/viewer) + permissions par hôte, audit logs, blocage IP persistant en DB | Solide pour du self-hosted mono-tenant | Élevée sur l'authentification | Aucun — le CRUD des tâches planifiées est désormais vérifié Operator+ comme `run` (voir ROADMAP.md item #1) | — |
 | **Intégrations** | Proxmox (riche), NPM (riche), GitHub/GitLab/Gitea + registres Docker, Git webhooks, CrowdSec, Restic | Différenciant réel — peu d'outils combinent tout ça nativement | Élevée | Pas de Prometheus/Grafana, pas de Slack/Teams/Discord, pas d'API publique documentée pour tiers | — |
-| **Reporting / historisation** | TimescaleDB (hypertables), rétention configurable, historique commandes/audit | Bonne base technique | Bonne côté stockage | Pas d'export PDF/CSV, pas de reporting SLA/SLO périodique | — |
+| **Reporting / historisation** | TimescaleDB (hypertables), rétention configurable **par catégorie** pour le journal d'audit (ROADMAP.md item #13, `models.AuditCategories`), export CSV du journal d'audit, historique commandes | Bonne base technique | Bonne côté stockage | Pas de reporting périodique disponibilité/incidents ni d'export PDF (item #10, distinct de l'export CSV du journal d'audit déjà livré) | — |
 | **Administration** | Users, Settings, Audit, RBAC | Correcte pour équipe unique | Bonne | Pas de multi-tenant/organisations | — |
 
 ---

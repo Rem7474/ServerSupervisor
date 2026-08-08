@@ -87,6 +87,7 @@ inclus) :
 - **Monitoring** : sondes HTTP/TCP synthétiques (uptime) et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
+- **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent
 - **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
@@ -759,7 +760,8 @@ curl http://localhost:8080/api/v1/hosts \
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/commands/history` | Historique toutes commandes (hôte) | Authentifié |
 | `GET` | `/api/v1/commands/:id` | Statut d'une commande par UUID | Authentifié |
-| `GET` | `/api/v1/audit/logs` | Logs d'audit paginés | Admin |
+| `GET` | `/api/v1/audit/logs` | Logs d'audit paginés (filtres `category`/`from`/`to`) | Admin |
+| `GET` | `/api/v1/audit/logs/export` | Export CSV des logs d'audit (mêmes filtres, jusqu'à 20 000 lignes) | Admin |
 | `GET` | `/api/v1/audit/logs/me` | Ses propres logs d'audit | Authentifié |
 | `GET` | `/api/v1/audit/logs/host/:host_id` | Logs d'audit par hôte | Admin |
 | `GET` | `/api/v1/audit/logs/user/:username` | Logs d'audit par utilisateur | Admin |
