@@ -147,13 +147,17 @@ func (db *DB) GetOpenAlertIncident(ctx context.Context, ruleID int64, hostID str
 	var inc models.AlertIncident
 	var nullableRuleID sql.NullInt64
 	var nullableCommandID sql.NullString
+	var ackAt, lastEscalatedAt sql.NullTime
+	var ackBy sql.NullString
 	err := db.conn.QueryRowContext(ctx,
-		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value, command_id
+		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value, command_id,
+ acknowledged_at, acknowledged_by, last_escalated_at
  FROM alert_incidents
  WHERE rule_id = $1 AND host_id = $2 AND resolved_at IS NULL
  ORDER BY triggered_at DESC LIMIT 1`,
 		ruleID, hostID,
-	).Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value, &nullableCommandID)
+	).Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value, &nullableCommandID,
+		&ackAt, &ackBy, &lastEscalatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +166,15 @@ func (db *DB) GetOpenAlertIncident(ctx context.Context, ruleID int64, hostID str
 	}
 	if nullableCommandID.Valid {
 		inc.CommandID = &nullableCommandID.String
+	}
+	if ackAt.Valid {
+		inc.AcknowledgedAt = &ackAt.Time
+	}
+	if ackBy.Valid {
+		inc.AcknowledgedBy = &ackBy.String
+	}
+	if lastEscalatedAt.Valid {
+		inc.LastEscalatedAt = &lastEscalatedAt.Time
 	}
 	return &inc, nil
 }
@@ -212,6 +225,29 @@ func (db *DB) ResolveAlertIncident(ctx context.Context, id int64) error {
 	_, err := db.conn.ExecContext(ctx,
 		`UPDATE alert_incidents SET resolved_at = NOW() WHERE id = $1 AND resolved_at IS NULL`,
 		id,
+	)
+	return err
+}
+
+// AcknowledgeAlertIncident marks an open incident as being handled. A no-op
+// (no error) if the incident is already acknowledged or already resolved —
+// acknowledging is idempotent from the caller's point of view, same as
+// resolving twice being harmless.
+func (db *DB) AcknowledgeAlertIncident(ctx context.Context, id int64, username string) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE alert_incidents SET acknowledged_at = NOW(), acknowledged_by = $2
+		 WHERE id = $1 AND resolved_at IS NULL AND acknowledged_at IS NULL`,
+		id, username,
+	)
+	return err
+}
+
+// UpdateAlertIncidentLastEscalated stamps the last time the engine re-sent a
+// notification for this open, unacknowledged incident (AlertActions.EscalateAfterMinutes).
+func (db *DB) UpdateAlertIncidentLastEscalated(ctx context.Context, id int64, t time.Time) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE alert_incidents SET last_escalated_at = $2 WHERE id = $1`,
+		id, t,
 	)
 	return err
 }
@@ -275,7 +311,8 @@ func (db *DB) ResolveOpenAlertIncidentsByRule(ctx context.Context, ruleID int64)
 func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error) {
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT ai.id, ai.rule_id, ai.host_id, ai.severity, ai.triggered_at, ai.resolved_at, ai.value,
-		        ai.command_id, COALESCE(rc.status, '') AS command_status
+		        ai.command_id, COALESCE(rc.status, '') AS command_status,
+		        ai.acknowledged_at, ai.acknowledged_by
  FROM alert_incidents ai
  LEFT JOIN remote_commands rc ON rc.id = ai.command_id
  ORDER BY ai.triggered_at DESC LIMIT $1 OFFSET $2`,
@@ -291,7 +328,9 @@ func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]model
 		var inc models.AlertIncident
 		var nullableRuleID sql.NullInt64
 		var nullableCommandID sql.NullString
-		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value, &nullableCommandID, &inc.CommandStatus); err != nil {
+		var ackAt sql.NullTime
+		var ackBy sql.NullString
+		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value, &nullableCommandID, &inc.CommandStatus, &ackAt, &ackBy); err != nil {
 			continue
 		}
 		if nullableRuleID.Valid {
@@ -299,6 +338,12 @@ func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]model
 		}
 		if nullableCommandID.Valid {
 			inc.CommandID = &nullableCommandID.String
+		}
+		if ackAt.Valid {
+			inc.AcknowledgedAt = &ackAt.Time
+		}
+		if ackBy.Valid {
+			inc.AcknowledgedBy = &ackBy.String
 		}
 		db.enrichDockerIncident(ctx, &inc)
 		incidents = append(incidents, inc)

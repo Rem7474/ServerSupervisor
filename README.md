@@ -88,7 +88,7 @@ inclus) :
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
+- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté)
 - **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
 - **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
@@ -769,6 +769,8 @@ curl http://localhost:8080/api/v1/hosts \
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/alerts/incidents` | Incidents déclenchés | Authentifié |
+| `POST` | `/api/v1/alerts/incidents/:id/resolve` | Clôturer manuellement un incident | Admin |
+| `POST` | `/api/v1/alerts/incidents/:id/ack` | Accuser réception d'un incident (« En cours de traitement », stoppe l'escalade) | Admin |
 | `GET` | `/api/v1/alert-rules` | Règles d'alertes | Authentifié |
 | `POST` | `/api/v1/alert-rules` | Créer une règle | Admin |
 | `PATCH` | `/api/v1/alert-rules/:id` | Modifier une règle | Admin |

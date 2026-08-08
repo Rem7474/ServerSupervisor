@@ -142,6 +142,15 @@ export interface AlertActions {
   ntfy_topic?: string; // ntfy push notification topic
   cooldown?: number /* int */; // seconds between re-notifications (0 = no cooldown)
   command_trigger?: CommandTrigger; // optional command to run on alert
+  /**
+   * EscalateAfterMinutes, when > 0, re-sends the fired notification for an
+   * open incident that hasn't been acknowledged, every N minutes since it
+   * triggered (or since the last escalation) — see internal/alerts/engine.go.
+   * 0 (default) disables escalation entirely. Unlike Cooldown, this never
+   * suppresses the *first* notification; it only repeats an unacknowledged
+   * one.
+   */
+  escalate_after_minutes?: number /* int */;
 }
 export interface AlertRule {
   id: number /* int64 */;
@@ -177,6 +186,13 @@ export interface AlertIncident {
    * this incident fired, if the rule has one configured. Nil otherwise.
    */
   command_id?: string;
+  /**
+   * AcknowledgedAt/AcknowledgedBy mark that someone is handling this incident
+   * — orthogonal to ResolvedAt (see migration 087's comment). Both nil until
+   * AcknowledgeIncident is called; never cleared once resolved.
+   */
+  acknowledged_at?: string;
+  acknowledged_by?: string;
   /**
    * Enriched post-fetch (not DB columns): Docker synthetic IDs resolution,
    * and the live status of CommandID's remote_commands row (joined at read
@@ -226,6 +242,12 @@ export interface NotificationItem {
    * alert_incidents.command_id — empty when no command_trigger fired.
    */
   command_status?: string;
+  /**
+   * AcknowledgedAt/AcknowledgedBy mirror AlertIncident's fields (alert_incident
+   * type only; always nil for a release-tracker entry).
+   */
+  acknowledged_at?: string;
+  acknowledged_by?: string;
 }
 /**
  * PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.

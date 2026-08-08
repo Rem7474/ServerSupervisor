@@ -235,6 +235,7 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 							slog.InfoContext(ctx, "alerts: incident UPDATED", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Float64("value", value), slog.String("severity_from", inc.Severity), slog.String("severity_to", string(currentSeveration)), slog.Int64("incident_id", inc.ID))
 						}
 					}
+					maybeEscalateIncident(ctx, db, chDispatch, pusher, cfg, rule, host, value, ruleName, *inc)
 				}
 			} else if inc != nil {
 				// No alert triggered - resolve if one exists
@@ -258,6 +259,44 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 			resolveStaleGlobalProxmoxIncidents(ctx, db, chDispatch, pusher, rule, evaluatedTargets)
 		}
 	}
+}
+
+// maybeEscalateIncident re-sends the fired notification for an already-open
+// incident that hasn't been acknowledged, once AlertActions.EscalateAfterMinutes
+// have elapsed since it last notified (its trigger time, or its last
+// escalation) — an unacknowledged critical incident staying silent between
+// the initial fire and eventual resolution is the gap this closes (ROADMAP.md
+// item #3). Acknowledging the incident (AcknowledgeIncident) stops it, same
+// as resolving it does. Unlike the initial fire, this never re-dispatches
+// CommandTrigger — repeating a remediation command every N minutes on a
+// timer is a materially different (and riskier) action than repeating a
+// notification, and isn't what "escalation" here means.
+func maybeEscalateIncident(ctx context.Context, db *database.DB, chDispatch *notifychannels.Dispatcher, pusher NotificationPusher, cfg *config.Config, rule models.AlertRule, host models.Host, value float64, ruleName string, inc models.AlertIncident) {
+	escalateAfter := rule.Actions.EscalateAfterMinutes
+	if escalateAfter <= 0 || inc.AcknowledgedAt != nil {
+		return
+	}
+	since := inc.TriggeredAt
+	if inc.LastEscalatedAt != nil {
+		since = *inc.LastEscalatedAt
+	}
+	now := time.Now()
+	if now.Sub(since) < time.Duration(escalateAfter)*time.Minute {
+		return
+	}
+	if err := db.UpdateAlertIncidentLastEscalated(ctx, inc.ID, now); err != nil {
+		slog.ErrorContext(ctx, "alerts: failed to stamp incident escalation", slog.Int64("incident_id", inc.ID), slog.Any("err", err))
+		return
+	}
+	slog.InfoContext(ctx, "alerts: incident ESCALATED", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Int64("incident_id", inc.ID), slog.Int("escalate_after_minutes", escalateAfter))
+	details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d,"severity":"%s"}`, rule.ID, inc.ID, inc.Severity)
+	if _, auditErr := db.CreateAuditLog(ctx, "alert-engine", "alert_escalated", host.ID, "", details, "success"); auditErr != nil {
+		slog.WarnContext(ctx, "alerts: failed to write alert_escalated audit log", slog.Int64("incident_id", inc.ID), slog.Any("err", auditErr))
+	}
+	broadcastIncidentUpdate(pusher, "fired", rule, host.ID)
+	ev := firedEvent(cfg, rule, host, value)
+	ev.OnBrowser = newAlertBroadcast(pusher, rule, host, value, inc.ID)
+	chDispatch.Send(ctx, ev)
 }
 
 func isProxmoxGlobalScope(rule models.AlertRule) bool {

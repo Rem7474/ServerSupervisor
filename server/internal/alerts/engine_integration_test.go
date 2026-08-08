@@ -324,6 +324,128 @@ func TestEvaluateAlerts_SilentlyResolvesIncidentWhenMaintenanceStarts(t *testing
 	}
 }
 
+// TestEvaluateAlerts_EscalatesUnacknowledgedIncident covers the escalation
+// half of ROADMAP.md item #3: an open, unacknowledged incident whose
+// EscalateAfterMinutes has elapsed since its last notification gets
+// re-notified and its last_escalated_at stamped, without opening a second
+// incident. Real time can't be waited out in a unit test, so "elapsed" is
+// simulated by backdating last_escalated_at directly via
+// UpdateAlertIncidentLastEscalated (the exact field the engine itself reads
+// to decide whether to escalate).
+func TestEvaluateAlerts_EscalatesUnacknowledgedIncident(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-escalate-1"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "alert-host", Hostname: "alert-host", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+	insertCPUMetric(t, db, hostID, 95, time.Now())
+
+	warn := 50.0
+	rule := &models.AlertRule{
+		SourceType: "agent", HostID: &hostID, Metric: "cpu", Operator: ">",
+		ThresholdWarn: &warn, Enabled: true,
+		Actions: models.AlertActions{Channels: []string{"browser"}, EscalateAfterMinutes: 5},
+	}
+	if err := db.CreateAlertRule(ctx, rule); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	cfg := &config.Config{}
+	disp := dispatch.New(db)
+
+	// First tick: incident opens, no escalation yet (last_escalated_at nil,
+	// triggered_at is "now").
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, &stubPusher{}, nil)
+	inc, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID)
+	if err != nil {
+		t.Fatalf("expected an open incident, got error: %v", err)
+	}
+	if inc.LastEscalatedAt != nil {
+		t.Fatalf("did not expect an escalation stamp on the very first fire, got %v", *inc.LastEscalatedAt)
+	}
+
+	// Simulate "5+ minutes since the last notification" by backdating
+	// last_escalated_at, then re-breach so the incident stays open.
+	if err := db.UpdateAlertIncidentLastEscalated(ctx, inc.ID, time.Now().Add(-10*time.Minute)); err != nil {
+		t.Fatalf("backdate last_escalated_at: %v", err)
+	}
+	insertCPUMetric(t, db, hostID, 95, time.Now().Add(time.Second))
+
+	pusher := &stubPusher{}
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher, nil)
+
+	escalated, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID)
+	if err != nil {
+		t.Fatalf("expected the incident still open after escalation, got error: %v", err)
+	}
+	if escalated.ID != inc.ID {
+		t.Fatalf("escalation must re-notify the existing incident (id %d), not open a new one (got id %d)", inc.ID, escalated.ID)
+	}
+	if escalated.LastEscalatedAt == nil || !escalated.LastEscalatedAt.After(inc.TriggeredAt) {
+		t.Fatalf("expected last_escalated_at to be stamped to ~now, got %v", escalated.LastEscalatedAt)
+	}
+	if pusher.count == 0 {
+		t.Error("expected the escalation to broadcast (list refresh + browser toast), pusher.count = 0")
+	}
+}
+
+// TestEvaluateAlerts_AcknowledgedIncidentDoesNotEscalate ensures
+// AcknowledgeIncident actually stops escalation, not just the UI badge — the
+// entire point of tying escalation to acknowledgment.
+func TestEvaluateAlerts_AcknowledgedIncidentDoesNotEscalate(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-escalate-2"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "alert-host", Hostname: "alert-host", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+	insertCPUMetric(t, db, hostID, 95, time.Now())
+
+	warn := 50.0
+	rule := &models.AlertRule{
+		SourceType: "agent", HostID: &hostID, Metric: "cpu", Operator: ">",
+		ThresholdWarn: &warn, Enabled: true,
+		Actions: models.AlertActions{Channels: []string{"browser"}, EscalateAfterMinutes: 5},
+	}
+	if err := db.CreateAlertRule(ctx, rule); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	cfg := &config.Config{}
+	disp := dispatch.New(db)
+
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, &stubPusher{}, nil)
+	inc, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID)
+	if err != nil {
+		t.Fatalf("expected an open incident, got error: %v", err)
+	}
+
+	if err := db.AcknowledgeAlertIncident(ctx, inc.ID, "tester"); err != nil {
+		t.Fatalf("acknowledge incident: %v", err)
+	}
+	if err := db.UpdateAlertIncidentLastEscalated(ctx, inc.ID, time.Now().Add(-10*time.Minute)); err != nil {
+		t.Fatalf("backdate last_escalated_at: %v", err)
+	}
+	insertCPUMetric(t, db, hostID, 95, time.Now().Add(time.Second))
+
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, &stubPusher{}, nil)
+
+	after, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID)
+	if err != nil {
+		t.Fatalf("expected the incident still open, got error: %v", err)
+	}
+	if after.LastEscalatedAt == nil || !after.LastEscalatedAt.Before(time.Now().Add(-5*time.Minute)) {
+		t.Errorf("expected last_escalated_at to stay untouched (still backdated) for an acknowledged incident, got %v", after.LastEscalatedAt)
+	}
+}
+
 // TestBuildDockerTestTargets_MultiContainerScope confirms a "specific
 // containers" scope evaluates every selected container, not just one — the
 // alert engine used to only ever build a target for a single ContainerID.

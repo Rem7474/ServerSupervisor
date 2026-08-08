@@ -149,6 +149,13 @@ type AlertActions struct {
 	NtfyTopic      string          `json:"ntfy_topic,omitempty"`      // ntfy push notification topic
 	Cooldown       int             `json:"cooldown,omitempty"`        // seconds between re-notifications (0 = no cooldown)
 	CommandTrigger *CommandTrigger `json:"command_trigger,omitempty"` // optional command to run on alert
+	// EscalateAfterMinutes, when > 0, re-sends the fired notification for an
+	// open incident that hasn't been acknowledged, every N minutes since it
+	// triggered (or since the last escalation) — see internal/alerts/engine.go.
+	// 0 (default) disables escalation entirely. Unlike Cooldown, this never
+	// suppresses the *first* notification; it only repeats an unacknowledged
+	// one.
+	EscalateAfterMinutes int `json:"escalate_after_minutes,omitempty"`
 }
 
 type AlertRule struct {
@@ -202,6 +209,15 @@ type AlertIncident struct {
 	// CommandID is the remote_commands row a command_trigger dispatched when
 	// this incident fired, if the rule has one configured. Nil otherwise.
 	CommandID *string `json:"command_id,omitempty" db:"command_id"`
+	// AcknowledgedAt/AcknowledgedBy mark that someone is handling this incident
+	// — orthogonal to ResolvedAt (see migration 087's comment). Both nil until
+	// AcknowledgeIncident is called; never cleared once resolved.
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty" db:"acknowledged_at"`
+	AcknowledgedBy *string    `json:"acknowledged_by,omitempty" db:"acknowledged_by"`
+	// LastEscalatedAt is the last time the engine re-sent a notification for
+	// this still-open, unacknowledged incident (see AlertActions.EscalateAfterMinutes).
+	// Not exposed in the incidents list JSON — internal engine bookkeeping only.
+	LastEscalatedAt *time.Time `json:"-" db:"last_escalated_at"`
 	// Enriched post-fetch (not DB columns): Docker synthetic IDs resolution,
 	// and the live status of CommandID's remote_commands row (joined at read
 	// time so the frontend doesn't need a second round-trip per incident).
@@ -244,6 +260,10 @@ type NotificationItem struct {
 	// dispatch for this incident (alert_incident type only), joined from
 	// alert_incidents.command_id — empty when no command_trigger fired.
 	CommandStatus string `json:"command_status,omitempty"`
+	// AcknowledgedAt/AcknowledgedBy mirror AlertIncident's fields (alert_incident
+	// type only; always nil for a release-tracker entry).
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
+	AcknowledgedBy string     `json:"acknowledged_by,omitempty"`
 }
 
 // PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.

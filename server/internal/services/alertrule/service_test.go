@@ -52,7 +52,8 @@ func (f *fakeRepo) ProxmoxDiskExists(context.Context, string) (bool, error)     
 func (f *fakeRepo) ResolveOpenAlertIncidentsByRule(context.Context, int64) (int64, error) {
 	return 0, nil
 }
-func (f *fakeRepo) ResolveAlertIncident(context.Context, int64) error { return nil }
+func (f *fakeRepo) ResolveAlertIncident(context.Context, int64) error             { return nil }
+func (f *fakeRepo) AcknowledgeAlertIncident(context.Context, int64, string) error { return nil }
 func (f *fakeRepo) GetAlertIncidents(context.Context, int, int) ([]models.AlertIncident, error) {
 	return nil, nil
 }
@@ -129,8 +130,11 @@ func TestValidateActions(t *testing.T) {
 	if status(svc.ValidateActions(&models.AlertActions{Cooldown: -1})) != 400 {
 		t.Error("negative cooldown should be 400")
 	}
-	if err := svc.ValidateActions(&models.AlertActions{Channels: []string{"smtp", "browser"}}); err != nil {
-		t.Errorf("valid channels should pass, got %v", err)
+	if status(svc.ValidateActions(&models.AlertActions{EscalateAfterMinutes: -1})) != 400 {
+		t.Error("negative escalate_after_minutes should be 400")
+	}
+	if err := svc.ValidateActions(&models.AlertActions{Channels: []string{"smtp", "browser"}, EscalateAfterMinutes: 30}); err != nil {
+		t.Errorf("valid channels + escalation should pass, got %v", err)
 	}
 }
 

@@ -37,6 +37,7 @@ interface AlertRuleFormActions {
   smtp_to: string
   ntfy_topic: string
   cooldown: number
+  escalate_after_minutes: number
   command_trigger?: CommandTrigger
 }
 
@@ -98,6 +99,7 @@ export interface AlertRuleInput {
     smtp_to?: string
     ntfy_topic?: string
     cooldown?: number
+    escalate_after_minutes?: number
     command_trigger?: Partial<CommandTrigger>
   }
 }
@@ -169,6 +171,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       smtp_to: '',
       ntfy_topic: '',
       cooldown: 3600,
+      escalate_after_minutes: 0,
       command_trigger: defaultCommandTrigger(),
     },
   })
@@ -236,6 +239,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
         smtp_to: actions.smtp_to || '',
         ntfy_topic: actions.ntfy_topic || '',
         cooldown: actions.cooldown ?? 3600,
+        escalate_after_minutes: actions.escalate_after_minutes ?? 0,
         command_trigger: commandTrigger
           ? {
               module: commandTrigger.module ?? 'processes',

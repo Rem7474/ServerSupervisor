@@ -103,7 +103,9 @@ The agent `Report` struct (`agent/internal/sender`) is fully typed against `agen
 
 ### Alert rules
 
-Rules have a single `actions JSONB` column: `{channels: ["smtp","ntfy","browser","notify"], smtp_to, ntfy_topic, cooldown, command_trigger}`. The engine in `alerts/engine.go` iterates `rule.Actions.Channels` to dispatch. `source_type` is one of `agent | proxmox | synthetic`. Hysteresis: `threshold_warn / threshold_crit / threshold_clear_warn / threshold_clear_crit` per severity.
+Rules have a single `actions JSONB` column: `{channels: ["smtp","ntfy","browser","notify"], smtp_to, ntfy_topic, cooldown, escalate_after_minutes, command_trigger}`. The engine in `alerts/engine.go` iterates `rule.Actions.Channels` to dispatch. `source_type` is one of `agent | proxmox | synthetic`. Hysteresis: `threshold_warn / threshold_crit / threshold_clear_warn / threshold_clear_crit` per severity.
+
+An open incident can be acknowledged (`POST /alerts/incidents/:id/ack`, admin-only like `resolve` — see `AlertRulesHandler.AcknowledgeIncident`'s doc comment for why ack isn't scoped to Operator+ the way host-scoped domains are) — `alert_incidents.acknowledged_at`/`acknowledged_by`, orthogonal to `resolved_at` (an incident can be open+acknowledged, open+unacknowledged, or resolved; ack no longer matters once resolved). `AlertActions.EscalateAfterMinutes`, when > 0, re-sends the fired notification for an open, unacknowledged incident every N minutes since it last notified (`alert_incidents.last_escalated_at`) — `maybeEscalateIncident` in `alerts/engine.go`, checked in the same per-target loop as the maintenance-window branch below it. Escalation never re-dispatches `command_trigger` (repeating a remediation command on a timer is a materially different, riskier action than repeating a notification).
 
 ### Maintenance windows
 

@@ -82,8 +82,10 @@
           :initial-search="hostFilterFromQuery"
           :marking-read="markingRead"
           :resolving-id="resolvingId"
+          :acknowledging-id="acknowledgingId"
           @mark-all-read="markAllRead"
           @resolve="resolveIncident"
+          @acknowledge="acknowledgeIncident"
         />
       </template>
 
@@ -178,6 +180,8 @@ const {
   markAllRead,
   resolvingId,
   resolveIncident,
+  acknowledgingId,
+  acknowledgeIncident,
   onWebSocketAlert: onNotificationHistoryWSAlert,
 } = useNotificationHistory()
 

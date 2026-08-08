@@ -15,6 +15,7 @@ export const alertsApi = {
   updateAlertRule: (id: number, payload: AlertRulePayload) => api.patch(`/v1/alert-rules/${id}`, payload),
   deleteAlertRule: (id: number) => api.delete(`/v1/alert-rules/${id}`),
   resolveAlertIncident: (id: number | string) => api.post(`/v1/alerts/incidents/${id}/resolve`),
+  acknowledgeAlertIncident: (id: number | string) => api.post(`/v1/alerts/incidents/${id}/ack`),
   testAlertRule: (payload: AlertRulePayload) => api.post('/v1/alert-rules/test', payload),
   downloadAlertRuleTestLogs: (payload: AlertRulePayload) =>
     api.post('/v1/alert-rules/test/logs', payload, { responseType: 'blob' }),

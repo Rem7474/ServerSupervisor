@@ -37,6 +37,22 @@
     </div>
 
     <div class="mb-3">
+      <label class="form-label">Escalade si non acquittée (minutes)</label>
+      <input
+        v-model.number="form.actions.escalate_after_minutes"
+        type="number"
+        min="0"
+        class="form-control"
+        placeholder="0"
+        aria-describedby="escalate-hint"
+      >
+      <small
+        id="escalate-hint"
+        class="form-hint"
+      >0 = désactivée. Sinon, renvoie la notification toutes les N minutes tant que l'incident reste ouvert et n'a pas été acquitté depuis /alerts.</small>
+    </div>
+
+    <div class="mb-3">
       <label class="form-label">Canaux de notification</label>
       <div>
         <label class="form-check form-check-inline">
