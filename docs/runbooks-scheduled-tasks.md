@@ -69,7 +69,7 @@ Dashboard → **Tâches planifiées**.
 | Module | `apt` / `docker` / `systemd` / `journal` / `processes` / `custom` / **`restic`** |
 | Action | Texte libre suggéré par une liste indicative selon le module — **non validé côté serveur au-delà de "non vide"** |
 | Cible (`target`) | Selon module (ex : nom de profil Restic, unité systemd…) |
-| Planification | `CronBuilder` — mode **Visuel** (fréquence quotidienne/hebdo/mensuelle/personnalisée) ou **Expert** (cron brut à 5 champs, `minute heure jour-du-mois mois jour-de-la-semaine`) |
+| Planification | `CronBuilder` — mode **Visuel** (fréquence quotidienne/hebdo/mensuelle/personnalisée) ou **Expert** (cron brut à 5 champs, `minute heure jour-du-mois mois jour-de-la-semaine`) ; l'heure saisie est interprétée dans le fuseau du serveur, pas du navigateur — voir [§2.3](#23-fuseau-horaire-dexécution) |
 | Exécution manuelle uniquement | Coché = pas de planification — voir [§2.1](#21-tâche-manuelle-uniquement-le-détail-dimplémentation) |
 
 ### 2.1 "Exécution manuelle uniquement" — le détail d'implémentation
@@ -87,6 +87,27 @@ Le sélecteur d'action bascule automatiquement en champ texte libre pour
 tout module sans liste d'actions suggérées prédéfinie — c'est voulu, pas un
 bug d'UI : le serveur ne validant pas `action`, l'UI ne peut de toute façon
 pas prétendre connaître la liste exhaustive.
+
+### 2.3 Fuseau horaire d'exécution
+
+Le scheduler cron (`robfig/cron`) interprète les champs heure/minute de
+chaque tâche dans le fuseau horaire du **process serveur** (`time.Local`),
+pas dans celui du navigateur utilisé pour la créer. Sans configuration
+explicite, le conteneur Docker tourne en UTC : une tâche planifiée pour
+"23h00" via `CronBuilder` se déclenche réellement à 23h00 **UTC**, soit
+01h00 le lendemain pour un opérateur en UTC+2 (heure d'été Europe/Paris) —
+`CronBuilder` affiche un hint le rappelant, dans les deux modes (Visuel et
+Expert).
+
+Pour aligner l'exécution sur votre propre fuseau, définissez la variable
+d'environnement `TZ` du service `server` (ex : `TZ=Europe/Paris` dans
+`.env`, voir [`docker-compose.yml`](../docker-compose.yml) et
+[`.env.example`](../.env.example)) — Go/tzdata la respecte nativement (le
+paquet `tzdata` est déjà installé dans l'image finale), aucun rebuild n'est
+nécessaire, un simple `docker compose up -d --force-recreate server`
+suffit. Le champ "Prochaine exécution" affiché dans l'UI est, lui, toujours
+converti dans le fuseau du **navigateur** ; une fois `TZ` réglé côté
+serveur sur votre propre fuseau, les deux coïncident.
 
 ## 3. L'asymétrie, en un coup d'œil
 
@@ -123,6 +144,7 @@ hôte à la fois.
 | Impossible d'ajouter `restic` comme module dans un runbook | Non supporté par design — utilisez une tâche planifiée pour un backup Restic récurrent, ou le bouton **Lancer un backup** de l'onglet Sauvegardes pour un déclenchement ponctuel |
 | L'action d'une tâche planifiée semble accepter n'importe quel texte | Normal — seul `module` est validé côté serveur, `action` est fait confiance (voir [§2.2](#22-modules-non-listés)) ; une faute de frappe échouera silencieusement côté agent, pas côté validation |
 | Une tâche "manuelle" apparaît quand même dans un export/API brut avec un cron | C'est la sentinelle `0 0 29 2 *` + `enabled=false` (voir [§2.1](#21-exécution-manuelle-uniquement--le-détail-dimplémentation)) — pas un vrai cron actif |
+| La "Prochaine exécution" affichée ne correspond pas à l'heure définie dans le cron (ex : décalée de 1-2h) | Le serveur tourne en UTC par défaut — définissez `TZ` sur votre propre fuseau (voir [§2.3](#23-fuseau-horaire-dexécution)) |
 | Runbook bloqué en `running` sans jamais passer `completed`/`failed` | La commande de l'étape en cours n'a jamais atteint un état terminal côté agent (agent déconnecté, commande perdue) — vérifiez les logs de l'étape en cours avant de relancer |
 
 ## Pour aller plus loin

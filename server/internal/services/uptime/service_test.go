@@ -15,9 +15,11 @@ type fakeRepo struct {
 	created   *models.UptimeProbe
 	updated   *models.UptimeProbe
 	recorded  []models.UptimeProbeResult
-	probe     *models.UptimeProbe
-	getErr    error
-	listProbe []models.UptimeProbe
+	probe      *models.UptimeProbe
+	getErr     error
+	listProbe  []models.UptimeProbe
+	buckets    []models.UptimeHistoryBucket
+	bucketsErr error
 }
 
 func (f *fakeRepo) ListUptimeProbes(context.Context) ([]models.UptimeProbe, error) {
@@ -42,6 +44,9 @@ func (f *fakeRepo) GetUptimeProbeResults(context.Context, string, int) ([]models
 }
 func (f *fakeRepo) GetUptimeStats(context.Context, string, int) (*models.UptimeStats, error) {
 	return &models.UptimeStats{}, nil
+}
+func (f *fakeRepo) GetUptimeHistoryBuckets(context.Context, string, int, int) ([]models.UptimeHistoryBucket, error) {
+	return f.buckets, f.bucketsErr
 }
 func (f *fakeRepo) RecordUptimeProbeResult(_ context.Context, r models.UptimeProbeResult) error {
 	f.recorded = append(f.recorded, r)
@@ -160,5 +165,28 @@ func TestListProbes_NeverNil(t *testing.T) {
 	}
 	if got == nil {
 		t.Error("ListProbes must return a non-nil slice")
+	}
+}
+
+func TestHistoryBuckets_NeverNil(t *testing.T) {
+	svc := NewService(&fakeRepo{buckets: nil})
+	got, err := svc.HistoryBuckets(context.Background(), "p1", 24)
+	if err != nil {
+		t.Fatalf("HistoryBuckets: %v", err)
+	}
+	if got == nil {
+		t.Error("HistoryBuckets must return a non-nil slice")
+	}
+}
+
+func TestHistoryBuckets_PropagatesRepoData(t *testing.T) {
+	want := []models.UptimeHistoryBucket{{TotalChecks: 3, UpChecks: 2, DownChecks: 1}}
+	svc := NewService(&fakeRepo{buckets: want})
+	got, err := svc.HistoryBuckets(context.Background(), "p1", 24)
+	if err != nil {
+		t.Fatalf("HistoryBuckets: %v", err)
+	}
+	if len(got) != 1 || got[0].TotalChecks != 3 || got[0].UpChecks != 2 || got[0].DownChecks != 1 {
+		t.Errorf("unexpected buckets: %+v", got)
 	}
 }

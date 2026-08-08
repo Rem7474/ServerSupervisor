@@ -70,6 +70,18 @@ type UptimeStats struct {
 	P95LatencyMs     int     `json:"p95_latency_ms"`
 }
 
+// UptimeHistoryBucket is one fixed-width time slice of a probe's results over a
+// selected window, used to render the availability bar and latency chart at a
+// resolution proportional to the selected window (1h/24h/7j/30j) instead of a
+// fixed "last N checks" that only ever reflects the most recent few minutes.
+type UptimeHistoryBucket struct {
+	BucketStart  time.Time `json:"bucket_start"`
+	TotalChecks  int       `json:"total_checks"`
+	UpChecks     int       `json:"up_checks"`
+	DownChecks   int       `json:"down_checks"`
+	AvgLatencyMs float64   `json:"avg_latency_ms"`
+}
+
 // ========== SSL/TLS Certificate Monitoring ==========
 
 // SSLCertificate represents a monitored TLS endpoint and its last check result.

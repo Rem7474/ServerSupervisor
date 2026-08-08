@@ -108,6 +108,23 @@ func (h *UptimeHandler) Stats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+// HistoryBuckets returns the availability/latency chart data, time-bucketed over
+// the requested window (see uptime.Service.HistoryBuckets).
+func (h *UptimeHandler) HistoryBuckets(c *gin.Context) {
+	hours := 24
+	if v := c.Query("hours"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			hours = n
+		}
+	}
+	buckets, err := h.svc.HistoryBuckets(c.Request.Context(), c.Param("id"), hours)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"buckets": buckets})
+}
+
 // CheckNow runs a probe immediately and records the result.
 func (h *UptimeHandler) CheckNow(c *gin.Context) {
 	result, err := h.svc.CheckNow(c.Request.Context(), c.Param("id"))

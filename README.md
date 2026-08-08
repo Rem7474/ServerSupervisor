@@ -143,7 +143,8 @@ suppression n'a aujourd'hui aucun contrôle de rôle côté API (voir le
 guide).
 
 Guide complet (whitelist par module, tableau comparatif runbook vs tâche
-planifiée, dépannage) : **[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)**.
+planifiée, fuseau horaire d'exécution du cron, dépannage) :
+**[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)**.
 
 ### Agent
 - Collecte automatique : CPU, RAM, disques, réseau, uptime
@@ -329,6 +330,7 @@ dérive : voir le guide complet **[docs/git-webhooks-releases.md](docs/git-webho
 |---|---|---|
 | `SERVER_PORT` | Port d'écoute | `8080` |
 | `BASE_URL` | URL publique (CORS + WebSocket) | `http://localhost:8080` |
+| `TZ` | Fuseau horaire d'interprétation des expressions cron des Tâches planifiées globales et de calcul de leur prochaine exécution — nom IANA/tzdata (ex: `Europe/Paris`). Laissé à `UTC`, une tâche créée pour "23h00" s'exécute réellement à 23h00 UTC, soit 01h00 le lendemain en UTC+2 | `UTC` |
 | `TRUSTED_PROXIES` | CIDRs des reverse proxies (ex: `172.18.0.0/16`) | `` |
 | `ALLOWED_ORIGINS` | Origins CORS supplémentaires autorisées (virgule) | `` |
 | `APP_ENV` | `dev`/`development` assouplit la validation stricte des secrets (JWT auto-généré) ; toute autre valeur = production stricte | `production` |

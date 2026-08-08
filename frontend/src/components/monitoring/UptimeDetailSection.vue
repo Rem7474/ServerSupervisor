@@ -114,12 +114,12 @@
             style="height: 40px;"
           >
             <div
-              v-for="r in heartbeatBar"
-              :key="r.id"
+              v-for="b in heartbeatBar"
+              :key="b.bucket_start"
               class="flex-fill rounded-1"
-              :class="r.success ? 'bg-success' : 'bg-danger'"
+              :class="bucketColorClass(b)"
               style="height: 100%; min-width: 3px;"
-              :title="`${formatDateTime(r.checked_at)} — ${r.success ? 'OK' : 'KO'}${r.success ? ` (${r.latency_ms} ms)` : (r.error ? ` — ${r.error}` : '')}`"
+              :title="bucketTitle(b)"
             />
           </div>
           <div
@@ -129,17 +129,29 @@
             Aucun check encore enregistré.
           </div>
           <div class="d-flex justify-content-between text-secondary small mt-1">
-            <span>{{ heartbeatBar.length ? formatDateTime(heartbeatBar[0].checked_at) : '' }}</span>
+            <span>{{ heartbeatBar.length ? formatDateTime(heartbeatBar[0].bucket_start) : '' }}</span>
             <span>maintenant</span>
           </div>
         </div>
       </div>
 
       <div class="card mb-3">
-        <div class="card-header">
+        <div class="card-header d-flex align-items-center justify-content-between">
           <h3 class="card-title mb-0">
-            Latence ({{ results.length }} derniers checks)
+            Latence ({{ STATS_WINDOWS.find((w) => w.hours === statsWindow)?.label }})
           </h3>
+          <div class="btn-group btn-group-sm">
+            <button
+              v-for="w in STATS_WINDOWS"
+              :key="w.hours"
+              type="button"
+              class="btn"
+              :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
+              @click="setStatsWindow(w.hours)"
+            >
+              {{ w.label }}
+            </button>
+          </div>
         </div>
         <div
           class="card-body chart-body position-relative"
@@ -244,12 +256,25 @@ import EmptyState from '../EmptyState.vue'
 import { formatDateTime } from '../../utils/formatters'
 import { getChartPalette } from '../../utils/chartTheme'
 import { useUptimeProbeDetail, STATS_WINDOWS } from '../../composables/useUptimeProbeDetail'
-import type { UptimeProbe } from '../../types/generated'
+import type { UptimeProbe, UptimeHistoryBucket } from '../../types/generated'
 
 const props = defineProps<{ probeId: string }>()
 const emit = defineEmits<{
   (e: 'loaded', probe: UptimeProbe | null): void
 }>()
+
+function bucketColorClass(b: UptimeHistoryBucket): string {
+  if (b.total_checks === 0) return 'bg-secondary-lt'
+  return b.down_checks > 0 ? 'bg-danger' : 'bg-success'
+}
+
+function bucketTitle(b: UptimeHistoryBucket): string {
+  const when = formatDateTime(b.bucket_start)
+  if (b.total_checks === 0) return `${when} — aucun check`
+  const outcome = b.down_checks > 0 ? `${b.down_checks} KO / ${b.total_checks}` : `${b.up_checks} OK`
+  const latency = b.up_checks > 0 ? ` — ${Math.round(b.avg_latency_ms)} ms moy.` : ''
+  return `${when} — ${outcome}${latency}`
+}
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line: LineComponent }, chart] = await Promise.all([

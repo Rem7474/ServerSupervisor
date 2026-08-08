@@ -505,6 +505,7 @@ func registerUptimeRoutes(g *gin.RouterGroup, h *handlers.UptimeHandler) {
 	g.GET("/uptime/probes", h.List)
 	g.GET("/uptime/probes/:id", h.Get)
 	g.GET("/uptime/probes/:id/history", h.History)
+	g.GET("/uptime/probes/:id/history/buckets", h.HistoryBuckets)
 	g.GET("/uptime/probes/:id/stats", h.Stats)
 
 	// Write endpoints: admin only

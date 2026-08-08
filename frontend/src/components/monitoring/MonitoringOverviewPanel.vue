@@ -59,6 +59,13 @@
       {{ error }}
     </div>
 
+    <DataToolbar
+      searchable
+      :search="search"
+      search-placeholder="Rechercher un hôte…"
+      @update:search="search = $event"
+    />
+
     <div
       v-if="loading && !pagedRows.length"
       class="row row-cards"
@@ -73,9 +80,9 @@
 
     <EmptyState
       v-else-if="!pagedRows.length"
-      title="Aucune sonde ni certificat configuré"
-      subtitle="Créez une sonde uptime ou un certificat SSL pour commencer à surveiller un service."
-      :cta-label="auth.role === 'admin' ? 'Nouvelle sonde' : ''"
+      :title="search ? 'Aucun résultat pour cette recherche' : 'Aucune sonde ni certificat configuré'"
+      :subtitle="search ? 'Modifiez votre recherche.' : 'Créez une sonde uptime ou un certificat SSL pour commencer à surveiller un service.'"
+      :cta-label="!search && auth.role === 'admin' ? 'Nouvelle sonde' : ''"
       @cta="openCreateProbe"
     />
 
@@ -297,7 +304,7 @@
         class="card-footer d-flex align-items-center justify-content-between"
       >
         <div class="text-secondary small">
-          {{ (rowPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(rowPage * PAGE_SIZE, totalMonitored) }} sur {{ totalMonitored }}
+          {{ (rowPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(rowPage * PAGE_SIZE, filteredCount) }} sur {{ filteredCount }}
         </div>
         <PaginationNav
           :current-page="rowPage"
@@ -589,6 +596,7 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import RelativeTime from '../RelativeTime.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import PaginationNav from '../PaginationNav.vue'
+import DataToolbar from '../common/DataToolbar.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import { formatDateTime } from '../../utils/formatters'
 import { useMonitoringOverview, type MonitoringRow } from '../../composables/useMonitoringOverview'
@@ -603,6 +611,8 @@ const {
   downCount,
   expiringCount,
   totalMonitored,
+  filteredCount,
+  search,
   rowSort,
   toggleRowSort,
   pagedRows,
