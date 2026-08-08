@@ -199,6 +199,9 @@ func (s *Service) HostTimeline(ctx context.Context, hostID string, limit int) ([
 			Detail:    truncate(c.Output, 120),
 			Status:    c.Status,
 			Module:    c.Module,
+			Action:    c.Action,
+			Target:    c.Target,
+			Output:    c.Output,
 			User:      c.TriggeredBy,
 		})
 	}
