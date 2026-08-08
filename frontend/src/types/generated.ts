@@ -1772,6 +1772,13 @@ export interface ReleaseTrackerExecution {
   triggered_at: string;
   completed_at?: string;
   /**
+   * HostID/HostName are the tracker's target host at query time (joined from
+   * release_trackers.host_id, not stored per-execution) — empty for a
+   * monitor-only tracker with no host_id.
+   */
+  host_id?: string;
+  host_name?: string;
+  /**
    * AlertsAfterCount is the number of alert incidents that fired on the
    * tracker's target host within 15 minutes after this execution started —
    * a cheap "did this deployment just break something" signal. Always 0 for

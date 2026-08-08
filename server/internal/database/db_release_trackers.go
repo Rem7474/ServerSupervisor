@@ -689,6 +689,7 @@ func (db *DB) ListReleaseTrackerExecutions(ctx context.Context, trackerID string
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT e.id, e.tracker_id, e.command_id, e.tag_name, e.release_url, e.release_name,
 		        e.status, e.triggered_at, e.completed_at,
+		        COALESCE(rt.host_id, ''), COALESCE(h.name, ''),
 		        (SELECT COUNT(*) FROM alert_incidents ai
 		          WHERE ai.host_id = rt.host_id AND rt.host_id != ''
 		            AND ai.triggered_at >= e.triggered_at
@@ -696,6 +697,7 @@ func (db *DB) ListReleaseTrackerExecutions(ctx context.Context, trackerID string
 		        ) AS alerts_after_count
 		 FROM release_tracker_executions e
 		 JOIN release_trackers rt ON rt.id = e.tracker_id
+		 LEFT JOIN hosts h ON h.id = rt.host_id
 		 WHERE e.tracker_id=$1 ORDER BY e.triggered_at DESC LIMIT $2`,
 		trackerID, limit)
 	if err != nil {
@@ -712,6 +714,7 @@ func (db *DB) ListReleaseTrackerExecutions(ctx context.Context, trackerID string
 			&e.ID, &e.TrackerID, &cmdID,
 			&e.TagName, &e.ReleaseURL, &e.ReleaseName,
 			&e.Status, &e.TriggeredAt, &completed,
+			&e.HostID, &e.HostName,
 			&e.AlertsAfterCount,
 		); err != nil {
 			return nil, err
