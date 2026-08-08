@@ -105,7 +105,40 @@
       <template #maintenance>
         <MaintenanceWindowsPanel :is-admin="auth.isAdmin" />
       </template>
+
+      <template #templates>
+        <AlertRuleTemplateList
+          :templates="templates"
+          :loading="templatesLoading"
+          :fetched="templatesFetched"
+          :is-admin="auth.isAdmin"
+          @add="startAddTemplate"
+          @edit="startEditTemplate"
+          @delete="deleteTemplate"
+          @apply="startApplyTemplate"
+        />
+      </template>
     </EntityTabShell>
+
+    <AlertRuleTemplateModal
+      :visible="showTemplateModal"
+      :template="editingTemplate"
+      :agent-metrics="(capabilities?.agent_metrics as any) || []"
+      :saving="templateSaving"
+      :error="templateSaveError"
+      @close="closeTemplateModal"
+      @submit="submitTemplate"
+    />
+    <AlertRuleTemplateApplyModal
+      :visible="showApplyModal"
+      :template="applyingTemplate"
+      :hosts="(hosts as any)"
+      :applying="applying"
+      :error="applyError"
+      :result="applyResult"
+      @close="closeApplyModal"
+      @apply="onApplyTemplate"
+    />
 
     <ErrorBoundary title="Erreur lors du chargement du formulaire de règle d'alerte">
       <AlertRuleModal
@@ -125,12 +158,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
 import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
+import AlertRuleTemplateList from '../components/alerts/AlertRuleTemplateList.vue'
+import AlertRuleTemplateModal from '../components/alerts/AlertRuleTemplateModal.vue'
+import AlertRuleTemplateApplyModal from '../components/alerts/AlertRuleTemplateApplyModal.vue'
 import MaintenanceWindowsPanel from '../components/alerts/MaintenanceWindowsPanel.vue'
 import WarRoomPanel from '../components/alerts/WarRoomPanel.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
@@ -139,9 +175,12 @@ import type { EntityTab } from '../components/EntityTabShell.vue'
 import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
 import { useNotificationHistory } from '../composables/useNotificationHistory'
+import { useAlertRuleTemplates } from '../composables/useAlertRuleTemplates'
 import { onNotificationsMessage } from '../composables/useNotifications'
+import { useAlertRulesStore } from '../stores/alertRules'
 import { useAuthStore } from '../stores/auth'
 import type { AlertRule } from '../types/alert'
+import type { AlertRuleTemplate, AlertRuleTemplateRequest } from '../types/generated'
 
 const auth = useAuthStore()
 
@@ -151,6 +190,7 @@ const TAB_TITLES: Record<string, string> = {
   releases: 'Suivi de versions',
   incidents: 'Historique de notifications',
   maintenance: 'Fenêtres de maintenance',
+  templates: 'Modèles de règles',
 }
 
 const route = useRoute()
@@ -199,6 +239,82 @@ const {
   acknowledgeIncident,
   onWebSocketAlert: onNotificationHistoryWSAlert,
 } = useNotificationHistory()
+
+const {
+  templates,
+  loading: templatesLoading,
+  fetched: templatesFetched,
+  saving: templateSaving,
+  saveError: templateSaveError,
+  applying,
+  applyError,
+  applyResult,
+  loadTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  applyTemplate,
+  clearApplyResult,
+} = useAlertRuleTemplates()
+
+const showTemplateModal = ref(false)
+const editingTemplate = ref<AlertRuleTemplate | null>(null)
+const showApplyModal = ref(false)
+const applyingTemplate = ref<AlertRuleTemplate | null>(null)
+let templatesLoaded = false
+
+async function switchToTemplates(): Promise<void> {
+  alertsTab.value = 'templates'
+  if (!templatesLoaded) {
+    templatesLoaded = true
+    await loadTemplates()
+  }
+}
+
+function startAddTemplate(): void {
+  editingTemplate.value = null
+  showTemplateModal.value = true
+}
+
+function startEditTemplate(template: AlertRuleTemplate): void {
+  editingTemplate.value = template
+  showTemplateModal.value = true
+}
+
+function closeTemplateModal(): void {
+  showTemplateModal.value = false
+  editingTemplate.value = null
+}
+
+async function submitTemplate(payload: AlertRuleTemplateRequest): Promise<void> {
+  const ok = editingTemplate.value
+    ? await updateTemplate(editingTemplate.value.id, payload)
+    : await createTemplate(payload)
+  if (ok) closeTemplateModal()
+}
+
+function startApplyTemplate(template: AlertRuleTemplate): void {
+  applyingTemplate.value = template
+  clearApplyResult()
+  showApplyModal.value = true
+}
+
+function closeApplyModal(): void {
+  showApplyModal.value = false
+  applyingTemplate.value = null
+}
+
+const alertRulesStore = useAlertRulesStore()
+
+async function onApplyTemplate(hostIds: string[], enabled: boolean): Promise<void> {
+  if (!applyingTemplate.value) return
+  const ok = await applyTemplate(applyingTemplate.value.id, hostIds, enabled)
+  // Applying stamps out new rules via a path this view's own `rules` list
+  // (useAlertsPage's alertRulesStore) doesn't know about — force a refetch so
+  // the Règles tab isn't stuck showing stale data (or an empty state) until
+  // a full page reload.
+  if (ok) await alertRulesStore.fetchRules(true)
+}
 
 async function ensureIncidentsLoaded(): Promise<void> {
   if (!incidentsLoaded.value) await loadIncidents()
@@ -261,6 +377,12 @@ const alertsTabs = computed<EntityTab[]>(() => [
     badges: [],
     lazy: true,
   },
+  {
+    key: 'templates',
+    label: 'Modèles',
+    badges: templates.value.length > 0 ? [{ value: templates.value.length, badgeClass: 'badge bg-azure-lt text-azure ms-1' }] : [],
+    lazy: true,
+  },
 ])
 
 // 'releases'/'incidents'/'warroom' each own the actual tab switch
@@ -270,6 +392,7 @@ function onTabClick(key: string): void {
   if (key === 'releases') { switchToTrackers(); return }
   if (key === 'incidents') { switchToIncidents(); return }
   if (key === 'warroom') { switchToWarRoom(); return }
+  if (key === 'templates') { switchToTemplates(); return }
   alertsTab.value = key
 }
 
@@ -294,6 +417,8 @@ onMounted(async () => {
     await switchToTrackers()
   } else if (route.query.tab === 'incidents') {
     await switchToIncidents()
+  } else if (route.query.tab === 'templates') {
+    await switchToTemplates()
   } else {
     await switchToWarRoom()
   }

@@ -342,6 +342,7 @@ func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler)
 	// restricted users only see items scoped to their granted hosts.
 	g.GET("/alerts/incidents", rulesH.ListIncidents)
 	g.GET("/alert-rules", rulesH.ListAlertRules)
+	g.GET("/alert-rule-templates", rulesH.ListAlertRuleTemplates)
 
 	admin := g.Group("")
 	admin.Use(AdminOnlyMiddleware())
@@ -358,6 +359,11 @@ func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler)
 	admin.DELETE("/alert-rules/:id", rulesH.DeleteAlertRule)
 	admin.POST("/alert-rules/test", rulesH.TestAlertRule)
 	admin.POST("/alert-rules/test/logs", rulesH.TestAlertRuleLogs)
+	admin.GET("/alert-rule-templates/:id", rulesH.GetAlertRuleTemplate)
+	admin.POST("/alert-rule-templates", rulesH.CreateAlertRuleTemplate)
+	admin.PATCH("/alert-rule-templates/:id", rulesH.UpdateAlertRuleTemplate)
+	admin.DELETE("/alert-rule-templates/:id", rulesH.DeleteAlertRuleTemplate)
+	admin.POST("/alert-rule-templates/:id/apply", rulesH.ApplyAlertRuleTemplate)
 }
 
 func registerSettingsRoutes(g *gin.RouterGroup, h *handlers.SettingsHandler) {

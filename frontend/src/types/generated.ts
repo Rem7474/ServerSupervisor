@@ -293,6 +293,60 @@ export interface AlertRuleCreate {
   duration: number /* int */;
   actions: AlertActions;
 }
+/**
+ * AlertRuleTemplate is a reusable rule "recipe" for agent metrics — no host,
+ * so ApplyAlertRuleTemplateRequest can stamp out the same rule across many
+ * hosts at once instead of re-entering the same metric/thresholds/actions
+ * per host (ROADMAP.md item #9). Not a live link to the rules it spawns:
+ * editing or deleting a template never touches an already-created rule (same
+ * "definition + independent instances" shape as runbooks/runbook_steps).
+ * Docker/Proxmox-scoped rules aren't templatable in this MVP — Docker
+ * scope's host_id is required per rule and Proxmox scope is cluster-level
+ * already, so neither fits "apply the same recipe to N hosts."
+ */
+export interface AlertRuleTemplate {
+  id: number /* int64 */;
+  name: string;
+  metric: string;
+  operator: string;
+  threshold_warn: number /* float64 */;
+  threshold_crit: number /* float64 */;
+  threshold_clear_warn?: number /* float64 */;
+  threshold_clear_crit?: number /* float64 */;
+  duration_seconds: number /* int */;
+  actions: AlertActions;
+  created_at: string;
+  updated_at: string;
+}
+export interface AlertRuleTemplateRequest {
+  name: string;
+  metric: string;
+  operator: string;
+  threshold_warn: number /* float64 */;
+  threshold_crit: number /* float64 */;
+  threshold_clear_warn?: number /* float64 */;
+  threshold_clear_crit?: number /* float64 */;
+  duration: number /* int */;
+  actions: AlertActions;
+}
+/**
+ * ApplyAlertRuleTemplateRequest is the body of POST /alert-rule-templates/:id/apply.
+ * Enabled defaults to false (zero value) — applying a template to a fleet
+ * shouldn't immediately start firing everywhere before the admin has
+ * reviewed the resulting per-host rules.
+ */
+export interface ApplyAlertRuleTemplateRequest {
+  host_ids: string[];
+  enabled: boolean;
+}
+/**
+ * ApplyAlertRuleTemplateResult reports what happened per host — applying to
+ * N hosts is not all-or-nothing, one host's failure shouldn't block the rest.
+ */
+export interface ApplyAlertRuleTemplateResult {
+  created_rule_ids: number /* int64 */[];
+  errors?: { [key: string]: string}; // host_id -> error message
+}
 export interface AlertRuleUpdate {
   name?: string;
   enabled?: boolean;

@@ -308,6 +308,58 @@ type AlertRuleCreate struct {
 	Actions            AlertActions        `json:"actions"`
 }
 
+// AlertRuleTemplate is a reusable rule "recipe" for agent metrics — no host,
+// so ApplyAlertRuleTemplateRequest can stamp out the same rule across many
+// hosts at once instead of re-entering the same metric/thresholds/actions
+// per host (ROADMAP.md item #9). Not a live link to the rules it spawns:
+// editing or deleting a template never touches an already-created rule (same
+// "definition + independent instances" shape as runbooks/runbook_steps).
+// Docker/Proxmox-scoped rules aren't templatable in this MVP — Docker
+// scope's host_id is required per rule and Proxmox scope is cluster-level
+// already, so neither fits "apply the same recipe to N hosts."
+type AlertRuleTemplate struct {
+	ID                 int64        `json:"id" db:"id"`
+	Name               string       `json:"name" db:"name"`
+	Metric             string       `json:"metric" db:"metric"`
+	Operator           string       `json:"operator" db:"operator"`
+	ThresholdWarn      float64      `json:"threshold_warn" db:"threshold_warn"`
+	ThresholdCrit      float64      `json:"threshold_crit" db:"threshold_crit"`
+	ThresholdClearWarn *float64     `json:"threshold_clear_warn,omitempty" db:"threshold_clear_warn"`
+	ThresholdClearCrit *float64     `json:"threshold_clear_crit,omitempty" db:"threshold_clear_crit"`
+	DurationSeconds    int          `json:"duration_seconds" db:"duration_seconds"`
+	Actions            AlertActions `json:"actions" db:"-"`
+	CreatedAt          time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at" db:"updated_at"`
+}
+
+type AlertRuleTemplateRequest struct {
+	Name               string       `json:"name" binding:"required"`
+	Metric             string       `json:"metric" binding:"required"`
+	Operator           string       `json:"operator" binding:"required"`
+	ThresholdWarn      float64      `json:"threshold_warn" binding:"required"`
+	ThresholdCrit      float64      `json:"threshold_crit" binding:"required"`
+	ThresholdClearWarn *float64     `json:"threshold_clear_warn"`
+	ThresholdClearCrit *float64     `json:"threshold_clear_crit"`
+	Duration           int          `json:"duration"`
+	Actions            AlertActions `json:"actions"`
+}
+
+// ApplyAlertRuleTemplateRequest is the body of POST /alert-rule-templates/:id/apply.
+// Enabled defaults to false (zero value) — applying a template to a fleet
+// shouldn't immediately start firing everywhere before the admin has
+// reviewed the resulting per-host rules.
+type ApplyAlertRuleTemplateRequest struct {
+	HostIDs []string `json:"host_ids" binding:"required,min=1"`
+	Enabled bool     `json:"enabled"`
+}
+
+// ApplyAlertRuleTemplateResult reports what happened per host — applying to
+// N hosts is not all-or-nothing, one host's failure shouldn't block the rest.
+type ApplyAlertRuleTemplateResult struct {
+	CreatedRuleIDs []int64           `json:"created_rule_ids"`
+	Errors         map[string]string `json:"errors,omitempty"` // host_id -> error message
+}
+
 type AlertRuleUpdate struct {
 	Name               *string             `json:"name"`
 	Enabled            *bool               `json:"enabled"`

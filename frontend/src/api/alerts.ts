@@ -1,5 +1,6 @@
 import { api } from './client'
 import type { AlertRule, AlertRulePayload } from '../types/alert'
+import type { AlertRuleTemplate, AlertRuleTemplateRequest, ApplyAlertRuleTemplateRequest, ApplyAlertRuleTemplateResult } from '../types/generated'
 
 // Re-exported so existing import sites keep working from the api barrel.
 export type { AlertRule, AlertRulePayload } from '../types/alert'
@@ -19,4 +20,11 @@ export const alertsApi = {
   testAlertRule: (payload: AlertRulePayload) => api.post('/v1/alert-rules/test', payload),
   downloadAlertRuleTestLogs: (payload: AlertRulePayload) =>
     api.post('/v1/alert-rules/test/logs', payload, { responseType: 'blob' }),
+  getAlertRuleTemplates: () => api.get<AlertRuleTemplate[]>('/v1/alert-rule-templates'),
+  createAlertRuleTemplate: (payload: AlertRuleTemplateRequest) => api.post<AlertRuleTemplate>('/v1/alert-rule-templates', payload),
+  updateAlertRuleTemplate: (id: number, payload: AlertRuleTemplateRequest) =>
+    api.patch<AlertRuleTemplate>(`/v1/alert-rule-templates/${id}`, payload),
+  deleteAlertRuleTemplate: (id: number) => api.delete(`/v1/alert-rule-templates/${id}`),
+  applyAlertRuleTemplate: (id: number, payload: ApplyAlertRuleTemplateRequest) =>
+    api.post<ApplyAlertRuleTemplateResult>(`/v1/alert-rule-templates/${id}/apply`, payload),
 }

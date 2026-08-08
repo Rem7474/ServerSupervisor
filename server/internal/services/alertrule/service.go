@@ -36,6 +36,13 @@ type Repository interface {
 	GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error)
 	GetAllHosts(ctx context.Context) ([]models.Host, error)
 
+	// rule templates (ROADMAP.md item #9)
+	CreateAlertRuleTemplate(ctx context.Context, t *models.AlertRuleTemplate) error
+	GetAlertRuleTemplates(ctx context.Context) ([]models.AlertRuleTemplate, error)
+	GetAlertRuleTemplateByID(ctx context.Context, id int64) (*models.AlertRuleTemplate, error)
+	UpdateAlertRuleTemplate(ctx context.Context, t *models.AlertRuleTemplate) error
+	DeleteAlertRuleTemplate(ctx context.Context, id int64) error
+
 	// capability discovery
 	GetHost(ctx context.Context, id string) (*models.Host, error)
 	GetDockerContainers(ctx context.Context, hostID string) ([]models.DockerContainer, error)

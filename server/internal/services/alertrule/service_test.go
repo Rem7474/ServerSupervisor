@@ -16,6 +16,7 @@ type fakeRepo struct {
 	created    *models.AlertRule
 	updated    *models.AlertRule
 	deleted    bool
+	template   *models.AlertRuleTemplate
 	hostExists bool
 	allHosts   []models.Host
 	// missingContainerID, when set, makes DockerContainerExists report that
@@ -54,6 +55,23 @@ func (f *fakeRepo) ResolveOpenAlertIncidentsByRule(context.Context, int64) (int6
 }
 func (f *fakeRepo) ResolveAlertIncident(context.Context, int64) error             { return nil }
 func (f *fakeRepo) AcknowledgeAlertIncident(context.Context, int64, string) error { return nil }
+func (f *fakeRepo) CreateAlertRuleTemplate(_ context.Context, t *models.AlertRuleTemplate) error {
+	t.ID = 1
+	return nil
+}
+func (f *fakeRepo) GetAlertRuleTemplates(context.Context) ([]models.AlertRuleTemplate, error) {
+	return nil, nil
+}
+func (f *fakeRepo) GetAlertRuleTemplateByID(_ context.Context, id int64) (*models.AlertRuleTemplate, error) {
+	if f.template == nil {
+		return nil, sql.ErrNoRows
+	}
+	return f.template, nil
+}
+func (f *fakeRepo) UpdateAlertRuleTemplate(context.Context, *models.AlertRuleTemplate) error {
+	return nil
+}
+func (f *fakeRepo) DeleteAlertRuleTemplate(context.Context, int64) error { return nil }
 func (f *fakeRepo) GetAlertIncidents(context.Context, int, int) ([]models.AlertIncident, error) {
 	return nil, nil
 }

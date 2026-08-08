@@ -26,9 +26,9 @@ non protégées, pas de backup DB) est déjà traitée — voir [AUDIT-2025.md](
 **L'écart réel avec Checkmk n'est pas featuritude, c'est l'architecture de check.**
 ServerSupervisor a des collecteurs agent figés + 2 types de sondes synthétiques (HTTP/TCP) +
 polling Proxmox API — pas de moteur de check générique, pas de plugins, pas de découverte
-réseau automatique, pas de templates de seuils réutilisables. Confirmé par recherche dans le
-code : **aucun ICMP, aucun SNMP** (la fenêtre de maintenance et l'escalade d'alerte listées ici
-à l'origine sont depuis corrigées, voir ROADMAP.md items #2 et #3).
+réseau automatique. Confirmé par recherche dans le code : **aucun ICMP, aucun SNMP** (la
+fenêtre de maintenance, l'escalade d'alerte et les templates de règles réutilisables
+cross-host listés ici à l'origine sont depuis corrigés, voir ROADMAP.md items #2, #3 et #9).
 C'est le choix structurant à trancher avant d'investir davantage : rester un outil
 « agent-first, zéro friction » ou basculer vers un moteur de check extensible façon Checkmk
 (bien plus de valeur long terme, bien plus de complexité).
@@ -110,8 +110,8 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 | Planification / scheduler | Deux mécanismes cohérents : `poller.Every` (pollers génériques) + `scheduler.TaskScheduler` (cron) | Réutilisable tel quel pour de futurs checks actifs | Ne pas fusionner artificiellement les deux |
 | Stockage des états | Postgres/TimescaleDB, pas de cache | — | Pas de Redis prématuré |
 | Historisation | Bonne (politiques de rétention) | Manque exports/rapports | — |
-| Gestion des règles | Moteur d'alertes correct (hystérésis, cooldown) | Pas de templates réutilisables cross-host, pas de règles par tag | — |
-| API | REST bien organisée par domaine | **RBAC manquant sur CRUD tâches planifiées** — dette de sécurité réelle, effort faible | — |
+| Gestion des règles | Moteur d'alertes correct (hystérésis, cooldown), templates réutilisables cross-host (`alert_rule_templates`, ROADMAP.md item #9) | Pas encore de règles par tag (dépend du tagging d'hôtes, item #7, non démarré) | — |
+| API | REST bien organisée par domaine | Aucun — le RBAC sur le CRUD des tâches planifiées, manquant à l'origine, est corrigé (ROADMAP.md item #1) | — |
 | Extension / plugins | Absent — plus gros écart structurel avec Checkmk | Élargir le nombre de types de check « en dur » (ICMP, SNMP basique) avant tout runtime de plugin | Ne pas construire de plugin engine sans demande prouvée |
 | Sécurité | Bon niveau (JWT, MFA, rate limiting, audit, secrets jamais renvoyés au frontend) | Pas de secret scanning ni signature d'image en CI, Trivy non bloquant — dette silencieuse, effort faible | — |
 | Scalabilité | Assumée single-instance par design (WS hubs, event bus, rate limiter, store WebAuthn) — cohérent avec `docker-compose.yml` actuel | Anticiper explicitement avant toute promesse de HA/clustering | Ne pas scaler une seule brique isolément |

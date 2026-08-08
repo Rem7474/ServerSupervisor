@@ -89,7 +89,7 @@ inclus) :
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent
+- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent ; onglet « Modèles » — définir une règle (métrique agent + seuils + notifications) une fois et l'appliquer à plusieurs hôtes en un clic
 - **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
 - **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
@@ -778,6 +778,11 @@ curl http://localhost:8080/api/v1/hosts \
 | `PATCH` | `/api/v1/alert-rules/:id` | Modifier une règle | Admin |
 | `DELETE` | `/api/v1/alert-rules/:id` | Supprimer une règle | Admin |
 | `POST` | `/api/v1/alert-rules/test` | Tester une règle | Admin |
+| `GET` | `/api/v1/alert-rule-templates` | Modèles de règles réutilisables | Authentifié |
+| `POST` | `/api/v1/alert-rule-templates` | Créer un modèle | Admin |
+| `PATCH` | `/api/v1/alert-rule-templates/:id` | Modifier un modèle | Admin |
+| `DELETE` | `/api/v1/alert-rule-templates/:id` | Supprimer un modèle | Admin |
+| `POST` | `/api/v1/alert-rule-templates/:id/apply` | Appliquer un modèle à N hôtes (`host_ids`) | Admin |
 
 Métriques additionnelles disponibles pour les règles d'alertes :
 - `npm_requests`
