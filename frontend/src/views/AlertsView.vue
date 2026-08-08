@@ -86,6 +86,10 @@
           @resolve="resolveIncident"
         />
       </template>
+
+      <template #maintenance>
+        <MaintenanceWindowsPanel :is-admin="auth.isAdmin" />
+      </template>
     </EntityTabShell>
 
     <ErrorBoundary title="Erreur lors du chargement du formulaire de règle d'alerte">
@@ -112,6 +116,7 @@ import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
 import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
+import MaintenanceWindowsPanel from '../components/alerts/MaintenanceWindowsPanel.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import EntityTabShell from '../components/EntityTabShell.vue'
 import type { EntityTab } from '../components/EntityTabShell.vue'
@@ -128,6 +133,7 @@ const TAB_TITLES: Record<string, string> = {
   rules: 'Alertes',
   releases: 'Suivi de versions',
   incidents: 'Historique de notifications',
+  maintenance: 'Fenêtres de maintenance',
 }
 
 const route = useRoute()
@@ -213,6 +219,12 @@ const alertsTabs = computed<EntityTab[]>(() => [
     key: 'incidents',
     label: 'Historique notifications',
     badges: activeIncidentCount.value > 0 ? [{ value: activeIncidentCount.value, badgeClass: 'badge bg-danger-lt text-danger ms-1' }] : [],
+    lazy: true,
+  },
+  {
+    key: 'maintenance',
+    label: 'Maintenance',
+    badges: [],
     lazy: true,
   },
 ])

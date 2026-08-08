@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -138,4 +139,115 @@ func TestScheduledTaskUpdateNotFound(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Errorf("update missing = %d, want 404; body = %s", w.Code, w.Body.String())
 	}
+}
+
+// newScheduledTasksRouterAsOperator mirrors newScheduledTasksRouter but runs
+// requests as a non-admin "operator" role/"tester" username, so per-host
+// requireHostAccess restrictions (host_permissions rows) actually apply —
+// role "admin" always short-circuits requireHostAccess, which would hide a
+// regression on the create/update/delete checks added below.
+func newScheduledTasksRouterAsOperator(t *testing.T) (*gin.Engine, *database.DB) {
+	t.Helper()
+	db, _ := testutil.NewPostgresDBWithConfig(t)
+	disp := dispatch.New(db)
+	sched := scheduler.New(db, disp)
+	h := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, disp), db)
+
+	r := gin.New()
+	r.Use(withRole("operator"))
+	r.POST("/hosts/:id/scheduled-tasks", h.CreateScheduledTask)
+	r.PUT("/scheduled-tasks/:id", h.UpdateScheduledTask)
+	r.DELETE("/scheduled-tasks/:id", h.DeleteScheduledTask)
+	return r, db
+}
+
+// TestScheduledTaskCreateRequiresOperatorHostAccess is the regression test for
+// the RBAC gap documented in docs/runbooks-scheduled-tasks.md §3: create was
+// previously reachable by any authenticated caller regardless of per-host
+// permissions, unlike RunScheduledTask which was already Operator+-gated.
+func TestScheduledTaskCreateRequiresOperatorHostAccess(t *testing.T) {
+	r, db := newScheduledTasksRouterAsOperator(t)
+	const hostID = "sched-rbac-host-1"
+	seedHost(t, db, hostID)
+
+	// "tester" has a restricted host_permissions row (viewer level) on this
+	// host -> create must be rejected even though their global role is
+	// "operator".
+	if err := db.SetHostPermission(context.Background(), "tester", hostID, "viewer"); err != nil {
+		t.Fatalf("seed host permission: %v", err)
+	}
+	if w := doJSON(t, r, http.MethodPost, "/hosts/"+hostID+"/scheduled-tasks", validTaskPayload()); w.Code != http.StatusForbidden {
+		t.Fatalf("create with viewer-level host access = %d, want 403; body = %s", w.Code, w.Body.String())
+	}
+
+	// Upgrading to operator-level access on that same host must unblock it.
+	if err := db.SetHostPermission(context.Background(), "tester", hostID, "operator"); err != nil {
+		t.Fatalf("upgrade host permission: %v", err)
+	}
+	if w := doJSON(t, r, http.MethodPost, "/hosts/"+hostID+"/scheduled-tasks", validTaskPayload()); w.Code != http.StatusCreated {
+		t.Fatalf("create with operator-level host access = %d, want 201; body = %s", w.Code, w.Body.String())
+	}
+}
+
+// TestScheduledTaskUpdateDeleteRequireOperatorHostAccess covers the same gap
+// for update/delete, which must resolve the task's host before checking
+// access (unlike create, :id here is the task id, not the host id).
+func TestScheduledTaskUpdateDeleteRequireOperatorHostAccess(t *testing.T) {
+	admin, db := newScheduledTasksRouter(t)
+	const hostID = "sched-rbac-host-2"
+	seedHost(t, db, hostID)
+
+	created := doJSON(t, admin, http.MethodPost, "/hosts/"+hostID+"/scheduled-tasks", validTaskPayload())
+	if created.Code != http.StatusCreated {
+		t.Fatalf("seed task create = %d, body = %s", created.Code, created.Body.String())
+	}
+	var task map[string]any
+	if err := json.Unmarshal(created.Body.Bytes(), &task); err != nil {
+		t.Fatalf("decode created task: %v", err)
+	}
+	id, _ := task["id"].(string)
+	if id == "" {
+		t.Fatalf("created task has no id: %s", created.Body.String())
+	}
+
+	op, _ := newScheduledTasksRouterAsOperatorOnDB(t, db)
+
+	// "tester" restricted to viewer level on this host -> both blocked.
+	if err := db.SetHostPermission(context.Background(), "tester", hostID, "viewer"); err != nil {
+		t.Fatalf("seed host permission: %v", err)
+	}
+	if w := doJSON(t, op, http.MethodPut, "/scheduled-tasks/"+id, validTaskPayload()); w.Code != http.StatusForbidden {
+		t.Fatalf("update with viewer-level host access = %d, want 403; body = %s", w.Code, w.Body.String())
+	}
+	if w := doJSON(t, op, http.MethodDelete, "/scheduled-tasks/"+id, nil); w.Code != http.StatusForbidden {
+		t.Fatalf("delete with viewer-level host access = %d, want 403; body = %s", w.Code, w.Body.String())
+	}
+
+	// Operator-level access on that host unblocks both.
+	if err := db.SetHostPermission(context.Background(), "tester", hostID, "operator"); err != nil {
+		t.Fatalf("upgrade host permission: %v", err)
+	}
+	if w := doJSON(t, op, http.MethodPut, "/scheduled-tasks/"+id, validTaskPayload()); w.Code != http.StatusOK {
+		t.Fatalf("update with operator-level host access = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+	if w := doJSON(t, op, http.MethodDelete, "/scheduled-tasks/"+id, nil); w.Code != http.StatusOK {
+		t.Fatalf("delete with operator-level host access = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+}
+
+// newScheduledTasksRouterAsOperatorOnDB is newScheduledTasksRouterAsOperator
+// but reuses an already-open db (needed when a test seeds data as admin
+// first, then re-issues requests as a restricted operator against the same
+// database).
+func newScheduledTasksRouterAsOperatorOnDB(t *testing.T, db *database.DB) (*gin.Engine, *database.DB) {
+	t.Helper()
+	disp := dispatch.New(db)
+	sched := scheduler.New(db, disp)
+	h := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, disp), db)
+
+	r := gin.New()
+	r.Use(withRole("operator"))
+	r.PUT("/scheduled-tasks/:id", h.UpdateScheduledTask)
+	r.DELETE("/scheduled-tasks/:id", h.DeleteScheduledTask)
+	return r, db
 }

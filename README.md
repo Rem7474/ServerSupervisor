@@ -17,6 +17,15 @@ inclus) :
 | [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md) | Runbooks multi-étapes vs tâches planifiées par hôte |
 | [docs/backup-restic.md](docs/backup-restic.md) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
 
+## Vision produit & roadmap
+
+- [AUDIT-PRODUIT-2026.md](AUDIT-PRODUIT-2026.md) — audit produit (état des lieux fonctionnel,
+  positionnement vis-à-vis d'un outil type Checkmk, risques/dettes, questions à trancher).
+- [ROADMAP.md](ROADMAP.md) — plan d'exécution détaillé (fonctionnalités priorisées, phases,
+  priorités court/moyen/long terme).
+- [AUDIT-2025.md](AUDIT-2025.md) — audit d'architecture technique (juillet 2026), résolu,
+  conservé pour référence historique.
+
 ## Architecture
 
 ```
@@ -80,6 +89,7 @@ inclus) :
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
+- **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
 - **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
 - **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, corrélation CrowdSec si activée côté agent), stats trafic web sur `/traffic`, menaces web sur `/threats`
@@ -137,10 +147,9 @@ Deux mécanismes de dispatch de commandes agent, à ne pas confondre : un
 hôtes en un seul déclenchement manuel, avec une whitelist d'actions
 strictement revalidée côté serveur ; une **tâche planifiée** cible un seul
 hôte sur un cron, avec une liste d'actions seulement indicative (non
-validée côté serveur au-delà du module) — seul le déclenchement manuel
-(`run`) est vérifié Operator+ par hôte, la création/modification/
-suppression n'a aujourd'hui aucun contrôle de rôle côté API (voir le
-guide).
+validée côté serveur au-delà du module) — le déclenchement manuel (`run`)
+et la création/modification/suppression sont tous vérifiés Operator+ par
+hôte (voir le guide).
 
 Guide complet (whitelist par module, tableau comparatif runbook vs tâche
 planifiée, fuseau horaire d'exécution du cron, dépannage) :
@@ -771,6 +780,15 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 - `npm_traffic_bytes`
 - `npm_5xx_errors`
 
+#### Fenêtres de maintenance
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/maintenance-windows` | Liste globale | Authentifié |
+| `GET` | `/api/v1/hosts/:id/maintenance-windows` | Fenêtres applicables à un hôte (les siennes + les globales) | Authentifié |
+| `POST` | `/api/v1/hosts/:id/maintenance-windows` | Créer une fenêtre sur un hôte | Operator+ (vérifié par hôte) |
+| `POST` | `/api/v1/maintenance-windows/global` | Créer une fenêtre sur tous les hôtes | Admin |
+| `DELETE` | `/api/v1/maintenance-windows/:id` | Supprimer une fenêtre | Operator+ sur l'hôte (Admin si globale) |
+
 #### Notifications & Push
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -856,15 +874,14 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/scheduled-tasks` | Lister les tâches d'un hôte | Authentifié |
-| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Authentifié* |
-| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Authentifié* |
-| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Authentifié* |
+| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Operator+ (vérifié par hôte) |
+| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Operator+ (vérifié par hôte) |
+| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Operator+ (vérifié par hôte) |
 | `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ (vérifié par hôte) |
 
-> \* Contrairement à `run` (qui vérifie l'accès Operator+ sur l'hôte
-> ciblé), la création/modification/suppression n'a **aucune vérification
-> de rôle côté API** à ce jour — seul le dashboard masque ces actions pour
-> un compte `viewer`. Voir [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
+> Création/modification/suppression sont désormais vérifiées au même
+> niveau que `run` (`requireHostAccess(..., "operator")`) — voir
+> [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
 > pour le détail.
 
 #### Proxmox VE

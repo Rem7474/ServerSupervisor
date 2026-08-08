@@ -124,6 +124,11 @@ type ReleaseTrackerExecution struct {
 	Status      string     `json:"status"`
 	TriggeredAt time.Time  `json:"triggered_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	// HostID/HostName are the tracker's target host at query time (joined from
+	// release_trackers.host_id, not stored per-execution) — empty for a
+	// monitor-only tracker with no host_id.
+	HostID   string `json:"host_id,omitempty"`
+	HostName string `json:"host_name,omitempty"`
 	// AlertsAfterCount is the number of alert incidents that fired on the
 	// tracker's target host within 15 minutes after this execution started —
 	// a cheap "did this deployment just break something" signal. Always 0 for

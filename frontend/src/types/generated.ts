@@ -802,6 +802,34 @@ export interface HostExposure {
 }
 
 //////////
+// source: maintenance.go
+
+/**
+ * MaintenanceWindow suppresses alert notifications for a host (HostID set)
+ * or every host (HostID nil, a global window) between StartsAt and EndsAt.
+ * The alert engine (internal/alerts) checks for an active window before
+ * evaluating an evaluation target and silently resolves any already-open
+ * incident without notifying, exactly like a disabled rule — see
+ * internal/alerts/engine.go and internal/database/db_maintenance.go's
+ * IsHostInMaintenance.
+ */
+export interface MaintenanceWindow {
+  id: string;
+  host_id?: string; // nil = applies to every host
+  host_name?: string;
+  reason: string;
+  starts_at: string;
+  ends_at: string;
+  created_by: string;
+  created_at: string;
+}
+export interface MaintenanceWindowRequest {
+  reason: string;
+  starts_at: string;
+  ends_at: string;
+}
+
+//////////
 // source: network.go
 
 export interface PortMapping {
@@ -1743,6 +1771,13 @@ export interface ReleaseTrackerExecution {
   status: string;
   triggered_at: string;
   completed_at?: string;
+  /**
+   * HostID/HostName are the tracker's target host at query time (joined from
+   * release_trackers.host_id, not stored per-execution) — empty for a
+   * monitor-only tracker with no host_id.
+   */
+  host_id?: string;
+  host_name?: string;
   /**
    * AlertsAfterCount is the number of alert incidents that fired on the
    * tracker's target host within 15 minutes after this execution started —

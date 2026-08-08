@@ -1,4 +1,4 @@
-const SW_VERSION = '2026-07-11-v1'
+const SW_VERSION = '2026-08-08-v1'
 const STATIC_CACHE_PREFIX = 'serversupervisor-static'
 const RUNTIME_CACHE_PREFIX = 'serversupervisor-runtime'
 const CACHE_NAME = `${STATIC_CACHE_PREFIX}-${SW_VERSION}`
@@ -90,19 +90,39 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // Endpoints whose GET response must never be served stale from cache — a
+  // transient network failure right after a redeploy (backend container
+  // bouncing) would otherwise silently rehydrate the *first-ever* cached
+  // snapshot (e.g. settings from before SMTP/notifications were configured)
+  // instead of surfacing a visible error, indistinguishable from real data.
+  const NO_CACHE_FALLBACK_PATHS = ['/api/v1/settings']
+  const noCacheFallback = NO_CACHE_FALLBACK_PATHS.some(
+    (p) => url.pathname === p || url.pathname.startsWith(p + '/')
+  )
+
   // API requests: network-first with cache fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
           // Cache successful API responses
-          if (response && response.status === 200) {
+          if (response && response.status === 200 && !noCacheFallback) {
             const responseClone = response.clone()
             caches.open(RUNTIME_CACHE).then((c) => c.put(event.request, responseClone))
           }
           return response
         })
         .catch(() => {
+          if (noCacheFallback) {
+            return new Response(
+              JSON.stringify({ error: 'Network error - please retry' }),
+              {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'application/json' }
+              }
+            )
+          }
           // Return cached response if network fails
           return caches.match(event.request)
             .then((cachedResponse) => {
@@ -113,7 +133,7 @@ self.addEventListener('fetch', (event) => {
               // If no cache and no network, return offline page
               return new Response(
                 JSON.stringify({ error: 'Offline - no cached data available' }),
-                { 
+                {
                   status: 503,
                   statusText: 'Service Unavailable',
                   headers: { 'Content-Type': 'application/json' }
