@@ -17,6 +17,15 @@ inclus) :
 | [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md) | Runbooks multi-étapes vs tâches planifiées par hôte |
 | [docs/backup-restic.md](docs/backup-restic.md) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
 
+## Vision produit & roadmap
+
+- [AUDIT-PRODUIT-2026.md](AUDIT-PRODUIT-2026.md) — audit produit (état des lieux fonctionnel,
+  positionnement vis-à-vis d'un outil type Checkmk, risques/dettes, questions à trancher).
+- [ROADMAP.md](ROADMAP.md) — plan d'exécution détaillé (fonctionnalités priorisées, phases,
+  priorités court/moyen/long terme).
+- [AUDIT-2025.md](AUDIT-2025.md) — audit d'architecture technique (juillet 2026), résolu,
+  conservé pour référence historique.
+
 ## Architecture
 
 ```
