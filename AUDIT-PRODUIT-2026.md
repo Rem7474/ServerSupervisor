@@ -34,9 +34,10 @@ C'est le choix structurant à trancher avant d'investir davantage : rester un ou
 
 Les manques les plus limitants pour un usage NOC/ops sérieux au quotidien : pas de fenêtres de
 maintenance, pas d'escalade, pas de déduplication/groupement d'incidents, pas de canal
-Slack/Teams/Discord/webhook générique, pas de tagging d'hôtes, et une vraie faille RBAC
-documentée mais non corrigée (création/modification de tâches planifiées non contrôlée côté
-API — voir [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)).
+Slack/Teams/Discord/webhook générique, pas de tagging d'hôtes. La faille RBAC sur la
+création/modification de tâches planifiées, documentée ici à l'origine, est **corrigée**
+(voir [ROADMAP.md](ROADMAP.md) item #1 et
+[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)).
 
 **Recommandation directrice** : ne pas refondre. Fermer d'abord les trous d'exploitabilité
 (maintenance windows, escalade, dédup, RBAC tâches planifiées, tagging, canal webhook
@@ -135,7 +136,8 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 
 ## 5. Risques et dettes
 
-- 🔴 **RBAC scheduled-tasks** : risque de sécurité réel, pas seulement cosmétique.
+- ✅ **RBAC scheduled-tasks** : corrigé (voir ROADMAP.md item #1) — création/modification/
+  suppression sont désormais vérifiées Operator+ par hôte, comme `run`.
 - 🟡 **Architecture single-instance assumée** (WS hubs, event bus, rate limiter, store
   WebAuthn) : pas un problème aujourd'hui, mais toute promesse de HA/clustering sans ce
   chantier groupé serait trompeuse.

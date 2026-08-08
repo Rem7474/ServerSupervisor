@@ -44,8 +44,14 @@ func (h *ScheduledTaskHandler) ListScheduledTasks(c *gin.Context) {
 	c.JSON(http.StatusOK, tasks)
 }
 
-// CreateScheduledTask creates a new scheduled task for a host.
+// CreateScheduledTask creates a new scheduled task for a host. Requires
+// Operator+ on that host — mirrors RunScheduledTask's check (see
+// docs/runbooks-scheduled-tasks.md §3, previously an undocumented gap: only
+// manual run was role-checked, create/update/delete were not).
 func (h *ScheduledTaskHandler) CreateScheduledTask(c *gin.Context) {
+	if !requireHostAccess(c, h.db, c.Param("id"), "operator") {
+		return
+	}
 	username := c.GetString("username")
 	if username == "" {
 		username = "unknown"
@@ -63,8 +69,18 @@ func (h *ScheduledTaskHandler) CreateScheduledTask(c *gin.Context) {
 	c.JSON(http.StatusCreated, created)
 }
 
-// UpdateScheduledTask modifies an existing scheduled task.
+// UpdateScheduledTask modifies an existing scheduled task. Requires Operator+
+// on the task's host — the task must be looked up first since :id is the
+// task id, not the host id (same shape as RunScheduledTask).
 func (h *ScheduledTaskHandler) UpdateScheduledTask(c *gin.Context) {
+	task, err := h.svc.Get(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	if !requireHostAccess(c, h.db, task.HostID, "operator") {
+		return
+	}
 	var req models.ScheduledTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondError(c, apperr.Validation(err.Error()))
@@ -78,8 +94,17 @@ func (h *ScheduledTaskHandler) UpdateScheduledTask(c *gin.Context) {
 	c.JSON(http.StatusOK, updated)
 }
 
-// DeleteScheduledTask removes a scheduled task.
+// DeleteScheduledTask removes a scheduled task. Requires Operator+ on the
+// task's host — same lookup-then-check shape as UpdateScheduledTask.
 func (h *ScheduledTaskHandler) DeleteScheduledTask(c *gin.Context) {
+	task, err := h.svc.Get(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	if !requireHostAccess(c, h.db, task.HostID, "operator") {
+		return
+	}
 	if err := h.svc.Delete(c.Request.Context(), c.Param("id")); err != nil {
 		respondError(c, err)
 		return

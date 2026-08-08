@@ -146,10 +146,9 @@ Deux mécanismes de dispatch de commandes agent, à ne pas confondre : un
 hôtes en un seul déclenchement manuel, avec une whitelist d'actions
 strictement revalidée côté serveur ; une **tâche planifiée** cible un seul
 hôte sur un cron, avec une liste d'actions seulement indicative (non
-validée côté serveur au-delà du module) — seul le déclenchement manuel
-(`run`) est vérifié Operator+ par hôte, la création/modification/
-suppression n'a aujourd'hui aucun contrôle de rôle côté API (voir le
-guide).
+validée côté serveur au-delà du module) — le déclenchement manuel (`run`)
+et la création/modification/suppression sont tous vérifiés Operator+ par
+hôte (voir le guide).
 
 Guide complet (whitelist par module, tableau comparatif runbook vs tâche
 planifiée, fuseau horaire d'exécution du cron, dépannage) :
@@ -865,15 +864,14 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/scheduled-tasks` | Lister les tâches d'un hôte | Authentifié |
-| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Authentifié* |
-| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Authentifié* |
-| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Authentifié* |
+| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Operator+ (vérifié par hôte) |
+| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Operator+ (vérifié par hôte) |
+| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Operator+ (vérifié par hôte) |
 | `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ (vérifié par hôte) |
 
-> \* Contrairement à `run` (qui vérifie l'accès Operator+ sur l'hôte
-> ciblé), la création/modification/suppression n'a **aucune vérification
-> de rôle côté API** à ce jour — seul le dashboard masque ces actions pour
-> un compte `viewer`. Voir [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
+> Création/modification/suppression sont désormais vérifiées au même
+> niveau que `run` (`requireHostAccess(..., "operator")`) — voir
+> [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
 > pour le détail.
 
 #### Proxmox VE

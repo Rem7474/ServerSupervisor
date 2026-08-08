@@ -16,7 +16,7 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 
 | # | Fonctionnalité | Pourquoi maintenant | Statut |
 |---|---|---|---|
-| 1 | RBAC serveur sur create/update/delete des tâches planifiées | Faille de sécurité documentée mais non corrigée (README : seul `run` est vérifié Operator+) | Non démarré |
+| 1 | RBAC serveur sur create/update/delete des tâches planifiées | Faille de sécurité documentée mais non corrigée (README : seul `run` est vérifié Operator+) | Fait |
 | 2 | Fenêtres de maintenance | Aucune existante (confirmé par grep) — bruit d'alerte pendant les interventions planifiées | Non démarré |
 | 3 | Escalade d'alertes (relance après N minutes si non acquittée) | Aucune existante — un incident critique non vu reste silencieux | Non démarré |
 | 4 | Acquittement (ack) d'incident + statut « en cours de traitement » | Prérequis technique de l'escalade (#3) et du dédup (#5) | Non démarré |
@@ -122,7 +122,7 @@ jamais pièce par pièce (voir `CLAUDE.md`, section serveur).
 
 ### 10 prochaines choses à faire
 
-1. RBAC serveur sur tâches planifiées (sécurité, dette connue, effort faible)
+1. ~~RBAC serveur sur tâches planifiées~~ — fait
 2. Fenêtres de maintenance
 3. Escalade + ack d'incidents
 4. Déduplication / groupement d'alertes
