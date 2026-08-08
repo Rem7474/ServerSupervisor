@@ -125,7 +125,9 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
   (Runbooks/Tâches/Releases/Webhooks) → admin. Cohérente, pas de refonte structurelle
   nécessaire.
 - **Écrans manquants** : pas de status page publique/partageable, pas de vue « santé globale »
-  agrégée cross-domaine, pas de vue « incidents actifs » transverse type war-room.
+  agrégée cross-domaine. La vue « incidents actifs » transverse type war-room listée ici à
+  l'origine est depuis **corrigée** (ROADMAP.md item #11, `WarRoomPanel.vue` — onglet « Vue
+  active », nouvel onglet par défaut de `/alerts`, groupé par sévérité).
 - **Temps réel** : bien ciblé (Dashboard/Host/Docker/Network/APT/Alerts/Notifications/Audit/
   Commandes). Proxmox et les domaines d'automatisation restent en polling — choix documenté et
   cohérent, **pas un gap à corriger** sans preuve d'usage contraire.

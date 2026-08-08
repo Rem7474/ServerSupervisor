@@ -48,6 +48,19 @@
       nav-margin-class="mb-4"
       @update:model-value="onTabClick"
     >
+      <template #warroom>
+        <WarRoomPanel
+          :incidents="(incidents as any)"
+          :loading="incidentsLoading"
+          :error="incidentsError"
+          :is-admin="auth.isAdmin"
+          :resolving-id="resolvingId"
+          :acknowledging-id="acknowledgingId"
+          @resolve="resolveIncident"
+          @acknowledge="acknowledgeIncident"
+        />
+      </template>
+
       <template #rules>
         <AlertRuleList
           :rules="(rules as any)"
@@ -119,6 +132,7 @@ import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
 import MaintenanceWindowsPanel from '../components/alerts/MaintenanceWindowsPanel.vue'
+import WarRoomPanel from '../components/alerts/WarRoomPanel.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import EntityTabShell from '../components/EntityTabShell.vue'
 import type { EntityTab } from '../components/EntityTabShell.vue'
@@ -132,6 +146,7 @@ import type { AlertRule } from '../types/alert'
 const auth = useAuthStore()
 
 const TAB_TITLES: Record<string, string> = {
+  warroom: 'Vue active',
   rules: 'Alertes',
   releases: 'Suivi de versions',
   incidents: 'Historique de notifications',
@@ -185,9 +200,18 @@ const {
   onWebSocketAlert: onNotificationHistoryWSAlert,
 } = useNotificationHistory()
 
+async function ensureIncidentsLoaded(): Promise<void> {
+  if (!incidentsLoaded.value) await loadIncidents()
+}
+
+async function switchToWarRoom(): Promise<void> {
+  alertsTab.value = 'warroom'
+  await ensureIncidentsLoaded()
+}
+
 async function switchToIncidents(): Promise<void> {
   alertsTab.value = 'incidents'
-  if (!incidentsLoaded.value) await loadIncidents()
+  await ensureIncidentsLoaded()
 }
 
 // Disabling a rule can auto-resolve its active incidents server-side — mirror
@@ -207,6 +231,12 @@ async function onToggleEnabled(rule: AlertRule): Promise<void> {
 const hostFilterFromQuery = typeof route.query.host === 'string' ? route.query.host : ''
 
 const alertsTabs = computed<EntityTab[]>(() => [
+  {
+    key: 'warroom',
+    label: 'Vue active',
+    badges: activeIncidentCount.value > 0 ? [{ value: activeIncidentCount.value, badgeClass: 'badge bg-danger-lt text-danger ms-1' }] : [],
+    lazy: true,
+  },
   {
     key: 'rules',
     label: 'Règles',
@@ -233,12 +263,13 @@ const alertsTabs = computed<EntityTab[]>(() => [
   },
 ])
 
-// 'releases'/'incidents' each own the actual tab switch (alertsTab.value=...)
-// as part of their lazy-load-on-first-visit logic; 'rules' has no such
-// loader, so it's a plain assignment.
+// 'releases'/'incidents'/'warroom' each own the actual tab switch
+// (alertsTab.value=...) as part of their lazy-load-on-first-visit logic;
+// 'rules' has no such loader, so it's a plain assignment.
 function onTabClick(key: string): void {
   if (key === 'releases') { switchToTrackers(); return }
   if (key === 'incidents') { switchToIncidents(); return }
+  if (key === 'warroom') { switchToWarRoom(); return }
   alertsTab.value = key
 }
 
@@ -251,16 +282,20 @@ watch(alertsTab, (tab) => {
 onMounted(async () => {
   await init()
 
-  // Default landing tab is the active-incidents triage view, not rule
-  // configuration — an ops opening /alerts wants to see what's actually
-  // firing right now. `?tab=rules`/`?tab=releases` (used by deep links, e.g.
-  // the command palette's alert-rule search results) are honored explicitly.
+  // Default landing tab is the war-room triage view, not rule configuration
+  // — an ops opening /alerts wants to see what's actually firing right now,
+  // grouped by severity, before anything else. `?tab=rules`/`?tab=releases`/
+  // `?tab=incidents` (used by deep links, e.g. the command palette's
+  // alert-rule search results, or HostDetailView's incident history link)
+  // are honored explicitly.
   if (route.query.tab === 'rules') {
     // stays on the 'rules' default from useAlertsPage()
   } else if (route.query.tab === 'releases') {
     await switchToTrackers()
-  } else {
+  } else if (route.query.tab === 'incidents') {
     await switchToIncidents()
+  } else {
+    await switchToWarRoom()
   }
 
   incidentsPollTimer = setInterval(loadIncidents, 300_000)

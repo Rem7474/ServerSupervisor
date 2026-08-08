@@ -31,7 +31,7 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 | 8 | Check ICMP générique (indépendant de l'agent) | Aucun ICMP dans le code — équipements non-agentables hors de portée | Non démarré |
 | 9 | Templates de règles d'alertes réutilisables cross-host | Chaque règle est créée individuellement aujourd'hui | Non démarré |
 | 10 | Export / rapport périodique (disponibilité, incidents) | Aucun export PDF/CSV trouvé | Non démarré |
-| 11 | Vue « incidents actifs » transverse (war-room) | `AlertsView` liste, ne regroupe pas visuellement par sévérité/statut | Non démarré |
+| 11 | Vue « incidents actifs » transverse (war-room) | `AlertsView` liste, ne regroupe pas visuellement par sévérité/statut | Fait |
 | 12 | Découverte réseau basique (scan de sous-réseau) | Onboarding actuel = ajout manuel un par un | Non démarré |
 | 13 | Audit log : rétention configurable par catégorie, export | Rétention actuelle globale (`AUDIT_RETENTION_DAYS`), pas par type d'événement | Non démarré |
 | 14 | API publique documentée + clés dédiées pour intégrations tierces | L'API existe mais orientée frontend/agent, pas pensée « client tiers » | Non démarré |
