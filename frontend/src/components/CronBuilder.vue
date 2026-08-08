@@ -36,7 +36,7 @@
         id="cron-format-hint"
         class="form-hint"
       >
-        Format : minute heure jour-du-mois mois jour-de-la-semaine
+        Format : minute heure jour-du-mois mois jour-de-la-semaine — heure interprétée dans le fuseau horaire du serveur (variable <code>TZ</code>, UTC par défaut).
       </div>
     </div>
 
@@ -149,6 +149,9 @@
         />
         {{ preview }}
         <code class="ms-2 text-muted small">{{ modelValue }}</code>
+      </div>
+      <div class="form-hint">
+        Heure interprétée dans le fuseau horaire du serveur (variable <code>TZ</code>, UTC par défaut).
       </div>
     </div>
   </div>

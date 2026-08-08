@@ -34,7 +34,13 @@ services:
       # Server
       SERVER_PORT: "8080"
       BASE_URL: ${BASE_URL:-http://localhost:8080}
-      
+      # Timezone used to interpret Global Scheduled Tasks' cron expressions and
+      # compute their "next run" times. Standard Go/tzdata name, e.g.
+      # Europe/Paris. Unset defaults the container to UTC, which silently
+      # offsets every schedule from what a non-UTC user typed into the cron
+      # builder.
+      TZ: ${TZ:-UTC}
+
       # Proxies
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
