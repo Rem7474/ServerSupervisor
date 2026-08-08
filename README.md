@@ -143,7 +143,8 @@ suppression n'a aujourd'hui aucun contrôle de rôle côté API (voir le
 guide).
 
 Guide complet (whitelist par module, tableau comparatif runbook vs tâche
-planifiée, dépannage) : **[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)**.
+planifiée, fuseau horaire d'exécution du cron, dépannage) :
+**[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)**.
 
 ### Agent
 - Collecte automatique : CPU, RAM, disques, réseau, uptime
