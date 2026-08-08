@@ -28,94 +28,117 @@
       {{ error }}
     </div>
 
-    <LoadingSkeleton
-      v-if="loading && events.length === 0"
-      variant="list"
-    />
-
-    <EmptyState
-      v-else-if="filteredEvents.length === 0"
-      title="Aucun événement."
-    />
-
-    <div
-      v-else
-      class="timeline-list"
-    >
-      <div
-        v-for="ev in filteredEvents"
-        :key="ev.type + ev.id"
-        class="timeline-event d-flex gap-3 mb-3"
-      >
-        <div class="timeline-icon flex-shrink-0">
-          <span
-            class="avatar avatar-sm rounded"
-            :class="iconBg(ev)"
-          >
-            <IconClipboard
-              v-if="ev.type === 'audit'"
-              :size="16"
-              class="icon"
-            />
-            <IconTerminal2
-              v-else-if="ev.type === 'command'"
-              :size="16"
-              class="icon"
-            />
-            <IconAlertTriangle
-              v-else
-              :size="16"
-              class="icon"
-            />
-          </span>
-        </div>
-        <div class="flex-grow-1 min-w-0">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <span class="fw-medium">{{ ev.title }}</span>
-              <span
-                v-if="ev.module"
-                class="badge bg-secondary-lt text-secondary ms-1 small"
-              >{{ ev.module }}</span>
-            </div>
-            <div class="d-flex gap-1 flex-shrink-0 align-items-center">
-              <span
-                v-if="ev.severity"
-                class="badge"
-                :class="severityBadge(ev.severity)"
-              >{{ ev.severity }}</span>
-              <span
-                v-if="ev.status"
-                class="badge"
-                :class="statusBadge(ev.status)"
-              >{{ ev.status }}</span>
-              <button
-                v-if="ev.type === 'command'"
-                type="button"
-                class="btn btn-icon btn-sm btn-ghost-secondary"
-                title="Voir les logs"
-                aria-label="Voir les logs"
-                @click="emit('watch-command', ev)"
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Événement</th>
+              <th>Détail</th>
+              <th>Statut</th>
+              <th>Utilisateur</th>
+              <th class="text-end" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading && events.length === 0">
+              <td
+                colspan="7"
+                class="py-2"
               >
-                <IconList
-                  :size="16"
-                  class="icon icon-sm"
+                <LoadingSkeleton
+                  variant="table"
+                  :lines="5"
                 />
-              </button>
-            </div>
-          </div>
-          <div
-            v-if="ev.detail"
-            class="text-muted small mt-1 text-truncate"
-            style="max-width: 600px"
-          >
-            {{ ev.detail }}
-          </div>
-          <div class="text-muted small mt-1">
-            <RelativeTime :date="ev.timestamp" />
-            <span v-if="ev.user">· {{ ev.user }}</span>
-          </div>
-        </div>
+              </td>
+            </tr>
+            <tr v-else-if="filteredEvents.length === 0">
+              <td colspan="7">
+                <EmptyState title="Aucun événement." />
+              </td>
+            </tr>
+            <tr
+              v-for="ev in filteredEvents"
+              :key="ev.type + ev.id"
+            >
+              <td class="text-secondary small">
+                <RelativeTime :date="ev.timestamp" />
+              </td>
+              <td>
+                <span
+                  class="avatar avatar-xs rounded me-1"
+                  :class="iconBg(ev)"
+                >
+                  <IconClipboard
+                    v-if="ev.type === 'audit'"
+                    :size="12"
+                    class="icon"
+                  />
+                  <IconTerminal2
+                    v-else-if="ev.type === 'command'"
+                    :size="12"
+                    class="icon"
+                  />
+                  <IconAlertTriangle
+                    v-else
+                    :size="12"
+                    class="icon"
+                  />
+                </span>
+                <span
+                  v-if="ev.type === 'command' && ev.module"
+                  :class="moduleClass(ev.module)"
+                >{{ moduleLabel(ev.module) }}</span>
+                <span
+                  v-else
+                  class="badge bg-secondary-lt text-secondary"
+                >{{ TYPE_LABELS[ev.type] || ev.type }}</span>
+              </td>
+              <td class="fw-medium">
+                {{ ev.title }}
+              </td>
+              <td
+                class="text-secondary small text-truncate"
+                style="max-width: 320px"
+              >
+                {{ ev.detail || '—' }}
+              </td>
+              <td>
+                <span
+                  v-if="ev.severity"
+                  class="badge me-1"
+                  :class="severityBadge(ev.severity)"
+                >{{ ev.severity }}</span>
+                <span
+                  v-if="ev.status"
+                  class="badge"
+                  :class="statusBadge(ev.status)"
+                >{{ ev.status }}</span>
+                <span v-if="!ev.severity && !ev.status">—</span>
+              </td>
+              <td class="text-secondary small">
+                {{ ev.user || '—' }}
+              </td>
+              <td class="text-end">
+                <button
+                  v-if="ev.type === 'command'"
+                  type="button"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
+                  title="Voir les logs"
+                  aria-label="Voir les logs"
+                  @click="emit('watch-command', ev)"
+                >
+                  <IconList
+                    :size="16"
+                    class="icon icon-sm"
+                  />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -131,6 +154,7 @@ import PageRefreshBar from '../PageRefreshBar.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
+import { moduleClass, moduleLabel } from '../../utils/moduleMeta'
 
 const props = defineProps<{ hostId: string }>()
 
@@ -144,6 +168,12 @@ const TYPE_FILTERS = [
   { value: 'command', label: 'Commandes' },
   { value: 'incident', label: 'Incidents' },
 ]
+
+const TYPE_LABELS: Record<string, string> = {
+  audit: 'Audit',
+  command: 'Commande',
+  incident: 'Incident',
+}
 
 const TIMELINE_REFRESH_SEC = 60
 
@@ -223,10 +253,3 @@ function filterCommands(): void {
 
 defineExpose({ filterCommands })
 </script>
-
-<style scoped>
-.timeline-event:not(:last-child) {
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--tblr-border-color);
-}
-</style>

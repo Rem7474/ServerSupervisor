@@ -61,6 +61,19 @@ type HostTimelineEvent struct {
 	Status    string    `json:"status,omitempty"`
 	Severity  string    `json:"severity,omitempty"`
 	Module    string    `json:"module,omitempty"`
+	// Action and Target are only set for Type=="command" — they mirror
+	// remote_commands.action/.target and are what the frontend's
+	// resolveStructuredOutput(module, action, output) needs to render a
+	// command's output through the same per-type formatting (ProcessesTable /
+	// SystemdTable / ResticBackupSummaryCard) as the Commandes/Audit views,
+	// instead of falling back to a raw dump.
+	Action string `json:"action,omitempty"`
+	Target string `json:"target,omitempty"`
+	// Output is the full, untruncated remote_commands.output for Type=="command"
+	// (Detail above stays a short truncated summary for the table row) — the
+	// structured-output parsers need the complete JSON, not a 120-char slice.
+	// Empty for audit/incident-type events.
+	Output string `json:"output,omitempty"`
 	// User is the acting username, straight from audit_logs.username /
 	// remote_commands.triggered_by — "system" for an automated trigger
 	// (scheduled task, alert rule, release tracker), same convention already
