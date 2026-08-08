@@ -218,6 +218,14 @@ type AlertIncident struct {
 	// this still-open, unacknowledged incident (see AlertActions.EscalateAfterMinutes).
 	// Not exposed in the incidents list JSON — internal engine bookkeeping only.
 	LastEscalatedAt *time.Time `json:"-" db:"last_escalated_at"`
+	// CorrelatedWith is the id of the host's own open status_offline/
+	// heartbeat_timeout incident this one was linked to at creation time — a
+	// host-down cascade (e.g. every Docker container on that host firing its
+	// own incident) is still recorded per-incident but doesn't independently
+	// notify or escalate (see maybeCorrelateWithHostDown/maybeEscalateIncident
+	// in internal/alerts/engine.go). Nil for an uncorrelated incident, or for
+	// a host-down incident itself (it's never correlated with another one).
+	CorrelatedWith *int64 `json:"correlated_with,omitempty" db:"correlated_with"`
 	// Enriched post-fetch (not DB columns): Docker synthetic IDs resolution,
 	// and the live status of CommandID's remote_commands row (joined at read
 	// time so the frontend doesn't need a second round-trip per incident).
@@ -264,6 +272,9 @@ type NotificationItem struct {
 	// type only; always nil for a release-tracker entry).
 	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
 	AcknowledgedBy string     `json:"acknowledged_by,omitempty"`
+	// CorrelatedWith mirrors AlertIncident.CorrelatedWith (alert_incident type
+	// only) — lets the UI mark a host-down cascade child without a second call.
+	CorrelatedWith *int64 `json:"correlated_with,omitempty"`
 }
 
 // PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.

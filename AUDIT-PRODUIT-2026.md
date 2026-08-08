@@ -33,17 +33,22 @@ C'est le choix structurant à trancher avant d'investir davantage : rester un ou
 « agent-first, zéro friction » ou basculer vers un moteur de check extensible façon Checkmk
 (bien plus de valeur long terme, bien plus de complexité).
 
-Les manques les plus limitants pour un usage NOC/ops sérieux au quotidien : pas de
-déduplication/groupement d'incidents, pas de canal Slack/Teams/Discord/webhook générique, pas
-de tagging d'hôtes. Trois items listés ici à l'origine sont depuis **corrigés** : la faille
-RBAC sur la création/modification de tâches planifiées (voir [ROADMAP.md](ROADMAP.md) item #1
-et [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)),
-l'absence de fenêtres de maintenance (item #2, `internal/services/maintenance`) et l'absence
+Les manques les plus limitants pour un usage NOC/ops sérieux au quotidien : pas de canal
+Slack/Teams/Discord/webhook générique, pas de tagging d'hôtes. Quatre items listés ici à
+l'origine sont depuis **corrigés** : la faille RBAC sur la création/modification de tâches
+planifiées (voir [ROADMAP.md](ROADMAP.md) item #1 et
+[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)),
+l'absence de fenêtres de maintenance (item #2, `internal/services/maintenance`), l'absence
 d'escalade/acquittement d'incident (items #3/#4, `AlertActions.EscalateAfterMinutes` +
-`AcknowledgeIncident`).
+`AcknowledgeIncident`) et l'absence de déduplication (item #5, `alert_incidents.correlated_with`
+— scope MVP : un incident sur un hôte, un container/projet Docker sur cet hôte, ou une VM/CT
+Proxmox avec un lien confirmé, se corrèle avec l'incident `status_offline`/`heartbeat_timeout`
+ouvert de ce même hôte et n'envoie pas sa propre notification tant que celui-ci reste ouvert ;
+ça couvre le cas concret cité — un hôte down faisant tomber tous ses containers Docker d'un
+coup — pas un moteur de corrélation général entre alertes par ailleurs indépendantes).
 
 **Recommandation directrice** : ne pas refondre. Fermer d'abord les trous d'exploitabilité
-restants (dédup, tagging, canal webhook générique) avant d'élargir la couverture de
+restants (tagging, canal webhook générique) avant d'élargir la couverture de
 check (SNMP, ICMP, plugins). Trancher
 explicitement l'ambition « moteur de check extensible » avant de la communiquer — c'est la
 seule décision qui change l'ordre de grandeur de l'effort à venir.
@@ -57,7 +62,7 @@ seule décision qui change l'ordre de grandeur de l'effort à venir.
 | **Supervision système** | Agent Go : CPU/RAM/disque/réseau/uptime, Docker, APT+CVE, S.M.A.R.T., température, systemd, journal, processus. Protocole agent↔serveur verrouillé par test contractuel golden-fixture (`protocol/`). | Forte — cœur du produit | Élevée | Pas de checks custom pluggables (seulement exécution de scripts allowlistés via `tasks.yaml`, pas de métriques/seuils arbitraires) ; agent Linux uniquement (hypothèse — aucune mention Windows/macOS trouvée dans le code) | Rien de majeur, module le plus mûr |
 | **Supervision réseau** | Topologie Docker (liens réseau, overrides manuels), sondes HTTP/TCP | Topologie Docker = différenciant réel | Moyenne | Pas de SNMP, pas d'ICMP générique, pas de cartographie réseau physique L2/L3 | — |
 | **Inventaire / découverte** | Ajout d'hôte manuel (wizard), auto-import Proxmox (guests) et NPM (proxy hosts) | Onboarding acceptable à petite échelle | Faible en tant qu'« inventaire » | Pas de scan/découverte réseau générique, pas de tagging d'hôtes trouvé dans le modèle de données | Devient un frein au-delà de ~50 hôtes |
-| **Alertes / notifications** | Moteur avec hystérésis warn/crit + seuils de clear, cooldown, 3 sources (`agent`/`proxmox`/`synthetic`), déclenchement de commande (`command_trigger`), fenêtres de maintenance (`internal/services/maintenance`), acquittement + escalade d'incident (`AcknowledgeIncident`, `AlertActions.EscalateAfterMinutes`). Canaux : SMTP, ntfy, push navigateur, in-app. | Cœur différenciant, anti-flapping déjà pensé | Élevée sur le moteur, faible sur l'écosystème de canaux | **Pas de déduplication/groupement inter-hôtes** (confirmé par grep sur `internal/alerts`) ; pas de Slack/Teams/Discord/webhook générique | Clarifier la vraie liste de canaux (le « webhook » évoqué en prose README recouvre en fait ntfy) |
+| **Alertes / notifications** | Moteur avec hystérésis warn/crit + seuils de clear, cooldown, 3 sources (`agent`/`proxmox`/`synthetic`), déclenchement de commande (`command_trigger`), fenêtres de maintenance (`internal/services/maintenance`), acquittement + escalade d'incident (`AcknowledgeIncident`, `AlertActions.EscalateAfterMinutes`), corrélation host-down → cascade Docker/Proxmox (`alert_incidents.correlated_with`). Canaux : SMTP, ntfy, push navigateur, in-app. | Cœur différenciant, anti-flapping déjà pensé | Élevée sur le moteur, faible sur l'écosystème de canaux | Pas de Slack/Teams/Discord/webhook générique | Clarifier la vraie liste de canaux (le « webhook » évoqué en prose README recouvre en fait ntfy) |
 | **Dashboards** | Dashboard fleet temps réel (KPIs, statuts, drift versions Docker, résumé Proxmox), WS-driven | Bon point d'entrée quotidien | Élevée | Pas de dashboard personnalisable, pas de vue « santé globale » agrégée type SLA | — |
 | **Logs / événements** | Journalctl streamé par hôte, historique de commandes, web logs (trafic + menaces) avec corrélation CrowdSec | Bon niveau debug ad hoc, web logs très travaillés | Moyenne-élevée sur le web, faible sur logs applicatifs génériques | Pas de recherche full-text cross-host sur les logs système | — |
 | **Configuration** | Settings globaux en DB, override par variables d'env, cartes settings par domaine | Correcte | Bonne | Pas d'export/import config-as-code, pas de versionning des règles d'alerte | — |
@@ -185,7 +190,7 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 
 Ne pas refondre — la base (couches, sécurité, moteur d'alertes, temps réel, design system) est
 saine et déjà auto-critiquée par l'équipe elle-même. Fermer d'abord les trous d'exploitabilité
-connus et documentés (dédup, tagging, canal webhook générique — RBAC tâches planifiées,
+connus et documentés (tagging, canal webhook générique — RBAC tâches planifiées, dédup,
 maintenance windows et escalade/ack sont déjà corrigés) : effort limité, impact immédiat sur la
 confiance en production.
 Trancher ensuite, explicitement et avant toute communication publique, le pari « moteur de

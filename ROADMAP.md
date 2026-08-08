@@ -20,7 +20,7 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 | 2 | Fenêtres de maintenance | Aucune existante (confirmé par grep) — bruit d'alerte pendant les interventions planifiées | Fait |
 | 3 | Escalade d'alertes (relance après N minutes si non acquittée) | Aucune existante — un incident critique non vu reste silencieux | Fait |
 | 4 | Acquittement (ack) d'incident + statut « en cours de traitement » | Prérequis technique de l'escalade (#3) et du dédup (#5) | Fait |
-| 5 | Déduplication / groupement d'alertes corrélées | Un hôte down peut aujourd'hui déclencher une cascade d'alertes filles indépendantes | Non démarré |
+| 5 | Déduplication / groupement d'alertes corrélées | Un hôte down peut aujourd'hui déclencher une cascade d'alertes filles indépendantes | Fait |
 | 6 | Canal Slack / Teams / Discord / webhook générique | Seuls SMTP et ntfy existent réellement (le « webhook » du README recouvre ntfy) | Non démarré |
 | 7 | Tagging des hôtes + groupes dynamiques | Aucun tagging trouvé dans le modèle de données — bloque le filtrage à l'échelle et les règles par groupe | Non démarré |
 
@@ -125,7 +125,7 @@ jamais pièce par pièce (voir `CLAUDE.md`, section serveur).
 1. ~~RBAC serveur sur tâches planifiées~~ — fait
 2. ~~Fenêtres de maintenance~~ — fait
 3. ~~Escalade + ack d'incidents~~ — fait
-4. Déduplication / groupement d'alertes
+4. ~~Déduplication / groupement d'alertes~~ — fait
 5. Canal webhook générique (Slack/Teams/Discord)
 6. Tagging des hôtes
 7. Secret scanning + Trivy bloquant en CI

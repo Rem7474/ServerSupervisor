@@ -206,6 +206,23 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 					// to AlertActions.Cooldown, so a flapping rule can't spam either.
 					broadcastIncidentUpdate(pusher, "fired", rule, host.ID)
 
+					// A host-down cascade (e.g. every Docker container on that host
+					// firing its own incident at once) shouldn't send an independent
+					// notification per child — link it to the host's own open
+					// status_offline/heartbeat_timeout incident and skip straight to
+					// the next target. The incident itself is still recorded (and
+					// still visible, grouped, in the UI) — only the loud notification
+					// and command_trigger are suppressed, since the real cause is
+					// "host is down," not this rule's own condition.
+					if correlatedWith := correlationTargetIncidentID(ctx, db, rule, host.ID); correlatedWith != nil {
+						if err := db.SetAlertIncidentCorrelation(ctx, incID, *correlatedWith); err != nil {
+							slog.ErrorContext(ctx, "alerts: failed to set incident correlation", slog.Int64("incident_id", incID), slog.Any("err", err))
+						} else {
+							slog.InfoContext(ctx, "alerts: incident correlated with host-down, notification suppressed", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Int64("incident_id", incID), slog.Int64("correlated_with", *correlatedWith))
+						}
+						continue
+					}
+
 					now := time.Now()
 					cooldown := time.Duration(rule.Actions.Cooldown) * time.Second
 					if cooldown > 0 && rule.LastFired != nil && now.Sub(*rule.LastFired) < cooldown {
@@ -261,6 +278,73 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 	}
 }
 
+// isHostDownMetric identifies the two "is this host reachable at all" metrics
+// — the root-cause signal correlationTargetIncidentID looks for. A rule using
+// one of these never gets correlated with another incident: it IS the root
+// cause a cascade correlates against, not a symptom of one.
+func isHostDownMetric(metric string) bool {
+	return metric == "status_offline" || metric == "heartbeat_timeout"
+}
+
+// correlationTargetIncidentID checks whether the target this incident just
+// fired on belongs to a host that's currently down, and if so returns that
+// host's own open status_offline/heartbeat_timeout incident id to correlate
+// against (see the comment at its call site in EvaluateAlerts). Returns nil
+// when the rule is itself a host-down rule, when the target can't be resolved
+// to a real host (Proxmox non-guest scopes, synthetic probes — same
+// unresolvable-target trade-off as resolvableHostID in
+// internal/handlers/host_authz.go), or when that host isn't currently down.
+func correlationTargetIncidentID(ctx context.Context, db *database.DB, rule models.AlertRule, targetID string) *int64 {
+	if isHostDownMetric(rule.Metric) {
+		return nil
+	}
+	realHostID, ok := correlationHostID(ctx, db, targetID)
+	if !ok {
+		return nil
+	}
+	incID, err := db.GetOpenHostDownIncidentID(ctx, realHostID)
+	if err != nil {
+		slog.ErrorContext(ctx, "alerts: failed to check host-down correlation", slog.String("host", realHostID), slog.Any("err", err))
+		return nil
+	}
+	return incID
+}
+
+// correlationHostID resolves an evaluation target ID to the real agent host
+// it should be correlated against. Mirrors triggerAlertCommand's synthetic-ID
+// resolution (docker:container:/docker:compose:/proxmox:guest:) since a
+// host-down cascade shows up on exactly those target shapes; a bare agent
+// host ID resolves to itself. Proxmox non-guest scopes and synthetic probes
+// have no single owning host and return ok=false, same as triggerAlertCommand.
+func correlationHostID(ctx context.Context, db *database.DB, targetID string) (hostID string, ok bool) {
+	switch {
+	case strings.HasPrefix(targetID, "docker:container:"):
+		uuid := strings.TrimPrefix(targetID, "docker:container:")
+		c, err := db.GetDockerContainerByID(ctx, uuid)
+		if err != nil || c == nil {
+			return "", false
+		}
+		return c.HostID, true
+	case strings.HasPrefix(targetID, "docker:compose:"):
+		composeHostID, _, composeOK := parseDockerComposeScopeID(targetID)
+		return composeHostID, composeOK
+	case strings.HasPrefix(targetID, "proxmox:"):
+		parts := strings.SplitN(targetID, ":", 3)
+		if len(parts) != 3 || parts[1] != "guest" || parts[2] == "" {
+			return "", false
+		}
+		link, err := db.GetProxmoxGuestLinkByGuest(ctx, parts[2])
+		if err != nil || link == nil || link.Status != "confirmed" {
+			return "", false
+		}
+		return link.HostID, true
+	case strings.HasPrefix(targetID, "synthetic:"):
+		return "", false
+	default:
+		return targetID, true
+	}
+}
+
 // maybeEscalateIncident re-sends the fired notification for an already-open
 // incident that hasn't been acknowledged, once AlertActions.EscalateAfterMinutes
 // have elapsed since it last notified (its trigger time, or its last
@@ -273,7 +357,11 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 // notification, and isn't what "escalation" here means.
 func maybeEscalateIncident(ctx context.Context, db *database.DB, chDispatch *notifychannels.Dispatcher, pusher NotificationPusher, cfg *config.Config, rule models.AlertRule, host models.Host, value float64, ruleName string, inc models.AlertIncident) {
 	escalateAfter := rule.Actions.EscalateAfterMinutes
-	if escalateAfter <= 0 || inc.AcknowledgedAt != nil {
+	// A correlated incident (host-down cascade child, see
+	// correlationTargetIncidentID) never independently escalates either —
+	// same reasoning as suppressing its initial notification: the real cause
+	// is the host-down incident, which handles its own escalation.
+	if escalateAfter <= 0 || inc.AcknowledgedAt != nil || inc.CorrelatedWith != nil {
 		return
 	}
 	since := inc.TriggeredAt

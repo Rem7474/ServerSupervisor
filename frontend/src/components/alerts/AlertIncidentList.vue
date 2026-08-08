@@ -265,6 +265,12 @@
                     :text="notificationTypeLabel(row.item)"
                     compact
                   />
+                  <IconLink
+                    v-if="row.item.correlated_with"
+                    :size="14"
+                    class="icon text-muted ms-1"
+                    title="Corrélé avec l'incident « hôte hors ligne » — pas de notification séparée"
+                  />
                 </td>
                 <td>
                   <div
@@ -407,7 +413,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconBell, IconCheck, IconChevronRight, IconEye, IconList, IconSearch, IconStack2, IconX } from '@tabler/icons-vue'
+import { IconBell, IconCheck, IconChevronRight, IconEye, IconLink, IconList, IconSearch, IconStack2, IconX } from '@tabler/icons-vue'
 import BadgePill from '../common/BadgePill.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'

@@ -446,6 +446,143 @@ func TestEvaluateAlerts_AcknowledgedIncidentDoesNotEscalate(t *testing.T) {
 	}
 }
 
+// TestEvaluateAlerts_CorrelatesDockerIncidentWithHostDown is the regression
+// test for ROADMAP.md item #5: a host going down used to make every Docker
+// container on it fire its own independent incident + notification — a
+// cascade of alert noise for one root cause. The child incident must still
+// be recorded (correlated_with set), but must not send its own notification.
+func TestEvaluateAlerts_CorrelatesDockerIncidentWithHostDown(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-correlate-1"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "correlate-host", Hostname: "correlate-host", Status: "offline", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+
+	statusRule := &models.AlertRule{
+		SourceType: "agent", HostID: &hostID, Metric: "status_offline", Enabled: true,
+		Actions: models.AlertActions{Channels: []string{"browser"}},
+	}
+	if err := db.CreateAlertRule(ctx, statusRule); err != nil {
+		t.Fatalf("create status_offline rule: %v", err)
+	}
+
+	cfg := &config.Config{}
+	disp := dispatch.New(db)
+
+	// First tick: only the host-down rule exists — creates the root incident.
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, &stubPusher{}, nil)
+	hostDownInc, err := db.GetOpenAlertIncident(ctx, statusRule.ID, hostID)
+	if err != nil {
+		t.Fatalf("expected an open status_offline incident, got error: %v", err)
+	}
+
+	if err := db.UpsertDockerContainers(ctx, hostID, []models.DockerContainer{
+		{ID: "c-correlate-1", ContainerID: "c-correlate-1-real", Name: "web", Image: "nginx", ImageTag: "1.27", State: "exited"},
+	}); err != nil {
+		t.Fatalf("seed container: %v", err)
+	}
+	dockerRule := &models.AlertRule{
+		SourceType: "docker", Metric: "docker_container_state", Operator: ">",
+		ThresholdWarn: floatPtr(0.5), ThresholdCrit: floatPtr(1.5), Enabled: true,
+		DockerScope: &models.DockerMetricScope{
+			ScopeMode: "container", HostID: hostID,
+			ContainerIDs: []string{"c-correlate-1"},
+			CritStates:   []string{"exited"},
+		},
+		Actions: models.AlertActions{Channels: []string{"browser"}},
+	}
+	if err := db.CreateAlertRule(ctx, dockerRule); err != nil {
+		t.Fatalf("create docker rule: %v", err)
+	}
+
+	// Second tick: the docker rule fires while the host is still down.
+	pusher := &stubPusher{}
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher, nil)
+
+	dockerInc, err := db.GetOpenAlertIncident(ctx, dockerRule.ID, "docker:container:c-correlate-1")
+	if err != nil {
+		t.Fatalf("expected the docker incident to still be recorded, got error: %v", err)
+	}
+	if dockerInc.CorrelatedWith == nil || *dockerInc.CorrelatedWith != hostDownInc.ID {
+		t.Fatalf("expected the docker incident correlated_with = %d, got %v", hostDownInc.ID, dockerInc.CorrelatedWith)
+	}
+	if pusher.count != 1 {
+		t.Errorf("pusher.count = %d, want 1 (list refresh ping only, no independent browser notification)", pusher.count)
+	}
+
+	// GetAlertIncidents (the /alerts/incidents list endpoint's query) must
+	// surface the same correlation, not just the direct per-rule lookup.
+	listed, err := db.GetAlertIncidents(ctx, 10, 0)
+	if err != nil {
+		t.Fatalf("GetAlertIncidents: %v", err)
+	}
+	var foundCorrelated bool
+	for _, li := range listed {
+		if li.ID == dockerInc.ID {
+			foundCorrelated = true
+			if li.CorrelatedWith == nil || *li.CorrelatedWith != hostDownInc.ID {
+				t.Errorf("GetAlertIncidents: correlated_with = %v, want %d", li.CorrelatedWith, hostDownInc.ID)
+			}
+		}
+	}
+	if !foundCorrelated {
+		t.Fatalf("docker incident %d not found via GetAlertIncidents", dockerInc.ID)
+	}
+}
+
+// TestEvaluateAlerts_NoCorrelationWhenHostIsUp is the negative case: the same
+// Docker rule firing on a host that's online (no open status_offline
+// incident) must notify normally, not silently.
+func TestEvaluateAlerts_NoCorrelationWhenHostIsUp(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-correlate-2"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "correlate-host-2", Hostname: "correlate-host-2", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+	if err := db.UpsertDockerContainers(ctx, hostID, []models.DockerContainer{
+		{ID: "c-correlate-2", ContainerID: "c-correlate-2-real", Name: "web", Image: "nginx", ImageTag: "1.27", State: "exited"},
+	}); err != nil {
+		t.Fatalf("seed container: %v", err)
+	}
+	dockerRule := &models.AlertRule{
+		SourceType: "docker", Metric: "docker_container_state", Operator: ">",
+		ThresholdWarn: floatPtr(0.5), ThresholdCrit: floatPtr(1.5), Enabled: true,
+		DockerScope: &models.DockerMetricScope{
+			ScopeMode: "container", HostID: hostID,
+			ContainerIDs: []string{"c-correlate-2"},
+			CritStates:   []string{"exited"},
+		},
+		Actions: models.AlertActions{Channels: []string{"browser"}},
+	}
+	if err := db.CreateAlertRule(ctx, dockerRule); err != nil {
+		t.Fatalf("create docker rule: %v", err)
+	}
+
+	pusher := &stubPusher{}
+	alerts.EvaluateAlerts(ctx, db, &config.Config{}, dispatch.New(db), pusher, nil)
+
+	dockerInc, err := db.GetOpenAlertIncident(ctx, dockerRule.ID, "docker:container:c-correlate-2")
+	if err != nil {
+		t.Fatalf("expected an open docker incident, got error: %v", err)
+	}
+	if dockerInc.CorrelatedWith != nil {
+		t.Errorf("expected no correlation for a host that's up, got correlated_with = %d", *dockerInc.CorrelatedWith)
+	}
+	if pusher.count != 2 {
+		t.Errorf("pusher.count = %d, want 2 (list refresh + browser notification, uncorrelated fire)", pusher.count)
+	}
+}
+
+func floatPtr(f float64) *float64 { return &f }
+
 // TestBuildDockerTestTargets_MultiContainerScope confirms a "specific
 // containers" scope evaluates every selected container, not just one — the
 // alert engine used to only ever build a target for a single ContainerID.
