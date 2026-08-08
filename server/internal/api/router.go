@@ -26,6 +26,7 @@ import (
 	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
+	maintenancesvc "github.com/serversupervisor/server/internal/services/maintenance"
 	networksvc "github.com/serversupervisor/server/internal/services/network"
 	notifssvc "github.com/serversupervisor/server/internal/services/notifications"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
@@ -105,6 +106,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	}), db)
 	pushH := handlers.NewPushHandler(pushSvc)
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
+	maintenanceH := handlers.NewMaintenanceWindowHandler(maintenancesvc.NewService(db), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	runbookH := handlers.NewRunbooksHandler(runbooksvc.NewService(db, dispatcher))
@@ -146,6 +148,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerPushRoutes(v1, pushH)
 	registerSettingsRoutes(v1, settingsH)
 	registerTaskRoutes(v1, scheduledTaskH)
+	registerMaintenanceRoutes(v1, maintenanceH)
 	registerUserRoutes(v1, userH)
 	registerGitWebhookRoutes(r, v1, gitWebhookH, webhookRateLimiter)
 	registerReleaseTrackerRoutes(v1, releaseTrackerH)
@@ -374,6 +377,23 @@ func registerTaskRoutes(g *gin.RouterGroup, h *handlers.ScheduledTaskHandler) {
 	g.DELETE("/scheduled-tasks/:id", h.DeleteScheduledTask)
 	g.POST("/scheduled-tasks/:id/run", h.RunScheduledTask)
 	g.GET("/scheduled-tasks/:id/executions", h.GetScheduledTaskExecutions)
+}
+
+func registerMaintenanceRoutes(g *gin.RouterGroup, h *handlers.MaintenanceWindowHandler) {
+	// List/read: any authenticated user, same as scheduled tasks' list routes.
+	// CreateMaintenanceWindow and DeleteMaintenanceWindow enforce Operator+ on
+	// the target host themselves (requireHostAccess, host_authz.go) — the
+	// window's host is resolved first in Delete since :id is the window id,
+	// not the host id, same lookup-then-check shape as scheduled tasks'
+	// Update/Delete.
+	g.GET("/maintenance-windows", h.ListAllMaintenanceWindows)
+	g.GET("/hosts/:id/maintenance-windows", h.ListMaintenanceWindowsForHost)
+	g.POST("/hosts/:id/maintenance-windows", h.CreateMaintenanceWindow)
+	g.DELETE("/maintenance-windows/:id", h.DeleteMaintenanceWindow)
+
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.POST("/maintenance-windows/global", h.CreateGlobalMaintenanceWindow)
 }
 
 func registerUserRoutes(g *gin.RouterGroup, h *handlers.UserHandler) {

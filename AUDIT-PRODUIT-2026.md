@@ -27,21 +27,23 @@ non protégées, pas de backup DB) est déjà traitée — voir [AUDIT-2025.md](
 ServerSupervisor a des collecteurs agent figés + 2 types de sondes synthétiques (HTTP/TCP) +
 polling Proxmox API — pas de moteur de check générique, pas de plugins, pas de découverte
 réseau automatique, pas de templates de seuils réutilisables. Confirmé par recherche dans le
-code : **aucun ICMP, aucun SNMP, aucune fenêtre de maintenance, aucune escalade d'alerte**.
+code : **aucun ICMP, aucun SNMP, aucune escalade d'alerte** (la fenêtre de maintenance listée
+ici à l'origine est depuis corrigée, voir ROADMAP.md item #2).
 C'est le choix structurant à trancher avant d'investir davantage : rester un outil
 « agent-first, zéro friction » ou basculer vers un moteur de check extensible façon Checkmk
 (bien plus de valeur long terme, bien plus de complexité).
 
-Les manques les plus limitants pour un usage NOC/ops sérieux au quotidien : pas de fenêtres de
-maintenance, pas d'escalade, pas de déduplication/groupement d'incidents, pas de canal
-Slack/Teams/Discord/webhook générique, pas de tagging d'hôtes. La faille RBAC sur la
-création/modification de tâches planifiées, documentée ici à l'origine, est **corrigée**
-(voir [ROADMAP.md](ROADMAP.md) item #1 et
-[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)).
+Les manques les plus limitants pour un usage NOC/ops sérieux au quotidien : pas d'escalade,
+pas de déduplication/groupement d'incidents, pas de canal Slack/Teams/Discord/webhook
+générique, pas de tagging d'hôtes. Deux items listés ici à l'origine sont depuis **corrigés** :
+la faille RBAC sur la création/modification de tâches planifiées (voir
+[ROADMAP.md](ROADMAP.md) item #1 et
+[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil))
+et l'absence de fenêtres de maintenance (item #2, `internal/services/maintenance`).
 
 **Recommandation directrice** : ne pas refondre. Fermer d'abord les trous d'exploitabilité
-(maintenance windows, escalade, dédup, RBAC tâches planifiées, tagging, canal webhook
-générique) avant d'élargir la couverture de check (SNMP, ICMP, plugins). Trancher
+restants (escalade, dédup, tagging, canal webhook générique) avant d'élargir la couverture de
+check (SNMP, ICMP, plugins). Trancher
 explicitement l'ambition « moteur de check extensible » avant de la communiquer — c'est la
 seule décision qui change l'ordre de grandeur de l'effort à venir.
 
@@ -54,7 +56,7 @@ seule décision qui change l'ordre de grandeur de l'effort à venir.
 | **Supervision système** | Agent Go : CPU/RAM/disque/réseau/uptime, Docker, APT+CVE, S.M.A.R.T., température, systemd, journal, processus. Protocole agent↔serveur verrouillé par test contractuel golden-fixture (`protocol/`). | Forte — cœur du produit | Élevée | Pas de checks custom pluggables (seulement exécution de scripts allowlistés via `tasks.yaml`, pas de métriques/seuils arbitraires) ; agent Linux uniquement (hypothèse — aucune mention Windows/macOS trouvée dans le code) | Rien de majeur, module le plus mûr |
 | **Supervision réseau** | Topologie Docker (liens réseau, overrides manuels), sondes HTTP/TCP | Topologie Docker = différenciant réel | Moyenne | Pas de SNMP, pas d'ICMP générique, pas de cartographie réseau physique L2/L3 | — |
 | **Inventaire / découverte** | Ajout d'hôte manuel (wizard), auto-import Proxmox (guests) et NPM (proxy hosts) | Onboarding acceptable à petite échelle | Faible en tant qu'« inventaire » | Pas de scan/découverte réseau générique, pas de tagging d'hôtes trouvé dans le modèle de données | Devient un frein au-delà de ~50 hôtes |
-| **Alertes / notifications** | Moteur avec hystérésis warn/crit + seuils de clear, cooldown, 3 sources (`agent`/`proxmox`/`synthetic`), déclenchement de commande (`command_trigger`). Canaux : SMTP, ntfy, push navigateur, in-app. | Cœur différenciant, anti-flapping déjà pensé | Élevée sur le moteur, faible sur l'écosystème de canaux | **Aucune fenêtre de maintenance, aucune escalade, pas de déduplication/groupement inter-hôtes** (confirmé par grep sur `internal/alerts`) ; pas de Slack/Teams/Discord/webhook générique | Clarifier la vraie liste de canaux (le « webhook » évoqué en prose README recouvre en fait ntfy) |
+| **Alertes / notifications** | Moteur avec hystérésis warn/crit + seuils de clear, cooldown, 3 sources (`agent`/`proxmox`/`synthetic`), déclenchement de commande (`command_trigger`), fenêtres de maintenance (`internal/services/maintenance`). Canaux : SMTP, ntfy, push navigateur, in-app. | Cœur différenciant, anti-flapping déjà pensé | Élevée sur le moteur, faible sur l'écosystème de canaux | **Aucune escalade, pas de déduplication/groupement inter-hôtes** (confirmé par grep sur `internal/alerts`) ; pas de Slack/Teams/Discord/webhook générique | Clarifier la vraie liste de canaux (le « webhook » évoqué en prose README recouvre en fait ntfy) |
 | **Dashboards** | Dashboard fleet temps réel (KPIs, statuts, drift versions Docker, résumé Proxmox), WS-driven | Bon point d'entrée quotidien | Élevée | Pas de dashboard personnalisable, pas de vue « santé globale » agrégée type SLA | — |
 | **Logs / événements** | Journalctl streamé par hôte, historique de commandes, web logs (trafic + menaces) avec corrélation CrowdSec | Bon niveau debug ad hoc, web logs très travaillés | Moyenne-élevée sur le web, faible sur logs applicatifs génériques | Pas de recherche full-text cross-host sur les logs système | — |
 | **Configuration** | Settings globaux en DB, override par variables d'env, cartes settings par domaine | Correcte | Bonne | Pas d'export/import config-as-code, pas de versionning des règles d'alerte | — |
@@ -182,8 +184,9 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 
 Ne pas refondre — la base (couches, sécurité, moteur d'alertes, temps réel, design system) est
 saine et déjà auto-critiquée par l'équipe elle-même. Fermer d'abord les trous d'exploitabilité
-connus et documentés (RBAC tâches planifiées, maintenance windows, escalade, dédup, tagging,
-canal webhook générique) : effort limité, impact immédiat sur la confiance en production.
+connus et documentés (escalade, dédup, tagging, canal webhook générique — RBAC tâches
+planifiées et maintenance windows sont déjà corrigés) : effort limité, impact immédiat sur la
+confiance en production.
 Trancher ensuite, explicitement et avant toute communication publique, le pari « moteur de
 check extensible façon Checkmk » — c'est la seule décision qui change réellement l'ordre de
 grandeur des mois à venir. Le reste (SNMP, status page, SLO, scale-out) doit rester conditionné

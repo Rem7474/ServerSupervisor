@@ -152,6 +152,25 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 				continue
 			}
 
+			if inMaintenance, err := db.IsHostInMaintenance(ctx, host.ID); err != nil {
+				slog.ErrorContext(ctx, "alerts: failed to check maintenance window", slog.String("host", host.ID), slog.Any("err", err))
+			} else if inMaintenance {
+				// Same shape as the disabled-rule branch above: silently resolve
+				// any already-open incident (UI refresh ping only, no loud
+				// notification channel) and skip evaluation entirely, so a
+				// planned intervention produces zero alert noise in either
+				// direction — no new incidents, no "resolved" emails either.
+				if inc, err := db.GetOpenAlertIncident(ctx, rule.ID, host.ID); err == nil && inc != nil {
+					if err := db.ResolveAlertIncident(ctx, inc.ID); err != nil {
+						slog.ErrorContext(ctx, "alerts: failed to resolve incident for host in maintenance", slog.Int64("incident_id", inc.ID), slog.Any("err", err))
+					} else {
+						slog.InfoContext(ctx, "alerts: incident silently resolved — host in maintenance", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Int64("incident_id", inc.ID))
+						broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
+					}
+				}
+				continue
+			}
+
 			value, ok := GetMetricValue(ctx, db, host, rule)
 			if !ok {
 				continue

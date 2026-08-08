@@ -228,6 +228,102 @@ func TestEvaluateAlerts_NoIncidentBelowThreshold(t *testing.T) {
 	}
 }
 
+// TestEvaluateAlerts_SuppressesNewIncidentDuringMaintenance ensures a host
+// covered by an active maintenance window never opens a new incident, even
+// with a metric well past the threshold — the core behavior the maintenance
+// windows feature exists for (ROADMAP.md item #2).
+func TestEvaluateAlerts_SuppressesNewIncidentDuringMaintenance(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-maintenance-1"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "alert-host", Hostname: "alert-host", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+	insertCPUMetric(t, db, hostID, 95, time.Now())
+
+	now := time.Now()
+	if _, err := db.CreateMaintenanceWindow(ctx, models.MaintenanceWindow{
+		HostID: &hostID, Reason: "planned upgrade",
+		StartsAt: now.Add(-time.Minute), EndsAt: now.Add(time.Hour), CreatedBy: "tester",
+	}); err != nil {
+		t.Fatalf("create maintenance window: %v", err)
+	}
+
+	warn := 50.0
+	rule := &models.AlertRule{
+		SourceType: "agent", HostID: &hostID, Metric: "cpu", Operator: ">",
+		ThresholdWarn: &warn, Enabled: true,
+		Actions: models.AlertActions{Channels: []string{"browser"}},
+	}
+	if err := db.CreateAlertRule(ctx, rule); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	alerts.EvaluateAlerts(ctx, db, &config.Config{}, dispatch.New(db), &stubPusher{}, nil)
+
+	if _, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID); err == nil {
+		t.Error("did not expect an incident for a host in an active maintenance window")
+	}
+}
+
+// TestEvaluateAlerts_SilentlyResolvesIncidentWhenMaintenanceStarts covers the
+// other half: an incident already open when a maintenance window starts must
+// be closed on the next tick, same as a disabled rule.
+func TestEvaluateAlerts_SilentlyResolvesIncidentWhenMaintenanceStarts(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-maintenance-2"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "alert-host", Hostname: "alert-host", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+	insertCPUMetric(t, db, hostID, 95, time.Now())
+
+	warn := 50.0
+	rule := &models.AlertRule{
+		SourceType: "agent", HostID: &hostID, Metric: "cpu", Operator: ">",
+		ThresholdWarn: &warn, Enabled: true,
+		Actions: models.AlertActions{Channels: []string{"browser"}},
+	}
+	if err := db.CreateAlertRule(ctx, rule); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	cfg := &config.Config{}
+	disp := dispatch.New(db)
+
+	// First tick: incident opens normally, no maintenance window yet.
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, &stubPusher{}, nil)
+	if _, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID); err != nil {
+		t.Fatalf("expected an open incident before maintenance started, got error: %v", err)
+	}
+
+	now := time.Now()
+	if _, err := db.CreateMaintenanceWindow(ctx, models.MaintenanceWindow{
+		HostID: &hostID, Reason: "planned upgrade",
+		StartsAt: now.Add(-time.Minute), EndsAt: now.Add(time.Hour), CreatedBy: "tester",
+	}); err != nil {
+		t.Fatalf("create maintenance window: %v", err)
+	}
+
+	// Metric still breaching — only the maintenance window changed.
+	insertCPUMetric(t, db, hostID, 95, now.Add(time.Second))
+	pusher := &stubPusher{}
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher, nil)
+
+	if _, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID); err == nil {
+		t.Error("expected the incident to be silently resolved once the host entered maintenance")
+	}
+	if pusher.count != 1 {
+		t.Errorf("pusher.count = %d, want 1 (list refresh ping only, no loud re-fire)", pusher.count)
+	}
+}
+
 // TestBuildDockerTestTargets_MultiContainerScope confirms a "specific
 // containers" scope evaluates every selected container, not just one — the
 // alert engine used to only ever build a target for a single ContainerID.

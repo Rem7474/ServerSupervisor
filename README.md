@@ -89,6 +89,7 @@ inclus) :
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
+- **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
 - **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
 - **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, corrélation CrowdSec si activée côté agent), stats trafic web sur `/traffic`, menaces web sur `/threats`
@@ -778,6 +779,15 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 - `npm_requests`
 - `npm_traffic_bytes`
 - `npm_5xx_errors`
+
+#### Fenêtres de maintenance
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/maintenance-windows` | Liste globale | Authentifié |
+| `GET` | `/api/v1/hosts/:id/maintenance-windows` | Fenêtres applicables à un hôte (les siennes + les globales) | Authentifié |
+| `POST` | `/api/v1/hosts/:id/maintenance-windows` | Créer une fenêtre sur un hôte | Operator+ (vérifié par hôte) |
+| `POST` | `/api/v1/maintenance-windows/global` | Créer une fenêtre sur tous les hôtes | Admin |
+| `DELETE` | `/api/v1/maintenance-windows/:id` | Supprimer une fenêtre | Operator+ sur l'hôte (Admin si globale) |
 
 #### Notifications & Push
 | Méthode | Endpoint | Description | Rôle |
