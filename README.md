@@ -84,7 +84,7 @@ inclus) :
 - **Versions** : suivi des releases GitHub/GitLab/Gitea et des digests d'images Docker, notification ou déclenchement automatique (script ou `compose pull && up -d`) — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
 - **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
 - **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Monitoring** : sondes HTTP/TCP synthétiques (uptime) et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
+- **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
@@ -808,6 +808,15 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | `DELETE` | `/api/v1/push/subscribe` | Supprimer l'abonnement | Authentifié |
 
 #### Monitoring (sondes uptime & certificats SSL)
+
+Une sonde uptime a un `type` : `http`, `tcp` ou `icmp` (ping). Le check ICMP a besoin d'un
+socket raw, ce qui nécessite la capacité Linux `CAP_NET_RAW` — l'image officielle l'accorde au
+binaire non-root via `setcap` dans le `Dockerfile` (`CAP_NET_RAW` fait déjà partie de
+l'ensemble de capacités par défaut de Docker, aucun `cap_add` requis en temps normal). Un
+déploiement durci avec `cap_drop: [ALL]` doit ajouter explicitement `cap_add: [NET_RAW]` ; sans
+cette capacité, un check ICMP échoue avec un message explicite plutôt que de rapporter un faux
+« hors ligne ».
+
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/uptime/probes` | Liste des sondes uptime | Authentifié |

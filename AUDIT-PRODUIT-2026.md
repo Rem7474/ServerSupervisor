@@ -24,11 +24,12 @@ avec corrélation CrowdSec, PWA. La dette « de fondation » (secrets qui fuitai
 non protégées, pas de backup DB) est déjà traitée — voir [AUDIT-2025.md](AUDIT-2025.md).
 
 **L'écart réel avec Checkmk n'est pas featuritude, c'est l'architecture de check.**
-ServerSupervisor a des collecteurs agent figés + 2 types de sondes synthétiques (HTTP/TCP) +
-polling Proxmox API — pas de moteur de check générique, pas de plugins, pas de découverte
-réseau automatique. Confirmé par recherche dans le code : **aucun ICMP, aucun SNMP** (la
-fenêtre de maintenance, l'escalade d'alerte et les templates de règles réutilisables
-cross-host listés ici à l'origine sont depuis corrigés, voir ROADMAP.md items #2, #3 et #9).
+ServerSupervisor a des collecteurs agent figés + 3 types de sondes synthétiques (HTTP/TCP/ICMP)
++ polling Proxmox API — pas de moteur de check générique, pas de plugins, pas de découverte
+réseau automatique. Confirmé par recherche dans le code : **aucun SNMP** (l'absence d'ICMP
+listée ici à l'origine, ainsi que la fenêtre de maintenance, l'escalade d'alerte et les
+templates de règles réutilisables cross-host, sont depuis corrigées — voir ROADMAP.md items
+#2, #3, #8 et #9).
 C'est le choix structurant à trancher avant d'investir davantage : rester un outil
 « agent-first, zéro friction » ou basculer vers un moteur de check extensible façon Checkmk
 (bien plus de valeur long terme, bien plus de complexité).
@@ -48,8 +49,8 @@ ouvert de ce même hôte et n'envoie pas sa propre notification tant que celui-c
 coup — pas un moteur de corrélation général entre alertes par ailleurs indépendantes).
 
 **Recommandation directrice** : ne pas refondre. Fermer d'abord les trous d'exploitabilité
-restants (tagging, canal webhook générique) avant d'élargir la couverture de
-check (SNMP, ICMP, plugins). Trancher
+restants (tagging, canal webhook générique) avant d'élargir encore la couverture de
+check (SNMP, plugins — ICMP est fait, item #8). Trancher
 explicitement l'ambition « moteur de check extensible » avant de la communiquer — c'est la
 seule décision qui change l'ordre de grandeur de l'effort à venir.
 
@@ -60,7 +61,7 @@ seule décision qui change l'ordre de grandeur de l'effort à venir.
 | Domaine | Ce qui existe | Valeur produit | Maturité | Manques confirmés | À consolider |
 |---|---|---|---|---|---|
 | **Supervision système** | Agent Go : CPU/RAM/disque/réseau/uptime, Docker, APT+CVE, S.M.A.R.T., température, systemd, journal, processus. Protocole agent↔serveur verrouillé par test contractuel golden-fixture (`protocol/`). | Forte — cœur du produit | Élevée | Pas de checks custom pluggables (seulement exécution de scripts allowlistés via `tasks.yaml`, pas de métriques/seuils arbitraires) ; agent Linux uniquement (hypothèse — aucune mention Windows/macOS trouvée dans le code) | Rien de majeur, module le plus mûr |
-| **Supervision réseau** | Topologie Docker (liens réseau, overrides manuels), sondes HTTP/TCP | Topologie Docker = différenciant réel | Moyenne | Pas de SNMP, pas d'ICMP générique, pas de cartographie réseau physique L2/L3 | — |
+| **Supervision réseau** | Topologie Docker (liens réseau, overrides manuels), sondes HTTP/TCP/ICMP (ROADMAP.md item #8) | Topologie Docker = différenciant réel | Moyenne | Pas de SNMP, pas de cartographie réseau physique L2/L3 | — |
 | **Inventaire / découverte** | Ajout d'hôte manuel (wizard), auto-import Proxmox (guests) et NPM (proxy hosts) | Onboarding acceptable à petite échelle | Faible en tant qu'« inventaire » | Pas de scan/découverte réseau générique, pas de tagging d'hôtes trouvé dans le modèle de données | Devient un frein au-delà de ~50 hôtes |
 | **Alertes / notifications** | Moteur avec hystérésis warn/crit + seuils de clear, cooldown, 3 sources (`agent`/`proxmox`/`synthetic`), déclenchement de commande (`command_trigger`), fenêtres de maintenance (`internal/services/maintenance`), acquittement + escalade d'incident (`AcknowledgeIncident`, `AlertActions.EscalateAfterMinutes`), corrélation host-down → cascade Docker/Proxmox (`alert_incidents.correlated_with`). Canaux : SMTP, ntfy, push navigateur, in-app. | Cœur différenciant, anti-flapping déjà pensé | Élevée sur le moteur, faible sur l'écosystème de canaux | Pas de Slack/Teams/Discord/webhook générique | Clarifier la vraie liste de canaux (le « webhook » évoqué en prose README recouvre en fait ntfy) |
 | **Dashboards** | Dashboard fleet temps réel (KPIs, statuts, drift versions Docker, résumé Proxmox), WS-driven | Bon point d'entrée quotidien | Élevée | Pas de dashboard personnalisable, pas de vue « santé globale » agrégée type SLA | — |
@@ -104,7 +105,7 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 |---|---|---|---|
 | Séparation des responsabilités | Déjà propre : `handlers` → `services/<domaine>` (port Repository) → `database`. Erreurs typées (`apperr`), goroutines protégées (`safego`). | Rien d'urgent | Ne pas ajouter de couche supplémentaire « juste pour la forme » |
 | Modèle de données | Un fichier de modèle par domaine (`internal/models/`), pas de `models.go` monolithique | OK | — |
-| Gestion des checks | Collecteurs agent fixes + sondes synthétiques HTTP/TCP + poll Proxmox — **pas de modèle « Check » générique unifié** | Introduire un modèle léger `Check{type, target, interval, thresholds}` couvrant HTTP/TCP et un futur ICMP/SNMP, sans runtime de plugin | Ne pas construire un vrai moteur de plugins tant que la demande n'est pas prouvée |
+| Gestion des checks | Collecteurs agent fixes + sondes synthétiques HTTP/TCP/ICMP (item #8) + poll Proxmox — **pas de modèle « Check » générique unifié** | Introduire un modèle léger `Check{type, target, interval, thresholds}` couvrant HTTP/TCP/ICMP et un futur SNMP, sans runtime de plugin | Ne pas construire un vrai moteur de plugins tant que la demande n'est pas prouvée |
 | Collecte de métriques | Solide : push agent 30s, TimescaleDB hypertables | — | — |
 | Ingestion d'événements | Bus pub/sub in-process minimal (`internal/events`), volontairement single-instance | Cohérent avec le déploiement actuel (1 conteneur `server`) | Ne pas introduire Redis avant un besoin réel de scale horizontal — et si besoin, migrer bus + WS hubs + rate limiter *ensemble* |
 | Planification / scheduler | Deux mécanismes cohérents : `poller.Every` (pollers génériques) + `scheduler.TaskScheduler` (cron) | Réutilisable tel quel pour de futurs checks actifs | Ne pas fusionner artificiellement les deux |
@@ -112,7 +113,7 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 | Historisation | Bonne (politiques de rétention) | Manque exports/rapports | — |
 | Gestion des règles | Moteur d'alertes correct (hystérésis, cooldown), templates réutilisables cross-host (`alert_rule_templates`, ROADMAP.md item #9) | Pas encore de règles par tag (dépend du tagging d'hôtes, item #7, non démarré) | — |
 | API | REST bien organisée par domaine | Aucun — le RBAC sur le CRUD des tâches planifiées, manquant à l'origine, est corrigé (ROADMAP.md item #1) | — |
-| Extension / plugins | Absent — plus gros écart structurel avec Checkmk | Élargir le nombre de types de check « en dur » (ICMP, SNMP basique) avant tout runtime de plugin | Ne pas construire de plugin engine sans demande prouvée |
+| Extension / plugins | Absent — plus gros écart structurel avec Checkmk | Élargir encore le nombre de types de check « en dur » (SNMP basique — ICMP fait, item #8) avant tout runtime de plugin | Ne pas construire de plugin engine sans demande prouvée |
 | Sécurité | Bon niveau (JWT, MFA, rate limiting, audit, secrets jamais renvoyés au frontend) | Pas de secret scanning ni signature d'image en CI, Trivy non bloquant — dette silencieuse, effort faible | — |
 | Scalabilité | Assumée single-instance par design (WS hubs, event bus, rate limiter, store WebAuthn) — cohérent avec `docker-compose.yml` actuel | Anticiper explicitement avant toute promesse de HA/clustering | Ne pas scaler une seule brique isolément |
 

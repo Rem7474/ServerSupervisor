@@ -11,11 +11,15 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
 
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
@@ -110,6 +114,8 @@ func executeProbe(ctx context.Context, p models.UptimeProbe) models.UptimeProbeR
 	switch strings.ToLower(p.Type) {
 	case "tcp":
 		return checkTCP(checkCtx, p)
+	case "icmp":
+		return checkICMP(checkCtx, p)
 	default: // "http"
 		return checkHTTP(checkCtx, p, timeout)
 	}
@@ -129,6 +135,100 @@ func checkTCP(ctx context.Context, p models.UptimeProbe) models.UptimeProbeResul
 		return result
 	}
 	_ = conn.Close()
+	result.Success = true
+	return result
+}
+
+// icmpProtocolICMPv4 is IANA's protocol number for ICMPv4 (1) — the value
+// icmp.ParseMessage needs to know how to interpret the reply bytes. Not
+// exported by golang.org/x/net/icmp (it lives in an internal subpackage),
+// so it's a well-known literal here, same as the package's own examples.
+const icmpProtocolICMPv4 = 1
+
+// listenICMP opens an ICMPv4 echo socket, preferring the unprivileged "ping
+// socket" (SOCK_DGRAM, needs no capability but requires the host/container's
+// net.ipv4.ping_group_range sysctl to include this process's group — not
+// configured by default) and falling back to a raw socket (needs
+// CAP_NET_RAW — see server/Dockerfile's setcap step, which grants exactly
+// that to the non-root server binary). The returned network name tells the
+// caller which net.Addr type WriteTo needs.
+func listenICMP() (conn *icmp.PacketConn, network string, err error) {
+	if conn, err = icmp.ListenPacket("udp4", "0.0.0.0"); err == nil {
+		return conn, "udp4", nil
+	}
+	conn, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		return nil, "", fmt.Errorf("ICMP indisponible (CAP_NET_RAW manquant sur le conteneur ? voir server/Dockerfile) : %w", err)
+	}
+	return conn, "ip4:icmp", nil
+}
+
+// checkICMP sends a single ICMPv4 echo request and waits for the matching
+// reply — a generic "is this IP alive" check for equipment that isn't
+// agent-installable and exposes no TCP/HTTP port to probe instead (switches,
+// printers, IP cameras, ...). IPv6 targets aren't supported in this MVP.
+func checkICMP(ctx context.Context, p models.UptimeProbe) models.UptimeProbeResult {
+	result := models.UptimeProbeResult{ProbeID: p.ID, CheckedAt: time.Now()}
+
+	dst, err := net.ResolveIPAddr("ip4", p.Target)
+	if err != nil {
+		result.Error = fmt.Sprintf("résolution de %q impossible : %v", p.Target, err)
+		return result
+	}
+
+	conn, network, err := listenICMP()
+	if err != nil {
+		result.Error = err.Error()
+		return result
+	}
+	defer func() { _ = conn.Close() }()
+
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+
+	msg := icmp.Message{
+		Type: ipv4.ICMPTypeEcho, Code: 0,
+		Body: &icmp.Echo{
+			ID: os.Getpid() & 0xffff, Seq: 1,
+			Data: []byte("serversupervisor-icmp-probe"),
+		},
+	}
+	wb, err := msg.Marshal(nil)
+	if err != nil {
+		result.Error = fmt.Sprintf("échec construction paquet ICMP : %v", err)
+		return result
+	}
+
+	var dstAddr net.Addr = &net.IPAddr{IP: dst.IP}
+	if network == "udp4" {
+		dstAddr = &net.UDPAddr{IP: dst.IP}
+	}
+
+	start := time.Now()
+	if _, err := conn.WriteTo(wb, dstAddr); err != nil {
+		result.Error = fmt.Sprintf("envoi ICMP échoué : %v", err)
+		return result
+	}
+
+	rb := make([]byte, 1500)
+	n, _, err := conn.ReadFrom(rb)
+	result.LatencyMs = int(time.Since(start) / time.Millisecond)
+	if err != nil {
+		result.Error = fmt.Sprintf("aucune réponse ICMP : %v", err)
+		return result
+	}
+
+	rm, err := icmp.ParseMessage(icmpProtocolICMPv4, rb[:n])
+	if err != nil {
+		result.Error = fmt.Sprintf("réponse ICMP illisible : %v", err)
+		return result
+	}
+	if rm.Type != ipv4.ICMPTypeEchoReply {
+		result.Error = fmt.Sprintf("type ICMP inattendu : %v", rm.Type)
+		return result
+	}
+
 	result.Success = true
 	return result
 }

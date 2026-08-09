@@ -28,7 +28,7 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 
 | # | Fonctionnalité | Pourquoi | Statut |
 |---|---|---|---|
-| 8 | Check ICMP générique (indépendant de l'agent) | Aucun ICMP dans le code — équipements non-agentables hors de portée | Non démarré |
+| 8 | Check ICMP générique (indépendant de l'agent) | Aucun ICMP dans le code — équipements non-agentables hors de portée | Fait |
 | 9 | Templates de règles d'alertes réutilisables cross-host | Chaque règle est créée individuellement aujourd'hui | Fait |
 | 10 | Export / rapport périodique (disponibilité, incidents) | Aucun export PDF/CSV trouvé | Non démarré |
 | 11 | Vue « incidents actifs » transverse (war-room) | `AlertsView` liste, ne regroupe pas visuellement par sévérité/statut | Fait |
