@@ -25,11 +25,12 @@ non protégées, pas de backup DB) est déjà traitée — voir [AUDIT-2025.md](
 
 **L'écart réel avec Checkmk n'est pas featuritude, c'est l'architecture de check.**
 ServerSupervisor a des collecteurs agent figés + 3 types de sondes synthétiques (HTTP/TCP/ICMP)
-+ polling Proxmox API — pas de moteur de check générique, pas de plugins, pas de découverte
-réseau automatique. Confirmé par recherche dans le code : **aucun SNMP** (l'absence d'ICMP
-listée ici à l'origine, ainsi que la fenêtre de maintenance, l'escalade d'alerte et les
-templates de règles réutilisables cross-host, sont depuis corrigées — voir ROADMAP.md items
-#2, #3, #8 et #9).
++ polling Proxmox API + un scan de sous-réseau par ping ICMP pour la découverte — pas de moteur
+de check générique, pas de plugins, pas de découverte réseau au-delà du ping (pas d'ARP, pas de
+scan de ports). Confirmé par recherche dans le code : **aucun SNMP** (l'absence d'ICMP listée
+ici à l'origine, ainsi que la fenêtre de maintenance, l'escalade d'alerte, les templates de
+règles réutilisables cross-host et la découverte de sous-réseau, sont depuis corrigées — voir
+ROADMAP.md items #2, #3, #8, #9 et #12).
 C'est le choix structurant à trancher avant d'investir davantage : rester un outil
 « agent-first, zéro friction » ou basculer vers un moteur de check extensible façon Checkmk
 (bien plus de valeur long terme, bien plus de complexité).
@@ -62,7 +63,7 @@ seule décision qui change l'ordre de grandeur de l'effort à venir.
 |---|---|---|---|---|---|
 | **Supervision système** | Agent Go : CPU/RAM/disque/réseau/uptime, Docker, APT+CVE, S.M.A.R.T., température, systemd, journal, processus. Protocole agent↔serveur verrouillé par test contractuel golden-fixture (`protocol/`). | Forte — cœur du produit | Élevée | Pas de checks custom pluggables (seulement exécution de scripts allowlistés via `tasks.yaml`, pas de métriques/seuils arbitraires) ; agent Linux uniquement (hypothèse — aucune mention Windows/macOS trouvée dans le code) | Rien de majeur, module le plus mûr |
 | **Supervision réseau** | Topologie Docker (liens réseau, overrides manuels), sondes HTTP/TCP/ICMP (ROADMAP.md item #8) | Topologie Docker = différenciant réel | Moyenne | Pas de SNMP, pas de cartographie réseau physique L2/L3 | — |
-| **Inventaire / découverte** | Ajout d'hôte manuel (wizard), auto-import Proxmox (guests) et NPM (proxy hosts) | Onboarding acceptable à petite échelle | Faible en tant qu'« inventaire » | Pas de scan/découverte réseau générique, pas de tagging d'hôtes trouvé dans le modèle de données | Devient un frein au-delà de ~50 hôtes |
+| **Inventaire / découverte** | Ajout d'hôte manuel (wizard), auto-import Proxmox (guests) et NPM (proxy hosts), scan de sous-réseau IPv4 par ping ICMP (`/24` à `/30`, ROADMAP.md item #12) avec ajout en masse des adresses trouvées | Onboarding correct à petite/moyenne échelle | Moyenne | Découverte limitée à un ping-sweep (pas d'ARP, pas de scan de ports, pas de fingerprinting) ; pas de tagging d'hôtes trouvé dans le modèle de données | Devient un frein au-delà de ~50 hôtes sans tagging/groupes |
 | **Alertes / notifications** | Moteur avec hystérésis warn/crit + seuils de clear, cooldown, 3 sources (`agent`/`proxmox`/`synthetic`), déclenchement de commande (`command_trigger`), fenêtres de maintenance (`internal/services/maintenance`), acquittement + escalade d'incident (`AcknowledgeIncident`, `AlertActions.EscalateAfterMinutes`), corrélation host-down → cascade Docker/Proxmox (`alert_incidents.correlated_with`). Canaux : SMTP, ntfy, push navigateur, in-app. | Cœur différenciant, anti-flapping déjà pensé | Élevée sur le moteur, faible sur l'écosystème de canaux | Pas de Slack/Teams/Discord/webhook générique | Clarifier la vraie liste de canaux (le « webhook » évoqué en prose README recouvre en fait ntfy) |
 | **Dashboards** | Dashboard fleet temps réel (KPIs, statuts, drift versions Docker, résumé Proxmox), WS-driven | Bon point d'entrée quotidien | Élevée | Pas de dashboard personnalisable, pas de vue « santé globale » agrégée type SLA | — |
 | **Logs / événements** | Journalctl streamé par hôte, historique de commandes, web logs (trafic + menaces) avec corrélation CrowdSec | Bon niveau debug ad hoc, web logs très travaillés | Moyenne-élevée sur le web, faible sur logs applicatifs génériques | Pas de recherche full-text cross-host sur les logs système | — |

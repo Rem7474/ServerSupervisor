@@ -85,6 +85,7 @@ inclus) :
 - **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
 - **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
 - **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
+- **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
@@ -200,7 +201,9 @@ Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin
 ### 2. Enregistrer un hôte
 
 1. Dashboard → **Ajouter un hôte**
-2. Renseigner le nom, hostname/IP, OS
+2. Renseigner le nom, hostname/IP, OS — ou onglet **Scanner un sous-réseau** pour ping-sweeper
+   un CIDR (`/24` à `/30`) et ajouter en masse les adresses qui répondent et ne sont pas encore
+   enregistrées
 3. **Copier la clé API** affichée (elle ne sera plus visible ensuite)
 
 ### 3. Installer l'agent sur une VM
@@ -712,6 +715,8 @@ curl http://localhost:8080/api/v1/hosts \
 |---|---|---|---|
 | `GET` | `/api/v1/hosts` | Liste des hôtes | Authentifié |
 | `POST` | `/api/v1/hosts` | Enregistrer un hôte | Admin |
+| `POST` | `/api/v1/hosts/bulk` | Enregistrer plusieurs hôtes en un appel (ex: après un scan réseau) | Admin |
+| `POST` | `/api/v1/hosts/discover` | Scanner un sous-réseau IPv4 par ping ICMP (`/24` à `/30`) | Admin |
 | `GET` | `/api/v1/hosts/:id` | Détails d'un hôte | Authentifié |
 | `PATCH` | `/api/v1/hosts/:id` | Modifier un hôte | Admin |
 | `DELETE` | `/api/v1/hosts/:id` | Supprimer un hôte | Admin |
@@ -815,7 +820,8 @@ binaire non-root via `setcap` dans le `Dockerfile` (`CAP_NET_RAW` fait déjà pa
 l'ensemble de capacités par défaut de Docker, aucun `cap_add` requis en temps normal). Un
 déploiement durci avec `cap_drop: [ALL]` doit ajouter explicitement `cap_add: [NET_RAW]` ; sans
 cette capacité, un check ICMP échoue avec un message explicite plutôt que de rapporter un faux
-« hors ligne ».
+« hors ligne ». Le scan de sous-réseau (`POST /api/v1/hosts/discover`, voir plus haut) réutilise
+le même mécanisme ICMP et nécessite donc la même capacité.
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|

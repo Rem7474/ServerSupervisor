@@ -22,6 +22,7 @@ import (
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
 	backupsvc "github.com/serversupervisor/server/internal/services/backup"
 	dashboardsvc "github.com/serversupervisor/server/internal/services/dashboard"
+	discoverysvc "github.com/serversupervisor/server/internal/services/discovery"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
@@ -125,6 +126,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	npmService := npmsvc.NewService(db)
 	npmH := handlers.NewNPMHandler(npmService)
 	dashboardH := handlers.NewDashboardHandler(dashboardsvc.NewService(db))
+	discoveryH := handlers.NewDiscoveryHandler(discoverysvc.NewService(db))
 
 	networkSvc.SetIPInventoryBuilder(func(ctx context.Context) (*models.NetworkIPInventory, error) {
 		return networkview.BuildIPInventory(ctx, db, proxmoxService, npmService)
@@ -139,7 +141,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	v1.Use(cookies.CSRFMiddleware())
 	registerAuthRoutes(v1, authH)
 	registerWebLogsRoutes(v1, webLogsH)
-	registerHostRoutes(v1, hostH, agentH, db)
+	registerHostRoutes(v1, hostH, agentH, discoveryH, db)
 	registerDockerRoutes(v1, dockerH, systemH, networkH, agentH)
 	registerAPTRoutes(v1, aptH)
 	registerAuditRoutes(v1, auditH)
@@ -243,9 +245,11 @@ func registerWebLogsRoutes(g *gin.RouterGroup, h *handlers.WebLogsHandler) {
 	g.GET("/security/web-logs/domain/:domain", h.GetWebLogsDomainDetails)
 }
 
-func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *handlers.AgentHandler, db *database.DB) {
+func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *handlers.AgentHandler, discoveryH *handlers.DiscoveryHandler, db *database.DB) {
 	g.GET("/hosts", h.ListHosts)
 	g.POST("/hosts", h.RegisterHost)
+	g.POST("/hosts/bulk", h.RegisterHostsBulk)
+	g.POST("/hosts/discover", discoveryH.Scan)
 	g.GET("/metrics/summary", agentH.GetMetricsSummary)
 
 	// Per-host routes protected by HostPermissionMiddleware (viewer level).

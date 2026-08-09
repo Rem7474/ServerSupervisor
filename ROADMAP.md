@@ -32,7 +32,7 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 | 9 | Templates de règles d'alertes réutilisables cross-host | Chaque règle est créée individuellement aujourd'hui | Fait |
 | 10 | Export / rapport périodique (disponibilité, incidents) | Aucun export PDF/CSV trouvé | Non démarré |
 | 11 | Vue « incidents actifs » transverse (war-room) | `AlertsView` liste, ne regroupe pas visuellement par sévérité/statut | Fait |
-| 12 | Découverte réseau basique (scan de sous-réseau) | Onboarding actuel = ajout manuel un par un | Non démarré |
+| 12 | Découverte réseau basique (scan de sous-réseau) | Onboarding actuel = ajout manuel un par un | Fait |
 | 13 | Audit log : rétention configurable par catégorie, export | Rétention actuelle globale (`AUDIT_RETENTION_DAYS`), pas par type d'événement | Fait |
 | 14 | API publique documentée + clés dédiées pour intégrations tierces | L'API existe mais orientée frontend/agent, pas pensée « client tiers » | Non démarré |
 
@@ -86,9 +86,10 @@ côté backend (voir AUDIT-PRODUIT-2026.md §3) pour porter HTTP/TCP/ICMP sous u
 abstraction, sans construire de runtime de plugin.
 
 **Risques** : ICMP et découverte réseau nécessitent des privilèges réseau (raw socket / accès
-au sous-réseau) — à valider avec le modèle de conteneurisation actuel (`docker-compose.yml`,
-un seul conteneur `server`) avant de s'engager. Attention à la charge ajoutée sur le poller si
-le scan réseau est mal borné.
+au sous-réseau) — validé : `CAP_NET_RAW` est accordé au binaire non-root via `setcap` dans
+`server/Dockerfile` (items #8 et #12, tous deux livrés). Le scan de sous-réseau est borné côté
+service (`/24` à `/30`, 2 à 254 adresses, exécuté en synchrone dans la requête HTTP) pour éviter
+toute charge mal maîtrisée.
 
 **Valeur utilisateur** : onboarding significativement plus rapide à l'échelle, moins d'angles
 morts (équipements sans agent possible).

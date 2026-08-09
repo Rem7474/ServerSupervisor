@@ -608,6 +608,28 @@ export interface AttentionItem {
 }
 
 //////////
+// source: discovery.go
+
+/**
+ * NetworkScanRequest is a subnet discovery scan request: ping-sweep every
+ * usable address in an IPv4 CIDR block.
+ */
+export interface NetworkScanRequest {
+  cidr: string;
+}
+/**
+ * DiscoveredHost is one address's outcome from a subnet discovery scan.
+ */
+export interface DiscoveredHost {
+  ip_address: string;
+  responded: boolean;
+  latency_ms?: number /* int */;
+  already_registered: boolean;
+  existing_host_id?: string;
+  existing_host_name?: string;
+}
+
+//////////
 // source: docker.go
 
 export interface DockerContainer {
@@ -1644,13 +1666,13 @@ export interface SettingsUpdateRequest {
 // source: synthetic.go
 
 /**
- * UptimeProbe configures a periodic HTTP or TCP check executed from the server.
+ * UptimeProbe configures a periodic HTTP, TCP or ICMP check executed from the server.
  */
 export interface UptimeProbe {
   id: string;
   name: string;
-  type: string; // "http" | "tcp"
-  target: string; // URL for http, host:port for tcp
+  type: string; // "http" | "tcp" | "icmp"
+  target: string; // URL for http, host:port for tcp, hostname/IP for icmp
   interval_sec: number /* int */;
   timeout_sec: number /* int */;
   expected_status: number /* int */; // http only

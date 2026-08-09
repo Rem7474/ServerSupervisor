@@ -169,17 +169,30 @@ func listenICMP() (conn *icmp.PacketConn, network string, err error) {
 // printers, IP cameras, ...). IPv6 targets aren't supported in this MVP.
 func checkICMP(ctx context.Context, p models.UptimeProbe) models.UptimeProbeResult {
 	result := models.UptimeProbeResult{ProbeID: p.ID, CheckedAt: time.Now()}
-
-	dst, err := net.ResolveIPAddr("ip4", p.Target)
+	success, latencyMs, err := PingICMP(ctx, p.Target)
+	result.Success = success
+	result.LatencyMs = latencyMs
 	if err != nil {
-		result.Error = fmt.Sprintf("résolution de %q impossible : %v", p.Target, err)
-		return result
+		result.Error = err.Error()
+	}
+	return result
+}
+
+// PingICMP sends a single ICMPv4 echo request to target (a hostname or IPv4
+// literal) and waits for the matching reply, bounded by ctx. Exported so
+// other packages needing a generic "is this IP alive" check — e.g. the
+// subnet discovery scan (internal/services/discovery) — can reuse the same
+// socket-handling and CAP_NET_RAW fallback logic as the uptime ICMP probe
+// instead of duplicating it.
+func PingICMP(ctx context.Context, target string) (success bool, latencyMs int, err error) {
+	dst, err := net.ResolveIPAddr("ip4", target)
+	if err != nil {
+		return false, 0, fmt.Errorf("résolution de %q impossible : %w", target, err)
 	}
 
 	conn, network, err := listenICMP()
 	if err != nil {
-		result.Error = err.Error()
-		return result
+		return false, 0, err
 	}
 	defer func() { _ = conn.Close() }()
 
@@ -196,8 +209,7 @@ func checkICMP(ctx context.Context, p models.UptimeProbe) models.UptimeProbeResu
 	}
 	wb, err := msg.Marshal(nil)
 	if err != nil {
-		result.Error = fmt.Sprintf("échec construction paquet ICMP : %v", err)
-		return result
+		return false, 0, fmt.Errorf("échec construction paquet ICMP : %w", err)
 	}
 
 	var dstAddr net.Addr = &net.IPAddr{IP: dst.IP}
@@ -207,30 +219,25 @@ func checkICMP(ctx context.Context, p models.UptimeProbe) models.UptimeProbeResu
 
 	start := time.Now()
 	if _, err := conn.WriteTo(wb, dstAddr); err != nil {
-		result.Error = fmt.Sprintf("envoi ICMP échoué : %v", err)
-		return result
+		return false, 0, fmt.Errorf("envoi ICMP échoué : %w", err)
 	}
 
 	rb := make([]byte, 1500)
 	n, _, err := conn.ReadFrom(rb)
-	result.LatencyMs = int(time.Since(start) / time.Millisecond)
+	latencyMs = int(time.Since(start) / time.Millisecond)
 	if err != nil {
-		result.Error = fmt.Sprintf("aucune réponse ICMP : %v", err)
-		return result
+		return false, latencyMs, fmt.Errorf("aucune réponse ICMP : %w", err)
 	}
 
 	rm, err := icmp.ParseMessage(icmpProtocolICMPv4, rb[:n])
 	if err != nil {
-		result.Error = fmt.Sprintf("réponse ICMP illisible : %v", err)
-		return result
+		return false, latencyMs, fmt.Errorf("réponse ICMP illisible : %w", err)
 	}
 	if rm.Type != ipv4.ICMPTypeEchoReply {
-		result.Error = fmt.Sprintf("type ICMP inattendu : %v", rm.Type)
-		return result
+		return false, latencyMs, fmt.Errorf("type ICMP inattendu : %v", rm.Type)
 	}
 
-	result.Success = true
-	return result
+	return true, latencyMs, nil
 }
 
 func checkHTTP(ctx context.Context, p models.UptimeProbe, timeout time.Duration) models.UptimeProbeResult {
