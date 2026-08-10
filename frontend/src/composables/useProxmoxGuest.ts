@@ -52,9 +52,17 @@ export function useProxmoxGuest() {
   // primary ethX IP is shown in the KPI row; this backs the collapsible
   // "detail réseau" section. Keyed by node, same endpoint the node's guest
   // table uses, since there is no single-guest network endpoint — see
-  // guestNodeId below for why this depends on a ?nodeId= query param.
+  // nodeId below for why this depends on resolving the node's DB id.
   const guestNetworks = ref<GuestNetworkIface[]>([])
   const guestNetworksLoading = ref(false)
+
+  // The node's own DB id — needed for the guest-networks fetch below *and*
+  // the view's "back to node" breadcrumb link. Resolved once per mount (see
+  // resolveNodeId), so both consumers share the same value instead of each
+  // re-deriving it (or, before this existed, the breadcrumb link reading
+  // route.query.nodeId directly and breaking exactly like the network fetch
+  // used to for any guest reached without that query param).
+  const nodeId = ref('')
 
   const linkSaving = ref(false)
   const linkMsg = ref('')
@@ -93,34 +101,40 @@ export function useProxmoxGuest() {
     }
   }
 
-  // The node's guest-networks endpoint is the only source for per-guest
-  // interface detail — there's no single-guest equivalent — so this needs the
-  // node's DB id. The node-drilldown guests tab passes it via ?nodeId=, but
+  // The node-drilldown guests tab passes the node's DB id via ?nodeId=, but
   // every other link to a guest (dashboard, host-detail Proxmox panel,
   // network graph, command palette, a bookmark) doesn't carry it — those used
-  // to just show an empty network/IP section. Resolve it ourselves from the
-  // guest's own connection_id/node_name when the query param is absent,
-  // instead of depending on the user having drilled in via /proxmox first.
-  async function resolveNodeId(): Promise<string> {
+  // to just show an empty network/IP section, and the breadcrumb's "back to
+  // node" link used to point at /proxmox/nodes/ (no id) instead. Resolve it
+  // ourselves from the guest's own connection_id/node_name when the query
+  // param is absent, instead of depending on the user having drilled in via
+  // /proxmox first.
+  async function resolveNodeId(): Promise<void> {
     const fromQuery = String(route.query.nodeId || '')
-    if (fromQuery) return fromQuery
-    if (!guest.value) return ''
+    if (fromQuery) {
+      nodeId.value = fromQuery
+      return
+    }
+    if (!guest.value) return
     try {
       const res = await api.getProxmoxNodes(guest.value.connection_id, signal)
       const nodes = Array.isArray(res.data) ? res.data : []
-      return nodes.find((n) => n.node_name === guest.value?.node_name)?.id || ''
+      nodeId.value = nodes.find((n) => n.node_name === guest.value?.node_name)?.id || ''
     } catch {
-      return ''
+      nodeId.value = ''
     }
   }
 
+  // The node's guest-networks endpoint is the only source for per-guest
+  // interface detail — there's no single-guest equivalent — so this needs
+  // nodeId resolved first.
   async function loadGuestNetworks(): Promise<void> {
     if (!guest.value) return
-    const nodeId = await resolveNodeId()
-    if (!nodeId || !guest.value) return
+    await resolveNodeId()
+    if (!nodeId.value || !guest.value) return
     guestNetworksLoading.value = true
     try {
-      const res = await api.getProxmoxNodeGuestNetworks(nodeId)
+      const res = await api.getProxmoxNodeGuestNetworks(nodeId.value)
       guestNetworks.value = res.data?.[guest.value.vmid] ?? []
     } catch {
       guestNetworks.value = []
@@ -246,6 +260,7 @@ export function useProxmoxGuest() {
     performGuestAction,
     guestNetworks,
     guestNetworksLoading,
+    nodeId,
     linkSaving,
     linkMsg,
     linkMsgOk,

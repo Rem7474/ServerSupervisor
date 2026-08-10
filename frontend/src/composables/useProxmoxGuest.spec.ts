@@ -79,6 +79,10 @@ describe('useProxmoxGuest — guest network IPs without a ?nodeId= query param',
     expect(getProxmoxNodes).toHaveBeenCalledWith('conn-1', expect.anything())
     expect(getProxmoxNodeGuestNetworks).toHaveBeenCalledWith('node-db-id')
     expect(api.guestNetworks.value).toEqual([{ name: 'eth0', ips: ['10.0.0.5'] }])
+    // The resolved node id is also exposed for the view's "back to node"
+    // breadcrumb link — it used to read route.query.nodeId directly there
+    // and break the same way the network fetch did.
+    expect(api.nodeId.value).toBe('node-db-id')
   })
 
   it('still prefers the ?nodeId= query param when present, without an extra lookup', async () => {
@@ -90,6 +94,7 @@ describe('useProxmoxGuest — guest network IPs without a ?nodeId= query param',
     expect(getProxmoxNodes).not.toHaveBeenCalled()
     expect(getProxmoxNodeGuestNetworks).toHaveBeenCalledWith('node-from-query')
     expect(api.guestNetworks.value).toEqual([{ name: 'eth0', ips: ['10.0.0.5'] }])
+    expect(api.nodeId.value).toBe('node-from-query')
   })
 
   it('leaves guestNetworks empty (not an error) when the node cannot be resolved', async () => {
@@ -100,5 +105,6 @@ describe('useProxmoxGuest — guest network IPs without a ?nodeId= query param',
 
     expect(getProxmoxNodeGuestNetworks).not.toHaveBeenCalled()
     expect(api.guestNetworks.value).toEqual([])
+    expect(api.nodeId.value).toBe('')
   })
 })

@@ -321,7 +321,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
@@ -334,7 +334,6 @@ import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses
 import { getMetricColorClass } from '../utils/metricColor'
 import type { ChartOptions, TooltipItem } from 'chart.js'
 
-const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
@@ -354,6 +353,7 @@ const {
   performGuestAction,
   guestNetworks,
   guestNetworksLoading,
+  nodeId: guestNodeId,
   linkMsg,
   linkMsgOk,
   confirmLink,
@@ -429,8 +429,6 @@ const chartOptions = computed((): ChartOptions<'line'> => ({
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
 }))
-
-const guestNodeId = computed(() => route.query.nodeId || '')
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
