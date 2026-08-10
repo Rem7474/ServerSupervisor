@@ -27,6 +27,9 @@ type fakeRepo struct {
 	resticProfileErr error
 	resticGroups     string
 	resticGroupErr   error
+	listRunsResult   []models.BackupRun
+	latestRunResult  *models.BackupRun
+	latestRunErr     error
 }
 
 func (f *fakeRepo) CreateBackupRun(_ context.Context, r models.BackupRun) (*models.BackupRun, error) {
@@ -39,9 +42,12 @@ func (f *fakeRepo) GetBackupRun(context.Context, string) (*models.BackupRun, err
 	return f.getRunResult, f.getRunErr
 }
 func (f *fakeRepo) ListBackupRuns(context.Context, string, int) ([]models.BackupRun, error) {
-	return nil, nil
+	return f.listRunsResult, nil
 }
 func (f *fakeRepo) GetLatestBackupRunByHost(context.Context, string) (*models.BackupRun, error) {
+	if f.latestRunResult != nil || f.latestRunErr != nil {
+		return f.latestRunResult, f.latestRunErr
+	}
 	return nil, sql.ErrNoRows
 }
 func (f *fakeRepo) GetBackupRunByCommandID(context.Context, string) (*models.BackupRun, error) {
@@ -320,3 +326,88 @@ func TestCheckStalledRuns_MarksErrorAndPersists(t *testing.T) {
 		t.Error("expected FinishedAt to be set on a stalled run")
 	}
 }
+
+// TestBackfillFromCommandOutput_RecoversStrandedSchedulerRuns is the
+// regression test for the "Durée"/"Volume" columns permanently showing "—"
+// on scheduler-triggered backup_runs rows created before the CreateBackupRun
+// fix (see that function's doc comment in db_backup.go). Those rows have
+// duration_sec/bytes_done etc. as NULL forever — but the same JSON is still
+// sitting in remote_commands.output, keyed by the row's command_id, and
+// should be re-derived from there on read instead of staying stuck.
+func TestBackfillFromCommandOutput_RecoversStrandedSchedulerRuns(t *testing.T) {
+	started := time.Now().Add(-90 * time.Minute)
+	strandedRun := &models.BackupRun{
+		ID: "run-1", HostID: "h1", Profile: "nextcloud-full", Status: "ok",
+		StartedAt: started, CommandID: strPtr("cmd-1"),
+		// DurationSec/BytesDone/FinishedAt/RawSummary all nil — exactly the
+		// shape a pre-fix scheduler-triggered INSERT left behind.
+	}
+	cmd := &models.RemoteCommand{
+		ID: "cmd-1", HostID: "h1", Module: "restic", Action: "run_backup", Status: "completed",
+		Output: `{"status":"ok","duration_sec":3780,"files_new":42,"bytes_added":124460646,"snapshot_id":"abc123","repo_size_bytes":987654321}`,
+	}
+	repo := &fakeRepo{latestRunResult: strandedRun, remoteCmd: cmd}
+	svc := NewService(repo, &fakeDispatcher{}, &config.Config{}, nil, nil)
+
+	status, err := svc.GetStatus(context.Background(), "h1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := status.LatestRun
+	if got == nil {
+		t.Fatal("expected a latest run")
+	}
+	if got.DurationSec == nil || *got.DurationSec != 3780 {
+		t.Errorf("DurationSec = %v, want 3780", got.DurationSec)
+	}
+	if got.BytesDone == nil || *got.BytesDone != 124460646 {
+		t.Errorf("BytesDone = %v, want 124460646", got.BytesDone)
+	}
+	if got.FilesDone == nil || *got.FilesDone != 42 {
+		t.Errorf("FilesDone = %v, want 42", got.FilesDone)
+	}
+	if got.SnapshotID != "abc123" {
+		t.Errorf("SnapshotID = %q, want abc123", got.SnapshotID)
+	}
+	if got.RepoSizeBytes == nil || *got.RepoSizeBytes != 987654321 {
+		t.Errorf("RepoSizeBytes = %v, want 987654321", got.RepoSizeBytes)
+	}
+}
+
+func TestBackfillFromCommandOutput_NoOpWhenAlreadyPopulated(t *testing.T) {
+	// A run created after the fix already has DurationSec set — must not be
+	// clobbered or trigger an extra GetRemoteCommandByID lookup.
+	duration := 60
+	run := models.BackupRun{
+		ID: "run-2", HostID: "h1", Status: "ok", StartedAt: time.Now(),
+		CommandID: strPtr("cmd-2"), DurationSec: &duration,
+	}
+	repo := &fakeRepo{listRunsResult: []models.BackupRun{run}}
+	svc := NewService(repo, &fakeDispatcher{}, &config.Config{}, nil, nil)
+
+	runs, err := svc.ListRuns(context.Background(), "h1", 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(runs) != 1 || runs[0].DurationSec == nil || *runs[0].DurationSec != 60 {
+		t.Errorf("expected the already-populated DurationSec to survive unchanged, got %+v", runs)
+	}
+}
+
+func TestBackfillFromCommandOutput_NoOpWithoutLinkedCommand(t *testing.T) {
+	// A run with no command_id at all (shouldn't happen for a dispatched
+	// backup, but must not panic) has nothing to recover from.
+	run := &models.BackupRun{ID: "run-3", HostID: "h1", Status: "ok", StartedAt: time.Now()}
+	repo := &fakeRepo{getRunResult: run}
+	svc := NewService(repo, &fakeDispatcher{}, &config.Config{}, nil, nil)
+
+	got, err := svc.GetRun(context.Background(), "run-3")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.DurationSec != nil {
+		t.Errorf("expected DurationSec to stay nil with no linked command, got %v", got.DurationSec)
+	}
+}
+
+func strPtr(s string) *string { return &s }
