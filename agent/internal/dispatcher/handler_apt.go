@@ -25,7 +25,7 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 		reportRunning(ctx, s, cmd)
 		output, err := collector.InstallUnattendedUpgrades(stream)
 		status, output := finaliseUUResult(err, output)
-		reportTerminal(ctx, s, cmd, status, output)
+		reportUUTerminal(ctx, s, cmd, status, output)
 		return
 
 	case "toggle_uu":
@@ -33,7 +33,7 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 		enable := cmd.Target == "enable"
 		output, err := collector.ToggleUnattendedUpgrades(enable)
 		status, output := finaliseUUResult(err, output)
-		reportTerminal(ctx, s, cmd, status, output)
+		reportUUTerminal(ctx, s, cmd, status, output)
 		return
 
 	case "configure_uu":
@@ -50,14 +50,14 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 			status = "failed"
 			output = fmt.Sprintf("ERROR: %v", err)
 		}
-		reportTerminal(ctx, s, cmd, status, output)
+		reportUUTerminal(ctx, s, cmd, status, output)
 		return
 
 	case "run_uu":
 		reportRunning(ctx, s, cmd)
 		output, err := collector.RunUnattendedUpgrades(stream)
 		status, output := finaliseUUResult(err, output)
-		reportTerminal(ctx, s, cmd, status, output)
+		reportUUTerminal(ctx, s, cmd, status, output)
 		return
 	}
 
@@ -135,4 +135,23 @@ func finaliseUUResult(err error, output string) (string, string) {
 		return "completed", output
 	}
 	return "failed", decorateErrorOutput(err, output)
+}
+
+// reportUUTerminal reports a UU command's terminal status with a fresh
+// CollectUnattendedUpgrades() snapshot bundled in — mirrors the default apt
+// path's fast CollectAPTFast bundling (above) so the server (and the UI it
+// drives) doesn't have to wait for the agent's next periodic report to see
+// the install/enable/config/run-history change this command just made.
+// CollectUnattendedUpgrades is cheap (dpkg -s + a few bounded file/systemctl
+// reads, no per-package lookups), so this stays safe to run synchronously.
+func reportUUTerminal(ctx context.Context, s *sender.Sender, cmd sender.PendingCommand, status, output string) {
+	uuStatus := collector.CollectUnattendedUpgrades()
+	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+		CommandID:          cmd.ID,
+		Status:             status,
+		Output:             output,
+		UnattendedUpgrades: uuStatus,
+	}); err != nil {
+		slog.Warn("failed to report uu command result", "err", err)
+	}
 }

@@ -209,21 +209,43 @@ func (s *Service) ReportCommandResult(ctx context.Context, hostID string, result
 		}
 	}
 
-	if cmd.Module == "apt" && result.Status == "completed" {
-		_ = s.repo.TouchAptLastAction(ctx, cmd.HostID, cmd.Action)
-		if result.AptStatus != nil {
-			result.AptStatus.HostID = cmd.HostID
-			// Partial, not UpsertAptStatus: this is the fast, CVE-free package
-			// count bundled into the terminal command report (handler_apt.go's
-			// CollectAPTFast) — a full upsert here would wipe the real
-			// security_updates/cve_list back to 0/"[]" until the slower,
-			// out-of-band CVE-enriched refresh (UpdateAptStatus, below) lands.
-			if err := s.repo.UpsertAptPendingPackages(ctx, result.AptStatus); err != nil {
-				slog.ErrorContext(ctx, fmt.Sprintf("Failed to update APT status: %v", err))
+	if cmd.Module == "apt" {
+		if result.Status == "completed" {
+			_ = s.repo.TouchAptLastAction(ctx, cmd.HostID, cmd.Action)
+			if result.AptStatus != nil {
+				result.AptStatus.HostID = cmd.HostID
+				// Partial, not UpsertAptStatus: this is the fast, CVE-free package
+				// count bundled into the terminal command report (handler_apt.go's
+				// CollectAPTFast) — a full upsert here would wipe the real
+				// security_updates/cve_list back to 0/"[]" until the slower,
+				// out-of-band CVE-enriched refresh (UpdateAptStatus, below) lands.
+				if err := s.repo.UpsertAptPendingPackages(ctx, result.AptStatus); err != nil {
+					slog.ErrorContext(ctx, fmt.Sprintf("Failed to update APT status: %v", err))
+				}
+			}
+			// Same fast-refresh treatment for install_uu/toggle_uu/configure_uu/run_uu:
+			// see applyUUReport's doc comment for why this can't just wait for the
+			// next periodic report.
+			if result.UnattendedUpgrades != nil {
+				safeHostID := strings.ReplaceAll(strings.ReplaceAll(cmd.HostID, "\n", ""), "\r", "")
+				s.applyUUReport(ctx, cmd.HostID, safeHostID, result.UnattendedUpgrades)
 			}
 		}
-		s.bus.Publish(events.TopicApt)
-		s.bus.Publish(events.HostTopic(cmd.HostID))
+		// Published on failure too, not just completed: the apt/host-detail WS
+		// snapshots (and every history-driven "command still running" badge/
+		// spinner they feed — AptHostCard.vue's activeCommand, HostAptTab.vue's
+		// button spinners) are built from remote_commands' status, which
+		// UpdateRemoteCommandStatus above already set to "failed". Without this
+		// publish on the failed branch, that status change never reaches those
+		// snapshot subscribers — the command-stream WS (BroadcastStatus above)
+		// still correctly shows the live console as failed, but the card/tab's
+		// own spinner, sourced from the stale snapshot, keeps spinning until the
+		// next unrelated report or the 60s safety-interval rebuild happens to
+		// touch this host.
+		if result.Status == "completed" || result.Status == "failed" {
+			s.bus.Publish(events.TopicApt)
+			s.bus.Publish(events.HostTopic(cmd.HostID))
+		}
 	}
 	return nil
 }
@@ -423,6 +445,43 @@ func (s *Service) storeMetrics(ctx context.Context, hostID string, report *model
 	return nil
 }
 
+// applyUUReport upserts a host's unattended-upgrades status and inserts any
+// newly-seen runs (cursor-based, so already-recorded runs are skipped).
+// Shared by both places a fresh UnattendedUpgradesStatus can arrive: every
+// periodic report (storeContainersAndPackages, below) and the fast,
+// synchronous snapshot bundled into a UU command's terminal CommandResult
+// (ReportCommandResult) — without the latter, the UU section of the UI stayed
+// stale until the agent's next periodic report landed, well after the
+// install/toggle/configure/run-now command that triggered the change had
+// already completed.
+func (s *Service) applyUUReport(ctx context.Context, hostID, safeHostID string, uu *models.UnattendedUpgradesStatus) {
+	if uu == nil {
+		return
+	}
+	if err := s.repo.UpsertUUStatus(ctx, hostID, *uu); err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store UU status for host %s: %v", safeHostID, err))
+	}
+	for _, run := range uu.NewRuns {
+		isNew, err := s.repo.InsertUURunIfNew(ctx, hostID, run)
+		if err != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to insert UU run for host %s: %v", safeHostID, err))
+			continue
+		}
+		if isNew {
+			_ = s.repo.UpdateUULastRun(ctx, hostID, run.RunAt, len(run.Packages))
+			_ = s.repo.TouchAptLastAction(ctx, hostID, "update")
+			if len(run.Packages) > 0 {
+				_ = s.repo.TouchAptLastUpgradeAt(ctx, hostID, run.RunAt)
+				hostname := hostID
+				if host, err := s.repo.GetHost(ctx, hostID); err == nil && host != nil {
+					hostname = host.Hostname
+				}
+				s.pushUUNotification(hostname, hostID, run)
+			}
+		}
+	}
+}
+
 func (s *Service) storeContainersAndPackages(ctx context.Context, hostID, safeHostID string, report *models.AgentReport) {
 	if report.Docker != nil {
 		for i := range report.Docker.Containers {
@@ -433,30 +492,7 @@ func (s *Service) storeContainersAndPackages(ctx context.Context, hostID, safeHo
 		}
 	}
 
-	if report.UnattendedUpgrades != nil {
-		if err := s.repo.UpsertUUStatus(ctx, hostID, *report.UnattendedUpgrades); err != nil {
-			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store UU status for host %s: %v", safeHostID, err))
-		}
-		for _, run := range report.UnattendedUpgrades.NewRuns {
-			isNew, err := s.repo.InsertUURunIfNew(ctx, hostID, run)
-			if err != nil {
-				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to insert UU run for host %s: %v", safeHostID, err))
-				continue
-			}
-			if isNew {
-				_ = s.repo.UpdateUULastRun(ctx, hostID, run.RunAt, len(run.Packages))
-				_ = s.repo.TouchAptLastAction(ctx, hostID, "update")
-				if len(run.Packages) > 0 {
-					_ = s.repo.TouchAptLastUpgradeAt(ctx, hostID, run.RunAt)
-					hostname := hostID
-					if host, err := s.repo.GetHost(ctx, hostID); err == nil && host != nil {
-						hostname = host.Hostname
-					}
-					s.pushUUNotification(hostname, hostID, run)
-				}
-			}
-		}
-	}
+	s.applyUUReport(ctx, hostID, safeHostID, report.UnattendedUpgrades)
 
 	if report.AptStatus != nil {
 		report.AptStatus.HostID = hostID

@@ -26,6 +26,7 @@ type fakeRepo struct {
 	touchedAptActions  []string
 	upsertedApt        *models.AptStatus
 	upsertedAptPending *models.AptStatus
+	upsertedUU         *models.UnattendedUpgradesStatus
 	upsertedRestic     *models.ResticStatus
 	updatedDiagnostics *string
 	updatedSchedStatus string
@@ -61,7 +62,8 @@ func (f *fakeRepo) InsertMetrics(context.Context, *models.SystemMetrics) (int64,
 func (f *fakeRepo) UpsertDockerContainers(context.Context, string, []models.DockerContainer) error {
 	return nil
 }
-func (f *fakeRepo) UpsertUUStatus(context.Context, string, models.UnattendedUpgradesStatus) error {
+func (f *fakeRepo) UpsertUUStatus(_ context.Context, _ string, status models.UnattendedUpgradesStatus) error {
+	f.upsertedUU = &status
 	return nil
 }
 func (f *fakeRepo) InsertUURunIfNew(context.Context, string, models.UURun) (bool, error) {
@@ -80,13 +82,13 @@ func (f *fakeRepo) UpsertDockerNetworks(context.Context, string, []models.Docker
 func (f *fakeRepo) UpsertComposeProjects(context.Context, string, []models.ComposeProject) error {
 	return nil
 }
-func (f *fakeRepo) InsertDiskMetrics(context.Context, []models.DiskMetrics) error         { return nil }
-func (f *fakeRepo) InsertDiskHealth(context.Context, []models.DiskHealth) error           { return nil }
-func (f *fakeRepo) UpdateHostCustomTasks(context.Context, string, string) error           { return nil }
-func (f *fakeRepo) UpdateHostTasksConfigYAML(context.Context, string, string) error       { return nil }
-func (f *fakeRepo) UpdateHostResticProfiles(context.Context, string, string) error        { return nil }
-func (f *fakeRepo) UpdateHostResticGroups(context.Context, string, string) error          { return nil }
-func (f *fakeRepo) UpdateHostCollectors(context.Context, string, string) error            { return nil }
+func (f *fakeRepo) InsertDiskMetrics(context.Context, []models.DiskMetrics) error   { return nil }
+func (f *fakeRepo) InsertDiskHealth(context.Context, []models.DiskHealth) error     { return nil }
+func (f *fakeRepo) UpdateHostCustomTasks(context.Context, string, string) error     { return nil }
+func (f *fakeRepo) UpdateHostTasksConfigYAML(context.Context, string, string) error { return nil }
+func (f *fakeRepo) UpdateHostResticProfiles(context.Context, string, string) error  { return nil }
+func (f *fakeRepo) UpdateHostResticGroups(context.Context, string, string) error    { return nil }
+func (f *fakeRepo) UpdateHostCollectors(context.Context, string, string) error      { return nil }
 func (f *fakeRepo) UpdateHostDiagnostics(_ context.Context, _, diagnosticsJSON string) error {
 	f.updatedDiagnostics = &diagnosticsJSON
 	return nil
@@ -306,6 +308,71 @@ func TestReportCommandResult_AptPostProcessingAndStream(t *testing.T) {
 	}
 	if repo.upsertedApt != nil {
 		t.Errorf("expected the full UpsertAptStatus NOT to be called from the terminal-report fast path (would wipe security_updates/cve_list), got %+v", repo.upsertedApt)
+	}
+}
+
+func TestReportCommandResult_UUFastRefresh(t *testing.T) {
+	// install_uu/toggle_uu/configure_uu/run_uu bundle a fresh UU snapshot into
+	// the terminal CommandResult (same "fast path" as AptStatus above) so the
+	// server doesn't have to wait for the agent's next periodic report to
+	// reflect an install/toggle/config/run-now the user just triggered.
+	repo := &fakeRepo{cmd: &models.RemoteCommand{HostID: "h1", Module: "apt", Action: "install_uu"}}
+	s := newSvc(repo, &recordingStreamHub{})
+
+	err := s.ReportCommandResult(context.Background(), "h1", models.CommandResult{
+		CommandID:          "c1",
+		Status:             "completed",
+		UnattendedUpgrades: &models.UnattendedUpgradesStatus{Installed: true, Enabled: true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.upsertedUU == nil || !repo.upsertedUU.Installed || !repo.upsertedUU.Enabled {
+		t.Fatalf("expected UU status to be upserted from the command result, got %+v", repo.upsertedUU)
+	}
+}
+
+func TestReportCommandResult_PublishesSnapshotTopicsOnFailureToo(t *testing.T) {
+	// A failed apt/UU command still needs the apt + host-detail snapshots
+	// republished — they're the source of every history-driven "still
+	// running" badge/spinner (AptHostCard.vue's activeCommand, HostAptTab.vue's
+	// button spinners), and remote_commands' status was already flipped to
+	// "failed" above regardless of this branch. Without this, that status
+	// change never reaches those subscribers and the spinner keeps spinning
+	// until an unrelated report happens to touch the same host.
+	bus := events.NewBus()
+	aptCh, unsubApt := bus.Subscribe(events.TopicApt)
+	defer unsubApt()
+	hostCh, unsubHost := bus.Subscribe(events.HostTopic("h1"))
+	defer unsubHost()
+
+	repo := &fakeRepo{cmd: &models.RemoteCommand{HostID: "h1", Module: "apt", Action: "upgrade"}}
+	s := NewService(repo, &config.Config{}, &recordingStreamHub{}, nil, bus)
+
+	err := s.ReportCommandResult(context.Background(), "h1", models.CommandResult{
+		CommandID: "c1",
+		Status:    "failed",
+		Output:    "dpkg was interrupted",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	select {
+	case <-aptCh:
+	case <-time.After(time.Second):
+		t.Fatal("a failed apt command must still wake apt snapshot subscribers")
+	}
+	select {
+	case <-hostCh:
+	case <-time.After(time.Second):
+		t.Fatal("a failed apt command must still wake the host's snapshot subscribers")
+	}
+
+	// The success-only side effects (last-action timestamp, pending-package
+	// upsert) must NOT run on failure — only the "go refresh yourselves" signal.
+	if len(repo.touchedAptActions) != 0 {
+		t.Errorf("expected no TouchAptLastAction on a failed command, got %v", repo.touchedAptActions)
 	}
 }
 

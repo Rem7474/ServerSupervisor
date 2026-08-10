@@ -85,6 +85,7 @@
               <th>Domaine</th>
               <th>Connexion NPM</th>
               <th>Cible</th>
+              <th>Monitoring</th>
               <th class="text-end">
                 Requêtes
               </th>
@@ -104,48 +105,69 @@
           </thead>
           <tbody>
             <tr
-              v-for="d in exposure.domains"
-              :key="`${d.proxy_host_id}:${d.domain_name}`"
+              v-for="row in domainRows"
+              :key="`${row.d.proxy_host_id}:${row.d.domain_name}`"
             >
               <td>
                 <button
                   type="button"
                   class="btn btn-link btn-sm p-0 font-monospace small fw-medium text-decoration-none"
                   title="Voir le détail des requêtes/menaces pour ce domaine"
-                  @click="openDomain(d.domain_name)"
+                  @click="openDomain(row.d.domain_name)"
                 >
-                  {{ d.domain_name }}
+                  {{ row.d.domain_name }}
                 </button>
               </td>
-              <td>{{ d.connection_name }}</td>
+              <td>{{ row.d.connection_name }}</td>
               <td>
-                <span class="badge bg-secondary-lt text-secondary me-1">:{{ d.forward_port }}</span>
+                <span class="badge bg-secondary-lt text-secondary me-1">:{{ row.d.forward_port }}</span>
                 <span
-                  v-if="d.ssl_enabled"
+                  v-if="row.d.ssl_enabled"
                   class="badge bg-success-lt text-success me-1"
                 >SSL</span>
                 <span
-                  v-if="!d.npm_enabled"
+                  v-if="!row.d.npm_enabled"
                   class="badge bg-danger-lt text-danger"
                 >Désactivé</span>
               </td>
-              <td class="text-end">
-                {{ d.requests.toLocaleString('fr-FR') }}
+              <td>
+                <router-link
+                  v-if="row.probe || row.cert"
+                  :to="`/monitoring/host/${row.d.proxy_host_id}`"
+                  class="d-inline-flex align-items-center gap-1 text-decoration-none"
+                  title="Voir le détail monitoring de ce domaine"
+                >
+                  <span
+                    v-if="row.probe"
+                    :class="['badge', probeBadge(row.probe)]"
+                  >{{ probeStatusLabel(row.probe) }}</span>
+                  <span
+                    v-if="row.cert"
+                    :class="['badge', daysBadge(row.cert.days_remaining)]"
+                  >SSL {{ daysLabel(row.cert.days_remaining) }}</span>
+                </router-link>
+                <span
+                  v-else
+                  class="text-secondary small"
+                >—</span>
               </td>
               <td class="text-end">
-                {{ formatBytes(d.bytes) }}
+                {{ row.d.requests.toLocaleString('fr-FR') }}
+              </td>
+              <td class="text-end">
+                {{ formatBytes(row.d.bytes) }}
               </td>
               <td class="text-end text-muted">
-                {{ d.errors_4xx.toLocaleString('fr-FR') }} / {{ d.errors_5xx.toLocaleString('fr-FR') }}
+                {{ row.d.errors_4xx.toLocaleString('fr-FR') }} / {{ row.d.errors_5xx.toLocaleString('fr-FR') }}
               </td>
               <td class="text-end">
-                <span :class="d.suspicious_requests > 0 ? 'text-warning fw-medium' : 'text-muted'">
-                  {{ d.suspicious_requests.toLocaleString('fr-FR') }}
+                <span :class="row.d.suspicious_requests > 0 ? 'text-warning fw-medium' : 'text-muted'">
+                  {{ row.d.suspicious_requests.toLocaleString('fr-FR') }}
                 </span>
               </td>
               <td class="text-end">
-                <span :class="d.blocked_requests > 0 ? 'text-danger fw-medium' : 'text-muted'">
-                  {{ d.blocked_requests.toLocaleString('fr-FR') }}
+                <span :class="row.d.blocked_requests > 0 ? 'text-danger fw-medium' : 'text-muted'">
+                  {{ row.d.blocked_requests.toLocaleString('fr-FR') }}
                 </span>
               </td>
             </tr>
@@ -179,11 +201,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import DomainDetailsModal from './DomainDetailsModal.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { useDomainDetails } from '../../composables/useDomainDetails'
-import type { HostExposure } from '../../types/host'
+import { useUptimeProbes } from '../../composables/useUptimeProbes'
+import { useSslCertificates } from '../../composables/useSslCertificates'
+import type { HostExposure, HostExposedDomain } from '../../types/host'
+import type { UptimeProbe } from '../../types/uptime'
+import type { SSLCertificate } from '../../types/ssl'
 import { formatBytes } from '../../utils/formatters'
 
 const props = defineProps<{
@@ -205,4 +232,43 @@ function openDomain(domain: string): void {
   if (!domain) return
   domainModal.open(domain, { period: props.period })
 }
+
+// Each exposed domain is one NPM proxy host — if that same proxy host's
+// monitoring toggle also created an uptime probe and/or SSL cert
+// (npm_proxy_host_id, see useMonitoringOverview.ts for the identical merge
+// key), surface its live status here instead of leaving the exposure tab
+// blind to whether the domain it's reporting traffic for is actually up.
+// Domains with no monitoring configured just show "—" — this never creates
+// anything, only reads what already exists.
+const { probes, probeBadge, probeStatusLabel } = useUptimeProbes()
+const { certs, daysLabel, daysBadge } = useSslCertificates()
+
+const probeByProxyHost = computed(() => {
+  const map = new Map<string, UptimeProbe>()
+  for (const p of probes.value) {
+    if (p.npm_proxy_host_id) map.set(p.npm_proxy_host_id, p)
+  }
+  return map
+})
+const certByProxyHost = computed(() => {
+  const map = new Map<string, SSLCertificate>()
+  for (const c of certs.value) {
+    if (c.npm_proxy_host_id) map.set(c.npm_proxy_host_id, c)
+  }
+  return map
+})
+
+interface DomainRow {
+  d: HostExposedDomain
+  probe?: UptimeProbe
+  cert?: SSLCertificate
+}
+
+const domainRows = computed<DomainRow[]>(() =>
+  (props.exposure?.domains ?? []).map((d) => ({
+    d,
+    probe: probeByProxyHost.value.get(d.proxy_host_id),
+    cert: certByProxyHost.value.get(d.proxy_host_id),
+  }))
+)
 </script>

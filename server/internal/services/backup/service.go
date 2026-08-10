@@ -113,6 +113,7 @@ func (s *Service) TriggerBackup(ctx context.Context, hostID, profile, triggeredB
 func (s *Service) GetStatus(ctx context.Context, hostID string) (*models.BackupStatus, error) {
 	status := &models.BackupStatus{}
 	if latest, err := s.repo.GetLatestBackupRunByHost(ctx, hostID); err == nil {
+		s.backfillFromCommandOutput(ctx, latest)
 		status.LatestRun = latest
 	}
 	if passive, err := s.repo.GetResticStatus(ctx, hostID); err == nil {
@@ -130,10 +131,72 @@ func (s *Service) ListRuns(ctx context.Context, hostID string, limit int) ([]mod
 	if err != nil {
 		return nil, err
 	}
+	for i := range runs {
+		s.backfillFromCommandOutput(ctx, &runs[i])
+	}
 	if runs == nil {
 		runs = []models.BackupRun{}
 	}
 	return runs, nil
+}
+
+// backfillFromCommandOutput fills in duration/files/bytes/snapshot/repo-size
+// for a run whose row predates the CreateBackupRun fix (see that function's
+// doc comment): a scheduled-task-triggered run's INSERT used to only write 6
+// placeholder columns, silently dropping everything from the agent's actual
+// result — permanently, since that fix only changes what gets written on the
+// *next* insert, not what's already stored. The data isn't actually gone
+// though: remote_commands.output (the same JSON HandleCommandCompletion
+// parsed the first time) is never pruned, so it's re-derived here on every
+// read instead of via a backfill migration — same "computed on read, nothing
+// stored" shape as the release-tracker execution-history host column
+// (db_release_trackers.go's ListReleaseTrackerExecutions). A no-op for any
+// run created after the fix (DurationSec already set) or with no linked
+// command (nothing left to recover it from).
+func (s *Service) backfillFromCommandOutput(ctx context.Context, run *models.BackupRun) {
+	if run == nil || run.DurationSec != nil || run.CommandID == nil {
+		return
+	}
+	cmd, err := s.repo.GetRemoteCommandByID(ctx, *run.CommandID)
+	if err != nil || cmd.Output == "" {
+		return
+	}
+	var summary resticBackupSummary
+	if err := json.Unmarshal([]byte(cmd.Output), &summary); err != nil {
+		return
+	}
+
+	if run.FinishedAt == nil {
+		run.FinishedAt = cmd.EndedAt
+	}
+	if run.FinishedAt != nil {
+		d := int(run.FinishedAt.Sub(run.StartedAt).Seconds())
+		if summary.DurationSec > 0 {
+			d = summary.DurationSec
+		}
+		if d >= 0 {
+			run.DurationSec = &d
+		}
+	} else if summary.DurationSec > 0 {
+		d := summary.DurationSec
+		run.DurationSec = &d
+	}
+	if run.FilesDone == nil {
+		run.FilesDone = int64PtrFromIntPtr(summary.FilesNew)
+	}
+	if run.BytesDone == nil {
+		run.BytesDone = summary.BytesAdded
+	}
+	if run.SnapshotID == "" {
+		run.SnapshotID = summary.SnapshotID
+	}
+	if run.RepoSizeBytes == nil {
+		run.RepoSizeBytes = summary.RepoSizeBytes
+	}
+	if run.RawSummary == nil {
+		out := truncate(cmd.Output, 8192)
+		run.RawSummary = &out
+	}
 }
 
 // GetProfiles returns the resticprofile.yaml profile names last reported by
@@ -182,6 +245,7 @@ func (s *Service) GetRun(ctx context.Context, id string) (*models.BackupRun, err
 	if err != nil {
 		return nil, err
 	}
+	s.backfillFromCommandOutput(ctx, run)
 	return run, nil
 }
 

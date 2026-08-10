@@ -112,6 +112,11 @@
           :always-expanded="true"
         />
       </div>
+
+      <AptPendingPackagesList
+        class="mt-3"
+        :packages="pendingPackages"
+      />
     </div>
   </div>
   <div
@@ -400,12 +405,14 @@ import { computed } from 'vue'
 import { IconList } from '@tabler/icons-vue'
 import dayjs from '../../utils/dayjs'
 import CVEList from '../apt/CVEList.vue'
+import AptPendingPackagesList from '../apt/AptPendingPackagesList.vue'
 
 interface AptStatus {
   last_upgrade?: string
   pending_packages?: number
   last_update?: string
   cve_list?: string | unknown[]
+  package_list?: string | unknown[]
   [key: string]: unknown
 }
 
@@ -458,6 +465,17 @@ const props = withDefaults(defineProps<{
   uuRuns: null,
   uuForm: null,
   uuLoading: '',
+})
+
+const pendingPackages = computed<string[]>(() => {
+  const raw = props.aptStatus?.package_list
+  if (!raw) return []
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return Array.isArray(parsed) ? (parsed as string[]) : []
+  } catch {
+    return []
+  }
 })
 
 const lastUpgradeDate = computed(() => {
