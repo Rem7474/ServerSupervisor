@@ -38,6 +38,18 @@ type Reporter struct {
 	tasks       *config.TasksConfig
 	skipMetrics *atomic.Bool
 	version     string
+
+	// webLogsRunning guards against overlapping web-log collections. Unlike
+	// every other collector here, CollectWebLogs does its own unbounded,
+	// synchronous file I/O (see collectionTimeout's doc comment) — on a huge
+	// or stuck log file, ctx cancellation only stops it between reads, not
+	// mid-syscall. The report loop's ticker fires again regardless of
+	// whether the previous Send finished (it drops, not queues, missed
+	// ticks — see agent/CLAUDE.md), so without this guard a collector stuck
+	// in a blocking read would get a brand new goroutine piled on top of it
+	// every cycle: an unbounded goroutine/memory leak ending in an OOM kill,
+	// not just one slow report.
+	webLogsRunning atomic.Bool
 }
 
 // New returns a ready Reporter. skipMetrics is shared with the caller — the
@@ -181,9 +193,26 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			if !r.webLogsRunning.CompareAndSwap(false, true) {
+				slog.Warn("web logs collection skipped: previous run is still in progress")
+				return
+			}
+			defer r.webLogsRunning.Store(false)
+
+			// CollectWebLogs has no timeout of its own (unlike docker.go/
+			// crowdsec.go/disk.go — see collectionTimeout's doc comment), so
+			// it needs its own bounded context here: tied to the same
+			// collectionTimeout the outer select already uses to stop
+			// waiting, so this goroutine actually stops doing work around
+			// the same time instead of continuing on discarded past that
+			// point (see webLogsRunning's doc comment for why that matters).
+			webLogsCtx, cancel := context.WithTimeout(context.Background(), collectionTimeout)
+			defer cancel()
+
 			globs := r.cfg.WebLogGlobs()
 			slog.Debug("web logs scan starting", "globs", globs, "crowdsec", r.cfg.CollectCrowdSecCorrelation)
 			report, err := collector.CollectWebLogs(
+				webLogsCtx,
 				globs,
 				r.cfg.WebLogsTailLines,
 				r.cfg.WebLogsTopN,

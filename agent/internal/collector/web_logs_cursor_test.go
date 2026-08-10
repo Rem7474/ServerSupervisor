@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,7 +137,7 @@ func TestReadIncrementalLines_FastRotationDetectedEvenWhenSizeGrew(t *testing.T)
 
 	// File A: the "old" file this agent already scanned once.
 	writeLines("line-a-1", "line-a-2", "line-a-3")
-	_, entryA, err := readIncrementalLines(path, 100, webLogCursorEntry{}, false)
+	_, entryA, err := readIncrementalLines(context.Background(), path, 100, webLogCursorEntry{}, false)
 	if err != nil {
 		t.Fatalf("initial read of file A returned error: %v", err)
 	}
@@ -161,7 +162,7 @@ func TestReadIncrementalLines_FastRotationDetectedEvenWhenSizeGrew(t *testing.T)
 		t.Fatalf("test setup invalid: file B (%d bytes) must be larger than file A's recorded offset (%d) to reproduce the bug", infoB.Size(), entryA.Offset)
 	}
 
-	got, _, err := readIncrementalLines(path, 100, entryA, true)
+	got, _, err := readIncrementalLines(context.Background(), path, 100, entryA, true)
 	if err != nil {
 		t.Fatalf("read after rotation returned error: %v", err)
 	}
