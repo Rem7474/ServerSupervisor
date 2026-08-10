@@ -105,6 +105,40 @@ func (s *Service) Register(ctx context.Context, req models.HostRegistration) (id
 	return hostID, plain, nil
 }
 
+// BulkResult reports one entry's outcome in a bulk registration.
+type BulkResult struct {
+	Name      string `json:"name"`
+	IPAddress string `json:"ip_address"`
+	Created   bool   `json:"created"`
+	HostID    string `json:"host_id,omitempty"`
+	APIKey    string `json:"api_key,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// RegisterBulk registers many hosts in one call (e.g. after a subnet
+// discovery scan); each entry is validated and registered independently so
+// one bad entry doesn't fail the whole batch.
+func (s *Service) RegisterBulk(ctx context.Context, reqs []models.HostRegistration) (int, []BulkResult, error) {
+	if len(reqs) == 0 {
+		return 0, nil, apperr.Validation("hosts array is required")
+	}
+	if len(reqs) > 254 {
+		return 0, nil, apperr.Validation("too many hosts (max 254)")
+	}
+	results := make([]BulkResult, 0, len(reqs))
+	created := 0
+	for _, req := range reqs {
+		id, plainKey, err := s.Register(ctx, req)
+		if err != nil {
+			results = append(results, BulkResult{Name: req.Name, IPAddress: req.IPAddress, Error: err.Error()})
+			continue
+		}
+		created++
+		results = append(results, BulkResult{Name: req.Name, IPAddress: req.IPAddress, Created: true, HostID: id, APIKey: plainKey})
+	}
+	return created, results, nil
+}
+
 // List returns all hosts (never nil).
 func (s *Service) List(ctx context.Context) ([]models.Host, error) {
 	hosts, err := s.repo.GetAllHosts(ctx)

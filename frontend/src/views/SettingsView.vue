@@ -121,6 +121,7 @@
         <div v-show="tab === 'retention'">
           <SettingsRetentionCard
             :form="form"
+            :audit-categories="settings.auditCategories"
             :auth-is-admin="auth.isAdmin"
             :saving-retention="savingRetention"
             :retention-save-msg="retentionSaveMsg"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"strconv"
@@ -73,6 +74,12 @@ type Config struct {
 	MetricsRetentionDays int
 	AuditRetentionDays   int
 	WebLogsRetentionDays int
+	// AuditRetentionDaysByCategory overrides AuditRetentionDays per audit
+	// log category (models.AuditCategories' keys) — settings-only (no env
+	// var: a per-category map doesn't fit the flat KEY=value env shape the
+	// rest of this config uses). A category absent from the map falls back
+	// to AuditRetentionDays. See internal/background/audit.go.
+	AuditRetentionDaysByCategory map[string]int
 
 	// Threat detection (web logs) — admin-tunable coefficients behind the
 	// BotView "IPs suspectes" score. See internal/threatdetect.Weights for
@@ -259,6 +266,12 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 	if v, ok := settings["audit_retention_days"]; ok && v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			c.AuditRetentionDays = i
+		}
+	}
+	if v, ok := settings["audit_retention_days_by_category"]; ok && v != "" {
+		var byCategory map[string]int
+		if err := json.Unmarshal([]byte(v), &byCategory); err == nil {
+			c.AuditRetentionDaysByCategory = byCategory
 		}
 	}
 	if v, ok := settings["web_logs_retention_days"]; ok && v != "" {

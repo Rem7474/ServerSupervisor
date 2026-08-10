@@ -367,17 +367,27 @@
                     <option value="tcp">
                       TCP
                     </option>
+                    <option value="icmp">
+                      ICMP (ping)
+                    </option>
                   </select>
                 </div>
                 <div class="col-12">
-                  <label class="form-label required">{{ probeForm.type === 'http' ? 'URL' : 'host:port' }}</label>
+                  <label class="form-label required">{{ probeTargetLabel }}</label>
                   <input
                     v-model="probeForm.target"
                     type="text"
                     class="form-control"
-                    :placeholder="probeForm.type === 'http' ? 'https://example.com/health' : 'example.com:443'"
+                    :placeholder="probeTargetPlaceholder"
                     required
                   >
+                  <div
+                    v-if="probeForm.type === 'icmp'"
+                    class="form-hint"
+                  >
+                    Nécessite CAP_NET_RAW côté conteneur serveur (activé par défaut — voir server/Dockerfile).
+                    Sans elle, le check échoue explicitement plutôt que de rapporter un faux "hors ligne".
+                  </div>
                 </div>
                 <div class="col-md-4">
                   <label class="form-label">Intervalle (sec)</label>
@@ -588,7 +598,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { IconActivity, IconLock, IconTrash } from '@tabler/icons-vue'
 import { useAuthStore } from '../../stores/auth'
 import EmptyState from '../EmptyState.vue'
@@ -651,6 +661,17 @@ const {
   saveCert,
   confirmDeleteCert,
 } = useMonitoringOverview()
+
+const probeTargetLabel = computed(() => {
+  if (probeForm.value.type === 'http') return 'URL'
+  if (probeForm.value.type === 'icmp') return 'Hôte ou IP'
+  return 'host:port'
+})
+const probeTargetPlaceholder = computed(() => {
+  if (probeForm.value.type === 'http') return 'https://example.com/health'
+  if (probeForm.value.type === 'icmp') return '192.168.1.1 ou switch.local'
+  return 'example.com:443'
+})
 
 const probeModalRef = ref<HTMLElement | null>(null)
 const certModalRef = ref<HTMLElement | null>(null)

@@ -1,5 +1,15 @@
 import { api } from './client'
 import type { Host, HostExposure, HostRegistration, HostUpdate } from '../types/host'
+import type { DiscoveredHost } from '../types/discovery'
+
+interface BulkHostResult {
+  name: string
+  ip_address: string
+  created: boolean
+  host_id?: string
+  api_key?: string
+  error?: string
+}
 
 export const hostsApi = {
   // Hosts
@@ -10,6 +20,10 @@ export const hostsApi = {
   getHostExposure: (id: string, period?: string) =>
     api.get<HostExposure>(`/v1/hosts/${id}/exposure`, { params: { period: period || '24h' } }),
   registerHost: (data: Partial<HostRegistration>) => api.post('/v1/hosts', data),
+  registerHostsBulk: (hosts: Partial<HostRegistration>[]) =>
+    api.post<{ created: number; results: BulkHostResult[] }>('/v1/hosts/bulk', { hosts }),
+  discoverHosts: (cidr: string) =>
+    api.post<{ results: DiscoveredHost[] }>('/v1/hosts/discover', { cidr }),
   updateHost: (id: string, data: Partial<HostUpdate>) => api.patch(`/v1/hosts/${id}`, data),
   deleteHost: (id: string) => api.delete(`/v1/hosts/${id}`),
   rotateHostKey: (id: string) => api.post(`/v1/hosts/${id}/rotate-key`),

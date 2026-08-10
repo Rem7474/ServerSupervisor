@@ -32,8 +32,16 @@ type Repository interface {
 	ProxmoxDiskExists(ctx context.Context, id string) (bool, error)
 	ResolveOpenAlertIncidentsByRule(ctx context.Context, ruleID int64) (int64, error)
 	ResolveAlertIncident(ctx context.Context, id int64) error
+	AcknowledgeAlertIncident(ctx context.Context, id int64, username string) error
 	GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error)
 	GetAllHosts(ctx context.Context) ([]models.Host, error)
+
+	// rule templates (ROADMAP.md item #9)
+	CreateAlertRuleTemplate(ctx context.Context, t *models.AlertRuleTemplate) error
+	GetAlertRuleTemplates(ctx context.Context) ([]models.AlertRuleTemplate, error)
+	GetAlertRuleTemplateByID(ctx context.Context, id int64) (*models.AlertRuleTemplate, error)
+	UpdateAlertRuleTemplate(ctx context.Context, t *models.AlertRuleTemplate) error
+	DeleteAlertRuleTemplate(ctx context.Context, id int64) error
 
 	// capability discovery
 	GetHost(ctx context.Context, id string) (*models.Host, error)
@@ -232,6 +240,14 @@ func (s *Service) ResolveIncident(ctx context.Context, id int64) error {
 	return s.repo.ResolveAlertIncident(ctx, id)
 }
 
+// AcknowledgeIncident marks an open incident as being handled, which also
+// stops the engine's escalation re-notifications for it (see
+// AlertActions.EscalateAfterMinutes). A no-op if already acknowledged or
+// already resolved.
+func (s *Service) AcknowledgeIncident(ctx context.Context, id int64, username string) error {
+	return s.repo.AcknowledgeAlertIncident(ctx, id, username)
+}
+
 // ListIncidents returns a page of alert incidents (never nil).
 func (s *Service) ListIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error) {
 	incidents, err := s.repo.GetAlertIncidents(ctx, limit, offset)
@@ -392,6 +408,9 @@ func validateAlertActions(actions *models.AlertActions) error {
 	}
 	if actions.Cooldown < 0 {
 		return apperr.Validation("La periode de silence doit etre positive ou nulle.")
+	}
+	if actions.EscalateAfterMinutes < 0 {
+		return apperr.Validation("Le delai d'escalade doit etre positif ou nul.")
 	}
 	for _, channel := range actions.Channels {
 		if !validAlertChannels[channel] {

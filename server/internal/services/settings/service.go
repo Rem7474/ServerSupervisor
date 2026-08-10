@@ -7,6 +7,7 @@ package settings
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/smtp"
@@ -54,8 +55,10 @@ func (s *Service) Snapshot(ctx context.Context) map[string]any {
 			"dbHost":               c.DBHost,
 			"dbPort":               c.DBPort,
 			"tlsEnabled":           c.TLSEnabled,
-			"metricsRetentionDays": c.MetricsRetentionDays,
-			"auditRetentionDays":   c.AuditRetentionDays,
+			"metricsRetentionDays":         c.MetricsRetentionDays,
+			"auditRetentionDays":           c.AuditRetentionDays,
+			"auditRetentionDaysByCategory": c.AuditRetentionDaysByCategory,
+			"auditCategories":              models.AuditCategories(),
 			"smtpConfigured":       c.SMTPHost != "",
 			"smtpHost":             c.SMTPHost,
 			"smtpPort":             c.SMTPPort,
@@ -154,6 +157,21 @@ func (s *Service) Update(ctx context.Context, req models.SettingsUpdateRequest, 
 	}
 	if req.AuditRetentionDays > 0 {
 		save("audit_retention_days", strconv.Itoa(req.AuditRetentionDays))
+	}
+	if req.AuditRetentionDaysByCategory != nil {
+		validKeys := map[string]bool{}
+		for _, cat := range models.AuditCategories() {
+			validKeys[cat.Key] = true
+		}
+		cleaned := map[string]int{}
+		for k, v := range req.AuditRetentionDaysByCategory {
+			if validKeys[k] && v > 0 {
+				cleaned[k] = v
+			}
+		}
+		if encoded, err := json.Marshal(cleaned); err == nil {
+			save("audit_retention_days_by_category", string(encoded))
+		}
 	}
 
 	saveFloat := func(key string, v *float64) {

@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"encoding/csv"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
@@ -33,7 +36,31 @@ func clampQueryInt(c *gin.Context, key string, def, max int) int {
 	return v
 }
 
-// GetAuditLogs returns paginated audit logs (admin only).
+// parseAuditLogFilter reads the optional category/from/to query params shared
+// by GetAuditLogs and ExportAuditLogs. from/to accept RFC3339 or a bare
+// YYYY-MM-DD date (the latter treated as that day's start, respectively end
+// of day, in UTC — a plain HTML date input sends this shape).
+func parseAuditLogFilter(c *gin.Context) database.AuditLogFilter {
+	f := database.AuditLogFilter{Category: c.Query("category")}
+	if raw := c.Query("from"); raw != "" {
+		if t, err := time.Parse(time.RFC3339, raw); err == nil {
+			f.From = &t
+		} else if t, err := time.Parse("2006-01-02", raw); err == nil {
+			f.From = &t
+		}
+	}
+	if raw := c.Query("to"); raw != "" {
+		if t, err := time.Parse(time.RFC3339, raw); err == nil {
+			f.To = &t
+		} else if t, err := time.Parse("2006-01-02", raw); err == nil {
+			endOfDay := t.Add(24*time.Hour - time.Nanosecond)
+			f.To = &endOfDay
+		}
+	}
+	return f
+}
+
+// GetAuditLogs returns a filtered, paginated page of audit logs (admin only).
 func (h *AuditHandler) GetAuditLogs(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
 		respondError(c, apperr.Forbidden("insufficient permissions"))
@@ -41,12 +68,47 @@ func (h *AuditHandler) GetAuditLogs(c *gin.Context) {
 	}
 	page := clampQueryInt(c, "page", 1, 1<<31-1)
 	limit := clampQueryInt(c, "limit", 50, 100)
-	logs, err := h.svc.Logs(c.Request.Context(), limit, (page-1)*limit)
+	logs, err := h.svc.Logs(c.Request.Context(), limit, (page-1)*limit, parseAuditLogFilter(c))
 	if err != nil {
 		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"logs": logs, "page": page, "limit": limit})
+}
+
+// ExportAuditLogs streams the same filtered set as GetAuditLogs (unpaginated,
+// capped at auditsvc's maxExportRows) as a CSV download.
+func (h *AuditHandler) ExportAuditLogs(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		respondError(c, apperr.Forbidden("insufficient permissions"))
+		return
+	}
+	logs, err := h.svc.Export(c.Request.Context(), parseAuditLogFilter(c))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+
+	filename := fmt.Sprintf("audit-logs-%s.csv", time.Now().Format("20060102-150405"))
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+
+	w := csv.NewWriter(c.Writer)
+	_ = w.Write([]string{"id", "created_at", "username", "category", "action", "host_name", "ip_address", "status", "details"})
+	for _, l := range logs {
+		_ = w.Write([]string{
+			strconv.FormatInt(l.ID, 10),
+			l.CreatedAt.UTC().Format(time.RFC3339),
+			l.Username,
+			l.Category,
+			l.Action,
+			l.HostName,
+			l.IPAddress,
+			l.Status,
+			l.Details,
+		})
+	}
+	w.Flush()
 }
 
 // GetAuditLogsByHost returns audit logs for a specific host.

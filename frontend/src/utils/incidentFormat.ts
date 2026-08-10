@@ -25,6 +25,13 @@ export function notificationResolved(item: ResolvedFields): boolean {
   return !!item.resolved_at
 }
 
+// "En cours de traitement" — acknowledged but not yet resolved. Only ever
+// true for an alert_incident item (release trackers have no ack concept);
+// once resolved, acknowledged_at is irrelevant (notificationResolved wins).
+export function notificationAcknowledged(item: Pick<NotificationItem, 'type' | 'acknowledged_at' | 'resolved_at' | 'status'>): boolean {
+  return !isTrackerType(item) && !!item.acknowledged_at && !notificationResolved(item)
+}
+
 export function trackerStatusLabel(status?: string): string {
   if (status === 'pending' || status === 'running') return 'Détection en cours'
   if (status === 'completed' || status === 'success') return 'Exécution réussie'

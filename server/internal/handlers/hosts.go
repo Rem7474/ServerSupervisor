@@ -44,6 +44,28 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 	})
 }
 
+// RegisterHostsBulk registers many hosts in one call, e.g. to confirm a batch
+// of addresses found by a subnet discovery scan (admin only).
+func (h *HostHandler) RegisterHostsBulk(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		respondError(c, apperr.Forbidden("insufficient permissions"))
+		return
+	}
+	var req struct {
+		Hosts []models.HostRegistration `json:"hosts"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, apperr.Validation(err.Error()))
+		return
+	}
+	created, results, err := h.svc.RegisterBulk(c.Request.Context(), req.Hosts)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"created": created, "results": results})
+}
+
 // ListHosts returns all hosts.
 func (h *HostHandler) ListHosts(c *gin.Context) {
 	hosts, err := h.svc.List(c.Request.Context())

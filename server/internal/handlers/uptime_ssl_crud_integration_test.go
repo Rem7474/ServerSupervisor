@@ -89,9 +89,31 @@ func TestUptimeProbeCreateValidation(t *testing.T) {
 	if w := doJSON(t, r, http.MethodPost, "/uptime/probes", map[string]any{"type": "http", "name": "x"}); w.Code != http.StatusBadRequest {
 		t.Errorf("missing target = %d, want 400", w.Code)
 	}
-	// Invalid type (not http/tcp) -> 400
+	// Invalid type (not http/tcp/icmp) -> 400
 	if w := doJSON(t, r, http.MethodPost, "/uptime/probes", map[string]any{"type": "ftp", "name": "x", "target": "y"}); w.Code != http.StatusBadRequest {
 		t.Errorf("invalid type = %d, want 400", w.Code)
+	}
+}
+
+// TestUptimeProbeICMPTypeAccepted is the regression test for ROADMAP.md item
+// #8: migration 091 widened uptime_probes' type CHECK constraint to allow
+// "icmp" alongside http/tcp — a request-level binding check alone wouldn't
+// catch a stale/missing migration, since Gin's `oneof=http tcp icmp` would
+// happily accept the value and only the INSERT would fail against the DB.
+func TestUptimeProbeICMPTypeAccepted(t *testing.T) {
+	r, _ := newUptimeRouter(t)
+	w := doJSON(t, r, http.MethodPost, "/uptime/probes", map[string]any{
+		"type": "icmp", "name": "gateway", "target": "192.0.2.1",
+	})
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create icmp probe status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var created idOnly
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil || created.ID == "" {
+		t.Fatalf("decode created icmp probe: err=%v body=%s", err, w.Body.String())
+	}
+	if g := doJSON(t, r, http.MethodGet, "/uptime/probes/"+created.ID, nil); g.Code != http.StatusOK {
+		t.Fatalf("get icmp probe status = %d", g.Code)
 	}
 }
 

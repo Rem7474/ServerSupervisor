@@ -19,7 +19,7 @@ type fakeRepo struct {
 	incidents []database.AlertIncidentWithRule
 }
 
-func (f *fakeRepo) GetAuditLogs(context.Context, int, int) ([]models.AuditLog, error) {
+func (f *fakeRepo) GetAuditLogs(context.Context, int, int, database.AuditLogFilter) ([]models.AuditLog, error) {
 	return nil, nil
 }
 func (f *fakeRepo) GetAuditLogsByHost(context.Context, string, int) ([]models.AuditLog, error) {
@@ -56,7 +56,7 @@ func TestCommand_NotFoundMapsToAppErr(t *testing.T) {
 
 func TestLogs_NeverNil(t *testing.T) {
 	svc := NewService(&fakeRepo{})
-	got, err := svc.Logs(context.Background(), 50, 0)
+	got, err := svc.Logs(context.Background(), 50, 0, database.AuditLogFilter{})
 	if err != nil {
 		t.Fatalf("Logs: %v", err)
 	}

@@ -94,4 +94,8 @@ type AuditLog struct {
 	Details   string    `json:"details" db:"details"`       // JSON payload (command output, new privileges, etc.)
 	Status    string    `json:"status" db:"status"`         // pending, completed, failed
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	// Category is computed once at write time by CategorizeAuditAction (see
+	// models/audit.go) — drives per-category retention and the audit log
+	// browser's filter.
+	Category string `json:"category" db:"category"`
 }

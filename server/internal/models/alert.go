@@ -149,6 +149,13 @@ type AlertActions struct {
 	NtfyTopic      string          `json:"ntfy_topic,omitempty"`      // ntfy push notification topic
 	Cooldown       int             `json:"cooldown,omitempty"`        // seconds between re-notifications (0 = no cooldown)
 	CommandTrigger *CommandTrigger `json:"command_trigger,omitempty"` // optional command to run on alert
+	// EscalateAfterMinutes, when > 0, re-sends the fired notification for an
+	// open incident that hasn't been acknowledged, every N minutes since it
+	// triggered (or since the last escalation) — see internal/alerts/engine.go.
+	// 0 (default) disables escalation entirely. Unlike Cooldown, this never
+	// suppresses the *first* notification; it only repeats an unacknowledged
+	// one.
+	EscalateAfterMinutes int `json:"escalate_after_minutes,omitempty"`
 }
 
 type AlertRule struct {
@@ -202,6 +209,23 @@ type AlertIncident struct {
 	// CommandID is the remote_commands row a command_trigger dispatched when
 	// this incident fired, if the rule has one configured. Nil otherwise.
 	CommandID *string `json:"command_id,omitempty" db:"command_id"`
+	// AcknowledgedAt/AcknowledgedBy mark that someone is handling this incident
+	// — orthogonal to ResolvedAt (see migration 087's comment). Both nil until
+	// AcknowledgeIncident is called; never cleared once resolved.
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty" db:"acknowledged_at"`
+	AcknowledgedBy *string    `json:"acknowledged_by,omitempty" db:"acknowledged_by"`
+	// LastEscalatedAt is the last time the engine re-sent a notification for
+	// this still-open, unacknowledged incident (see AlertActions.EscalateAfterMinutes).
+	// Not exposed in the incidents list JSON — internal engine bookkeeping only.
+	LastEscalatedAt *time.Time `json:"-" db:"last_escalated_at"`
+	// CorrelatedWith is the id of the host's own open status_offline/
+	// heartbeat_timeout incident this one was linked to at creation time — a
+	// host-down cascade (e.g. every Docker container on that host firing its
+	// own incident) is still recorded per-incident but doesn't independently
+	// notify or escalate (see maybeCorrelateWithHostDown/maybeEscalateIncident
+	// in internal/alerts/engine.go). Nil for an uncorrelated incident, or for
+	// a host-down incident itself (it's never correlated with another one).
+	CorrelatedWith *int64 `json:"correlated_with,omitempty" db:"correlated_with"`
 	// Enriched post-fetch (not DB columns): Docker synthetic IDs resolution,
 	// and the live status of CommandID's remote_commands row (joined at read
 	// time so the frontend doesn't need a second round-trip per incident).
@@ -244,6 +268,13 @@ type NotificationItem struct {
 	// dispatch for this incident (alert_incident type only), joined from
 	// alert_incidents.command_id — empty when no command_trigger fired.
 	CommandStatus string `json:"command_status,omitempty"`
+	// AcknowledgedAt/AcknowledgedBy mirror AlertIncident's fields (alert_incident
+	// type only; always nil for a release-tracker entry).
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
+	AcknowledgedBy string     `json:"acknowledged_by,omitempty"`
+	// CorrelatedWith mirrors AlertIncident.CorrelatedWith (alert_incident type
+	// only) — lets the UI mark a host-down cascade child without a second call.
+	CorrelatedWith *int64 `json:"correlated_with,omitempty"`
 }
 
 // PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.
@@ -275,6 +306,58 @@ type AlertRuleCreate struct {
 	ThresholdClearCrit *float64            `json:"threshold_clear_crit"`
 	Duration           int                 `json:"duration"`
 	Actions            AlertActions        `json:"actions"`
+}
+
+// AlertRuleTemplate is a reusable rule "recipe" for agent metrics — no host,
+// so ApplyAlertRuleTemplateRequest can stamp out the same rule across many
+// hosts at once instead of re-entering the same metric/thresholds/actions
+// per host (ROADMAP.md item #9). Not a live link to the rules it spawns:
+// editing or deleting a template never touches an already-created rule (same
+// "definition + independent instances" shape as runbooks/runbook_steps).
+// Docker/Proxmox-scoped rules aren't templatable in this MVP — Docker
+// scope's host_id is required per rule and Proxmox scope is cluster-level
+// already, so neither fits "apply the same recipe to N hosts."
+type AlertRuleTemplate struct {
+	ID                 int64        `json:"id" db:"id"`
+	Name               string       `json:"name" db:"name"`
+	Metric             string       `json:"metric" db:"metric"`
+	Operator           string       `json:"operator" db:"operator"`
+	ThresholdWarn      float64      `json:"threshold_warn" db:"threshold_warn"`
+	ThresholdCrit      float64      `json:"threshold_crit" db:"threshold_crit"`
+	ThresholdClearWarn *float64     `json:"threshold_clear_warn,omitempty" db:"threshold_clear_warn"`
+	ThresholdClearCrit *float64     `json:"threshold_clear_crit,omitempty" db:"threshold_clear_crit"`
+	DurationSeconds    int          `json:"duration_seconds" db:"duration_seconds"`
+	Actions            AlertActions `json:"actions" db:"-"`
+	CreatedAt          time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at" db:"updated_at"`
+}
+
+type AlertRuleTemplateRequest struct {
+	Name               string       `json:"name" binding:"required"`
+	Metric             string       `json:"metric" binding:"required"`
+	Operator           string       `json:"operator" binding:"required"`
+	ThresholdWarn      float64      `json:"threshold_warn" binding:"required"`
+	ThresholdCrit      float64      `json:"threshold_crit" binding:"required"`
+	ThresholdClearWarn *float64     `json:"threshold_clear_warn"`
+	ThresholdClearCrit *float64     `json:"threshold_clear_crit"`
+	Duration           int          `json:"duration"`
+	Actions            AlertActions `json:"actions"`
+}
+
+// ApplyAlertRuleTemplateRequest is the body of POST /alert-rule-templates/:id/apply.
+// Enabled defaults to false (zero value) — applying a template to a fleet
+// shouldn't immediately start firing everywhere before the admin has
+// reviewed the resulting per-host rules.
+type ApplyAlertRuleTemplateRequest struct {
+	HostIDs []string `json:"host_ids" binding:"required,min=1"`
+	Enabled bool     `json:"enabled"`
+}
+
+// ApplyAlertRuleTemplateResult reports what happened per host — applying to
+// N hosts is not all-or-nothing, one host's failure shouldn't block the rest.
+type ApplyAlertRuleTemplateResult struct {
+	CreatedRuleIDs []int64           `json:"created_rule_ids"`
+	Errors         map[string]string `json:"errors,omitempty"` // host_id -> error message
 }
 
 type AlertRuleUpdate struct {

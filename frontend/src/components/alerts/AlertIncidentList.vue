@@ -204,7 +204,7 @@
                 @toggle="toggleSort('resolved_at')"
               />
             </th>
-            <th style="width: 60px;" />
+            <th style="width: 90px;" />
           </tr>
         </thead>
         <tbody>
@@ -264,6 +264,12 @@
                     :tone="notificationTypeTone(row.item)"
                     :text="notificationTypeLabel(row.item)"
                     compact
+                  />
+                  <IconLink
+                    v-if="row.item.correlated_with"
+                    :size="14"
+                    class="icon text-muted ms-1"
+                    title="Corrélé avec l'incident « hôte hors ligne » — pas de notification séparée"
                   />
                 </td>
                 <td>
@@ -343,7 +349,26 @@
                     class="text-secondary"
                   >-</span>
                 </td>
-                <td>
+                <td class="text-nowrap">
+                  <button
+                    v-if="isAdmin && !isCompleted(row.item) && !isTrackerType(row.item) && !isAcknowledged(row.item) && row.item.id"
+                    type="button"
+                    class="btn btn-icon btn-sm btn-ghost-warning"
+                    :disabled="acknowledgingId === row.item.id"
+                    title="Accuser réception — je m'en occupe"
+                    aria-label="Accuser réception de l'incident"
+                    @click="$emit('acknowledge', row.item)"
+                  >
+                    <span
+                      v-if="acknowledgingId === row.item.id"
+                      class="spinner-border spinner-border-sm"
+                    />
+                    <IconEye
+                      v-else
+                      :size="14"
+                      class="icon"
+                    />
+                  </button>
                   <button
                     v-if="isAdmin && !isCompleted(row.item) && row.item.id"
                     type="button"
@@ -388,7 +413,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconBell, IconCheck, IconChevronRight, IconList, IconSearch, IconStack2, IconX } from '@tabler/icons-vue'
+import { IconBell, IconCheck, IconChevronRight, IconEye, IconLink, IconList, IconSearch, IconStack2, IconX } from '@tabler/icons-vue'
 import BadgePill from '../common/BadgePill.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
@@ -406,6 +431,7 @@ import {
   incidentDuration,
   isTrackerType,
   metricLabel,
+  notificationAcknowledged as isAcknowledged,
   notificationResolved as isCompleted,
   notificationRoute,
   notificationTitle,
@@ -447,6 +473,7 @@ const TYPE_FILTERS = [
 const STATUS_FILTERS = [
   { value: 'all', label: 'Tous états', activeClass: 'btn-primary shadow-sm' },
   { value: 'active', label: 'Actifs', activeClass: 'btn-danger shadow-sm' },
+  { value: 'acknowledged', label: 'En cours', activeClass: 'btn-warning shadow-sm' },
   { value: 'resolved', label: 'Terminés', activeClass: 'btn-success shadow-sm' },
 ] as const
 
@@ -459,6 +486,7 @@ const props = withDefaults(defineProps<{
   initialSearch?: string
   markingRead?: boolean
   resolvingId?: string | number | null
+  acknowledgingId?: string | number | null
 }>(), {
   incidents: () => [],
   loading: false,
@@ -468,11 +496,13 @@ const props = withDefaults(defineProps<{
   initialSearch: '',
   markingRead: false,
   resolvingId: null,
+  acknowledgingId: null,
 })
 
 defineEmits<{
   (e: 'mark-all-read'): void
   (e: 'resolve', item: Incident): void
+  (e: 'acknowledge', item: Incident): void
 }>()
 
 const filterType = ref('all')
@@ -500,7 +530,8 @@ const filteredIncidents = computed(() => {
       if (!isTrackerType(incident)) return false
     }
 
-    if (filterStatus.value === 'active' && isCompleted(incident)) return false
+    if (filterStatus.value === 'active' && (isCompleted(incident) || isAcknowledged(incident))) return false
+    if (filterStatus.value === 'acknowledged' && !isAcknowledged(incident)) return false
     if (filterStatus.value === 'resolved' && !isCompleted(incident)) return false
 
     if (search) {

@@ -1,7 +1,7 @@
 import type { NotificationItem } from '../types/generated'
-import { isTrackerType, notificationResolved } from './incidentFormat'
+import { isTrackerType, notificationAcknowledged, notificationResolved } from './incidentFormat'
 
-type StateFields = Parameters<typeof notificationResolved>[0]
+type StateFields = Parameters<typeof notificationResolved>[0] & Parameters<typeof notificationAcknowledged>[0]
 type TypeFields = Pick<NotificationItem, 'type' | 'severity'>
 
 // Shared severity/type -> visual mapping, previously reimplemented (each
@@ -10,12 +10,20 @@ type TypeFields = Pick<NotificationItem, 'type' | 'severity'>
 // BadgePill has no 'primary' tone, so the tracker-detected case uses 'info'
 // (renders as the same blue as everywhere else a release tracker is tagged).
 
-export function notificationStateTone(item: StateFields): 'danger' | 'success' {
-  return notificationResolved(item) ? 'success' : 'danger'
+// Three states, not two: an acknowledged-but-not-resolved alert incident is
+// "en cours de traitement" — distinct from "actif" (nobody's looked at it
+// yet) and "terminé" (closed). Release trackers only ever have the binary
+// active/resolved pair (notificationAcknowledged is always false for them).
+export function notificationStateTone(item: StateFields): 'danger' | 'success' | 'warning' {
+  if (notificationResolved(item)) return 'success'
+  if (notificationAcknowledged(item)) return 'warning'
+  return 'danger'
 }
 
 export function notificationStateLabel(item: StateFields): string {
-  return notificationResolved(item) ? 'Terminé' : 'Actif'
+  if (notificationResolved(item)) return 'Terminé'
+  if (notificationAcknowledged(item)) return 'En cours'
+  return 'Actif'
 }
 
 export function notificationTypeTone(item: TypeFields): 'info' | 'secondary' | 'danger' | 'warning' {

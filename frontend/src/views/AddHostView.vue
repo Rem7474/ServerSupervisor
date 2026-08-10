@@ -31,7 +31,45 @@
 
     <div class="row justify-content-center">
       <div class="col-12 col-md-8 col-lg-6">
-        <div class="card">
+        <ul
+          v-if="!result"
+          class="nav nav-pills mb-3"
+        >
+          <li class="nav-item">
+            <button
+              type="button"
+              class="nav-link"
+              :class="{ active: mode === 'manual' }"
+              @click="mode = 'manual'"
+            >
+              Ajout manuel
+            </button>
+          </li>
+          <li class="nav-item">
+            <button
+              type="button"
+              class="nav-link"
+              :class="{ active: mode === 'scan' }"
+              @click="mode = 'scan'"
+            >
+              Scanner un sous-réseau
+            </button>
+          </li>
+        </ul>
+
+        <div
+          v-if="mode === 'scan' && !result"
+          class="card"
+        >
+          <div class="card-body">
+            <NetworkDiscoveryPanel @done="finishAdd" />
+          </div>
+        </div>
+
+        <div
+          v-else
+          class="card"
+        >
           <div class="card-body">
             <form
               v-if="!result"
@@ -278,8 +316,12 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { IconCircleCheck, IconServer2 } from '@tabler/icons-vue'
 import { useAddHost } from '../composables/useAddHost'
+import NetworkDiscoveryPanel from '../components/host/NetworkDiscoveryPanel.vue'
+
+const mode = ref<'manual' | 'scan'>('manual')
 
 const {
   form,

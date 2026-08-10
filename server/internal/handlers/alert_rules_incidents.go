@@ -27,6 +27,32 @@ func (h *AlertRulesHandler) ResolveIncident(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "incident resolved"})
 }
 
+// AcknowledgeIncident marks an open incident as being handled — same
+// admin-only bar as ResolveIncident (incident triage is admin-only in this
+// app today; ack has no existing per-incident host-resolution primitive to
+// scope it to Operator+ the way requireHostAccess does elsewhere, so it
+// isn't worth introducing one just for a lower-stakes action).
+func (h *AlertRulesHandler) AcknowledgeIncident(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		respondError(c, apperr.Forbidden("insufficient permissions"))
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		respondError(c, apperr.Validation("invalid incident id"))
+		return
+	}
+	username := c.GetString("username")
+	if username == "" {
+		username = "unknown"
+	}
+	if err := h.svc.AcknowledgeIncident(c.Request.Context(), id, username); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "incident acknowledged"})
+}
+
 // ListIncidents returns a page of alert incidents. Admins and users with no
 // host_permissions entries see everything; hostperm-restricted users only see
 // incidents resolvable to one of their granted hosts (direct agent-host

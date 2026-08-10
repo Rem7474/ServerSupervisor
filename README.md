@@ -17,6 +17,15 @@ inclus) :
 | [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md) | Runbooks multi-étapes vs tâches planifiées par hôte |
 | [docs/backup-restic.md](docs/backup-restic.md) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
 
+## Vision produit & roadmap
+
+- [AUDIT-PRODUIT-2026.md](AUDIT-PRODUIT-2026.md) — audit produit (état des lieux fonctionnel,
+  positionnement vis-à-vis d'un outil type Checkmk, risques/dettes, questions à trancher).
+- [ROADMAP.md](ROADMAP.md) — plan d'exécution détaillé (fonctionnalités priorisées, phases,
+  priorités court/moyen/long terme).
+- [AUDIT-2025.md](AUDIT-2025.md) — audit d'architecture technique (juillet 2026), résolu,
+  conservé pour référence historique.
+
 ## Architecture
 
 ```
@@ -75,11 +84,14 @@ inclus) :
 - **Versions** : suivi des releases GitHub/GitLab/Gitea et des digests d'images Docker, notification ou déclenchement automatique (script ou `compose pull && up -d`) — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
 - **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
 - **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Monitoring** : sondes HTTP/TCP synthétiques (uptime) et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
+- **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
+- **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
+- **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
+- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent ; onglet « Modèles » — définir une règle (métrique agent + seuils + notifications) une fois et l'appliquer à plusieurs hôtes en un clic
+- **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
 - **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
 - **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, corrélation CrowdSec si activée côté agent), stats trafic web sur `/traffic`, menaces web sur `/threats`
@@ -137,10 +149,9 @@ Deux mécanismes de dispatch de commandes agent, à ne pas confondre : un
 hôtes en un seul déclenchement manuel, avec une whitelist d'actions
 strictement revalidée côté serveur ; une **tâche planifiée** cible un seul
 hôte sur un cron, avec une liste d'actions seulement indicative (non
-validée côté serveur au-delà du module) — seul le déclenchement manuel
-(`run`) est vérifié Operator+ par hôte, la création/modification/
-suppression n'a aujourd'hui aucun contrôle de rôle côté API (voir le
-guide).
+validée côté serveur au-delà du module) — le déclenchement manuel (`run`)
+et la création/modification/suppression sont tous vérifiés Operator+ par
+hôte (voir le guide).
 
 Guide complet (whitelist par module, tableau comparatif runbook vs tâche
 planifiée, fuseau horaire d'exécution du cron, dépannage) :
@@ -190,7 +201,9 @@ Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin
 ### 2. Enregistrer un hôte
 
 1. Dashboard → **Ajouter un hôte**
-2. Renseigner le nom, hostname/IP, OS
+2. Renseigner le nom, hostname/IP, OS — ou onglet **Scanner un sous-réseau** pour ping-sweeper
+   un CIDR (`/24` à `/30`) et ajouter en masse les adresses qui répondent et ne sont pas encore
+   enregistrées
 3. **Copier la clé API** affichée (elle ne sera plus visible ensuite)
 
 ### 3. Installer l'agent sur une VM
@@ -702,6 +715,8 @@ curl http://localhost:8080/api/v1/hosts \
 |---|---|---|---|
 | `GET` | `/api/v1/hosts` | Liste des hôtes | Authentifié |
 | `POST` | `/api/v1/hosts` | Enregistrer un hôte | Admin |
+| `POST` | `/api/v1/hosts/bulk` | Enregistrer plusieurs hôtes en un appel (ex: après un scan réseau) | Admin |
+| `POST` | `/api/v1/hosts/discover` | Scanner un sous-réseau IPv4 par ping ICMP (`/24` à `/30`) | Admin |
 | `GET` | `/api/v1/hosts/:id` | Détails d'un hôte | Authentifié |
 | `PATCH` | `/api/v1/hosts/:id` | Modifier un hôte | Admin |
 | `DELETE` | `/api/v1/hosts/:id` | Supprimer un hôte | Admin |
@@ -750,7 +765,8 @@ curl http://localhost:8080/api/v1/hosts \
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/commands/history` | Historique toutes commandes (hôte) | Authentifié |
 | `GET` | `/api/v1/commands/:id` | Statut d'une commande par UUID | Authentifié |
-| `GET` | `/api/v1/audit/logs` | Logs d'audit paginés | Admin |
+| `GET` | `/api/v1/audit/logs` | Logs d'audit paginés (filtres `category`/`from`/`to`) | Admin |
+| `GET` | `/api/v1/audit/logs/export` | Export CSV des logs d'audit (mêmes filtres, jusqu'à 20 000 lignes) | Admin |
 | `GET` | `/api/v1/audit/logs/me` | Ses propres logs d'audit | Authentifié |
 | `GET` | `/api/v1/audit/logs/host/:host_id` | Logs d'audit par hôte | Admin |
 | `GET` | `/api/v1/audit/logs/user/:username` | Logs d'audit par utilisateur | Admin |
@@ -760,16 +776,32 @@ curl http://localhost:8080/api/v1/hosts \
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/alerts/incidents` | Incidents déclenchés | Authentifié |
+| `POST` | `/api/v1/alerts/incidents/:id/resolve` | Clôturer manuellement un incident | Admin |
+| `POST` | `/api/v1/alerts/incidents/:id/ack` | Accuser réception d'un incident (« En cours de traitement », stoppe l'escalade) | Admin |
 | `GET` | `/api/v1/alert-rules` | Règles d'alertes | Authentifié |
 | `POST` | `/api/v1/alert-rules` | Créer une règle | Admin |
 | `PATCH` | `/api/v1/alert-rules/:id` | Modifier une règle | Admin |
 | `DELETE` | `/api/v1/alert-rules/:id` | Supprimer une règle | Admin |
 | `POST` | `/api/v1/alert-rules/test` | Tester une règle | Admin |
+| `GET` | `/api/v1/alert-rule-templates` | Modèles de règles réutilisables | Authentifié |
+| `POST` | `/api/v1/alert-rule-templates` | Créer un modèle | Admin |
+| `PATCH` | `/api/v1/alert-rule-templates/:id` | Modifier un modèle | Admin |
+| `DELETE` | `/api/v1/alert-rule-templates/:id` | Supprimer un modèle | Admin |
+| `POST` | `/api/v1/alert-rule-templates/:id/apply` | Appliquer un modèle à N hôtes (`host_ids`) | Admin |
 
 Métriques additionnelles disponibles pour les règles d'alertes :
 - `npm_requests`
 - `npm_traffic_bytes`
 - `npm_5xx_errors`
+
+#### Fenêtres de maintenance
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/maintenance-windows` | Liste globale | Authentifié |
+| `GET` | `/api/v1/hosts/:id/maintenance-windows` | Fenêtres applicables à un hôte (les siennes + les globales) | Authentifié |
+| `POST` | `/api/v1/hosts/:id/maintenance-windows` | Créer une fenêtre sur un hôte | Operator+ (vérifié par hôte) |
+| `POST` | `/api/v1/maintenance-windows/global` | Créer une fenêtre sur tous les hôtes | Admin |
+| `DELETE` | `/api/v1/maintenance-windows/:id` | Supprimer une fenêtre | Operator+ sur l'hôte (Admin si globale) |
 
 #### Notifications & Push
 | Méthode | Endpoint | Description | Rôle |
@@ -781,6 +813,16 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | `DELETE` | `/api/v1/push/subscribe` | Supprimer l'abonnement | Authentifié |
 
 #### Monitoring (sondes uptime & certificats SSL)
+
+Une sonde uptime a un `type` : `http`, `tcp` ou `icmp` (ping). Le check ICMP a besoin d'un
+socket raw, ce qui nécessite la capacité Linux `CAP_NET_RAW` — l'image officielle l'accorde au
+binaire non-root via `setcap` dans le `Dockerfile` (`CAP_NET_RAW` fait déjà partie de
+l'ensemble de capacités par défaut de Docker, aucun `cap_add` requis en temps normal). Un
+déploiement durci avec `cap_drop: [ALL]` doit ajouter explicitement `cap_add: [NET_RAW]` ; sans
+cette capacité, un check ICMP échoue avec un message explicite plutôt que de rapporter un faux
+« hors ligne ». Le scan de sous-réseau (`POST /api/v1/hosts/discover`, voir plus haut) réutilise
+le même mécanisme ICMP et nécessite donc la même capacité.
+
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/uptime/probes` | Liste des sondes uptime | Authentifié |
@@ -856,15 +898,14 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/scheduled-tasks` | Lister les tâches d'un hôte | Authentifié |
-| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Authentifié* |
-| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Authentifié* |
-| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Authentifié* |
+| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Operator+ (vérifié par hôte) |
+| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Operator+ (vérifié par hôte) |
+| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Operator+ (vérifié par hôte) |
 | `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ (vérifié par hôte) |
 
-> \* Contrairement à `run` (qui vérifie l'accès Operator+ sur l'hôte
-> ciblé), la création/modification/suppression n'a **aucune vérification
-> de rôle côté API** à ce jour — seul le dashboard masque ces actions pour
-> un compte `viewer`. Voir [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
+> Création/modification/suppression sont désormais vérifiées au même
+> niveau que `run` (`requireHostAccess(..., "operator")`) — voir
+> [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
 > pour le détail.
 
 #### Proxmox VE

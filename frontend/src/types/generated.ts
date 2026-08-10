@@ -142,6 +142,15 @@ export interface AlertActions {
   ntfy_topic?: string; // ntfy push notification topic
   cooldown?: number /* int */; // seconds between re-notifications (0 = no cooldown)
   command_trigger?: CommandTrigger; // optional command to run on alert
+  /**
+   * EscalateAfterMinutes, when > 0, re-sends the fired notification for an
+   * open incident that hasn't been acknowledged, every N minutes since it
+   * triggered (or since the last escalation) — see internal/alerts/engine.go.
+   * 0 (default) disables escalation entirely. Unlike Cooldown, this never
+   * suppresses the *first* notification; it only repeats an unacknowledged
+   * one.
+   */
+  escalate_after_minutes?: number /* int */;
 }
 export interface AlertRule {
   id: number /* int64 */;
@@ -177,6 +186,23 @@ export interface AlertIncident {
    * this incident fired, if the rule has one configured. Nil otherwise.
    */
   command_id?: string;
+  /**
+   * AcknowledgedAt/AcknowledgedBy mark that someone is handling this incident
+   * — orthogonal to ResolvedAt (see migration 087's comment). Both nil until
+   * AcknowledgeIncident is called; never cleared once resolved.
+   */
+  acknowledged_at?: string;
+  acknowledged_by?: string;
+  /**
+   * CorrelatedWith is the id of the host's own open status_offline/
+   * heartbeat_timeout incident this one was linked to at creation time — a
+   * host-down cascade (e.g. every Docker container on that host firing its
+   * own incident) is still recorded per-incident but doesn't independently
+   * notify or escalate (see maybeCorrelateWithHostDown/maybeEscalateIncident
+   * in internal/alerts/engine.go). Nil for an uncorrelated incident, or for
+   * a host-down incident itself (it's never correlated with another one).
+   */
+  correlated_with?: number /* int64 */;
   /**
    * Enriched post-fetch (not DB columns): Docker synthetic IDs resolution,
    * and the live status of CommandID's remote_commands row (joined at read
@@ -226,6 +252,17 @@ export interface NotificationItem {
    * alert_incidents.command_id — empty when no command_trigger fired.
    */
   command_status?: string;
+  /**
+   * AcknowledgedAt/AcknowledgedBy mirror AlertIncident's fields (alert_incident
+   * type only; always nil for a release-tracker entry).
+   */
+  acknowledged_at?: string;
+  acknowledged_by?: string;
+  /**
+   * CorrelatedWith mirrors AlertIncident.CorrelatedWith (alert_incident type
+   * only) — lets the UI mark a host-down cascade child without a second call.
+   */
+  correlated_with?: number /* int64 */;
 }
 /**
  * PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.
@@ -256,6 +293,60 @@ export interface AlertRuleCreate {
   duration: number /* int */;
   actions: AlertActions;
 }
+/**
+ * AlertRuleTemplate is a reusable rule "recipe" for agent metrics — no host,
+ * so ApplyAlertRuleTemplateRequest can stamp out the same rule across many
+ * hosts at once instead of re-entering the same metric/thresholds/actions
+ * per host (ROADMAP.md item #9). Not a live link to the rules it spawns:
+ * editing or deleting a template never touches an already-created rule (same
+ * "definition + independent instances" shape as runbooks/runbook_steps).
+ * Docker/Proxmox-scoped rules aren't templatable in this MVP — Docker
+ * scope's host_id is required per rule and Proxmox scope is cluster-level
+ * already, so neither fits "apply the same recipe to N hosts."
+ */
+export interface AlertRuleTemplate {
+  id: number /* int64 */;
+  name: string;
+  metric: string;
+  operator: string;
+  threshold_warn: number /* float64 */;
+  threshold_crit: number /* float64 */;
+  threshold_clear_warn?: number /* float64 */;
+  threshold_clear_crit?: number /* float64 */;
+  duration_seconds: number /* int */;
+  actions: AlertActions;
+  created_at: string;
+  updated_at: string;
+}
+export interface AlertRuleTemplateRequest {
+  name: string;
+  metric: string;
+  operator: string;
+  threshold_warn: number /* float64 */;
+  threshold_crit: number /* float64 */;
+  threshold_clear_warn?: number /* float64 */;
+  threshold_clear_crit?: number /* float64 */;
+  duration: number /* int */;
+  actions: AlertActions;
+}
+/**
+ * ApplyAlertRuleTemplateRequest is the body of POST /alert-rule-templates/:id/apply.
+ * Enabled defaults to false (zero value) — applying a template to a fleet
+ * shouldn't immediately start firing everywhere before the admin has
+ * reviewed the resulting per-host rules.
+ */
+export interface ApplyAlertRuleTemplateRequest {
+  host_ids: string[];
+  enabled: boolean;
+}
+/**
+ * ApplyAlertRuleTemplateResult reports what happened per host — applying to
+ * N hosts is not all-or-nothing, one host's failure shouldn't block the rest.
+ */
+export interface ApplyAlertRuleTemplateResult {
+  created_rule_ids: number /* int64 */[];
+  errors?: { [key: string]: string}; // host_id -> error message
+}
 export interface AlertRuleUpdate {
   name?: string;
   enabled?: boolean;
@@ -271,6 +362,54 @@ export interface AlertRuleUpdate {
   threshold_clear_crit?: number /* float64 */;
   duration?: number /* int */;
   actions?: AlertActions;
+}
+
+//////////
+// source: audit.go
+
+/**
+ * Audit log categories (ROADMAP.md item #13: per-category retention +
+ * export). Low-maintenance by design — action is free text with no strict
+ * enum anywhere else (any CreateAuditLog caller can pass a new string), so
+ * CategorizeAuditAction buckets by a handful of known prefixes/exact matches
+ * and defaults everything else to "command" rather than requiring every new
+ * action string to be taught to a growing switch statement.
+ */
+export const AuditCategoryAlert = "alert";
+/**
+ * Audit log categories (ROADMAP.md item #13: per-category retention +
+ * export). Low-maintenance by design — action is free text with no strict
+ * enum anywhere else (any CreateAuditLog caller can pass a new string), so
+ * CategorizeAuditAction buckets by a handful of known prefixes/exact matches
+ * and defaults everything else to "command" rather than requiring every new
+ * action string to be taught to a growing switch statement.
+ */
+export const AuditCategorySettings = "settings";
+/**
+ * Audit log categories (ROADMAP.md item #13: per-category retention +
+ * export). Low-maintenance by design — action is free text with no strict
+ * enum anywhere else (any CreateAuditLog caller can pass a new string), so
+ * CategorizeAuditAction buckets by a handful of known prefixes/exact matches
+ * and defaults everything else to "command" rather than requiring every new
+ * action string to be taught to a growing switch statement.
+ */
+export const AuditCategoryAuth = "auth";
+/**
+ * Audit log categories (ROADMAP.md item #13: per-category retention +
+ * export). Low-maintenance by design — action is free text with no strict
+ * enum anywhere else (any CreateAuditLog caller can pass a new string), so
+ * CategorizeAuditAction buckets by a handful of known prefixes/exact matches
+ * and defaults everything else to "command" rather than requiring every new
+ * action string to be taught to a growing switch statement.
+ */
+export const AuditCategoryCommand = "command";
+/**
+ * AuditCategory describes one bucket for the retention-settings UI and the
+ * audit log browser's category filter.
+ */
+export interface AuditCategory {
+  key: string;
+  label: string;
 }
 
 //////////
@@ -440,6 +579,12 @@ export interface AuditLog {
   details: string; // JSON payload (command output, new privileges, etc.)
   status: string; // pending, completed, failed
   created_at: string;
+  /**
+   * Category is computed once at write time by CategorizeAuditAction (see
+   * models/audit.go) — drives per-category retention and the audit log
+   * browser's filter.
+   */
+  category: string;
 }
 
 //////////
@@ -460,6 +605,28 @@ export interface AttentionItem {
   count: number /* int */;
   to: string;
   severity: string; // "info" | "warning"
+}
+
+//////////
+// source: discovery.go
+
+/**
+ * NetworkScanRequest is a subnet discovery scan request: ping-sweep every
+ * usable address in an IPv4 CIDR block.
+ */
+export interface NetworkScanRequest {
+  cidr: string;
+}
+/**
+ * DiscoveredHost is one address's outcome from a subnet discovery scan.
+ */
+export interface DiscoveredHost {
+  ip_address: string;
+  responded: boolean;
+  latency_ms?: number /* int */;
+  already_registered: boolean;
+  existing_host_id?: string;
+  existing_host_name?: string;
 }
 
 //////////
@@ -799,6 +966,34 @@ export interface HostExposure {
   total_requests: number /* int64 */;
   total_suspicious_requests: number /* int64 */;
   total_blocked_requests: number /* int64 */;
+}
+
+//////////
+// source: maintenance.go
+
+/**
+ * MaintenanceWindow suppresses alert notifications for a host (HostID set)
+ * or every host (HostID nil, a global window) between StartsAt and EndsAt.
+ * The alert engine (internal/alerts) checks for an active window before
+ * evaluating an evaluation target and silently resolves any already-open
+ * incident without notifying, exactly like a disabled rule — see
+ * internal/alerts/engine.go and internal/database/db_maintenance.go's
+ * IsHostInMaintenance.
+ */
+export interface MaintenanceWindow {
+  id: string;
+  host_id?: string; // nil = applies to every host
+  host_name?: string;
+  reason: string;
+  starts_at: string;
+  ends_at: string;
+  created_by: string;
+  created_at: string;
+}
+export interface MaintenanceWindowRequest {
+  reason: string;
+  starts_at: string;
+  ends_at: string;
 }
 
 //////////
@@ -1441,6 +1636,15 @@ export interface SettingsUpdateRequest {
   github_token: string;
   metrics_retention_days: number /* int */;
   audit_retention_days: number /* int */;
+  /**
+   * AuditRetentionDaysByCategory, when non-nil, replaces the whole map
+   * (not a per-key merge) — same semantics as the rest of this struct's
+   * "send what you mean the new state to be" fields. A category omitted
+   * here falls back to AuditRetentionDays. Keys are models.AuditCategories'
+   * Key values; an unknown key or a non-positive value is dropped, not
+   * rejected — see Service.Update.
+   */
+  audit_retention_days_by_category?: { [key: string]: number /* int */};
   threat_weight_wordpress?: number /* float64 */;
   threat_weight_adminpanel?: number /* float64 */;
   threat_weight_pathtraversal?: number /* float64 */;
@@ -1462,13 +1666,13 @@ export interface SettingsUpdateRequest {
 // source: synthetic.go
 
 /**
- * UptimeProbe configures a periodic HTTP or TCP check executed from the server.
+ * UptimeProbe configures a periodic HTTP, TCP or ICMP check executed from the server.
  */
 export interface UptimeProbe {
   id: string;
   name: string;
-  type: string; // "http" | "tcp"
-  target: string; // URL for http, host:port for tcp
+  type: string; // "http" | "tcp" | "icmp"
+  target: string; // URL for http, host:port for tcp, hostname/IP for icmp
   interval_sec: number /* int */;
   timeout_sec: number /* int */;
   expected_status: number /* int */; // http only
@@ -1743,6 +1947,13 @@ export interface ReleaseTrackerExecution {
   status: string;
   triggered_at: string;
   completed_at?: string;
+  /**
+   * HostID/HostName are the tracker's target host at query time (joined from
+   * release_trackers.host_id, not stored per-execution) — empty for a
+   * monitor-only tracker with no host_id.
+   */
+  host_id?: string;
+  host_name?: string;
   /**
    * AlertsAfterCount is the number of alert incidents that fired on the
    * tracker's target host within 15 minutes after this execution started —

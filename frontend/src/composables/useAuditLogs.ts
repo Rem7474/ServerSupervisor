@@ -11,8 +11,20 @@ import { moduleLabel, moduleClass, REMOTE_COMMAND_MODULE_OPTIONS } from '../util
 import { useCommandStream } from './useCommandStream'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
 import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
-import type { LoginEvent } from '../types/generated'
+import type { AuditLog, LoginEvent } from '../types/generated'
+import { AuditCategoryAlert, AuditCategoryAuth, AuditCategoryCommand, AuditCategorySettings } from '../types/generated'
 import type { SecurityData } from '../components/security/AuditSecurityPanel.vue'
+
+// Values imported from the generated Go consts so they can't drift from
+// server/internal/models/audit.go's category keys — only the French labels
+// are local to this file.
+export const JOURNAL_CATEGORY_OPTIONS = [
+  { value: '', label: 'Toutes catégories' },
+  { value: AuditCategoryAlert, label: 'Alertes' },
+  { value: AuditCategoryAuth, label: 'Authentification' },
+  { value: AuditCategorySettings, label: 'Réglages' },
+  { value: AuditCategoryCommand, label: 'Commandes' },
+]
 
 // Backs AuditLogsView.vue (command history + admin connexions/security tabs).
 // NOTE: this file previously held a small, unused `fetchAuditLogs` scaffold
@@ -301,6 +313,77 @@ export function useAuditLogs() {
     if (!connexionsLoaded.value) await fetchConnexions()
   }
 
+  // ── Journal d'audit (raw audit_logs, admin only) ────────────────────────────────
+  const journalLogs = ref<AuditLog[]>([])
+  const journalPage = ref(1)
+  const journalLimit = 50
+  const journalLoading = ref(false)
+  const journalLoaded = ref(false)
+  const journalExporting = ref(false)
+  // No total count from the API (GetAuditLogs doesn't run a COUNT) — a full
+  // page means "there might be more," same trade-off as a cursor without a
+  // known end, cheap enough at this limit to just try the next page.
+  const journalHasMore = ref(false)
+  const journalCategoryFilter = ref('')
+  const journalFrom = ref('')
+  const journalTo = ref('')
+
+  async function fetchJournal(): Promise<void> {
+    journalLoading.value = true
+    try {
+      const res = await apiClient.getAuditLogs(journalPage.value, journalLimit, {
+        category: journalCategoryFilter.value || undefined,
+        from: journalFrom.value || undefined,
+        to: journalTo.value || undefined,
+      })
+      journalLogs.value = res.data?.logs || []
+      journalHasMore.value = journalLogs.value.length === journalLimit
+      journalLoaded.value = true
+    } catch (err: unknown) {
+      addToast(getApiErrorMessage(err, "Impossible de charger le journal d'audit"), 'error')
+    } finally {
+      journalLoading.value = false
+    }
+  }
+
+  async function switchToJournal(): Promise<void> {
+    activeTab.value = 'journal'
+    if (!journalLoaded.value) await fetchJournal()
+  }
+
+  function selectJournalPage(page: number): void {
+    if (page < 1 || page === journalPage.value) return
+    journalPage.value = page
+    fetchJournal()
+  }
+
+  watch([journalCategoryFilter, journalFrom, journalTo], () => {
+    journalPage.value = 1
+    fetchJournal()
+  })
+
+  async function exportJournal(): Promise<void> {
+    journalExporting.value = true
+    try {
+      const response = await apiClient.exportAuditLogs({
+        category: journalCategoryFilter.value || undefined,
+        from: journalFrom.value || undefined,
+        to: journalTo.value || undefined,
+      })
+      const blob = response.data instanceof Blob ? response.data : new Blob([response.data as BlobPart], { type: 'text/csv' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `audit-logs-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err: unknown) {
+      addToast(getApiErrorMessage(err, "Échec de l'export du journal d'audit"), 'error')
+    } finally {
+      journalExporting.value = false
+    }
+  }
+
   // ── Pagination ────────────────────────────────────────────────────────────────
   function selectCmdsPage(page: number): void {
     if (page === cmdsPage.value) return
@@ -395,6 +478,17 @@ export function useAuditLogs() {
     activeTab,
     switchToCommandes,
     switchToConnexions,
+    switchToJournal,
+    journalLogs,
+    journalPage,
+    journalLoading,
+    journalExporting,
+    journalHasMore,
+    journalCategoryFilter,
+    journalFrom,
+    journalTo,
+    selectJournalPage,
+    exportJournal,
     cmds,
     cmdsPage,
     cmdsTotal,

@@ -16,6 +16,7 @@ type fakeRepo struct {
 	created    *models.AlertRule
 	updated    *models.AlertRule
 	deleted    bool
+	template   *models.AlertRuleTemplate
 	hostExists bool
 	allHosts   []models.Host
 	// missingContainerID, when set, makes DockerContainerExists report that
@@ -52,7 +53,25 @@ func (f *fakeRepo) ProxmoxDiskExists(context.Context, string) (bool, error)     
 func (f *fakeRepo) ResolveOpenAlertIncidentsByRule(context.Context, int64) (int64, error) {
 	return 0, nil
 }
-func (f *fakeRepo) ResolveAlertIncident(context.Context, int64) error { return nil }
+func (f *fakeRepo) ResolveAlertIncident(context.Context, int64) error             { return nil }
+func (f *fakeRepo) AcknowledgeAlertIncident(context.Context, int64, string) error { return nil }
+func (f *fakeRepo) CreateAlertRuleTemplate(_ context.Context, t *models.AlertRuleTemplate) error {
+	t.ID = 1
+	return nil
+}
+func (f *fakeRepo) GetAlertRuleTemplates(context.Context) ([]models.AlertRuleTemplate, error) {
+	return nil, nil
+}
+func (f *fakeRepo) GetAlertRuleTemplateByID(_ context.Context, id int64) (*models.AlertRuleTemplate, error) {
+	if f.template == nil {
+		return nil, sql.ErrNoRows
+	}
+	return f.template, nil
+}
+func (f *fakeRepo) UpdateAlertRuleTemplate(context.Context, *models.AlertRuleTemplate) error {
+	return nil
+}
+func (f *fakeRepo) DeleteAlertRuleTemplate(context.Context, int64) error { return nil }
 func (f *fakeRepo) GetAlertIncidents(context.Context, int, int) ([]models.AlertIncident, error) {
 	return nil, nil
 }
@@ -129,8 +148,11 @@ func TestValidateActions(t *testing.T) {
 	if status(svc.ValidateActions(&models.AlertActions{Cooldown: -1})) != 400 {
 		t.Error("negative cooldown should be 400")
 	}
-	if err := svc.ValidateActions(&models.AlertActions{Channels: []string{"smtp", "browser"}}); err != nil {
-		t.Errorf("valid channels should pass, got %v", err)
+	if status(svc.ValidateActions(&models.AlertActions{EscalateAfterMinutes: -1})) != 400 {
+		t.Error("negative escalate_after_minutes should be 400")
+	}
+	if err := svc.ValidateActions(&models.AlertActions{Channels: []string{"smtp", "browser"}, EscalateAfterMinutes: 30}); err != nil {
+		t.Errorf("valid channels + escalation should pass, got %v", err)
 	}
 }
 

@@ -113,7 +113,7 @@ serveur sur votre propre fuseau, les deux coïncident.
 
 | | Runbooks | Tâches planifiées |
 |---|---|---|
-| Qui peut créer/modifier/supprimer | **Admin uniquement** (toute la section) | Aucune vérification de rôle côté API à ce jour — l'UI masque le bouton pour un `viewer`, mais l'API ne le bloque pas |
+| Qui peut créer/modifier/supprimer | **Admin uniquement** (toute la section) | `Operator`+ (vérifié par hôte, `requireHostAccess(..., "operator")`) |
 | Qui peut exécuter manuellement | Admin (dans le groupe admin-only) | `Operator`+ (vérifié par hôte, `requireHostAccess(..., "operator")`) |
 | `action` validée côté serveur ? | **Oui** — whitelist stricte par module | **Non** — seul `module` est vérifié dans une liste connue, `action` est fait confiance |
 | Modules disponibles | 6 (docker/apt/systemd/journal/processes/custom) | 7 (les 6 + `restic`) |
@@ -126,15 +126,16 @@ déclenchement (surface de casse plus large), d'où le verrouillage
 admin-only + whitelist stricte. Une tâche planifiée reste bornée à un seul
 hôte à la fois.
 
-> **Point d'attention pour un déploiement multi-utilisateurs** : le
-> handler des tâches planifiées ne vérifie aucun rôle sur la création/
-> modification/suppression — c'est un `viewer` capable d'appeler l'API
-> directement (pas via le dashboard, qui masque ces actions) qui pourrait
-> créer une tâche planifiée sur n'importe quel hôte. Si votre instance a des
-> comptes `viewer` en qui vous n'avez pas une confiance totale, gardez ça en
-> tête — ce n'est pas différent du reste du modèle RBAC de l'app en
-> pratique (`viewer` = accès en lecture *destiné*, pas garanti partout),
-> mais ça vaut la peine d'être su explicitement plutôt que découvert.
+> **Historique** : jusqu'à la correction de cette faille (voir
+> [ROADMAP.md](../ROADMAP.md), item #1), la création/modification/
+> suppression n'étaient vérifiées par aucun rôle côté API — un `viewer`
+> capable d'appeler l'API directement (pas via le dashboard, qui masquait
+> déjà ces actions) pouvait créer une tâche planifiée sur n'importe quel
+> hôte. Les trois handlers (`Create`/`Update`/`DeleteScheduledTask`)
+> appellent désormais `requireHostAccess(..., "operator")` sur l'hôte
+> ciblé, exactement comme `run` — `Update`/`Delete` résolvent d'abord la
+> tâche pour retrouver son `host_id` (`:id` dans l'URL est l'id de la
+> tâche, pas de l'hôte).
 
 ## Dépannage
 

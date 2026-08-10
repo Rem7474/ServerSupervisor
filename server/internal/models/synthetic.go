@@ -4,12 +4,12 @@ import "time"
 
 // ========== Uptime / Synthetic Monitoring ==========
 
-// UptimeProbe configures a periodic HTTP or TCP check executed from the server.
+// UptimeProbe configures a periodic HTTP, TCP or ICMP check executed from the server.
 type UptimeProbe struct {
 	ID                  string     `json:"id"`
 	Name                string     `json:"name"`
-	Type                string     `json:"type"`   // "http" | "tcp"
-	Target              string     `json:"target"` // URL for http, host:port for tcp
+	Type                string     `json:"type"`   // "http" | "tcp" | "icmp"
+	Target              string     `json:"target"` // URL for http, host:port for tcp, hostname/IP for icmp
 	IntervalSec         int        `json:"interval_sec"`
 	TimeoutSec          int        `json:"timeout_sec"`
 	ExpectedStatus      int        `json:"expected_status"` // http only
@@ -38,7 +38,7 @@ type UptimeProbe struct {
 // fields default to true server-side when omitted (see uptimeProbeFromRequest).
 type UptimeProbeRequest struct {
 	Name              string `json:"name" binding:"required"`
-	Type              string `json:"type" binding:"required,oneof=http tcp"`
+	Type              string `json:"type" binding:"required,oneof=http tcp icmp"`
 	Target            string `json:"target" binding:"required"`
 	IntervalSec       int    `json:"interval_sec"`
 	TimeoutSec        int    `json:"timeout_sec"`

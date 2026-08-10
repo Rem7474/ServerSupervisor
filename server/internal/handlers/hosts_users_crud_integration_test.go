@@ -10,6 +10,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
+	discoverysvc "github.com/serversupervisor/server/internal/services/discovery"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
 	"github.com/serversupervisor/server/internal/testutil"
@@ -33,12 +34,24 @@ func newHostsRouter(t *testing.T, role string) (*gin.Engine, *database.DB) {
 	r := gin.New()
 	r.Use(withRole(role))
 	r.POST("/hosts", h.RegisterHost)
+	r.POST("/hosts/bulk", h.RegisterHostsBulk)
 	r.GET("/hosts", h.ListHosts)
 	r.GET("/hosts/:id", h.GetHost)
 	r.PATCH("/hosts/:id", h.UpdateHost)
 	r.DELETE("/hosts/:id", h.DeleteHost)
 	r.POST("/hosts/:id/rotate-key", h.RotateAPIKey)
 	return r, db
+}
+
+func newDiscoveryRouter(t *testing.T, role string) *gin.Engine {
+	t.Helper()
+	db, _ := testutil.NewPostgresDBWithConfig(t)
+	h := handlers.NewDiscoveryHandler(discoverysvc.NewService(db))
+
+	r := gin.New()
+	r.Use(withRole(role))
+	r.POST("/hosts/discover", h.Scan)
+	return r
 }
 
 func TestHostsCRUD(t *testing.T) {
@@ -139,6 +152,90 @@ func TestHostsRegisterForbiddenForNonAdmin(t *testing.T) {
 	w := doJSON(t, r, http.MethodPost, "/hosts", map[string]any{"name": "x", "ip_address": "10.0.0.1"})
 	if w.Code != http.StatusForbidden {
 		t.Errorf("viewer register = %d, want 403", w.Code)
+	}
+}
+
+func TestHostsRegisterBulk(t *testing.T) {
+	r, _ := newHostsRouter(t, "admin")
+	w := doJSON(t, r, http.MethodPost, "/hosts/bulk", map[string]any{
+		"hosts": []map[string]any{
+			{"name": "disc-1", "ip_address": "10.10.10.1"},
+			{"name": "disc-2", "ip_address": "not-an-ip"},
+			{"name": "disc-3", "ip_address": "10.10.10.3", "tags": []string{"discovered"}},
+		},
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("bulk register status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Created int `json:"created"`
+		Results []struct {
+			Name    string `json:"name"`
+			Created bool   `json:"created"`
+			HostID  string `json:"host_id"`
+			APIKey  string `json:"api_key"`
+			Error   string `json:"error"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Created != 2 {
+		t.Fatalf("created = %d, want 2", resp.Created)
+	}
+	if len(resp.Results) != 3 {
+		t.Fatalf("results = %d, want 3", len(resp.Results))
+	}
+	if !resp.Results[0].Created || resp.Results[0].HostID == "" || resp.Results[0].APIKey == "" {
+		t.Errorf("disc-1 should be created with id+key, got %+v", resp.Results[0])
+	}
+	if resp.Results[1].Created || resp.Results[1].Error == "" {
+		t.Errorf("disc-2 (bad ip) should fail, got %+v", resp.Results[1])
+	}
+	if !resp.Results[2].Created {
+		t.Errorf("disc-3 should be created, got %+v", resp.Results[2])
+	}
+
+	// Both valid hosts should now be listed.
+	wl := doJSON(t, r, http.MethodGet, "/hosts", nil)
+	var hosts []map[string]any
+	_ = json.Unmarshal(wl.Body.Bytes(), &hosts)
+	if len(hosts) != 2 {
+		t.Fatalf("expected 2 persisted hosts, got %d", len(hosts))
+	}
+}
+
+func TestHostsRegisterBulkForbiddenForNonAdmin(t *testing.T) {
+	r, _ := newHostsRouter(t, "operator")
+	w := doJSON(t, r, http.MethodPost, "/hosts/bulk", map[string]any{
+		"hosts": []map[string]any{{"name": "x", "ip_address": "10.0.0.1"}},
+	})
+	if w.Code != http.StatusForbidden {
+		t.Errorf("operator bulk register = %d, want 403", w.Code)
+	}
+}
+
+func TestDiscoveryScan_RejectsBadCIDR(t *testing.T) {
+	r := newDiscoveryRouter(t, "admin")
+	w := doJSON(t, r, http.MethodPost, "/hosts/discover", map[string]any{"cidr": "not-a-cidr"})
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("bad cidr = %d, want 400, body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDiscoveryScan_RejectsTooLargeNetwork(t *testing.T) {
+	r := newDiscoveryRouter(t, "admin")
+	w := doJSON(t, r, http.MethodPost, "/hosts/discover", map[string]any{"cidr": "10.0.0.0/8"})
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("/8 cidr = %d, want 400, body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDiscoveryScan_ForbiddenForNonAdmin(t *testing.T) {
+	r := newDiscoveryRouter(t, "viewer")
+	w := doJSON(t, r, http.MethodPost, "/hosts/discover", map[string]any{"cidr": "10.0.0.0/30"})
+	if w.Code != http.StatusForbidden {
+		t.Errorf("viewer scan = %d, want 403", w.Code)
 	}
 }
 

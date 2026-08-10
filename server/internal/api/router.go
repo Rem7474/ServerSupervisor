@@ -22,10 +22,12 @@ import (
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
 	backupsvc "github.com/serversupervisor/server/internal/services/backup"
 	dashboardsvc "github.com/serversupervisor/server/internal/services/dashboard"
+	discoverysvc "github.com/serversupervisor/server/internal/services/discovery"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
+	maintenancesvc "github.com/serversupervisor/server/internal/services/maintenance"
 	networksvc "github.com/serversupervisor/server/internal/services/network"
 	notifssvc "github.com/serversupervisor/server/internal/services/notifications"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
@@ -105,6 +107,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	}), db)
 	pushH := handlers.NewPushHandler(pushSvc)
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
+	maintenanceH := handlers.NewMaintenanceWindowHandler(maintenancesvc.NewService(db), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	runbookH := handlers.NewRunbooksHandler(runbooksvc.NewService(db, dispatcher))
@@ -123,6 +126,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	npmService := npmsvc.NewService(db)
 	npmH := handlers.NewNPMHandler(npmService)
 	dashboardH := handlers.NewDashboardHandler(dashboardsvc.NewService(db))
+	discoveryH := handlers.NewDiscoveryHandler(discoverysvc.NewService(db))
 
 	networkSvc.SetIPInventoryBuilder(func(ctx context.Context) (*models.NetworkIPInventory, error) {
 		return networkview.BuildIPInventory(ctx, db, proxmoxService, npmService)
@@ -137,7 +141,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	v1.Use(cookies.CSRFMiddleware())
 	registerAuthRoutes(v1, authH)
 	registerWebLogsRoutes(v1, webLogsH)
-	registerHostRoutes(v1, hostH, agentH, db)
+	registerHostRoutes(v1, hostH, agentH, discoveryH, db)
 	registerDockerRoutes(v1, dockerH, systemH, networkH, agentH)
 	registerAPTRoutes(v1, aptH)
 	registerAuditRoutes(v1, auditH)
@@ -146,6 +150,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerPushRoutes(v1, pushH)
 	registerSettingsRoutes(v1, settingsH)
 	registerTaskRoutes(v1, scheduledTaskH)
+	registerMaintenanceRoutes(v1, maintenanceH)
 	registerUserRoutes(v1, userH)
 	registerGitWebhookRoutes(r, v1, gitWebhookH, webhookRateLimiter)
 	registerReleaseTrackerRoutes(v1, releaseTrackerH)
@@ -240,9 +245,11 @@ func registerWebLogsRoutes(g *gin.RouterGroup, h *handlers.WebLogsHandler) {
 	g.GET("/security/web-logs/domain/:domain", h.GetWebLogsDomainDetails)
 }
 
-func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *handlers.AgentHandler, db *database.DB) {
+func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *handlers.AgentHandler, discoveryH *handlers.DiscoveryHandler, db *database.DB) {
 	g.GET("/hosts", h.ListHosts)
 	g.POST("/hosts", h.RegisterHost)
+	g.POST("/hosts/bulk", h.RegisterHostsBulk)
+	g.POST("/hosts/discover", discoveryH.Scan)
 	g.GET("/metrics/summary", agentH.GetMetricsSummary)
 
 	// Per-host routes protected by HostPermissionMiddleware (viewer level).
@@ -311,6 +318,7 @@ func registerAPTRoutes(g *gin.RouterGroup, h *handlers.AptHandler) {
 
 func registerAuditRoutes(g *gin.RouterGroup, h *handlers.AuditHandler) {
 	g.GET("/audit/logs", h.GetAuditLogs)
+	g.GET("/audit/logs/export", h.ExportAuditLogs)
 	g.GET("/audit/logs/me", h.GetMyAuditLogs)
 	g.GET("/audit/logs/host/:host_id", h.GetAuditLogsByHost)
 	g.GET("/audit/logs/user/:username", h.GetAuditLogsByUser)
@@ -338,10 +346,12 @@ func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler)
 	// restricted users only see items scoped to their granted hosts.
 	g.GET("/alerts/incidents", rulesH.ListIncidents)
 	g.GET("/alert-rules", rulesH.ListAlertRules)
+	g.GET("/alert-rule-templates", rulesH.ListAlertRuleTemplates)
 
 	admin := g.Group("")
 	admin.Use(AdminOnlyMiddleware())
 	admin.POST("/alerts/incidents/:id/resolve", rulesH.ResolveIncident)
+	admin.POST("/alerts/incidents/:id/ack", rulesH.AcknowledgeIncident)
 	admin.GET("/alert-rules/capabilities/agent", rulesH.GetAgentAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/proxmox", rulesH.GetProxmoxAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/synthetic", rulesH.GetSyntheticAlertRuleCapabilities)
@@ -353,6 +363,11 @@ func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler)
 	admin.DELETE("/alert-rules/:id", rulesH.DeleteAlertRule)
 	admin.POST("/alert-rules/test", rulesH.TestAlertRule)
 	admin.POST("/alert-rules/test/logs", rulesH.TestAlertRuleLogs)
+	admin.GET("/alert-rule-templates/:id", rulesH.GetAlertRuleTemplate)
+	admin.POST("/alert-rule-templates", rulesH.CreateAlertRuleTemplate)
+	admin.PATCH("/alert-rule-templates/:id", rulesH.UpdateAlertRuleTemplate)
+	admin.DELETE("/alert-rule-templates/:id", rulesH.DeleteAlertRuleTemplate)
+	admin.POST("/alert-rule-templates/:id/apply", rulesH.ApplyAlertRuleTemplate)
 }
 
 func registerSettingsRoutes(g *gin.RouterGroup, h *handlers.SettingsHandler) {
@@ -374,6 +389,23 @@ func registerTaskRoutes(g *gin.RouterGroup, h *handlers.ScheduledTaskHandler) {
 	g.DELETE("/scheduled-tasks/:id", h.DeleteScheduledTask)
 	g.POST("/scheduled-tasks/:id/run", h.RunScheduledTask)
 	g.GET("/scheduled-tasks/:id/executions", h.GetScheduledTaskExecutions)
+}
+
+func registerMaintenanceRoutes(g *gin.RouterGroup, h *handlers.MaintenanceWindowHandler) {
+	// List/read: any authenticated user, same as scheduled tasks' list routes.
+	// CreateMaintenanceWindow and DeleteMaintenanceWindow enforce Operator+ on
+	// the target host themselves (requireHostAccess, host_authz.go) — the
+	// window's host is resolved first in Delete since :id is the window id,
+	// not the host id, same lookup-then-check shape as scheduled tasks'
+	// Update/Delete.
+	g.GET("/maintenance-windows", h.ListAllMaintenanceWindows)
+	g.GET("/hosts/:id/maintenance-windows", h.ListMaintenanceWindowsForHost)
+	g.POST("/hosts/:id/maintenance-windows", h.CreateMaintenanceWindow)
+	g.DELETE("/maintenance-windows/:id", h.DeleteMaintenanceWindow)
+
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.POST("/maintenance-windows/global", h.CreateGlobalMaintenanceWindow)
 }
 
 func registerUserRoutes(g *gin.RouterGroup, h *handlers.UserHandler) {

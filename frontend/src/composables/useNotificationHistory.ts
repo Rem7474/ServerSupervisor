@@ -26,6 +26,8 @@ interface UseNotificationHistoryApi {
   markAllRead: () => Promise<void>
   resolvingId: Ref<string | number | null>
   resolveIncident: (item: NotificationItem) => Promise<void>
+  acknowledgingId: Ref<string | number | null>
+  acknowledgeIncident: (item: NotificationItem) => Promise<void>
   onWebSocketAlert: (payload: WSNotificationMessage) => void
 }
 
@@ -42,6 +44,7 @@ export function useNotificationHistory(): UseNotificationHistoryApi {
   const loaded = ref(false)
   const markingRead = ref(false)
   const resolvingId = ref<string | number | null>(null)
+  const acknowledgingId = ref<string | number | null>(null)
 
   const activeIncidentCount = computed(
     () => incidents.value.filter((item) => (item.type === 'alert_incident' || !item.type) && !item.resolved_at).length
@@ -90,6 +93,23 @@ export function useNotificationHistory(): UseNotificationHistoryApi {
     }
   }
 
+  async function acknowledgeIncident(item: NotificationItem): Promise<void> {
+    const id = resolvableIncidentId(item)
+    if (!id || acknowledgingId.value) return
+    acknowledgingId.value = item.id
+    try {
+      await apiClient.acknowledgeAlertIncident(id)
+      incidents.value = incidents.value.map((n) =>
+        n.id === item.id ? { ...n, acknowledged_at: new Date().toISOString() } : n
+      )
+      addToast('Incident pris en charge', 'success')
+    } catch (err: unknown) {
+      addToast(getApiErrorMessage(err, "Impossible d'accuser réception"), 'error')
+    } finally {
+      acknowledgingId.value = null
+    }
+  }
+
   function onWebSocketAlert(payload: WSNotificationMessage): void {
     if (payload.type === 'alert_incident_update') {
       loadIncidents()
@@ -130,6 +150,8 @@ export function useNotificationHistory(): UseNotificationHistoryApi {
     markAllRead,
     resolvingId,
     resolveIncident,
+    acknowledgingId,
+    acknowledgeIncident,
     onWebSocketAlert,
   }
 }
