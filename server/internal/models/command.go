@@ -46,6 +46,11 @@ type CommandResult struct {
 	Status    string     `json:"status"`     // running | completed | failed
 	Output    string     `json:"output"`
 	AptStatus *AptStatus `json:"apt_status,omitempty"` // Full APT status after update/upgrade
+	// UnattendedUpgrades is a fresh CollectUnattendedUpgrades() snapshot bundled
+	// into the terminal report of install_uu/toggle_uu/configure_uu/run_uu, the
+	// same "fast, synchronous" pattern AptStatus uses for update/upgrade/dist-upgrade —
+	// without it, the UU section only refreshes on the agent's next periodic report.
+	UnattendedUpgrades *UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`
 }
 
 // ========== Host Timeline ==========
