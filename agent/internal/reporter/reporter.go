@@ -69,6 +69,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		resticStatus     *collector.ResticStatus
 		resticProfiles   []string
 		resticGroups     []string
+		networkFlows     *collector.NetworkFlowsReport
 	)
 
 	var wg sync.WaitGroup
@@ -206,6 +207,19 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		}()
 	}
 
+	if r.cfg.CollectNetworkFlows {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			flows, err := collector.CollectNetworkFlows(ctx, r.cfg.NetworkFlowsTopN)
+			if err != nil {
+				slog.Warn("network flows collection skipped", "err", err)
+				return
+			}
+			networkFlows = flows
+		}()
+	}
+
 	if r.cfg.CollectRestic {
 		wg.Add(1)
 		go func() {
@@ -253,14 +267,15 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 	}
 
 	capabilities := &sender.Capabilities{
-		Docker:  r.cfg.CollectDocker,
-		APT:     r.cfg.CollectAPT,
-		SMART:   r.cfg.CollectSMART,
-		CPUTemp: r.cfg.CollectCPUTemperature,
-		WebLogs: r.cfg.CollectWebLogs,
-		Systemd: true,
-		Journal: true,
-		Restic:  r.cfg.CollectRestic,
+		Docker:       r.cfg.CollectDocker,
+		APT:          r.cfg.CollectAPT,
+		SMART:        r.cfg.CollectSMART,
+		CPUTemp:      r.cfg.CollectCPUTemperature,
+		WebLogs:      r.cfg.CollectWebLogs,
+		Systemd:      true,
+		Journal:      true,
+		Restic:       r.cfg.CollectRestic,
+		NetworkFlows: r.cfg.CollectNetworkFlows,
 	}
 
 	diagnostics := collector.CheckConfig(r.cfg)
@@ -283,6 +298,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		Restic:             resticStatus,
 		ResticProfiles:     resticProfiles,
 		ResticGroups:       resticGroups,
+		NetworkFlows:       networkFlows,
 		Timestamp:          time.Now(),
 	}
 	trimWebLogsForReportSize(report, r.cfg.MaxReportBodyBytes)

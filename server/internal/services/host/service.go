@@ -41,6 +41,9 @@ type Repository interface {
 	GetDiskMetricsAggregated(ctx context.Context, hostID, mountPoint string, hours int) ([]models.DiskMetrics, string, error)
 	GetRecentCommandsByHost(ctx context.Context, hostID string, limit int) ([]models.RemoteCommand, error)
 	GetHostExposure(ctx context.Context, ip string, since time.Time) (*models.HostExposure, error)
+	GetLatestNetworkFlowMetrics(ctx context.Context, hostID string) ([]models.NetworkFlowMetric, error)
+	GetNetworkFlowsHistory(ctx context.Context, hostID, remoteIP string, remotePort int, protocol string, hours int) ([]models.NetworkFlowSummaryPoint, error)
+	GetNetworkFlowsSummary(ctx context.Context, hostID string, hours int) ([]models.NetworkFlowSummaryPoint, error)
 }
 
 // Dispatcher is the agent-command port. *dispatch.Dispatcher satisfies it.
@@ -240,14 +243,15 @@ func (s *Service) TriggerAgentUpdate(ctx context.Context, id, username, clientIP
 
 // HostComplete is the comprehensive host snapshot for initial page load.
 type HostComplete struct {
-	Host               *models.Host             `json:"host"`
-	Metrics            *models.SystemMetrics    `json:"metrics"`
-	Containers         []models.DockerContainer `json:"containers"`
-	AptStatus          *models.AptStatus        `json:"apt_status"`
-	DiskMetrics        []models.DiskMetrics     `json:"disk_metrics"`
-	DiskHealth         []models.DiskHealth      `json:"disk_health"`
-	CommandHistory     []models.RemoteCommand   `json:"command_history"`
-	LatestAgentVersion string                   `json:"latest_agent_version"`
+	Host               *models.Host               `json:"host"`
+	Metrics            *models.SystemMetrics      `json:"metrics"`
+	Containers         []models.DockerContainer   `json:"containers"`
+	AptStatus          *models.AptStatus          `json:"apt_status"`
+	DiskMetrics        []models.DiskMetrics       `json:"disk_metrics"`
+	DiskHealth         []models.DiskHealth        `json:"disk_health"`
+	NetworkFlows       []models.NetworkFlowMetric `json:"network_flows"`
+	CommandHistory     []models.RemoteCommand     `json:"command_history"`
+	LatestAgentVersion string                     `json:"latest_agent_version"`
 }
 
 // Complete returns the page-load snapshot, running the independent reads in
@@ -258,15 +262,16 @@ func (s *Service) Complete(ctx context.Context, id string) (*HostComplete, error
 		return nil, err
 	}
 	var (
-		metrics     *models.SystemMetrics
-		containers  []models.DockerContainer
-		aptStatus   *models.AptStatus
-		diskMetrics []models.DiskMetrics
-		diskHealth  []models.DiskHealth
-		cmdHistory  []models.RemoteCommand
+		metrics      *models.SystemMetrics
+		containers   []models.DockerContainer
+		aptStatus    *models.AptStatus
+		diskMetrics  []models.DiskMetrics
+		diskHealth   []models.DiskHealth
+		networkFlows []models.NetworkFlowMetric
+		cmdHistory   []models.RemoteCommand
 	)
 	var wg sync.WaitGroup
-	wg.Add(6)
+	wg.Add(7)
 	go func() {
 		defer wg.Done()
 		defer safego.Recover(ctx, "host.Complete.metrics")
@@ -294,6 +299,11 @@ func (s *Service) Complete(ctx context.Context, id string) (*HostComplete, error
 	}()
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "host.Complete.networkFlows")
+		networkFlows, _ = s.repo.GetLatestNetworkFlowMetrics(ctx, id)
+	}()
+	go func() {
+		defer wg.Done()
 		defer safego.Recover(ctx, "host.Complete.cmdHistory")
 		cmdHistory, _ = s.repo.GetRecentCommandsByHost(ctx, id, 20)
 	}()
@@ -307,6 +317,7 @@ func (s *Service) Complete(ctx context.Context, id string) (*HostComplete, error
 		AptStatus:          aptStatus,
 		DiskMetrics:        nonNilDiskMetrics(diskMetrics),
 		DiskHealth:         nonNilDiskHealth(diskHealth),
+		NetworkFlows:       nonNilNetworkFlows(networkFlows),
 		CommandHistory:     nonNilCommands(cmdHistory),
 		LatestAgentVersion: s.latestVersion(),
 	}, nil
@@ -407,6 +418,42 @@ func (s *Service) DiskHealth(ctx context.Context, id string) ([]models.DiskHealt
 	return nonNilDiskHealth(h), nil
 }
 
+// NetworkFlows returns the host's most recent report cycle's top talkers
+// (never nil) — the "others" rollup row, if any, sorted last.
+func (s *Service) NetworkFlows(ctx context.Context, id string) ([]models.NetworkFlowMetric, error) {
+	m, err := s.repo.GetLatestNetworkFlowMetrics(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return nonNilNetworkFlows(m), nil
+}
+
+// NetworkFlowsHistory returns one talker's bandwidth over time (never nil),
+// for the per-talker drill-down chart.
+func (s *Service) NetworkFlowsHistory(ctx context.Context, id, remoteIP string, remotePort int, protocol string, hours int) ([]models.NetworkFlowSummaryPoint, error) {
+	points, err := s.repo.GetNetworkFlowsHistory(ctx, id, remoteIP, remotePort, protocol, hours)
+	if err != nil {
+		return nil, err
+	}
+	if points == nil {
+		points = []models.NetworkFlowSummaryPoint{}
+	}
+	return points, nil
+}
+
+// NetworkFlowsSummary returns a host's total tracked bandwidth over time
+// (never nil), for the overview chart.
+func (s *Service) NetworkFlowsSummary(ctx context.Context, id string, hours int) ([]models.NetworkFlowSummaryPoint, error) {
+	points, err := s.repo.GetNetworkFlowsSummary(ctx, id, hours)
+	if err != nil {
+		return nil, err
+	}
+	if points == nil {
+		points = []models.NetworkFlowSummaryPoint{}
+	}
+	return points, nil
+}
+
 // resolveTemp overrides the agent-reported CPU temperature with the effective
 // (sensor-source) one when available.
 func (s *Service) resolveTemp(ctx context.Context, id string, metrics *models.SystemMetrics) {
@@ -433,6 +480,12 @@ func nonNilDiskMetrics(v []models.DiskMetrics) []models.DiskMetrics {
 func nonNilDiskHealth(v []models.DiskHealth) []models.DiskHealth {
 	if v == nil {
 		return []models.DiskHealth{}
+	}
+	return v
+}
+func nonNilNetworkFlows(v []models.NetworkFlowMetric) []models.NetworkFlowMetric {
+	if v == nil {
+		return []models.NetworkFlowMetric{}
 	}
 	return v
 }

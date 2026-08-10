@@ -37,6 +37,15 @@ export const hostsApi = {
   // Physical disks (SMART health) of the Proxmox node hosting a linked host
   getHostProxmoxDisks: (hostId: string) => api.get(`/v1/hosts/${hostId}/proxmox-disks`),
 
+  // Network flows ("top talkers")
+  getNetworkFlows: (hostId: string) => api.get(`/v1/hosts/${hostId}/network/flows`),
+  getNetworkFlowsHistory: (
+    hostId: string,
+    params: { remote_ip: string; remote_port?: number; protocol: string; hours?: number },
+  ) => api.get(`/v1/hosts/${hostId}/network/flows/history`, { params: { hours: 24, ...params } }),
+  getNetworkFlowsSummary: (hostId: string, hours?: number) =>
+    api.get(`/v1/hosts/${hostId}/network/flows/summary`, { params: { hours: hours ?? 24 } }),
+
   // Metrics
   getMetricsHistory: (hostId: string, hours?: number) =>
     api.get(`/v1/hosts/${hostId}/metrics/history`, { params: { hours: hours ?? 24 } }),

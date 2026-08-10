@@ -74,6 +74,11 @@ type Config struct {
 	MetricsRetentionDays int
 	AuditRetentionDays   int
 	WebLogsRetentionDays int
+	// NetworkFlowsRetentionDays governs network_flow_metrics ("top talkers"),
+	// which stores remote IPs — a potentially identifying value, hence a
+	// short applicative-job retention (internal/background/network_flows.go)
+	// rather than a fixed TimescaleDB policy, same posture as WebLogsRetentionDays.
+	NetworkFlowsRetentionDays int
 	// AuditRetentionDaysByCategory overrides AuditRetentionDays per audit
 	// log category (models.AuditCategories' keys) — settings-only (no env
 	// var: a per-category map doesn't fit the flat KEY=value env shape the
@@ -192,9 +197,10 @@ func Load() *Config {
 		SMTPTo:        getEnv("SMTP_TO", ""),
 		SMTPTLS:       getBoolEnv("SMTP_TLS", true),
 
-		MetricsRetentionDays: getIntEnv("METRICS_RETENTION_DAYS", 30),
-		AuditRetentionDays:   getIntEnv("AUDIT_RETENTION_DAYS", 90),
-		WebLogsRetentionDays: getIntEnv("WEB_LOGS_RETENTION_DAYS", 30),
+		MetricsRetentionDays:      getIntEnv("METRICS_RETENTION_DAYS", 30),
+		AuditRetentionDays:        getIntEnv("AUDIT_RETENTION_DAYS", 90),
+		WebLogsRetentionDays:      getIntEnv("WEB_LOGS_RETENTION_DAYS", 30),
+		NetworkFlowsRetentionDays: getIntEnv("NETWORK_FLOWS_RETENTION_DAYS", 14),
 
 		// Defaults below must match internal/threatdetect.DefaultWeights() —
 		// duplicated as literals rather than imported so this leaf config
@@ -279,6 +285,11 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 			c.WebLogsRetentionDays = i
 		}
 	}
+	if v, ok := settings["network_flows_retention_days"]; ok && v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			c.NetworkFlowsRetentionDays = i
+		}
+	}
 
 	overrideFloat(settings, "threat_weight_wordpress", &c.ThreatWeightWordPress)
 	overrideFloat(settings, "threat_weight_adminpanel", &c.ThreatWeightAdminPanel)
@@ -332,6 +343,9 @@ func (c *Config) Validate() []string {
 	}
 	if c.WebLogsRetentionDays <= 0 {
 		warnings = append(warnings, "WEB_LOGS_RETENTION_DAYS must be a positive integer")
+	}
+	if c.NetworkFlowsRetentionDays <= 0 {
+		warnings = append(warnings, "NETWORK_FLOWS_RETENTION_DAYS must be a positive integer")
 	}
 	return warnings
 }
