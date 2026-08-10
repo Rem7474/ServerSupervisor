@@ -7,6 +7,7 @@ import { looksLikeIP } from '../utils/network'
 import { useDomainDetails } from './useDomainDetails'
 import { useConfirmDialog } from './useConfirmDialog'
 import type { WebLogIPTimelineRow } from '../types/security'
+import type { TimeRangeModel } from '../types/timeRange'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
@@ -31,9 +32,17 @@ export function useBot() {
 
   const source = ref(typeof route.query.source === 'string' ? route.query.source : '')
   const hostId = ref(typeof route.query.host_id === 'string' ? route.query.host_id : '')
+  const from = ref<string | null>(typeof route.query.from === 'string' ? route.query.from : null)
+  const to = ref<string | null>(typeof route.query.to === 'string' ? route.query.to : null)
+  const timeRange = ref<TimeRangeModel>({
+    mode: from.value && to.value ? 'custom' : 'preset',
+    period: period.value,
+    from: from.value,
+    to: to.value,
+  })
 
-  watch([period, source, hostId], ([p, s, h]) => {
-    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined } })
+  watch([period, source, hostId, from, to], ([p, s, h, f, t]) => {
+    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined, from: f || undefined, to: t || undefined } })
   })
 
   const loading = ref(false)
@@ -175,7 +184,8 @@ export function useBot() {
       // Threats mode reads only `threats`; request the threats-only scope so the server
       // skips the heavy (unindexed) traffic aggregates + geolocation that would
       // otherwise time the request out on long windows.
-      const res = await apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined, 'threats')
+      const range = from.value && to.value ? { from: from.value, to: to.value } : undefined
+      const res = await apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined, 'threats', range)
       summary.value = { threats: res.data?.threats || {} }
       // Purger les bans optimistes dont le snapshot réel prend le relais
       const snapshotIPs = new Set((res.data?.threats?.crowdsec_top_blocked || []).map((e: AnyRecord) => e.ip as string))
@@ -188,9 +198,15 @@ export function useBot() {
     }
   }
 
-  function setPeriod(value: string) {
-    if (period.value === value) return
-    period.value = value
+  function onRangeChange(): void {
+    if (timeRange.value.mode === 'custom' && timeRange.value.from && timeRange.value.to) {
+      from.value = timeRange.value.from
+      to.value = timeRange.value.to
+    } else {
+      period.value = timeRange.value.period
+      from.value = null
+      to.value = null
+    }
     void loadThreats()
   }
 
@@ -201,7 +217,8 @@ export function useBot() {
     showTimeline.value = true
     timelineLoading.value = true
     try {
-      const res = await apiClient.getIPTimeline(ip, hostId.value || undefined, period.value, 500)
+      const range = from.value && to.value ? { from: from.value, to: to.value } : undefined
+      const res = await apiClient.getIPTimeline(ip, hostId.value || undefined, period.value, 500, range)
       timeline.value = res.data?.requests || []
       const rows: AnyRecord[] = timeline.value
       if (rows.length > 0) {
@@ -231,7 +248,13 @@ export function useBot() {
   // which 404s/500s since that string was never a real host.
   function openDomain(domain: string) {
     if (!domain) return
-    domainModal.open(domain, { period: period.value, hostId: hostId.value || undefined, source: source.value || undefined })
+    domainModal.open(domain, {
+      period: period.value,
+      hostId: hostId.value || undefined,
+      source: source.value || undefined,
+      from: from.value || undefined,
+      to: to.value || undefined,
+    })
   }
 
   // Free-text search: routes to the domain or IP detail view depending on
@@ -337,6 +360,7 @@ export function useBot() {
   return {
     period,
     periodOptions,
+    timeRange,
     hostsStore,
     source,
     hostId,
@@ -368,7 +392,7 @@ export function useBot() {
     truncate,
     formatBlockedUntil,
     loadThreats,
-    setPeriod,
+    onRangeChange,
     openTimeline,
     closeTimeline,
     openDomain,

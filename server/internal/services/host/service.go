@@ -42,8 +42,8 @@ type Repository interface {
 	GetRecentCommandsByHost(ctx context.Context, hostID string, limit int) ([]models.RemoteCommand, error)
 	GetHostExposure(ctx context.Context, ip string, since time.Time) (*models.HostExposure, error)
 	GetLatestNetworkFlowMetrics(ctx context.Context, hostID string) ([]models.NetworkFlowMetric, error)
-	GetNetworkFlowsHistory(ctx context.Context, hostID, remoteIP string, remotePort int, protocol string, hours int) ([]models.NetworkFlowSummaryPoint, error)
-	GetNetworkFlowsSummary(ctx context.Context, hostID string, hours int) ([]models.NetworkFlowSummaryPoint, error)
+	GetNetworkFlowsHistory(ctx context.Context, hostID, remoteIP string, remotePort int, protocol string, since, until time.Time) ([]models.NetworkFlowSummaryPoint, error)
+	GetNetworkFlowsSummary(ctx context.Context, hostID string, since, until time.Time) ([]models.NetworkFlowSummaryPoint, error)
 }
 
 // Dispatcher is the agent-command port. *dispatch.Dispatcher satisfies it.
@@ -429,9 +429,9 @@ func (s *Service) NetworkFlows(ctx context.Context, id string) ([]models.Network
 }
 
 // NetworkFlowsHistory returns one talker's bandwidth over time (never nil),
-// for the per-talker drill-down chart.
-func (s *Service) NetworkFlowsHistory(ctx context.Context, id, remoteIP string, remotePort int, protocol string, hours int) ([]models.NetworkFlowSummaryPoint, error) {
-	points, err := s.repo.GetNetworkFlowsHistory(ctx, id, remoteIP, remotePort, protocol, hours)
+// for the per-talker drill-down chart. until being zero means "open ended".
+func (s *Service) NetworkFlowsHistory(ctx context.Context, id, remoteIP string, remotePort int, protocol string, since, until time.Time) ([]models.NetworkFlowSummaryPoint, error) {
+	points, err := s.repo.GetNetworkFlowsHistory(ctx, id, remoteIP, remotePort, protocol, since, until)
 	if err != nil {
 		return nil, err
 	}
@@ -442,9 +442,9 @@ func (s *Service) NetworkFlowsHistory(ctx context.Context, id, remoteIP string, 
 }
 
 // NetworkFlowsSummary returns a host's total tracked bandwidth over time
-// (never nil), for the overview chart.
-func (s *Service) NetworkFlowsSummary(ctx context.Context, id string, hours int) ([]models.NetworkFlowSummaryPoint, error) {
-	points, err := s.repo.GetNetworkFlowsSummary(ctx, id, hours)
+// (never nil), for the overview chart. until being zero means "open ended".
+func (s *Service) NetworkFlowsSummary(ctx context.Context, id string, since, until time.Time) ([]models.NetworkFlowSummaryPoint, error) {
+	points, err := s.repo.GetNetworkFlowsSummary(ctx, id, since, until)
 	if err != nil {
 		return nil, err
 	}

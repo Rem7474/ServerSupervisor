@@ -93,11 +93,14 @@ func scanNetworkFlowMetrics(rows *sql.Rows) ([]models.NetworkFlowMetric, error) 
 
 // historyBucketInterval picks a coarser bucket for longer ranges, same
 // adaptive-granularity intent as GetDiskMetricsAggregated (raw/hour/day).
-func historyBucketInterval(hours int) string {
+// Takes the actual span (until-since) rather than a named preset so it works
+// identically for a preset ("last 24h") and a precise custom range that has
+// no preset name to key off of.
+func historyBucketInterval(span time.Duration) string {
 	switch {
-	case hours <= 6:
+	case span <= 6*time.Hour:
 		return "1 minute"
-	case hours <= 48:
+	case span <= 48*time.Hour:
 		return "15 minutes"
 	default:
 		return "1 hour"
@@ -107,20 +110,29 @@ func historyBucketInterval(hours int) string {
 // GetNetworkFlowsHistory returns one talker's bandwidth over time, bucketed
 // and SUMmed (not MAX-MIN: rx_bytes/tx_bytes are already per-cycle deltas —
 // see models.NetworkFlowTalker). Used for the per-talker drill-down chart.
-func (db *DB) GetNetworkFlowsHistory(ctx context.Context, hostID, remoteIP string, remotePort int, protocol string, hours int) ([]models.NetworkFlowSummaryPoint, error) {
-	if hours <= 0 {
-		hours = 24
+// until being zero means "open ended" (no upper bound), same convention as
+// buildWebLogsWhere.
+func (db *DB) GetNetworkFlowsHistory(ctx context.Context, hostID, remoteIP string, remotePort int, protocol string, since, until time.Time) ([]models.NetworkFlowSummaryPoint, error) {
+	effectiveUntil := until
+	if effectiveUntil.IsZero() {
+		effectiveUntil = time.Now()
 	}
+
+	args := []any{historyBucketInterval(effectiveUntil.Sub(since)), hostID, remoteIP, remotePort, protocol, since}
+	where := "host_id = $2 AND is_others = false AND remote_ip = $3 AND remote_port = $4 AND protocol = $5 AND timestamp > $6"
+	if !until.IsZero() {
+		args = append(args, until)
+		where += fmt.Sprintf(" AND timestamp <= $%d", len(args))
+	}
+
 	rows, err := db.conn.QueryContext(ctx,
-		`SELECT time_bucket($1::interval, timestamp) AS bucket,
+		fmt.Sprintf(`SELECT time_bucket($1::interval, timestamp) AS bucket,
 			COALESCE(SUM(rx_bytes), 0), COALESCE(SUM(tx_bytes), 0)
 		FROM network_flow_metrics
-		WHERE host_id = $2 AND is_others = false
-		  AND remote_ip = $3 AND remote_port = $4 AND protocol = $5
-		  AND timestamp > NOW() - INTERVAL '1 hour' * $6
+		WHERE %s
 		GROUP BY bucket
-		ORDER BY bucket ASC`,
-		historyBucketInterval(hours), hostID, remoteIP, remotePort, protocol, hours,
+		ORDER BY bucket ASC`, where),
+		args...,
 	)
 	if err != nil {
 		return nil, err
@@ -131,20 +143,28 @@ func (db *DB) GetNetworkFlowsHistory(ctx context.Context, hostID, remoteIP strin
 
 // GetNetworkFlowsSummary returns a host's total tracked bandwidth over time
 // (every talker plus the "others" bucket summed together), for the overview
-// chart.
-func (db *DB) GetNetworkFlowsSummary(ctx context.Context, hostID string, hours int) ([]models.NetworkFlowSummaryPoint, error) {
-	if hours <= 0 {
-		hours = 24
+// chart. until being zero means "open ended".
+func (db *DB) GetNetworkFlowsSummary(ctx context.Context, hostID string, since, until time.Time) ([]models.NetworkFlowSummaryPoint, error) {
+	effectiveUntil := until
+	if effectiveUntil.IsZero() {
+		effectiveUntil = time.Now()
 	}
+
+	args := []any{historyBucketInterval(effectiveUntil.Sub(since)), hostID, since}
+	where := "host_id = $2 AND timestamp > $3"
+	if !until.IsZero() {
+		args = append(args, until)
+		where += fmt.Sprintf(" AND timestamp <= $%d", len(args))
+	}
+
 	rows, err := db.conn.QueryContext(ctx,
-		`SELECT time_bucket($1::interval, timestamp) AS bucket,
+		fmt.Sprintf(`SELECT time_bucket($1::interval, timestamp) AS bucket,
 			COALESCE(SUM(rx_bytes), 0), COALESCE(SUM(tx_bytes), 0)
 		FROM network_flow_metrics
-		WHERE host_id = $2
-		  AND timestamp > NOW() - INTERVAL '1 hour' * $3
+		WHERE %s
 		GROUP BY bucket
-		ORDER BY bucket ASC`,
-		historyBucketInterval(hours), hostID, hours,
+		ORDER BY bucket ASC`, where),
+		args...,
 	)
 	if err != nil {
 		return nil, err

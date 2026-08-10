@@ -107,7 +107,7 @@ func TestGetNetworkFlowsSummary_SumsAcrossTalkers(t *testing.T) {
 		t.Fatalf("InsertNetworkFlowMetrics: %v", err)
 	}
 
-	points, err := db.GetNetworkFlowsSummary(ctx, testNetworkFlowsHostID, 1)
+	points, err := db.GetNetworkFlowsSummary(ctx, testNetworkFlowsHostID, time.Now().Add(-1*time.Hour), time.Time{})
 	if err != nil {
 		t.Fatalf("GetNetworkFlowsSummary: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestGetNetworkFlowsHistory_FiltersToOneTalker(t *testing.T) {
 		t.Fatalf("InsertNetworkFlowMetrics: %v", err)
 	}
 
-	points, err := db.GetNetworkFlowsHistory(ctx, testNetworkFlowsHostID, "1.2.3.4", 443, "tcp", 1)
+	points, err := db.GetNetworkFlowsHistory(ctx, testNetworkFlowsHostID, "1.2.3.4", 443, "tcp", time.Now().Add(-1*time.Hour), time.Time{})
 	if err != nil {
 		t.Fatalf("GetNetworkFlowsHistory: %v", err)
 	}
@@ -191,5 +191,60 @@ func TestCleanOldNetworkFlowMetrics_DeletesOnlyOldRows(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].RemoteIP != "2.2.2.2" {
 		t.Errorf("expected only the fresh row to remain, got %+v", got)
+	}
+}
+
+// TestGetNetworkFlowsSummary_UntilExcludesPointsPastTheUpperBound guards the
+// custom-range support: a non-zero until must exclude cycles reported after
+// it, not just before since — the pre-existing preset-only path only ever
+// exercised the lower bound (until always zero/open-ended).
+func TestGetNetworkFlowsSummary_UntilExcludesPointsPastTheUpperBound(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+	registerNetworkFlowsHost(t, db, ctx)
+
+	now := time.Now()
+	since := now.Add(-3 * time.Hour)
+	until := now.Add(-1 * time.Hour)
+
+	inWindow := &models.NetworkFlowsReport{
+		Available:   true,
+		TopTalkers:  []models.NetworkFlowTalker{{RemoteIP: "1.1.1.1", RemotePort: 80, Protocol: "tcp", Direction: "outbound", RxBytes: 10, TxBytes: 20}},
+		CollectedAt: now.Add(-2 * time.Hour),
+	}
+	afterWindow := &models.NetworkFlowsReport{
+		Available:   true,
+		TopTalkers:  []models.NetworkFlowTalker{{RemoteIP: "2.2.2.2", RemotePort: 80, Protocol: "tcp", Direction: "outbound", RxBytes: 1000, TxBytes: 1000}},
+		CollectedAt: now.Add(-30 * time.Minute),
+	}
+	if err := db.InsertNetworkFlowMetrics(ctx, testNetworkFlowsHostID, inWindow); err != nil {
+		t.Fatalf("insert in-window: %v", err)
+	}
+	if err := db.InsertNetworkFlowMetrics(ctx, testNetworkFlowsHostID, afterWindow); err != nil {
+		t.Fatalf("insert after-window: %v", err)
+	}
+
+	points, err := db.GetNetworkFlowsSummary(ctx, testNetworkFlowsHostID, since, until)
+	if err != nil {
+		t.Fatalf("GetNetworkFlowsSummary: %v", err)
+	}
+	var totalRx uint64
+	for _, p := range points {
+		totalRx += p.RxBytes
+	}
+	if totalRx != 10 {
+		t.Errorf("expected only the in-window cycle's rx=10, got total rx=%d across %+v", totalRx, points)
+	}
+
+	openEnded, err := db.GetNetworkFlowsSummary(ctx, testNetworkFlowsHostID, since, time.Time{})
+	if err != nil {
+		t.Fatalf("GetNetworkFlowsSummary (open-ended): %v", err)
+	}
+	var openTotalRx uint64
+	for _, p := range openEnded {
+		openTotalRx += p.RxBytes
+	}
+	if openTotalRx != 1010 {
+		t.Errorf("expected both cycles with an open-ended until, got total rx=%d across %+v", openTotalRx, openEnded)
 	}
 }

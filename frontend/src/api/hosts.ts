@@ -1,4 +1,5 @@
-import { api } from './client'
+import { api, rangeParams } from './client'
+import type { TimeRange } from './client'
 import type { Host, HostExposure, HostRegistration, HostUpdate } from '../types/host'
 import type { DiscoveredHost } from '../types/discovery'
 
@@ -37,14 +38,18 @@ export const hostsApi = {
   // Physical disks (SMART health) of the Proxmox node hosting a linked host
   getHostProxmoxDisks: (hostId: string) => api.get(`/v1/hosts/${hostId}/proxmox-disks`),
 
-  // Network flows ("top talkers")
+  // Network flows ("top talkers"). period is a Go duration string ('24h',
+  // '168h', ...), matching the web-logs endpoints' convention — the backend
+  // parses both through the same shared parseTimeRange helper, which also
+  // accepts an optional from/to (see range).
   getNetworkFlows: (hostId: string) => api.get(`/v1/hosts/${hostId}/network/flows`),
   getNetworkFlowsHistory: (
     hostId: string,
-    params: { remote_ip: string; remote_port?: number; protocol: string; hours?: number },
-  ) => api.get(`/v1/hosts/${hostId}/network/flows/history`, { params: { hours: 24, ...params } }),
-  getNetworkFlowsSummary: (hostId: string, hours?: number) =>
-    api.get(`/v1/hosts/${hostId}/network/flows/summary`, { params: { hours: hours ?? 24 } }),
+    params: { remote_ip: string; remote_port?: number; protocol: string; period?: string },
+    range?: TimeRange,
+  ) => api.get(`/v1/hosts/${hostId}/network/flows/history`, { params: { period: '24h', ...params, ...rangeParams(range) } }),
+  getNetworkFlowsSummary: (hostId: string, period?: string, range?: TimeRange) =>
+    api.get(`/v1/hosts/${hostId}/network/flows/summary`, { params: { period: period ?? '24h', ...rangeParams(range) } }),
 
   // Metrics
   getMetricsHistory: (hostId: string, hours?: number) =>

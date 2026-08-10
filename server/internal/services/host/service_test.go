@@ -68,10 +68,10 @@ func (f *fakeRepo) GetDiskMetricsAggregated(context.Context, string, string, int
 func (f *fakeRepo) GetLatestNetworkFlowMetrics(context.Context, string) ([]models.NetworkFlowMetric, error) {
 	return nil, nil
 }
-func (f *fakeRepo) GetNetworkFlowsHistory(context.Context, string, string, int, string, int) ([]models.NetworkFlowSummaryPoint, error) {
+func (f *fakeRepo) GetNetworkFlowsHistory(context.Context, string, string, int, string, time.Time, time.Time) ([]models.NetworkFlowSummaryPoint, error) {
 	return nil, nil
 }
-func (f *fakeRepo) GetNetworkFlowsSummary(context.Context, string, int) ([]models.NetworkFlowSummaryPoint, error) {
+func (f *fakeRepo) GetNetworkFlowsSummary(context.Context, string, time.Time, time.Time) ([]models.NetworkFlowSummaryPoint, error) {
 	return nil, nil
 }
 func (f *fakeRepo) GetRecentCommandsByHost(context.Context, string, int) ([]models.RemoteCommand, error) {

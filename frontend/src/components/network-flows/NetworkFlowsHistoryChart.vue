@@ -4,17 +4,12 @@
       <h3 class="card-title mb-0">
         {{ mode === 'summary' ? 'Bande passante trackée' : 'Historique du talker' }}
       </h3>
-      <div class="btn-group btn-group-sm">
-        <button
-          v-for="opt in timeRangeOptions"
-          :key="opt.hours"
-          type="button"
-          :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-          @click="loadHistory(opt.hours)"
-        >
-          {{ opt.label }}
-        </button>
-      </div>
+      <TimeRangePicker
+        v-model="timeRange"
+        :presets="timeRangeOptions"
+        :loading="loading"
+        @change="loadHistory"
+      />
     </div>
     <div
       class="card-body"
@@ -45,6 +40,8 @@ import { ref, shallowRef, watch, onMounted, defineAsyncComponent } from 'vue'
 import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
 import { fetchNetworkFlowsSummary, fetchNetworkFlowsHistory } from '../../composables/useNetworkFlowsHistory'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import TimeRangePicker from '../common/TimeRangePicker.vue'
+import type { TimeRangeModel, TimeRangePreset } from '../../types/timeRange'
 import dayjs from '../../utils/dayjs'
 import { formatBytes } from '../../utils/formatters'
 import { getApiErrorMessage } from '../../api/client'
@@ -85,24 +82,36 @@ const props = withDefaults(defineProps<{
   refreshTick: 0,
 })
 
-const chartHours = ref(24)
 const rxPoints = ref<ChartPoint[]>([])
 const txPoints = ref<ChartPoint[]>([])
 const chartData = shallowRef<ChartData<'line'> | null>(null)
 const loading = ref(false)
 
-const timeRangeOptions = [
-  { hours: 1,   label: '1h' },
-  { hours: 6,   label: '6h' },
-  { hours: 24,  label: '24h' },
-  { hours: 168, label: '7j' },
+const timeRangeOptions: TimeRangePreset[] = [
+  { value: '1h', label: '1h' },
+  { value: '6h', label: '6h' },
+  { value: '24h', label: '24h' },
+  { value: '168h', label: '7j' },
 ]
+
+const timeRange = ref<TimeRangeModel>({ mode: 'preset', period: '24h', from: null, to: null })
+
+// Approximate span in hours for the current selection — used only to decide
+// the axis label granularity below, not sent to the API (the backend derives
+// its own bucket size the same way, from the actual since/until).
+function currentSpanHours(): number {
+  if (timeRange.value.mode === 'custom' && timeRange.value.from && timeRange.value.to) {
+    return (new Date(timeRange.value.to).getTime() - new Date(timeRange.value.from).getTime()) / 3600000
+  }
+  const match = /^(\d+)h$/.exec(timeRange.value.period)
+  return match ? Number(match[1]) : 24
+}
 
 function formatChartTime(timestamp: number | string | undefined): string {
   if (!timestamp) return ''
   const d = dayjs(timestamp)
   if (!d.isValid()) return ''
-  if (chartHours.value <= 24) return d.format('HH:mm')
+  if (currentSpanHours() <= 24) return d.format('HH:mm')
   return d.format('DD/MM HH:mm')
 }
 
@@ -178,13 +187,16 @@ function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-async function loadHistory(hours: number): Promise<void> {
-  chartHours.value = hours
+async function loadHistory(): Promise<void> {
   if (!chartData.value) loading.value = true
   try {
+    const period = timeRange.value.period || '24h'
+    const range = timeRange.value.mode === 'custom' && timeRange.value.from && timeRange.value.to
+      ? { from: timeRange.value.from, to: timeRange.value.to }
+      : undefined
     const raw = props.mode === 'summary'
-      ? await fetchNetworkFlowsSummary(props.hostId, hours)
-      : await fetchNetworkFlowsHistory(props.hostId, props.remoteIp, props.remotePort, props.protocol, hours)
+      ? await fetchNetworkFlowsSummary(props.hostId, period, range)
+      : await fetchNetworkFlowsHistory(props.hostId, props.remoteIp, props.remotePort, props.protocol, period, range)
 
     rxPoints.value = raw
       .map((p) => ({ x: clampTimestamp(dayjs(p.timestamp).valueOf()), y: p.rx_bytes }))
@@ -229,16 +241,19 @@ async function loadHistory(hours: number): Promise<void> {
   }
 }
 
+// Fires on every new report cycle for this host (see HostDetailView's
+// metricsUpdatedAt). Deliberately does not touch `timeRange` — a custom
+// range the user picked stays active across refreshes, same as a preset.
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
 watch(() => props.refreshTick, () => {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
     refreshTimer = null
-    loadHistory(chartHours.value)
+    loadHistory()
   }, 400)
 })
 
 onMounted(() => {
-  loadHistory(chartHours.value)
+  loadHistory()
 })
 </script>

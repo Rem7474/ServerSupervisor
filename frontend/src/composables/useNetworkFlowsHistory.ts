@@ -1,9 +1,10 @@
 import api from '../api'
+import type { TimeRange } from '../api/client'
 import type { NetworkFlowSummaryPoint } from '../types/networkFlows'
 
 /** Total tracked bandwidth for a host over time (every talker + "others" summed). */
-export async function fetchNetworkFlowsSummary(hostId: string, hours: number): Promise<NetworkFlowSummaryPoint[]> {
-  const res = await api.getNetworkFlowsSummary(hostId, hours)
+export async function fetchNetworkFlowsSummary(hostId: string, period: string, range?: TimeRange): Promise<NetworkFlowSummaryPoint[]> {
+  const res = await api.getNetworkFlowsSummary(hostId, period, range)
   return Array.isArray(res.data?.points) ? res.data.points : []
 }
 
@@ -13,8 +14,9 @@ export async function fetchNetworkFlowsHistory(
   remoteIp: string,
   remotePort: number,
   protocol: string,
-  hours: number,
+  period: string,
+  range?: TimeRange,
 ): Promise<NetworkFlowSummaryPoint[]> {
-  const res = await api.getNetworkFlowsHistory(hostId, { remote_ip: remoteIp, remote_port: remotePort, protocol, hours })
+  const res = await api.getNetworkFlowsHistory(hostId, { remote_ip: remoteIp, remote_port: remotePort, protocol, period }, range)
   return Array.isArray(res.data?.points) ? res.data.points : []
 }

@@ -27,43 +27,45 @@ func (h *HostHandler) GetNetworkFlowsHistory(c *gin.Context) {
 		return
 	}
 	remotePort, _ := strconv.Atoi(c.Query("remote_port"))
-	hours, err := strconv.Atoi(c.DefaultQuery("hours", "24"))
-	if err != nil || hours <= 0 {
-		hours = 24
+	since, until, ok := parseTimeRange(c, "24h")
+	if !ok {
+		return
 	}
-	if hours > 8760 {
-		hours = 8760
-	}
-	points, err := h.svc.NetworkFlowsHistory(c.Request.Context(), c.Param("id"), remoteIP, remotePort, protocol, hours)
+	points, err := h.svc.NetworkFlowsHistory(c.Request.Context(), c.Param("id"), remoteIP, remotePort, protocol, since, until)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"hours":       hours,
+	resp := gin.H{
+		"since":       since,
 		"remote_ip":   remoteIP,
 		"remote_port": remotePort,
 		"protocol":    protocol,
 		"points":      points,
-	})
+	}
+	if !until.IsZero() {
+		resp["until"] = until
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetNetworkFlowsSummary retourne la bande passante totale trackée d'un hôte dans le temps.
 func (h *HostHandler) GetNetworkFlowsSummary(c *gin.Context) {
-	hours, err := strconv.Atoi(c.DefaultQuery("hours", "24"))
-	if err != nil || hours <= 0 {
-		hours = 24
+	since, until, ok := parseTimeRange(c, "24h")
+	if !ok {
+		return
 	}
-	if hours > 8760 {
-		hours = 8760
-	}
-	points, err := h.svc.NetworkFlowsSummary(c.Request.Context(), c.Param("id"), hours)
+	points, err := h.svc.NetworkFlowsSummary(c.Request.Context(), c.Param("id"), since, until)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"hours":  hours,
+	resp := gin.H{
+		"since":  since,
 		"points": points,
-	})
+	}
+	if !until.IsZero() {
+		resp["until"] = until
+	}
+	c.JSON(http.StatusOK, resp)
 }

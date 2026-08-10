@@ -54,15 +54,17 @@ export function useDomainDetails() {
   )
 
   // Captured at open() from the caller's own current page-level filters
-  // (Traffic/Threats' host/source selectors) — not reactive to them changing
-  // while the drawer is open, same as everything else here resetting on open.
-  let context: { hostId?: string; source?: string } = {}
+  // (Traffic/Threats' host/source selectors, and now their active time
+  // range) — not reactive to them changing while the drawer is open, same as
+  // everything else here resetting on open.
+  let context: { hostId?: string; source?: string; from?: string; to?: string } = {}
 
   async function load(): Promise<void> {
     if (!domain.value) return
     loading.value = true
     error.value = ''
     try {
+      const range = context.from && context.to ? { from: context.from, to: context.to } : undefined
       const res = await api.getDomainDetails(domain.value, period.value, {
         hostId: context.hostId,
         source: context.source,
@@ -74,7 +76,7 @@ export function useDomainDetails() {
         ip: filters.ip || undefined,
         sort: sortKey.value,
         dir: sortDir.value,
-      })
+      }, range)
       details.value = res.data?.details || {}
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, 'Erreur de chargement')
@@ -84,10 +86,14 @@ export function useDomainDetails() {
     }
   }
 
-  function open(domainName: string, opts: { period?: string; hostId?: string; source?: string } = {}): void {
+  // from/to (ISO 8601 UTC), when the caller's page has a custom range active,
+  // let the drawer inherit it instead of silently falling back to 24h —
+  // otherwise opening a domain from a custom-ranged Traffic/Threats view
+  // would show unrelated data.
+  function open(domainName: string, opts: { period?: string; hostId?: string; source?: string; from?: string; to?: string } = {}): void {
     domain.value = domainName
     period.value = opts.period ?? '24h'
-    context = { hostId: opts.hostId, source: opts.source }
+    context = { hostId: opts.hostId, source: opts.source, from: opts.from, to: opts.to }
     filters.status = ''
     filters.method = ''
     filters.path = ''
