@@ -171,24 +171,7 @@
               </router-link>
             </td>
             <td>
-              <div
-                v-if="getComposeInfo(c).project"
-                class="small"
-              >
-                <div class="text-primary fw-semibold">
-                  {{ getComposeInfo(c).project }}
-                </div>
-                <div
-                  v-if="!isComposeServiceRedundant(c)"
-                  class="text-secondary"
-                >
-                  {{ getComposeInfo(c).service }}
-                </div>
-              </div>
-              <span
-                v-else
-                class="text-secondary"
-              >-</span>
+              <DockerComposeBadge :labels="c.labels" />
             </td>
             <td class="small">
               <div>{{ c.image }}</div>
@@ -724,6 +707,7 @@ import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import DockerPortBadges from '../common/DockerPortBadges.vue'
+import DockerComposeBadge from './DockerComposeBadge.vue'
 import EmptyState from '../EmptyState.vue'
 import PaginationNav from '../PaginationNav.vue'
 import BulkActionBar from '../BulkActionBar.vue'
@@ -732,6 +716,10 @@ import { useDockerContainerPorts } from '../../composables/useDockerContainerPor
 import { usePagination } from '../../composables/usePagination'
 import { getApiErrorMessage } from '../../api/client'
 import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
+import {
+  getComposeInfo as getComposeInfoFromLabels,
+  isComposeContainer as isComposeContainerFromLabels,
+} from '../../utils/dockerCompose'
 
 interface Container {
   id: string
@@ -875,35 +863,12 @@ function toggleSort(key: keyof Container): void {
   sortDir.value = 'asc'
 }
 
-interface ComposeInfo {
-  project: string
-  service: string
-  workingDir: string
-  configFiles: string
-}
-
-function getComposeInfo(container: Container): Partial<ComposeInfo> {
-  if (!container.labels) return {}
-  return {
-    project: container.labels['com.docker.compose.project'] || '',
-    service: container.labels['com.docker.compose.service'] || '',
-    workingDir: container.labels['com.docker.compose.project.working_dir'] || '',
-    configFiles: container.labels['com.docker.compose.project.config_files'] || '',
-  }
-}
-
-function normalizeComposeName(value: string | undefined): string {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-}
-
-function isComposeServiceRedundant(container: Container): boolean {
-  const info = getComposeInfo(container)
-  if (!info.project || !info.service) return true
-  return normalizeComposeName(info.project) === normalizeComposeName(info.service)
+function getComposeInfo(container: Container) {
+  return getComposeInfoFromLabels(container.labels)
 }
 
 function isComposeContainer(container: Container): boolean {
-  return !!container.labels?.['com.docker.compose.project']
+  return isComposeContainerFromLabels(container.labels)
 }
 
 // Groups states by operational severity rather than sorting alphabetically
