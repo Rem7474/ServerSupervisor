@@ -10,6 +10,7 @@
         <thead>
           <tr>
             <th>Nom</th>
+            <th>Compose</th>
             <th>Image</th>
             <th>Tag</th>
             <th>Version réelle</th>
@@ -27,6 +28,9 @@
           >
             <td class="fw-semibold">
               {{ c.name }}
+            </td>
+            <td>
+              <DockerComposeBadge :labels="c.labels" />
             </td>
             <td class="text-secondary">
               {{ c.image }}
@@ -160,7 +164,7 @@
             </td>
           </tr>
           <tr v-if="!containers.length">
-            <td :colspan="canRun ? 9 : 8">
+            <td :colspan="canRun ? 10 : 9">
               <EmptyState title="Aucun conteneur Docker actif sur cet hôte." />
             </td>
           </tr>
@@ -174,6 +178,7 @@
 import { computed, ref, toRef } from 'vue'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconList } from '@tabler/icons-vue'
 import DockerPortBadges from '../common/DockerPortBadges.vue'
+import DockerComposeBadge from '../docker/DockerComposeBadge.vue'
 import EmptyState from '../EmptyState.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
@@ -187,6 +192,7 @@ interface Container {
   image_tag?: string
   state?: string
   status?: string
+  labels?: Record<string, string>
   [key: string]: unknown
 }
 
