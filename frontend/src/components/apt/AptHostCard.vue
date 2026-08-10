@@ -282,38 +282,7 @@
           </div>
 
           <!-- Paquets en attente -->
-          <div
-            v-if="packages.length > 0"
-            class="mb-3"
-          >
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <span class="small fw-semibold text-secondary">
-                Paquets en attente
-                <span class="badge bg-warning-lt text-warning ms-1">
-                  {{ packages.length }}
-                </span>
-              </span>
-              <button
-                v-if="packages.length > PKG_PREVIEW_COUNT"
-                type="button"
-                class="btn btn-link btn-sm p-0 small text-secondary"
-                @click="pkgShowAll = !pkgShowAll"
-              >
-                {{ pkgShowAll ? 'Réduire' : `Voir tout (${packages.length})` }}
-              </button>
-            </div>
-            <div class="apt-packages-grid">
-              <div
-                v-for="pkg in visiblePackages"
-                :key="pkg"
-              >
-                <code
-                  class="small text-body apt-package-item"
-                  :title="pkg"
-                >{{ pkg }}</code>
-              </div>
-            </div>
-          </div>
+          <AptPendingPackagesList :packages="packages" />
 
           <!-- Historique (2 dernières commandes) -->
           <div
@@ -361,11 +330,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { IconChevronDown, IconList, IconCalendar } from '@tabler/icons-vue'
 import CVEList from './CVEList.vue'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useStatusBadge } from '../../composables/useStatusBadge'
+import AptPendingPackagesList from './AptPendingPackagesList.vue'
 import type { Host } from '../../types/host'
 import type { UnattendedUpgradesDB } from '../../types/ws'
 
@@ -413,9 +383,6 @@ defineEmits<{
 const { formatRelativeDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
 
-const PKG_PREVIEW_COUNT = 15
-const pkgShowAll = ref(false)
-
 const activeCommand = computed(() =>
   props.history?.find((cmd) => cmd.status === 'pending' || cmd.status === 'running')
 )
@@ -433,9 +400,6 @@ function parseJsonArray<T = unknown>(value: unknown): T[] {
 
 const cveList = computed(() => parseJsonArray<CveInfo>(props.aptStatus?.cve_list))
 const packages = computed(() => parseJsonArray<string>(props.aptStatus?.package_list))
-const visiblePackages = computed(() =>
-  pkgShowAll.value ? packages.value : packages.value.slice(0, PKG_PREVIEW_COUNT),
-)
 
 function formatDate(date: string | undefined): string {
   return formatRelativeDate(date)
@@ -456,24 +420,3 @@ function statusClass(status: string | undefined): string {
   return getStatusBadgeClass(status, 'badge bg-warning-lt text-warning')
 }
 </script>
-
-<style scoped>
-.apt-packages-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.35rem 0.75rem;
-}
-.apt-package-item {
-  display: block;
-}
-@media (min-width: 768px) {
-  .apt-packages-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1200px) {
-  .apt-packages-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-</style>
