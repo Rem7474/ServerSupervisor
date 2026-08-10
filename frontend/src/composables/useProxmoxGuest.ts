@@ -16,6 +16,7 @@ interface GuestMetricPoint { timestamp: string; cpu_avg?: number; memory_avg?: n
 
 interface ProxmoxGuest {
   id: string
+  connection_id: string
   node_name: string
   guest_type: string
   vmid: number
@@ -93,12 +94,29 @@ export function useProxmoxGuest() {
   }
 
   // The node's guest-networks endpoint is the only source for per-guest
-  // interface detail — there's no single-guest equivalent — so this depends
-  // on the ?nodeId= query param the guest list links carry. A guest page
-  // reached without it (direct link, bookmark) just shows an empty network
-  // detail section, same accepted limitation as the breadcrumb's node link.
+  // interface detail — there's no single-guest equivalent — so this needs the
+  // node's DB id. The node-drilldown guests tab passes it via ?nodeId=, but
+  // every other link to a guest (dashboard, host-detail Proxmox panel,
+  // network graph, command palette, a bookmark) doesn't carry it — those used
+  // to just show an empty network/IP section. Resolve it ourselves from the
+  // guest's own connection_id/node_name when the query param is absent,
+  // instead of depending on the user having drilled in via /proxmox first.
+  async function resolveNodeId(): Promise<string> {
+    const fromQuery = String(route.query.nodeId || '')
+    if (fromQuery) return fromQuery
+    if (!guest.value) return ''
+    try {
+      const res = await api.getProxmoxNodes(guest.value.connection_id, signal)
+      const nodes = Array.isArray(res.data) ? res.data : []
+      return nodes.find((n) => n.node_name === guest.value?.node_name)?.id || ''
+    } catch {
+      return ''
+    }
+  }
+
   async function loadGuestNetworks(): Promise<void> {
-    const nodeId = String(route.query.nodeId || '')
+    if (!guest.value) return
+    const nodeId = await resolveNodeId()
     if (!nodeId || !guest.value) return
     guestNetworksLoading.value = true
     try {
