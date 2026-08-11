@@ -110,14 +110,11 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
   const chartData = computed(() => {
     if (!buckets.value.length) return null
     return {
-      labels: buckets.value.map((b) => formatBucketLabel(b.bucket_start, statsWindow.value)),
-      datasets: [{
-        label: 'Latence moy. ms',
+      categories: buckets.value.map((b) => formatBucketLabel(b.bucket_start, statsWindow.value)),
+      series: [{
+        name: 'Latence moy. ms',
         data: buckets.value.map((b) => b.up_checks > 0 ? Math.round(b.avg_latency_ms) : null),
-        borderColor: '#2fb344',
-        backgroundColor: 'rgba(47,179,68,0.15)',
-        fill: true,
-        spanGaps: false,
+        color: '#2fb344',
       }],
     }
   })
