@@ -312,7 +312,7 @@
                   @toggle="toggleNodeSort('lxc_count')"
                 />
               </th>
-              <th>
+              <th style="width: 200px;">
                 <SortableHeader
                   label="CPU"
                   :active="nodeSortKey === 'cpu_usage'"
@@ -320,7 +320,7 @@
                   @toggle="toggleNodeSort('cpu_usage')"
                 />
               </th>
-              <th>
+              <th style="width: 200px;">
                 <SortableHeader
                   label="RAM"
                   :active="nodeSortKey === 'mem_used'"
