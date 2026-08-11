@@ -15,25 +15,25 @@ import (
 
 type fakeRepo struct{}
 
-func (fakeRepo) GetWebLogsSummary(context.Context, time.Time, string, string) (map[string]any, error) {
+func (fakeRepo) GetWebLogsSummary(context.Context, time.Time, time.Time, string, string) (map[string]any, error) {
 	return nil, nil
 }
-func (fakeRepo) GetWebLogsThreats(context.Context, time.Time, string, string) (map[string]any, error) {
+func (fakeRepo) GetWebLogsThreats(context.Context, time.Time, time.Time, string, string) (map[string]any, error) {
 	return nil, nil
 }
-func (fakeRepo) GetWebLogsTopClientIPs(context.Context, time.Time, string, string, int) ([]map[string]any, error) {
+func (fakeRepo) GetWebLogsTopClientIPs(context.Context, time.Time, time.Time, string, string, int) ([]map[string]any, error) {
 	return nil, nil
 }
 func (fakeRepo) GetWebLogsKPIWindow(context.Context, time.Time, time.Time, string, string) (map[string]any, error) {
 	return nil, nil
 }
-func (fakeRepo) GetIPTimeline(context.Context, string, time.Time, string, int) ([]models.WebLogIPTimelineRow, error) {
+func (fakeRepo) GetIPTimeline(context.Context, string, time.Time, time.Time, string, int) ([]models.WebLogIPTimelineRow, error) {
 	return nil, nil
 }
-func (fakeRepo) GetDomainDetails(context.Context, string, time.Time, string, string, database.DomainDetailsFilter, int, int) (map[string]any, error) {
+func (fakeRepo) GetDomainDetails(context.Context, string, time.Time, time.Time, string, string, database.DomainDetailsFilter, int, int) (map[string]any, error) {
 	return nil, nil
 }
-func (fakeRepo) GetWebLogsTimeseries(context.Context, time.Time, string, string, string) ([]map[string]any, error) {
+func (fakeRepo) GetWebLogsTimeseries(context.Context, time.Time, time.Time, string, string, string) ([]map[string]any, error) {
 	return nil, nil
 }
 func (fakeRepo) GetWebLogsLive(context.Context, string, string, int) ([]map[string]any, error) {

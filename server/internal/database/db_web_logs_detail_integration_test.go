@@ -51,7 +51,7 @@ func TestGetDomainDetails_FilterSortPaginate(t *testing.T) {
 	since := now.Add(-time.Hour)
 
 	t.Run("status filter scopes hits and the requests page together", func(t *testing.T) {
-		details, err := db.GetDomainDetails(ctx, domain, since, "", "", database.DomainDetailsFilter{Status: "4xx"}, 50, 0)
+		details, err := db.GetDomainDetails(ctx, domain, since, time.Time{}, "", "", database.DomainDetailsFilter{Status: "4xx"}, 50, 0)
 		if err != nil {
 			t.Fatalf("GetDomainDetails: %v", err)
 		}
@@ -65,7 +65,7 @@ func TestGetDomainDetails_FilterSortPaginate(t *testing.T) {
 	})
 
 	t.Run("blocked filter", func(t *testing.T) {
-		details, err := db.GetDomainDetails(ctx, domain, since, "", "", database.DomainDetailsFilter{Status: "blocked"}, 50, 0)
+		details, err := db.GetDomainDetails(ctx, domain, since, time.Time{}, "", "", database.DomainDetailsFilter{Status: "blocked"}, 50, 0)
 		if err != nil {
 			t.Fatalf("GetDomainDetails: %v", err)
 		}
@@ -76,7 +76,7 @@ func TestGetDomainDetails_FilterSortPaginate(t *testing.T) {
 	})
 
 	t.Run("suspicious filter", func(t *testing.T) {
-		details, err := db.GetDomainDetails(ctx, domain, since, "", "", database.DomainDetailsFilter{Status: "suspicious"}, 50, 0)
+		details, err := db.GetDomainDetails(ctx, domain, since, time.Time{}, "", "", database.DomainDetailsFilter{Status: "suspicious"}, 50, 0)
 		if err != nil {
 			t.Fatalf("GetDomainDetails: %v", err)
 		}
@@ -90,7 +90,7 @@ func TestGetDomainDetails_FilterSortPaginate(t *testing.T) {
 	})
 
 	t.Run("method + path filters narrow the whole scope, not just the requests page", func(t *testing.T) {
-		details, err := db.GetDomainDetails(ctx, domain, since, "", "", database.DomainDetailsFilter{Method: "POST", Path: "/login"}, 50, 0)
+		details, err := db.GetDomainDetails(ctx, domain, since, time.Time{}, "", "", database.DomainDetailsFilter{Method: "POST", Path: "/login"}, 50, 0)
 		if err != nil {
 			t.Fatalf("GetDomainDetails: %v", err)
 		}
@@ -104,7 +104,7 @@ func TestGetDomainDetails_FilterSortPaginate(t *testing.T) {
 	})
 
 	t.Run("sort by bytes ascending", func(t *testing.T) {
-		details, err := db.GetDomainDetails(ctx, domain, since, "", "", database.DomainDetailsFilter{Sort: "bytes", Dir: "asc"}, 50, 0)
+		details, err := db.GetDomainDetails(ctx, domain, since, time.Time{}, "", "", database.DomainDetailsFilter{Sort: "bytes", Dir: "asc"}, 50, 0)
 		if err != nil {
 			t.Fatalf("GetDomainDetails: %v", err)
 		}
@@ -118,7 +118,7 @@ func TestGetDomainDetails_FilterSortPaginate(t *testing.T) {
 	})
 
 	t.Run("pagination via limit/offset, total reflects the filtered count", func(t *testing.T) {
-		page1, err := db.GetDomainDetails(ctx, domain, since, "", "", database.DomainDetailsFilter{Sort: "bytes", Dir: "asc"}, 2, 0)
+		page1, err := db.GetDomainDetails(ctx, domain, since, time.Time{}, "", "", database.DomainDetailsFilter{Sort: "bytes", Dir: "asc"}, 2, 0)
 		if err != nil {
 			t.Fatalf("GetDomainDetails page1: %v", err)
 		}
@@ -130,7 +130,7 @@ func TestGetDomainDetails_FilterSortPaginate(t *testing.T) {
 			t.Fatalf("expected first page = [10, 20] bytes, got %+v", reqs1)
 		}
 
-		page2, err := db.GetDomainDetails(ctx, domain, since, "", "", database.DomainDetailsFilter{Sort: "bytes", Dir: "asc"}, 2, 2)
+		page2, err := db.GetDomainDetails(ctx, domain, since, time.Time{}, "", "", database.DomainDetailsFilter{Sort: "bytes", Dir: "asc"}, 2, 2)
 		if err != nil {
 			t.Fatalf("GetDomainDetails page2: %v", err)
 		}

@@ -92,6 +92,15 @@ func CheckConfig(cfg *config.Config) []DiagnosticIssue {
 		issues = append(issues, checkResticConfig(cfg)...)
 	}
 
+	if cfg.CollectNetworkFlows {
+		if ok, reason := checkConntrackAcct(); !ok {
+			issues = append(issues, DiagnosticIssue{
+				Collector: "network_flows", Severity: DiagnosticWarning,
+				Message: "collect_network_flows est activé mais aucun compteur d'octets par connexion n'est disponible : " + reason,
+			})
+		}
+	}
+
 	return issues
 }
 

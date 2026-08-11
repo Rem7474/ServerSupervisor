@@ -42,17 +42,6 @@ func validWebLogSource(source string) bool {
 	}
 }
 
-// parseWebLogsPeriod parses ?period (default 24h) into a since timestamp.
-func parseWebLogsPeriod(c *gin.Context) (period time.Duration, since time.Time, ok bool) {
-	raw := strings.TrimSpace(c.DefaultQuery("period", "24h"))
-	period, err := time.ParseDuration(raw)
-	if err != nil || period <= 0 {
-		respondError(c, apperr.Validation("invalid period (example: 24h, 168h)"))
-		return 0, time.Time{}, false
-	}
-	return period, time.Now().Add(-period), true
-}
-
 func webLogsLimit(c *gin.Context, def int) int {
 	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
 		if n, err := strconv.Atoi(raw); err == nil {
@@ -116,7 +105,7 @@ func (h *WebLogsHandler) GetWebLogsSummary(c *gin.Context) {
 	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-	period, _, ok := parseWebLogsPeriod(c)
+	since, until, ok := parseTimeRange(c, "24h")
 	if !ok {
 		return
 	}
@@ -131,12 +120,12 @@ func (h *WebLogsHandler) GetWebLogsSummary(c *gin.Context) {
 		respondError(c, apperr.Validation("invalid scope (threats|full)"))
 		return
 	}
-	result, err := h.svc.Summary(c.Request.Context(), period, hostID, source, scope)
+	result, err := h.svc.Summary(c.Request.Context(), since, until, hostID, source, scope)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"period":  strings.TrimSpace(c.DefaultQuery("period", "24h")),
 		"since":   result.Since,
 		"host_id": hostID,
@@ -144,7 +133,11 @@ func (h *WebLogsHandler) GetWebLogsSummary(c *gin.Context) {
 		"traffic": result.Traffic,
 		"threats": result.Threats,
 		"compare": result.Compare,
-	})
+	}
+	if !until.IsZero() {
+		resp["until"] = until
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *WebLogsHandler) GetWebLogsIPTimeline(c *gin.Context) {
@@ -156,24 +149,28 @@ func (h *WebLogsHandler) GetWebLogsIPTimeline(c *gin.Context) {
 		respondError(c, apperr.Validation("ip is required"))
 		return
 	}
-	_, since, ok := parseWebLogsPeriod(c)
+	since, until, ok := parseTimeRange(c, "24h")
 	if !ok {
 		return
 	}
 	hostID := strings.TrimSpace(c.Query("host_id"))
-	rows, err := h.svc.IPTimeline(c.Request.Context(), ip, since, hostID, webLogsLimit(c, 500))
+	rows, err := h.svc.IPTimeline(c.Request.Context(), ip, since, until, hostID, webLogsLimit(c, 500))
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"ip":       ip,
 		"host_id":  hostID,
 		"period":   strings.TrimSpace(c.DefaultQuery("period", "24h")),
 		"since":    since,
 		"count":    len(rows),
 		"requests": rows,
-	})
+	}
+	if !until.IsZero() {
+		resp["until"] = until
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
@@ -185,7 +182,7 @@ func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
 		respondError(c, apperr.Validation("domain is required"))
 		return
 	}
-	_, since, ok := parseWebLogsPeriod(c)
+	since, until, ok := parseTimeRange(c, "24h")
 	if !ok {
 		return
 	}
@@ -201,12 +198,12 @@ func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
 		Sort:   strings.ToLower(strings.TrimSpace(c.Query("sort"))),
 		Dir:    strings.ToLower(strings.TrimSpace(c.Query("dir"))),
 	}
-	data, err := h.svc.DomainDetails(c.Request.Context(), domain, since, hostID, source, filter, limit, (page-1)*limit)
+	data, err := h.svc.DomainDetails(c.Request.Context(), domain, since, until, hostID, source, filter, limit, (page-1)*limit)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"domain":  domain,
 		"period":  strings.TrimSpace(c.DefaultQuery("period", "24h")),
 		"since":   since,
@@ -215,21 +212,40 @@ func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
 		"page":    page,
 		"limit":   limit,
 		"details": data,
-	})
+	}
+	if !until.IsZero() {
+		resp["until"] = until
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *WebLogsHandler) GetWebLogsTimeseries(c *gin.Context) {
 	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-	_, since, ok := parseWebLogsPeriod(c)
+	since, until, ok := parseTimeRange(c, "24h")
 	if !ok {
 		return
 	}
-	bucket := strings.ToLower(strings.TrimSpace(c.DefaultQuery("bucket", "hour")))
-	if bucket != "hour" && bucket != "minute" {
+	bucket := strings.ToLower(strings.TrimSpace(c.Query("bucket")))
+	if bucket != "" && bucket != "hour" && bucket != "minute" {
 		respondError(c, apperr.Validation("invalid bucket (hour|minute)"))
 		return
+	}
+	if bucket == "" {
+		// No explicit bucket: derive it from the actual span so a custom
+		// range works the same as a named preset (period=1h used to map to
+		// "minute" client-side; same threshold, computed here so it also
+		// covers a from/to range that has no preset name to key off of).
+		span := time.Since(since)
+		if !until.IsZero() {
+			span = until.Sub(since)
+		}
+		if span <= time.Hour {
+			bucket = "minute"
+		} else {
+			bucket = "hour"
+		}
 	}
 	hostID := strings.TrimSpace(c.Query("host_id"))
 	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
@@ -237,19 +253,23 @@ func (h *WebLogsHandler) GetWebLogsTimeseries(c *gin.Context) {
 		respondError(c, apperr.Validation("invalid source"))
 		return
 	}
-	points, err := h.svc.Timeseries(c.Request.Context(), since, hostID, source, bucket)
+	points, err := h.svc.Timeseries(c.Request.Context(), since, until, hostID, source, bucket)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"period":  strings.TrimSpace(c.DefaultQuery("period", "24h")),
 		"bucket":  bucket,
 		"since":   since,
 		"host_id": hostID,
 		"source":  source,
 		"points":  points,
-	})
+	}
+	if !until.IsZero() {
+		resp["until"] = until
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *WebLogsHandler) GetWebLogsLive(c *gin.Context) {

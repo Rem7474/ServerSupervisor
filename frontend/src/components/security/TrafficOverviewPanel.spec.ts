@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
 
 const summaryData = {
   data: {
@@ -52,10 +53,20 @@ describe('TrafficOverviewPanel (characterization)', () => {
     setActivePinia(createPinia())
   })
 
+  // useTraffic() now reads/writes the URL query (period/source/host_id/from/to
+  // sync, see useTraffic.ts) — a real router instance is required for
+  // useRoute()/useRouter() to resolve during setup, a plain 'router-link' stub
+  // is not enough for that.
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/', component: { template: '<div/>' } }],
+  })
+
   // Charts + world map render imperatively (Chart.js / D3) and are verified in
   // the real-browser test; stub them here so the happy-dom shell test stays clean.
   const mountOpts = {
     global: {
+      plugins: [router],
       stubs: {
         TrafficRequestsChart: true,
         TrafficStatusChart: true,

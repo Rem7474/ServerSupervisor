@@ -50,7 +50,7 @@ func TestGetWebLogsSummary_ParallelFanOutMatchesExpectedAggregates(t *testing.T)
 	since := now.Add(-time.Hour)
 
 	t.Run("GetWebLogsSummary aggregates match the seeded requests", func(t *testing.T) {
-		result, err := db.GetWebLogsSummary(ctx, since, "", "")
+		result, err := db.GetWebLogsSummary(ctx, since, time.Time{}, "", "")
 		if err != nil {
 			t.Fatalf("GetWebLogsSummary: %v", err)
 		}
@@ -105,7 +105,7 @@ func TestGetWebLogsSummary_ParallelFanOutMatchesExpectedAggregates(t *testing.T)
 	})
 
 	t.Run("GetWebLogsThreats (threats-only scope) matches the same suspicious/blocked counts", func(t *testing.T) {
-		threats, err := db.GetWebLogsThreats(ctx, since, "", "")
+		threats, err := db.GetWebLogsThreats(ctx, since, time.Time{}, "", "")
 		if err != nil {
 			t.Fatalf("GetWebLogsThreats: %v", err)
 		}
@@ -116,4 +116,64 @@ func TestGetWebLogsSummary_ParallelFanOutMatchesExpectedAggregates(t *testing.T)
 			t.Errorf("expected blocked_ips=1, got %d", got)
 		}
 	})
+}
+
+// TestGetWebLogsSummary_UntilExcludesRequestsPastTheUpperBound guards the
+// custom-range support added to buildWebLogsWhere: a non-zero `until` must
+// exclude requests captured after it, not just requests before `since` —
+// the pre-existing behavior (until always zero) only ever tested the lower
+// bound.
+func TestGetWebLogsSummary_UntilExcludesRequestsPastTheUpperBound(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "web-logs-until-host"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "edge", Hostname: "edge.local", Status: "online",
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+
+	now := time.Now().UTC()
+	since := now.Add(-3 * time.Hour)
+	until := now.Add(-1 * time.Hour)
+
+	report := &models.WebLogReport{
+		Source:      "npm",
+		Traffic:     &models.TrafficSummary{},
+		Threats:     &models.ThreatSummary{},
+		CollectedAt: now,
+		Requests: []models.WebRequest{
+			// Before the window: must be excluded by since.
+			{Timestamp: now.Add(-4 * time.Hour).Format(time.RFC3339), IP: "1.1.1.1", Method: "GET", Path: "/", Status: 200, Bytes: 1, Domain: "app.example.com"},
+			// Inside [since, until): must be counted.
+			{Timestamp: now.Add(-2 * time.Hour).Format(time.RFC3339), IP: "1.1.1.2", Method: "GET", Path: "/", Status: 200, Bytes: 1, Domain: "app.example.com"},
+			// After the window: must be excluded by until.
+			{Timestamp: now.Add(-30 * time.Minute).Format(time.RFC3339), IP: "1.1.1.3", Method: "GET", Path: "/", Status: 200, Bytes: 1, Domain: "app.example.com"},
+		},
+	}
+	if err := db.InsertWebLogSnapshot(ctx, hostID, report); err != nil {
+		t.Fatalf("insert web log snapshot: %v", err)
+	}
+
+	result, err := db.GetWebLogsSummary(ctx, since, until, "", "")
+	if err != nil {
+		t.Fatalf("GetWebLogsSummary: %v", err)
+	}
+	traffic := result["traffic"].(map[string]any)
+	if got := traffic["total_requests"].(int64); got != 1 {
+		t.Errorf("expected exactly the 1 in-window request, got total_requests=%d", got)
+	}
+
+	// Sanity check: the same query with until=zero (open ended) must count
+	// both the in-window and the after-window request, confirming the
+	// exclusion above is actually caused by until, not some other filter.
+	openEnded, err := db.GetWebLogsSummary(ctx, since, time.Time{}, "", "")
+	if err != nil {
+		t.Fatalf("GetWebLogsSummary (open-ended): %v", err)
+	}
+	openTraffic := openEnded["traffic"].(map[string]any)
+	if got := openTraffic["total_requests"].(int64); got != 2 {
+		t.Errorf("expected 2 requests with an open-ended until, got total_requests=%d", got)
+	}
 }

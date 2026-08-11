@@ -14,6 +14,9 @@ type AgentCapabilities struct {
 	Systemd bool `json:"systemd"`  // Systemd unit monitoring enabled
 	Journal bool `json:"journal"`  // Journald log collection enabled
 	Restic  bool `json:"restic"`   // Restic backup collector enabled
+	// NetworkFlows only reflects whether the collector ran, not whether the
+	// kernel could actually provide byte counters — see NetworkFlowsReport.Available.
+	NetworkFlows bool `json:"network_flows"`
 }
 
 // DiagnosticIssue mirrors agent/internal/collector.DiagnosticIssue — one
@@ -58,16 +61,17 @@ type AgentReport struct {
 	// AptStatus mirrors CommandResult.AptStatus's shape and purpose, but for a
 	// periodic report that caught a new unattended-upgrades run rather than a
 	// live-dispatched apt command — see agent/internal/reporter's AptStatus doc.
-	AptStatus *AptStatus `json:"apt_status,omitempty"`
-	WebLogs            *WebLogReport             `json:"web_logs,omitempty"`
-	DockerNetworks     []DockerNetwork           `json:"docker_networks,omitempty"`
-	ComposeProjects    []ComposeProject          `json:"compose_projects,omitempty"`
-	DiskMetrics        []DiskMetrics             `json:"disk_metrics,omitempty"`
-	DiskHealth         []DiskHealth              `json:"disk_health,omitempty"`
-	CustomTasks        []CustomTaskSummary       `json:"custom_tasks,omitempty"`
-	TasksConfigYAML    string                    `json:"tasks_config_yaml,omitempty"`
-	Restic             *ResticStatus             `json:"restic,omitempty"`
-	ResticProfiles     []string                  `json:"restic_profiles,omitempty"`
-	ResticGroups       []string                  `json:"restic_groups,omitempty"`
-	Timestamp          time.Time                 `json:"timestamp"`
+	AptStatus       *AptStatus          `json:"apt_status,omitempty"`
+	WebLogs         *WebLogReport       `json:"web_logs,omitempty"`
+	DockerNetworks  []DockerNetwork     `json:"docker_networks,omitempty"`
+	ComposeProjects []ComposeProject    `json:"compose_projects,omitempty"`
+	DiskMetrics     []DiskMetrics       `json:"disk_metrics,omitempty"`
+	DiskHealth      []DiskHealth        `json:"disk_health,omitempty"`
+	CustomTasks     []CustomTaskSummary `json:"custom_tasks,omitempty"`
+	TasksConfigYAML string              `json:"tasks_config_yaml,omitempty"`
+	Restic          *ResticStatus       `json:"restic,omitempty"`
+	ResticProfiles  []string            `json:"restic_profiles,omitempty"`
+	ResticGroups    []string            `json:"restic_groups,omitempty"`
+	NetworkFlows    *NetworkFlowsReport `json:"network_flows,omitempty"`
+	Timestamp       time.Time           `json:"timestamp"`
 }

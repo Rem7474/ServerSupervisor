@@ -263,6 +263,9 @@ func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *han
 	hostViewer.GET("/disk/metrics/history", h.GetDiskMetricsHistory)
 	hostViewer.GET("/disk/metrics/aggregated", h.GetDiskMetricsAggregated)
 	hostViewer.GET("/disk/health", h.GetDiskHealth)
+	hostViewer.GET("/network/flows", h.GetNetworkFlows)
+	hostViewer.GET("/network/flows/history", h.GetNetworkFlowsHistory)
+	hostViewer.GET("/network/flows/summary", h.GetNetworkFlowsSummary)
 	hostViewer.GET("/complete", h.GetHostComplete)
 	hostViewer.GET("/exposure", h.GetHostExposure)
 
