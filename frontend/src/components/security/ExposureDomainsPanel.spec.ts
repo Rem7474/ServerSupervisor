@@ -15,6 +15,7 @@ vi.mock('../../composables/useUptimeProbes', () => ({
     probes: probesRef,
     probeBadge: (p: UptimeProbe) => (p.last_status === 'up' ? 'bg-success-lt text-success' : 'bg-danger-lt text-danger'),
     probeStatusLabel: (p: UptimeProbe) => (p.last_status === 'up' ? 'UP' : 'DOWN'),
+    probeHistory: {} as Record<string, { id: string | number; checked_at: string; success: boolean }[]>,
   }),
 }))
 

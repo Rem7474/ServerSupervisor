@@ -86,6 +86,7 @@
               <th>Connexion NPM</th>
               <th>Cible</th>
               <th>Monitoring</th>
+              <th>Disponibilité</th>
               <th class="text-end">
                 Requêtes
               </th>
@@ -151,6 +152,26 @@
                   class="text-secondary small"
                 >—</span>
               </td>
+              <td>
+                <div
+                  v-if="row.probe && probeHistory[row.probe.id]?.length"
+                  class="d-flex align-items-end gap-1"
+                  style="height: 20px; min-width: 110px;"
+                >
+                  <div
+                    v-for="tick in probeHistory[row.probe.id]"
+                    :key="tick.id"
+                    class="flex-fill rounded-1"
+                    :class="tick.success ? 'bg-success' : 'bg-danger'"
+                    style="height: 100%; min-width: 2px;"
+                    :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? 'OK' : 'KO'}`"
+                  />
+                </div>
+                <span
+                  v-else
+                  class="text-secondary small"
+                >—</span>
+              </td>
               <td class="text-end">
                 {{ row.d.requests.toLocaleString('fr-FR') }}
               </td>
@@ -211,7 +232,7 @@ import { useSslCertificates } from '../../composables/useSslCertificates'
 import type { HostExposure, HostExposedDomain } from '../../types/host'
 import type { UptimeProbe } from '../../types/uptime'
 import type { SSLCertificate } from '../../types/ssl'
-import { formatBytes } from '../../utils/formatters'
+import { formatBytes, formatDateTime } from '../../utils/formatters'
 
 const props = defineProps<{
   exposure: HostExposure | null
@@ -240,7 +261,7 @@ function openDomain(domain: string): void {
 // blind to whether the domain it's reporting traffic for is actually up.
 // Domains with no monitoring configured just show "—" — this never creates
 // anything, only reads what already exists.
-const { probes, probeBadge, probeStatusLabel } = useUptimeProbes()
+const { probes, probeBadge, probeStatusLabel, probeHistory } = useUptimeProbes()
 const { certs, daysLabel, daysBadge } = useSslCertificates()
 
 const probeByProxyHost = computed(() => {
