@@ -21,7 +21,6 @@
     "@tabler/icons-vue": "^3.46.0",
     "apexcharts": "^6.8.0",
     "axios": "^1.18.1",
-    "chart.js": "^4.4.1",
     "cytoscape": "^3.34.0",
     "cytoscape-fcose": "^2.2.0",
     "d3": "^7.9.0",
@@ -30,14 +29,12 @@
     "pinia": "^3.0.4",
     "topojson-client": "^3.1.0",
     "vue": "^3.5.41",
-    "vue-chartjs": "^5.3.4",
     "vue-router": "^5.2.0",
     "vue3-apexcharts": "^1.11.1",
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/chart.js": "^4.0.1",
     "@types/cytoscape": "^3.21.9",
     "@types/d3": "^7.4.3",
     "@types/node": "^26.2.0",
