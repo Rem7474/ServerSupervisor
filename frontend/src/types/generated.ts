@@ -1113,6 +1113,98 @@ export interface NetworkIPInventory {
 }
 
 //////////
+// source: network_flows.go
+
+/**
+ * NetworkFlowsReport is the agent-reported "top talkers" block for one report
+ * cycle: the busiest remote peers this host talked to, derived from conntrack
+ * accounting and aggregated agent-side into a bounded top-N + "others" bucket
+ * (see agent/internal/collector/network_flows.go). Mirrors
+ * agent/internal/collector.NetworkFlowsReport — kept in its own file rather
+ * than network.go, which already covers the unrelated logical-topology domain
+ * (server/internal/networkview).
+ */
+export interface NetworkFlowsReport {
+  /**
+   * Available is false when the host can't provide per-connection byte
+   * counters (nf_conntrack not loaded, accounting disabled, non-Linux, or
+   * collection disabled in agent.yaml) — never an error, a capability flag.
+   */
+  available: boolean;
+  /**
+   * Reason is an actionable message when Available is false.
+   */
+  reason?: string;
+  top_talkers?: NetworkFlowTalker[];
+  others?: NetworkFlowBucket;
+  total_flows: number /* int */;
+  collected_at: string;
+}
+/**
+ * NetworkFlowTalker is one aggregated remote peer for a report cycle.
+ * RxBytes/TxBytes/Packets are deltas since the previous cycle, not conntrack's
+ * own cumulative counters — see agent/internal/collector/network_flows.go's
+ * per-cycle delta tracking. This is why server-side history aggregation must
+ * SUM() these values per time_bucket, not MAX()-MIN() like system_metrics'
+ * truly-cumulative network_rx_bytes/network_tx_bytes.
+ */
+export interface NetworkFlowTalker {
+  remote_ip: string;
+  remote_port: number /* int */;
+  protocol: string; // "tcp" | "udp"
+  direction: string; // "inbound" | "outbound"
+  /**
+   * ProcessName/PID are best-effort (socket→inode→pid via /proc), empty/0
+   * when attribution failed — never treated as a collection error.
+   */
+  process_name?: string;
+  pid?: number /* int */;
+  rx_bytes: number /* uint64 */;
+  tx_bytes: number /* uint64 */;
+  packets: number /* uint64 */;
+  connections: number /* int */;
+}
+/**
+ * NetworkFlowBucket aggregates every talker beyond the agent's top-N cutoff.
+ */
+export interface NetworkFlowBucket {
+  connections: number /* int */;
+  rx_bytes: number /* uint64 */;
+  tx_bytes: number /* uint64 */;
+}
+/**
+ * NetworkFlowMetric is one persisted row in network_flow_metrics: either a
+ * named talker (IsOthers=false) or the single per-cycle "others" rollup
+ * (IsOthers=true, RemoteIP/RemotePort/Protocol/Direction/ProcessName/PID all
+ * zero-valued).
+ */
+export interface NetworkFlowMetric {
+  id: number /* int64 */;
+  host_id: string;
+  timestamp: string;
+  is_others: boolean;
+  remote_ip?: string;
+  remote_port?: number /* int */;
+  protocol?: string;
+  direction?: string;
+  process_name?: string;
+  pid?: number /* int */;
+  rx_bytes: number /* uint64 */;
+  tx_bytes: number /* uint64 */;
+  packets: number /* uint64 */;
+  connections: number /* int */;
+}
+/**
+ * NetworkFlowSummaryPoint is one time-bucketed point of a host's total tracked
+ * bandwidth (all talkers summed), used for the overview chart.
+ */
+export interface NetworkFlowSummaryPoint {
+  timestamp: string;
+  rx_bytes: number /* uint64 */;
+  tx_bytes: number /* uint64 */;
+}
+
+//////////
 // source: npm.go
 
 /**
@@ -1488,6 +1580,11 @@ export interface AgentCapabilities {
   systemd: boolean; // Systemd unit monitoring enabled
   journal: boolean; // Journald log collection enabled
   restic: boolean; // Restic backup collector enabled
+  /**
+   * NetworkFlows only reflects whether the collector ran, not whether the
+   * kernel could actually provide byte counters — see NetworkFlowsReport.Available.
+   */
+  network_flows: boolean;
 }
 /**
  * DiagnosticIssue mirrors agent/internal/collector.DiagnosticIssue — one
@@ -1546,6 +1643,7 @@ export interface AgentReport {
   restic?: ResticStatus;
   restic_profiles?: string[];
   restic_groups?: string[];
+  network_flows?: NetworkFlowsReport;
   timestamp: string;
 }
 

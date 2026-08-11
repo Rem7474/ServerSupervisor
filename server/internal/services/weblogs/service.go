@@ -27,13 +27,13 @@ import (
 
 // Repository is the data-access port. *database.DB satisfies it structurally.
 type Repository interface {
-	GetWebLogsSummary(ctx context.Context, since time.Time, hostID, source string) (map[string]any, error)
-	GetWebLogsThreats(ctx context.Context, since time.Time, hostID, source string) (map[string]any, error)
-	GetWebLogsTopClientIPs(ctx context.Context, since time.Time, hostID, source string, limit int) ([]map[string]any, error)
+	GetWebLogsSummary(ctx context.Context, since, until time.Time, hostID, source string) (map[string]any, error)
+	GetWebLogsThreats(ctx context.Context, since, until time.Time, hostID, source string) (map[string]any, error)
+	GetWebLogsTopClientIPs(ctx context.Context, since, until time.Time, hostID, source string, limit int) ([]map[string]any, error)
 	GetWebLogsKPIWindow(ctx context.Context, since, until time.Time, hostID, source string) (map[string]any, error)
-	GetIPTimeline(ctx context.Context, ip string, since time.Time, hostID string, limit int) ([]models.WebLogIPTimelineRow, error)
-	GetDomainDetails(ctx context.Context, domain string, since time.Time, hostID, source string, filter database.DomainDetailsFilter, limit, offset int) (map[string]any, error)
-	GetWebLogsTimeseries(ctx context.Context, since time.Time, hostID, source, bucket string) ([]map[string]any, error)
+	GetIPTimeline(ctx context.Context, ip string, since, until time.Time, hostID string, limit int) ([]models.WebLogIPTimelineRow, error)
+	GetDomainDetails(ctx context.Context, domain string, since, until time.Time, hostID, source string, filter database.DomainDetailsFilter, limit, offset int) (map[string]any, error)
+	GetWebLogsTimeseries(ctx context.Context, since, until time.Time, hostID, source, bucket string) ([]map[string]any, error)
 	GetWebLogsLive(ctx context.Context, hostID, source string, limit int) ([]map[string]any, error)
 }
 
@@ -183,11 +183,9 @@ type SummaryResult struct {
 // windows. The threats-only consumer (BotView) reads only summary.threats, so
 // this keeps that page responsive on large windows where the full summary would
 // otherwise time out.
-func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, source, scope string) (*SummaryResult, error) {
-	since := time.Now().Add(-period)
-
+func (s *Service) Summary(ctx context.Context, since, until time.Time, hostID, source, scope string) (*SummaryResult, error) {
 	if scope == "threats" {
-		threats, err := s.repo.GetWebLogsThreats(ctx, since, hostID, source)
+		threats, err := s.repo.GetWebLogsThreats(ctx, since, until, hostID, source)
 		if err != nil {
 			return nil, err
 		}
@@ -230,15 +228,25 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 		}
 		mu.Unlock()
 	}
-	now := time.Now().UTC()
-	currentSince := now.Add(-period)
-	previousSince := currentSince.Add(-period)
+	// The KPI compare windows need concrete timestamps on both ends, unlike
+	// the "open ended" until=zero the other three reads happily accept — in
+	// period mode (until zero) "now" is the implicit upper bound anyway
+	// (rows keep arriving up to it), so use it explicitly here; in a custom
+	// range, until is already concrete. Either way, "previous" is simply the
+	// same-length window immediately preceding "since" — this generalizes
+	// unchanged to a custom range with no extra logic.
+	effectiveUntil := until
+	if effectiveUntil.IsZero() {
+		effectiveUntil = time.Now().UTC()
+	}
+	previousSince := since.Add(-effectiveUntil.Sub(since))
+	previousUntil := since
 
 	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		defer safego.Recover(ctx, "weblogs.Summary.summary")
-		sm, err := s.repo.GetWebLogsSummary(ctx, since, hostID, source)
+		sm, err := s.repo.GetWebLogsSummary(ctx, since, until, hostID, source)
 		if err != nil {
 			setErr(err)
 			return
@@ -250,7 +258,7 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 		defer safego.Recover(ctx, "weblogs.Summary.topIPs")
 		// Best-effort, matching the pre-existing "if err == nil" behavior: a
 		// failure here just skips the top-IP/country enrichment.
-		ips, err := s.repo.GetWebLogsTopClientIPs(ctx, since, hostID, source, 120)
+		ips, err := s.repo.GetWebLogsTopClientIPs(ctx, since, until, hostID, source, 120)
 		if err != nil {
 			return
 		}
@@ -260,7 +268,7 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 	go func() {
 		defer wg.Done()
 		defer safego.Recover(ctx, "weblogs.Summary.currentKPI")
-		kpi, err := s.repo.GetWebLogsKPIWindow(ctx, currentSince, now, hostID, source)
+		kpi, err := s.repo.GetWebLogsKPIWindow(ctx, since, effectiveUntil, hostID, source)
 		if err != nil {
 			setErr(err)
 			return
@@ -270,7 +278,7 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 	go func() {
 		defer wg.Done()
 		defer safego.Recover(ctx, "weblogs.Summary.previousKPI")
-		kpi, err := s.repo.GetWebLogsKPIWindow(ctx, previousSince, currentSince, hostID, source)
+		kpi, err := s.repo.GetWebLogsKPIWindow(ctx, previousSince, previousUntil, hostID, source)
 		if err != nil {
 			setErr(err)
 			return
@@ -308,18 +316,18 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 }
 
 // IPTimeline returns the request timeline for an IP.
-func (s *Service) IPTimeline(ctx context.Context, ip string, since time.Time, hostID string, limit int) ([]models.WebLogIPTimelineRow, error) {
-	return s.repo.GetIPTimeline(ctx, ip, since, hostID, limit)
+func (s *Service) IPTimeline(ctx context.Context, ip string, since, until time.Time, hostID string, limit int) ([]models.WebLogIPTimelineRow, error) {
+	return s.repo.GetIPTimeline(ctx, ip, since, until, hostID, limit)
 }
 
 // DomainDetails returns aggregated details for a domain.
-func (s *Service) DomainDetails(ctx context.Context, domain string, since time.Time, hostID, source string, filter database.DomainDetailsFilter, limit, offset int) (map[string]any, error) {
-	return s.repo.GetDomainDetails(ctx, domain, since, hostID, source, filter, limit, offset)
+func (s *Service) DomainDetails(ctx context.Context, domain string, since, until time.Time, hostID, source string, filter database.DomainDetailsFilter, limit, offset int) (map[string]any, error) {
+	return s.repo.GetDomainDetails(ctx, domain, since, until, hostID, source, filter, limit, offset)
 }
 
 // Timeseries returns bucketed web-log counts.
-func (s *Service) Timeseries(ctx context.Context, since time.Time, hostID, source, bucket string) ([]map[string]any, error) {
-	return s.repo.GetWebLogsTimeseries(ctx, since, hostID, source, bucket)
+func (s *Service) Timeseries(ctx context.Context, since, until time.Time, hostID, source, bucket string) ([]map[string]any, error) {
+	return s.repo.GetWebLogsTimeseries(ctx, since, until, hostID, source, bucket)
 }
 
 // Live returns the most recent web-log entries.

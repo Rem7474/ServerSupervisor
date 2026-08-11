@@ -4,6 +4,24 @@ import { emitHttpError, emitNetworkOk } from '../utils/httpErrorBus'
 
 export type JsonObject = Record<string, unknown>
 
+/**
+ * A precise custom time window (ISO 8601 UTC strings), as produced by
+ * components/common/TimeRangePicker.vue's `from`/`to`. Optional and additive
+ * everywhere it's accepted — the server ignores the accompanying `period`
+ * once both are present (see parseTimeRange, server/internal/handlers), so
+ * sending both at once is safe.
+ */
+export interface TimeRange {
+  from?: string | null
+  to?: string | null
+}
+
+/** Spreads a TimeRange into query params, omitting from/to when unset. */
+export function rangeParams(range?: TimeRange): { from?: string; to?: string } {
+  if (!range?.from || !range?.to) return {}
+  return { from: range.from, to: range.to }
+}
+
 type ApiErrorLike = {
   response?: {
     data?: {

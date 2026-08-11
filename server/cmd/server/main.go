@@ -124,6 +124,7 @@ func main() {
 	// The remaining job only trims release-tracker tag digests.
 	bg.Add(background.NewMetricsRetentionJob(db, cfg))
 	bg.Add(background.NewWebLogsRetentionJob(db, cfg))
+	bg.Add(background.NewNetworkFlowsRetentionJob(db, cfg))
 	bg.Add(background.NewUptimeWorkerJob(db))
 	bg.Add(background.NewSSLWorkerJob(db))
 	// Separate Service instance from the one wired into the router/completion

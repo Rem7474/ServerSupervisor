@@ -528,6 +528,16 @@
             />
           </template>
 
+          <template #reseau-flux>
+            <NetworkFlowsTable
+              :host-id="hostId"
+              :initial-data="(networkFlows as any)"
+              :collector-available="host?.collectors?.network_flows !== false"
+              :active="activeTab === 'reseau-flux'"
+              :refresh-tick="metricsUpdatedAt"
+            />
+          </template>
+
           <template #exposition>
             <HostExposureTab
               :host-id="hostId"
@@ -763,6 +773,7 @@ import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'
 import DiskHealthCard from '../components/disk/DiskHealthCard.vue'
 import ProxmoxHostDiskHealthCard from '../components/proxmox/ProxmoxHostDiskHealthCard.vue'
+import NetworkFlowsTable from '../components/network-flows/NetworkFlowsTable.vue'
 import DiskHistoryChart from '../components/disk/DiskHistoryChart.vue'
 import HostMetricsPanel from '../components/host/HostMetricsPanel.vue'
 import HostProcessesPanel from '../components/host/HostProcessesPanel.vue'
@@ -802,6 +813,7 @@ const {
   cmdHistory,
   diskMetrics,
   diskHealth,
+  networkFlows,
   proxmoxLink,
   linkSaving,
   hostActiveIncidents,
@@ -959,6 +971,7 @@ const hostTabs = computed<EntityTab[]>(() => {
           : [],
     },
     { key: 'backup', label: 'Sauvegardes' },
+    { key: 'reseau-flux', label: 'Trafic réseau', lazy: true },
     {
       key: 'exposition',
       label: 'Exposition',

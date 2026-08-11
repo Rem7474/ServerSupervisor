@@ -64,6 +64,7 @@ type Repository interface {
 	UpsertComposeProjects(ctx context.Context, hostID string, projects []models.ComposeProject) error
 	InsertDiskMetrics(ctx context.Context, metrics []models.DiskMetrics) error
 	InsertDiskHealth(ctx context.Context, healthData []models.DiskHealth) error
+	InsertNetworkFlowMetrics(ctx context.Context, hostID string, report *models.NetworkFlowsReport) error
 	UpdateHostCustomTasks(ctx context.Context, hostID, tasksJSON string) error
 	UpdateHostTasksConfigYAML(ctx context.Context, hostID, yaml string) error
 	UpdateHostResticProfiles(ctx context.Context, hostID, profilesJSON string) error
@@ -558,6 +559,15 @@ func (s *Service) storeDiskAndMetadata(ctx context.Context, hostID, safeHostID s
 		}
 		if err := s.repo.InsertDiskHealth(ctx, report.DiskHealth); err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store disk health for host %s: %v", safeHostID, err))
+		}
+	}
+
+	// report.NetworkFlows is always sent when collect_network_flows is enabled
+	// (even Available=false — a capability flag, not an error), but only ever
+	// worth a write when it actually carries talkers/others for this cycle.
+	if report.NetworkFlows != nil && report.NetworkFlows.Available {
+		if err := s.repo.InsertNetworkFlowMetrics(ctx, hostID, report.NetworkFlows); err != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store network flow metrics for host %s: %v", safeHostID, err))
 		}
 	}
 

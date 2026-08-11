@@ -15,9 +15,17 @@ import (
 // every web-logs aggregate query (filtering by window, optional host, optional
 // source). The same clause applies to both web_log_requests and
 // web_log_snapshots since both carry captured_at / host_id / source columns.
-func buildWebLogsWhere(since time.Time, hostID, source string) (string, []any) {
+// until being zero means "open ended" (no upper bound) — the pre-existing
+// behavior for every caller before custom time ranges existed; see
+// GetWebLogsKPIWindow, the original until-aware query this pattern is
+// generalized from.
+func buildWebLogsWhere(since, until time.Time, hostID, source string) (string, []any) {
 	args := []any{since}
 	where := "captured_at >= $1"
+	if !until.IsZero() {
+		args = append(args, until)
+		where += fmt.Sprintf(" AND captured_at < $%d", len(args))
+	}
 	if hostID != "" {
 		args = append(args, hostID)
 		where += fmt.Sprintf(" AND host_id = $%d", len(args))
@@ -68,8 +76,8 @@ func (c *errCollector) first() error {
 // (via errCollector) except the best-effort "blocked" stats, which
 // preserves the pre-existing "absent key on error" behavior other code
 // depends on (see promoteBlockedIntoThreats in the weblogs service).
-func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID string, source string) (map[string]any, error) {
-	where, args := buildWebLogsWhere(since, hostID, source)
+func (db *DB) GetWebLogsSummary(ctx context.Context, since, until time.Time, hostID string, source string) (map[string]any, error) {
+	where, args := buildWebLogsWhere(since, until, hostID, source)
 
 	var errs errCollector
 	var wg sync.WaitGroup
@@ -373,8 +381,8 @@ func (db *DB) topHostTraffic(ctx context.Context, where string, args []any) ([]m
 // and the geolocation/compare enrichment, so the threats-only BotView stays fast
 // even on large windows. Every query here is served by an index leading with
 // `suspicious`, `blocked` or the snapshot indexes.
-func (db *DB) GetWebLogsThreats(ctx context.Context, since time.Time, hostID string, source string) (map[string]any, error) {
-	where, args := buildWebLogsWhere(since, hostID, source)
+func (db *DB) GetWebLogsThreats(ctx context.Context, since, until time.Time, hostID string, source string) (map[string]any, error) {
+	where, args := buildWebLogsWhere(since, until, hostID, source)
 
 	var errs errCollector
 	var wg sync.WaitGroup
@@ -801,21 +809,12 @@ func (db *DB) GetWebLogsKPIWindow(ctx context.Context, since time.Time, until ti
 
 // GetWebLogsTimeseries returns request counts bucketed by minute or hour for
 // stacked area / line charts. Bucket defaults to "hour" when unrecognised.
-func (db *DB) GetWebLogsTimeseries(ctx context.Context, since time.Time, hostID string, source string, bucket string) ([]map[string]any, error) {
+func (db *DB) GetWebLogsTimeseries(ctx context.Context, since, until time.Time, hostID string, source string, bucket string) ([]map[string]any, error) {
 	if bucket != "minute" && bucket != "hour" {
 		bucket = "hour"
 	}
 
-	args := []any{since}
-	where := "captured_at >= $1"
-	if hostID != "" {
-		args = append(args, hostID)
-		where += fmt.Sprintf(" AND host_id = $%d", len(args))
-	}
-	if source != "" {
-		args = append(args, source)
-		where += fmt.Sprintf(" AND source = $%d", len(args))
-	}
+	where, args := buildWebLogsWhere(since, until, hostID, source)
 
 	query := fmt.Sprintf(`SELECT date_trunc('%s', captured_at) AS bucket_ts,
 	COUNT(*) AS total,

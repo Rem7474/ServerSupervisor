@@ -6,19 +6,12 @@
       :interval-sec="BOT_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     >
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span class="small text-secondary">Période :</span>
-        <button
-          v-for="p in periodOptions"
-          :key="p.value"
-          type="button"
-          class="btn btn-sm"
-          :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
-          @click="setPeriod(p.value)"
-        >
-          {{ p.label }}
-        </button>
-      </div>
+      <TimeRangePicker
+        v-model="timeRange"
+        :presets="periodOptions"
+        :loading="loading"
+        @change="onRangeChange"
+      />
     </PageRefreshBar>
 
     <TrafficThreatsFilterBar
@@ -676,6 +669,7 @@ import DomainDetailsModal from './DomainDetailsModal.vue'
 import TrafficWorldMap from './TrafficWorldMap.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import PaginationNav from '../PaginationNav.vue'
+import TimeRangePicker from '../common/TimeRangePicker.vue'
 import { useBot } from '../../composables/useBot'
 import { usePagination } from '../../composables/usePagination'
 import { compareValues } from '../../utils/sort'
@@ -684,8 +678,8 @@ import { compareValues } from '../../utils/sort'
 type AnyRecord = Record<string, any>
 
 const {
-  period,
   periodOptions,
+  timeRange,
   source,
   hostId,
   loading,
@@ -716,7 +710,7 @@ const {
   truncate,
   formatBlockedUntil,
   loadThreats,
-  setPeriod,
+  onRangeChange,
   openTimeline,
   closeTimeline,
   openDomain,

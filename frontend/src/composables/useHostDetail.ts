@@ -72,6 +72,7 @@ export function useHostDetail() {
   const cmdHistory = ref<AnyRecord[]>([])
   const diskMetrics = ref<AnyRecord | null>(null)
   const diskHealth = ref<AnyRecord | null>(null)
+  const networkFlows = ref<AnyRecord | null>(null)
   const latestAgentVersion = ref('')
 
   const uuStatus = ref<AnyRecord | null>(null)
@@ -323,6 +324,7 @@ export function useHostDetail() {
       if (d.apt_status) aptStatus.value = d.apt_status
       if (d.disk_metrics) diskMetrics.value = d.disk_metrics
       if (d.disk_health) diskHealth.value = d.disk_health
+      if (d.network_flows) networkFlows.value = d.network_flows
       if (d.command_history) cmdHistory.value = d.command_history
       if (d.latest_agent_version) latestAgentVersion.value = d.latest_agent_version
 
@@ -691,6 +693,7 @@ export function useHostDetail() {
     cmdHistory,
     diskMetrics,
     diskHealth,
+    networkFlows,
     proxmoxLink,
     linkSaving,
     hostActiveIncidents,

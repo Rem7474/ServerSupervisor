@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
 
 // Real-browser test: Chart.js + the D3/topojson world map actually render here
 // (Chromium provides a real 2D canvas context + layout), unlike happy-dom.
@@ -53,9 +54,15 @@ describe('TrafficOverviewPanel (browser / real render)', () => {
   it('renders chart canvases and the SVG world map for real', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
+    // useTraffic() reads/writes the URL query (see useTraffic.ts) — a real
+    // router instance is required for useRoute()/useRouter() during setup.
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div/>' } }],
+    })
     mount(TrafficOverviewPanel, {
       attachTo: host,
-      global: { stubs: { 'router-link': true } },
+      global: { plugins: [router], stubs: { 'router-link': true } },
     })
 
     await flushPromises()

@@ -11,12 +11,16 @@ import (
 
 // GetIPTimeline returns the per-request timeline for a single source IP,
 // used by the IP-detail drawer (block/unblock + per-host activity).
-func (db *DB) GetIPTimeline(ctx context.Context, ip string, since time.Time, hostID string, limit int) ([]models.WebLogIPTimelineRow, error) {
+func (db *DB) GetIPTimeline(ctx context.Context, ip string, since, until time.Time, hostID string, limit int) ([]models.WebLogIPTimelineRow, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 500
 	}
 	args := []any{ip, since}
 	where := "r.ip = $1 AND r.captured_at >= $2"
+	if !until.IsZero() {
+		args = append(args, until)
+		where += fmt.Sprintf(" AND r.captured_at < $%d", len(args))
+	}
 	if hostID != "" {
 		args = append(args, hostID)
 		where += fmt.Sprintf(" AND r.host_id = $%d", len(args))
@@ -73,10 +77,14 @@ var domainDetailsSortColumns = map[string]string{
 }
 
 // buildDomainDetailsWhere builds the shared WHERE clause + args for
-// GetDomainDetails' four queries.
-func buildDomainDetailsWhere(domain string, since time.Time, hostID, source string, filter DomainDetailsFilter) (string, []any) {
+// GetDomainDetails' four queries. until being zero means "open ended".
+func buildDomainDetailsWhere(domain string, since, until time.Time, hostID, source string, filter DomainDetailsFilter) (string, []any) {
 	args := []any{since, domain}
 	where := "captured_at >= $1 AND COALESCE(NULLIF(domain,''), '(unknown)') = $2"
+	if !until.IsZero() {
+		args = append(args, until)
+		where += fmt.Sprintf(" AND captured_at < $%d", len(args))
+	}
 	if hostID != "" {
 		args = append(args, hostID)
 		where += fmt.Sprintf(" AND host_id = $%d", len(args))
@@ -119,14 +127,14 @@ func buildDomainDetailsWhere(domain string, since time.Time, hostID, source stri
 // filtered WHERE as the requests page) doubles as that page's pagination
 // total — filter/sort/limit/offset are consistent with each other, so there's
 // no separate COUNT query to keep in sync.
-func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Time, hostID string, source string, filter DomainDetailsFilter, limit, offset int) (map[string]any, error) {
+func (db *DB) GetDomainDetails(ctx context.Context, domain string, since, until time.Time, hostID string, source string, filter DomainDetailsFilter, limit, offset int) (map[string]any, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 300
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	where, args := buildDomainDetailsWhere(domain, since, hostID, source, filter)
+	where, args := buildDomainDetailsWhere(domain, since, until, hostID, source, filter)
 
 	out := map[string]any{}
 	var hits int64
@@ -366,21 +374,12 @@ func (db *DB) GetWebLogsLive(ctx context.Context, hostID string, source string, 
 
 // GetWebLogsTopClientIPs returns the N most active source IPs over the
 // requested window.
-func (db *DB) GetWebLogsTopClientIPs(ctx context.Context, since time.Time, hostID string, source string, limit int) ([]map[string]any, error) {
+func (db *DB) GetWebLogsTopClientIPs(ctx context.Context, since, until time.Time, hostID string, source string, limit int) ([]map[string]any, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
 
-	args := []any{since}
-	where := "captured_at >= $1"
-	if hostID != "" {
-		args = append(args, hostID)
-		where += fmt.Sprintf(" AND host_id = $%d", len(args))
-	}
-	if source != "" {
-		args = append(args, source)
-		where += fmt.Sprintf(" AND source = $%d", len(args))
-	}
+	where, args := buildWebLogsWhere(since, until, hostID, source)
 	args = append(args, limit)
 
 	rows, err := db.conn.QueryContext(ctx,
