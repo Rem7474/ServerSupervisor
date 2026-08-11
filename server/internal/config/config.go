@@ -24,6 +24,17 @@ type Config struct {
 	Port       string
 	BaseURL    string
 	TLSEnabled bool // Whether HTTPS is enabled
+	// DemoMode disables every background job/poller that makes a real
+	// outbound network call (Proxmox VE, Nginx Proxy Manager, uptime/SSL
+	// probes, Git release tracking) — see main.go's job/poller wiring.
+	// Orthogonal to APP_ENV=dev (which only relaxes secret validation):
+	// a real local dev setup against a real Proxmox box must not have its
+	// pollers silently disabled just because APP_ENV=dev is convenient for
+	// the JWT secret auto-generation. Env-only by design — never read back
+	// from OverrideFromDB, so it can't be flipped at runtime via the
+	// Settings UI (that would defeat the "zero network calls" guarantee the
+	// demo/screenshot pipeline relies on).
+	DemoMode bool
 
 	// Logging
 	LogLevel  string // debug|info|warn|error
@@ -158,6 +169,7 @@ func Load() *Config {
 		Port:       getEnv("SERVER_PORT", "8080"),
 		BaseURL:    getEnv("BASE_URL", "http://localhost:8080"),
 		TLSEnabled: getBoolEnv("TLS_ENABLED", false),
+		DemoMode:   getBoolEnv("DEMO_MODE", false),
 
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: logFormatDefault(),

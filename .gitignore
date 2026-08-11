@@ -19,6 +19,8 @@ server/server.exe
 server/main
 server/main.exe
 server/test.exe
+server/seed-demo
+server/seed-demo.exe
 
 # Frontend test artifacts (Vitest browser / Playwright)
 frontend/**/__screenshots__/
