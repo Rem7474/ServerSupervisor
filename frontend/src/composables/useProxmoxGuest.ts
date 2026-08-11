@@ -1,11 +1,13 @@
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, shallowRef, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import type { ApexOptions } from 'apexcharts'
 import dayjs from '../utils/dayjs'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
-import type { ChartData } from 'chart.js'
+import { getApexChartPalette } from '../utils/apexChartTheme'
+import { getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
 import type { ProxmoxGuestLink } from '../types/generated'
 
 export type { GuestPowerAction }
@@ -13,6 +15,8 @@ export type { GuestPowerAction }
 const GUEST_REFRESH_SEC = 30
 
 interface GuestMetricPoint { timestamp: string; cpu_avg?: number; memory_avg?: number; [key: string]: unknown }
+interface ChartPoint { x: number; y: number }
+type GuestChartSeries = { name: string; data: ChartPoint[]; color: string }[]
 
 interface ProxmoxGuest {
   id: string
@@ -43,7 +47,7 @@ export function useProxmoxGuest() {
   const summaryLoading = ref(false)
   const error = ref('')
   const hours = ref(24)
-  const chartData = ref<ChartData<'line'> | null>(null)
+  const series = shallowRef<GuestChartSeries | null>(null)
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
   const actionLoading = computed(() => guestActions.isLoading(guest.value?.id))
@@ -177,9 +181,55 @@ export function useProxmoxGuest() {
     }
   }
 
-  function cssVar(name: string): string {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  function formatChartTime(timestampMs: number): string {
+    const d = dayjs(timestampMs)
+    if (!d.isValid()) return ''
+    return hours.value >= 24 ? d.format('DD/MM HH:mm') : d.format('HH:mm')
   }
+
+  function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
+    return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+      + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
+      + body
+      + '</div>'
+  }
+
+  const chartOptions = computed((): ApexOptions => {
+    const palette = getApexChartPalette()
+    const allPoints = (series.value ?? []).flatMap((s) => s.data)
+    return {
+      chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+      fill: { type: 'solid', opacity: 0.1 },
+      stroke: { curve: 'smooth', width: 2 },
+      markers: { size: 0, hover: { size: 5 } },
+      dataLabels: { enabled: false },
+      legend: { show: true, position: 'top', labels: { colors: palette.legendText }, markers: { size: 5 } },
+      grid: { borderColor: palette.grid },
+      xaxis: {
+        type: 'datetime',
+        min: getMinPointTimestamp(allPoints),
+        max: getMaxPointTimestamp(allPoints),
+        labels: { style: { colors: palette.tickText }, formatter: (v: string) => formatChartTime(Number(v)) },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        tooltip: { enabled: false },
+      },
+      yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
+      tooltip: {
+        shared: true,
+        custom: ({ series: s, seriesIndex, dataPointIndex, w }) => {
+          const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
+          const rows = w.globals.seriesNames
+            .map((name: string, idx: number) => {
+              const y = s[idx]?.[dataPointIndex]
+              return `<div>${name}: ${y != null ? Number(y).toFixed(1) : '—'}%</div>`
+            })
+            .join('')
+          return tooltipHtml(palette, formatChartTime(Number(ts)), rows)
+        },
+      },
+    }
+  })
 
   async function loadGuestSummary(): Promise<void> {
     if (!guest.value) return
@@ -189,33 +239,24 @@ export function useProxmoxGuest() {
       const res = await api.getProxmoxGuestMetrics(guest.value.id, hours.value, bucketMinutes, signal)
       const points = Array.isArray(res.data) ? res.data : []
       if (!points.length) {
-        chartData.value = null
+        series.value = null
         return
       }
-      const labels = points.map((p: GuestMetricPoint) =>
-        hours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
-      )
-      chartData.value = {
-        labels,
-        datasets: [
-          {
-            label: 'CPU %',
-            data: points.map((p: GuestMetricPoint) => Number(p.cpu_avg ?? 0)),
-            borderColor: cssVar('--tblr-blue'),
-            backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.10)`,
-            fill: true,
-          },
-          {
-            label: 'RAM %',
-            data: points.map((p: GuestMetricPoint) => Number(p.memory_avg ?? 0)),
-            borderColor: cssVar('--tblr-green'),
-            backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.10)`,
-            fill: true,
-          },
-        ],
-      }
+      const palette = getApexChartPalette()
+      series.value = [
+        {
+          name: 'CPU %',
+          data: points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.cpu_avg ?? 0) })),
+          color: palette.cpu,
+        },
+        {
+          name: 'RAM %',
+          data: points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.memory_avg ?? 0) })),
+          color: palette.ram,
+        },
+      ]
     } catch {
-      chartData.value = null
+      series.value = null
     } finally {
       summaryLoading.value = false
     }
@@ -251,7 +292,8 @@ export function useProxmoxGuest() {
     summaryLoading,
     error,
     hours,
-    chartData,
+    series,
+    chartOptions,
     autoRefresh,
     lastUpdatedAt,
     GUEST_REFRESH_SEC,
