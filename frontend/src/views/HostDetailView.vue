@@ -211,8 +211,7 @@
               <strong
                 v-if="linkRamPct != null"
                 :class="getMetricColorClass(linkRamPct)"
-              >{{ linkRamPct.toFixed(1) }}%</strong>
-              <span class="text-body">({{ formatBytesLink(proxmoxLink.mem_usage) }} / {{ formatBytesLink(proxmoxLink.mem_alloc) }})</span>
+              >{{ linkRamPct.toFixed(1) }}%</strong> <span class="text-body">({{ formatBytesLink(proxmoxLink.mem_usage) }} / {{ formatBytesLink(proxmoxLink.mem_alloc) }})</span>
             </div>
             <div
               v-if="linkDiskPct != null"

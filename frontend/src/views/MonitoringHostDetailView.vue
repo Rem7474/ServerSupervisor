@@ -58,31 +58,122 @@
         </router-link>.
       </div>
 
-      <template v-if="host.uptime_probe_id">
-        <h3 class="mb-2">
-          Disponibilité
-        </h3>
-        <UptimeDetailSection
-          :probe-id="host.uptime_probe_id"
-          class="mb-4"
-        />
-      </template>
+      <!-- Combined at-a-glance summary — both detail sections below already
+           carry their own full KPI row, but each only covers its own domain;
+           this is the one place on the page a NPM-linked host's uptime AND
+           SSL status are visible together without scrolling past both. -->
+      <div
+        v-if="host.uptime_probe_id && host.ssl_certificate_id"
+        class="row row-cards mb-4"
+      >
+        <div class="col-6 col-md-3">
+          <div class="card card-sm h-100">
+            <div class="card-body">
+              <div class="subheader">
+                Sonde uptime
+              </div>
+              <div
+                class="h2 mb-0 mt-1"
+                :class="probeStatusColor"
+              >
+                {{ probeStatusLabel }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="card card-sm h-100">
+            <div class="card-body">
+              <div class="subheader">
+                Certificat SSL
+              </div>
+              <div
+                class="h2 mb-0 mt-1"
+                :class="certDaysColor"
+              >
+                {{ certDaysLabel }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <template v-if="host.ssl_certificate_id">
-        <h3 class="mb-2">
-          Certificat SSL
-        </h3>
-        <SslDetailSection :cert-id="host.ssl_certificate_id" />
-      </template>
+      <div class="row row-cards">
+        <div
+          v-if="host.uptime_probe_id"
+          :class="host.ssl_certificate_id ? 'col-lg-6' : 'col-12'"
+        >
+          <h3 class="mb-2">
+            Disponibilité
+          </h3>
+          <UptimeDetailSection
+            :probe-id="host.uptime_probe_id"
+            @loaded="probeLoaded = $event"
+          />
+        </div>
+
+        <div
+          v-if="host.ssl_certificate_id"
+          :class="host.uptime_probe_id ? 'col-lg-6' : 'col-12'"
+        >
+          <h3 class="mb-2">
+            Certificat SSL
+          </h3>
+          <SslDetailSection
+            :cert-id="host.ssl_certificate_id"
+            @loaded="certLoaded = $event"
+          />
+        </div>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import UptimeDetailSection from '../components/monitoring/UptimeDetailSection.vue'
 import SslDetailSection from '../components/monitoring/SslDetailSection.vue'
 import { useMonitoringHostDetail } from '../composables/useMonitoringHostDetail'
+import type { UptimeProbe } from '../types/uptime'
+import type { SSLCertificate } from '../types/ssl'
 
 const { host, loading, error } = useMonitoringHostDetail()
+
+// Fed by UptimeDetailSection/SslDetailSection's own `@loaded` emit — reused
+// here rather than re-fetched, purely to drive the combined summary row
+// above. Same status wording/thresholds as useUptimeProbes.ts/
+// useSslCertificates.ts's probeStatusLabel/daysLabel, kept local (not
+// imported from those) since calling either composable here would also
+// trigger its own full probes/certs list fetch for a page that only ever
+// needs this one probe and this one cert.
+const probeLoaded = ref<UptimeProbe | null>(null)
+const certLoaded = ref<SSLCertificate | null>(null)
+
+const probeStatusLabel = computed(() => {
+  const status = probeLoaded.value?.last_status
+  if (status === 'up') return 'UP'
+  if (status === 'down') return 'DOWN'
+  return 'Inconnue'
+})
+const probeStatusColor = computed(() => {
+  const status = probeLoaded.value?.last_status
+  if (status === 'up') return 'text-success'
+  if (status === 'down') return 'text-danger'
+  return 'text-secondary'
+})
+
+const certDaysLabel = computed(() => {
+  const d = certLoaded.value?.days_remaining
+  if (d == null) return 'Inconnu'
+  if (d < 0) return `Expiré (${Math.abs(d)}j)`
+  return `${d} jour${d > 1 ? 's' : ''}`
+})
+const certDaysColor = computed(() => {
+  const d = certLoaded.value?.days_remaining
+  if (d == null) return 'text-secondary'
+  if (d < 0 || d <= 7) return 'text-danger'
+  if (d <= 30) return 'text-warning'
+  return 'text-success'
+})
 </script>

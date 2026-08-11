@@ -4,17 +4,23 @@
       <h3 class="card-title mb-0">
         Domaines &amp; exposition
       </h3>
-      <div class="d-flex gap-2 flex-wrap">
-        <button
-          v-for="p in PERIODS"
-          :key="p.value"
-          type="button"
-          class="btn btn-sm"
-          :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
-          @click="period = p.value"
-        >
-          {{ p.label }}
-        </button>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex gap-2 flex-wrap">
+          <button
+            v-for="p in PERIODS"
+            :key="p.value"
+            type="button"
+            class="btn btn-sm"
+            :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
+            @click="period = p.value"
+          >
+            {{ p.label }}
+          </button>
+        </div>
+        <span
+          v-if="loading"
+          class="spinner-border spinner-border-sm text-muted"
+        />
       </div>
     </div>
     <div class="card-body">

@@ -33,6 +33,10 @@
         >
           Plein dans ~{{ fillPrediction.days }}j
         </span>
+        <span
+          v-if="rangeLoading"
+          class="spinner-border spinner-border-sm text-muted"
+        />
         <div class="btn-group btn-group-sm">
           <button
             v-for="opt in timeRangeOptions"
@@ -108,6 +112,13 @@ const selectedMount = ref<string>(props.mounts[0] ?? '')
 const points = ref<ChartPoint[]>([])
 const chartData = shallowRef<ChartData<'line'> | null>(null)
 const loading = ref(false)
+// Unlike `loading` (only true before the very first chart renders, so
+// periodic WS-tick refreshes don't blank + re-animate an already-visible
+// chart — see loadHistory), this is true for every in-flight fetch,
+// including one triggered by a range button click, so that click always
+// gets a visible spinner instead of silently doing nothing until the data
+// pops in.
+const rangeLoading = ref(false)
 
 const timeRangeOptions = [
   { hours: 1,    label: '1h' },
@@ -229,10 +240,12 @@ function cssVar(name: string): string {
 async function loadHistory(hours: number): Promise<void> {
   if (!selectedMount.value) return
   chartHours.value = hours
-  // Only show the spinner on the very first load; on subsequent refreshes (each
-  // WS tick) keep the existing chart visible and swap the data in place, so the
-  // graph updates silently like HostMetricsPanel instead of blanking + re-animating.
+  // Only show the full-chart spinner on the very first load; on subsequent
+  // refreshes (each WS tick) keep the existing chart visible and swap the
+  // data in place, so the graph updates silently instead of blanking +
+  // re-animating.
   if (!chartData.value) loading.value = true
+  rangeLoading.value = true
   try {
     const raw = await fetchDiskMetricsHistory(props.hostId, selectedMount.value, hours)
     points.value = raw.map((p) => ({
@@ -259,6 +272,7 @@ async function loadHistory(hours: number): Promise<void> {
     chartData.value = null
   } finally {
     loading.value = false
+    rangeLoading.value = false
   }
 }
 

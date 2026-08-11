@@ -28,72 +28,76 @@
         subtitle="Le poller Proxmox n'a pas encore remonté de disque pour ce nœud (rôle PVEAuditor requis)."
       />
     </div>
-    <div
-      v-else
-      class="card-body"
-    >
-      <div class="mb-3 small text-muted">
-        Cet hôte ne peut pas lire le SMART localement (conteneur/VM). Santé remontée par le nœud Proxmox qui l'héberge.
+    <template v-else>
+      <div class="card-body pb-0">
+        <div class="mb-0 small text-muted">
+          Cet hôte ne peut pas lire le SMART localement (conteneur/VM). Santé remontée par le nœud Proxmox qui l'héberge.
+        </div>
       </div>
-      <div class="d-flex flex-column gap-3">
-        <div
-          v-for="disk in disks"
-          :key="disk.id"
-          class="border rounded-3 p-3 shadow-sm"
-          :class="getCardClass(disk.health)"
-        >
-          <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
-            <div class="min-w-0">
-              <div class="fw-semibold text-truncate">
-                {{ disk.dev_path }}
-                <span
-                  v-if="disk.disk_type"
-                  class="badge bg-secondary-lt text-uppercase ms-2"
-                >{{ disk.disk_type }}</span>
-              </div>
-              <div class="text-muted small text-truncate">
-                {{ disk.model }}
-                <span
-                  v-if="disk.serial"
-                  class="ms-2"
-                >{{ disk.serial }}</span>
-              </div>
-            </div>
-            <BadgePill
-              :tone="smartStatusTone(disk.health)"
-              :text="disk.health"
-              compact
-            />
-          </div>
-
-          <div class="row mt-3 g-3 text-sm">
-            <div class="col-6">
-              <div class="text-muted small">
-                Taille
-              </div>
-              <div class="fw-bold">
+      <div class="table-responsive scroll-table">
+        <table class="table table-vcenter card-table table-sm">
+          <thead>
+            <tr>
+              <th>Périphérique</th>
+              <th>Statut</th>
+              <th>Taille</th>
+              <th>Durée de vie restante</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="disk in disks"
+              :key="disk.id"
+            >
+              <td class="text-truncate">
+                <div class="fw-semibold">
+                  {{ disk.dev_path }}
+                  <span
+                    v-if="disk.disk_type"
+                    class="badge bg-secondary-lt text-uppercase ms-1"
+                  >{{ disk.disk_type }}</span>
+                </div>
+                <div class="text-muted small text-truncate">
+                  {{ disk.model }}
+                  <span
+                    v-if="disk.serial"
+                    class="ms-1"
+                  >{{ disk.serial }}</span>
+                </div>
+              </td>
+              <td>
+                <BadgePill
+                  :tone="smartStatusTone(disk.health)"
+                  :text="disk.health"
+                  compact
+                />
+              </td>
+              <td>
                 {{ formatBytes(disk.size_bytes) }}
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="text-muted small">
-                Durée de vie restante
-              </div>
-              <div
-                class="fw-bold"
-                :class="{ 'text-danger': disk.wearout >= 0 && disk.wearout <= 20, 'text-warning': disk.wearout > 20 && disk.wearout <= 50 }"
-              >
-                <span v-if="disk.wearout >= 0">{{ disk.wearout }}%</span>
+              </td>
+              <td>
+                <template v-if="disk.wearout >= 0">
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress progress-xs flex-grow-1 disk-wear-progress-min-60">
+                      <div
+                        class="progress-bar"
+                        :class="wearoutColor(disk.wearout)"
+                        :style="`width:${disk.wearout}%`"
+                      />
+                    </div>
+                    <span class="text-muted small">{{ disk.wearout }}%</span>
+                  </div>
+                </template>
                 <span
                   v-else
                   class="text-muted"
                 >N/A</span>
-              </div>
-            </div>
-          </div>
-        </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -127,12 +131,19 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function getCardClass(status: string): string {
-  switch (status) {
-    case 'FAILED': return 'bg-danger-lt border-danger'
-    case 'UNKNOWN': return 'bg-warning-lt border-warning'
-    case 'PASSED': return 'bg-success-lt border-success'
-    default: return 'bg-secondary-lt border-secondary'
-  }
+// wearout is remaining life (100 = new, 0 = worn out) — same direction and
+// thresholds as ProxmoxNodeDisksTab.vue's own wearoutColor for the cluster
+// disks table, so a disk reads the same severity color whether it's shown
+// there or here.
+function wearoutColor(wearout: number): string {
+  if (wearout < 20) return 'bg-danger'
+  if (wearout < 50) return 'bg-warning'
+  return 'bg-success'
 }
 </script>
+
+<style scoped>
+.disk-wear-progress-min-60 {
+  min-width: 60px;
+}
+</style>

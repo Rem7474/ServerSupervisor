@@ -55,10 +55,11 @@
               </template>
             </td>
             <td>
-              <code v-if="containerVersion(c)?.running_version">
-                {{ c.image_tag }} → <strong>{{ containerVersion(c)?.running_version }}</strong>
-              </code>
-              <code v-else>{{ c.image_tag }}</code>
+              <code v-if="containerVersion(c)?.running_version">{{ containerVersion(c)?.running_version }}</code>
+              <span
+                v-else
+                class="text-muted"
+              >—</span>
             </td>
             <td>
               <span :class="c.state === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">

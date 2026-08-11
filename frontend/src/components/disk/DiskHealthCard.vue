@@ -26,137 +26,93 @@
     </div>
     <div
       v-else
-      class="card-body"
+      class="table-responsive scroll-table"
     >
-      <div class="d-flex flex-column gap-3">
-        <div
-          v-for="disk in health"
-          :key="disk.device"
-          class="border rounded-3 p-3 shadow-sm"
-          :class="getCardClass(disk.smart_status)"
-        >
-          <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
-            <div class="min-w-0">
-              <div class="fw-semibold text-truncate">
+      <table class="table table-vcenter card-table table-sm">
+        <thead>
+          <tr>
+            <th>Périphérique</th>
+            <th>Statut</th>
+            <th>Température</th>
+            <th>Heures d'utilisation</th>
+            <th>Secteurs (réal. / attente / incorr.)</th>
+            <th>Cycles d'alim.</th>
+            <th>Usure SSD/NVMe</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="disk in health"
+            :key="disk.device"
+          >
+            <td class="text-truncate">
+              <div class="fw-semibold">
                 {{ disk.device }}
               </div>
               <div class="text-muted small text-truncate">
                 {{ disk.model }}
                 <span
                   v-if="disk.serial_number"
-                  class="ms-2"
+                  class="ms-1"
                 >{{ disk.serial_number }}</span>
               </div>
-            </div>
-            <BadgePill
-              :tone="smartStatusTone(disk.smart_status)"
-              :text="disk.smart_status"
-              compact
-            />
-          </div>
-
-          <div class="row mt-3 g-3 text-sm">
-            <div class="col-6">
-              <div
-                class="text-muted small"
-              >
-                Température
-              </div>
-              <div class="fw-bold">
-                <span v-if="disk.temperature > 0">{{ disk.temperature }}°C</span>
-                <span
-                  v-else
-                  class="text-muted"
-                >N/A</span>
-              </div>
-            </div>
-            <div class="col-6">
-              <div
-                class="text-muted small"
-              >
-                Heures d'utilisation
-              </div>
-              <div class="fw-bold">
-                <span v-if="disk.power_on_hours > 0">{{ disk.power_on_hours.toLocaleString() }}h</span>
-                <span
-                  v-else
-                  class="text-muted"
-                >N/A</span>
-              </div>
-            </div>
-            <div class="col-6 mt-2">
-              <div
-                class="text-muted small"
-              >
-                Secteurs réalloués
-              </div>
-              <div
-                class="fw-bold"
-                :class="{ 'text-danger': disk.realloc_sectors > 10 }"
-              >
-                {{ disk.realloc_sectors }}
-              </div>
-            </div>
-            <div class="col-6 mt-2">
-              <div
-                class="text-muted small"
-              >
-                Secteurs en attente
-              </div>
-              <div
-                class="fw-bold"
-                :class="{ 'text-danger': disk.pending_sectors > 0 }"
-              >
-                {{ disk.pending_sectors }}
-              </div>
-            </div>
-            <div class="col-6 mt-2">
-              <div
-                class="text-muted small"
-              >
-                Secteurs incorrigibles
-              </div>
-              <div
-                class="fw-bold"
-                :class="{ 'text-danger': (disk.uncorrectable_sectors ?? 0) > 0 }"
-              >
-                {{ disk.uncorrectable_sectors ?? 0 }}
-              </div>
-            </div>
-            <div class="col-6 mt-2">
-              <div
-                class="text-muted small"
-              >
-                Cycles d'alimentation
-              </div>
-              <div class="fw-bold">
-                <span v-if="(disk.power_cycles ?? 0) > 0">{{ disk.power_cycles!.toLocaleString() }}</span>
-                <span
-                  v-else
-                  class="text-muted"
-                >N/A</span>
-              </div>
-            </div>
-            <div class="col-6 mt-2">
-              <div
-                class="text-muted small"
-              >
-                Usure SSD/NVMe
-              </div>
-              <div
-                class="fw-bold"
-                :class="{ 'text-danger': (disk.percentage_used ?? 0) >= 80, 'text-warning': (disk.percentage_used ?? 0) >= 50 && (disk.percentage_used ?? 0) < 80 }"
-              >
-                <span v-if="(disk.percentage_used ?? 0) > 0">{{ disk.percentage_used }}%</span>
-                <span
-                  v-else
-                  class="text-muted"
-                >N/A</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </td>
+            <td>
+              <BadgePill
+                :tone="smartStatusTone(disk.smart_status)"
+                :text="disk.smart_status"
+                compact
+              />
+            </td>
+            <td>
+              <span v-if="disk.temperature > 0">{{ disk.temperature }}°C</span>
+              <span
+                v-else
+                class="text-muted"
+              >N/A</span>
+            </td>
+            <td>
+              <span v-if="disk.power_on_hours > 0">{{ disk.power_on_hours.toLocaleString() }}h</span>
+              <span
+                v-else
+                class="text-muted"
+              >N/A</span>
+            </td>
+            <td>
+              <span :class="{ 'text-danger fw-medium': disk.realloc_sectors > 10 }">{{ disk.realloc_sectors }}</span>
+              <span class="text-muted mx-1">/</span>
+              <span :class="{ 'text-danger fw-medium': disk.pending_sectors > 0 }">{{ disk.pending_sectors }}</span>
+              <span class="text-muted mx-1">/</span>
+              <span :class="{ 'text-danger fw-medium': (disk.uncorrectable_sectors ?? 0) > 0 }">{{ disk.uncorrectable_sectors ?? 0 }}</span>
+            </td>
+            <td>
+              <span v-if="(disk.power_cycles ?? 0) > 0">{{ disk.power_cycles!.toLocaleString() }}</span>
+              <span
+                v-else
+                class="text-muted"
+              >N/A</span>
+            </td>
+            <td>
+              <template v-if="(disk.percentage_used ?? 0) > 0">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress progress-xs flex-grow-1 disk-wear-progress-min-60">
+                    <div
+                      class="progress-bar"
+                      :class="wearColor(disk.percentage_used ?? 0)"
+                      :style="`width:${disk.percentage_used}%`"
+                    />
+                  </div>
+                  <span class="text-muted small">{{ disk.percentage_used }}%</span>
+                </div>
+              </template>
+              <span
+                v-else
+                class="text-muted"
+              >N/A</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </template>
@@ -184,14 +140,22 @@ onMounted(async () => {
   await load()
 })
 
-function getCardClass(status: string): string {
-  switch (status) {
-    case 'FAILED': return 'bg-danger-lt border-danger'
-    case 'UNKNOWN': return 'bg-warning-lt border-warning'
-    case 'PASSED': return 'bg-success-lt border-success'
-    default: return 'bg-secondary-lt border-secondary'
-  }
+// percentage_used is SSD/NVMe wear *consumed* (0 = new, high = worn) — same
+// "high is bad" direction as a usage metric, unlike Proxmox's own wearout
+// column (ProxmoxNodeDisksTab.vue's wearoutColor), which is remaining life
+// and therefore inverted. Keeps this file's original 50/80 thresholds
+// instead of switching to utils/metricColor.ts's 75/90 — those are tuned
+// for CPU/RAM/disk *usage*, not SMART wear-out, which fails at a much lower
+// tolerance than "the disk is 80% busy."
+function wearColor(pct: number): string {
+  if (pct >= 80) return 'bg-danger'
+  if (pct >= 50) return 'bg-warning'
+  return 'bg-success'
 }
 </script>
 
-
+<style scoped>
+.disk-wear-progress-min-60 {
+  min-width: 60px;
+}
+</style>

@@ -79,12 +79,18 @@
         :interval-sec="REFRESH_INTERVAL_MS / 1000"
         :last-updated-at="lastUpdatedAt"
       >
-        <TimeRangePicker
-          v-model="timeRange"
-          :presets="periodOptions"
-          :loading="loading"
-          @change="onRangeChange"
-        />
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <TimeRangePicker
+            v-model="timeRange"
+            :presets="periodOptions"
+            :loading="loading"
+            @change="onRangeChange"
+          />
+          <span
+            v-if="loading"
+            class="spinner-border spinner-border-sm text-muted"
+          />
+        </div>
       </PageRefreshBar>
 
       <TrafficThreatsFilterBar

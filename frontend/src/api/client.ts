@@ -143,6 +143,11 @@ api.interceptors.response.use(
       hardRedirectToLogin()
     } else if (status === 403) {
       emitHttpError(403, "Vous n'avez pas les droits nécessaires pour cette action")
+    } else if (status === 502) {
+      // apperr.BadGateway: an upstream dependency (Proxmox, a Git provider, …)
+      // failed or rejected our credentials — distinct from a genuine internal
+      // error, and retrying won't help until the upstream config is fixed.
+      emitHttpError(502, 'Un service externe est injoignable ou a refusé la connexion (identifiants/permissions à vérifier).')
     } else if (status && status >= 500) {
       emitHttpError(status, 'Le serveur a rencontré une erreur. Réessayez dans quelques instants.')
     } else if (status === null) {
