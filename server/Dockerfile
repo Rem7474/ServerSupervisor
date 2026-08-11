@@ -29,6 +29,13 @@ COPY server/ .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /serversupervisor ./cmd/server
+# seed-demo fills a DEMO_MODE=true database with fixture data (local demo mode
+# + the release screenshot pipeline, see docker-compose.demo.yml). It hard-
+# refuses to run without DEMO_MODE=true, so shipping it in every image is
+# inert in production, not a security concern.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /seed-demo ./cmd/seed-demo
 
 # ==== Stage 3: Final Image ====
 FROM alpine:3.24
@@ -38,6 +45,7 @@ RUN apk add --no-cache ca-certificates tzdata libcap && \
 WORKDIR /app
 
 COPY --from=server-builder /serversupervisor .
+COPY --from=server-builder /seed-demo .
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 RUN chown -R supervisor:supervisor /app && \
     setcap cap_net_raw+ep /app/serversupervisor

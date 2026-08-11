@@ -185,6 +185,23 @@ planifiée, fuseau horaire d'exécution du cron, dépannage) :
 
 ---
 
+## Captures d'écran
+
+| | |
+|---|---|
+| ![Dashboard](screenshot/Dashboard.png) | ![Détail hôte](screenshot/HostDetail.png) |
+| **Dashboard** — vue d'ensemble de la flotte | **Détail hôte** — métriques, disques, historique |
+| ![Docker](screenshot/Docker.png) | ![APT](screenshot/APT.png) |
+| **Docker** — conteneurs et projets compose | **APT** — mises à jour et CVE par hôte |
+| ![Proxmox](screenshot/Proxmox.png) | ![Monitoring](screenshot/Monitoring.png) |
+| **Proxmox VE** — nœuds, VMs et LXC | **Monitoring** — sondes uptime et certificats SSL |
+| ![Audit](screenshot/Audit.png) | |
+| **Audit** — journal des actions, filtrable par catégorie | |
+
+Ces captures sont générées automatiquement à chaque release contre un jeu de
+données de démonstration fixe (voir [CONTRIBUTING.md](CONTRIBUTING.md#mode-démo)
+pour lancer ce même mode démo en local).
+
 ## Démarrage rapide
 
 ### 1. Déployer le serveur

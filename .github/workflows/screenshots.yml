@@ -1,0 +1,89 @@
+name: Update Release Screenshots
+
+# Tag patterns mirror release.yml's — real version tags only, not every
+# "v*"-prefixed tag someone might push for an unrelated reason.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update-screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start demo stack
+        run: docker compose -f docker-compose.demo.yml up -d --build
+
+      - name: Wait for server health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api/health >/dev/null; then
+              echo "server healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::server did not become healthy in time"
+          docker compose -f docker-compose.demo.yml logs
+          exit 1
+
+      - name: Seed demo data
+        run: docker compose -f docker-compose.demo.yml exec -T server-demo /app/seed-demo
+
+      - name: Capture screenshots
+        working-directory: frontend
+        env:
+          BASE_URL: http://localhost:8080
+          ADMIN_USER: demo
+          ADMIN_PASSWORD: DemoPass123!
+        run: node scripts/capture-screenshots.mjs
+
+      - name: Diff screenshots
+        id: diff
+        run: |
+          git add screenshot/
+          if git diff --cached --quiet -- screenshot/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs: update screenshots for ${GITHUB_REF_NAME}"
+          git push origin HEAD:main
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.demo.yml down -v

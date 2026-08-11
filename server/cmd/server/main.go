@@ -117,7 +117,16 @@ func main() {
 	// Start background jobs (each runs in its own goroutine with panic recovery)
 	bg := background.New()
 	bg.Add(background.NewAuditCleanupJob(db, cfg))
-	bg.Add(background.NewHostStatusJob(db, eventBus))
+	if cfg.DemoMode {
+		// Demo hosts never send real heartbeats, so this job (offline after a
+		// 2-minute-stale last_seen, every 30s) would flip every seeded "online"
+		// host offline within minutes — fighting the seed's fixed fleet state
+		// instead of real network isolation, so it's gated here rather than in
+		// the network-call group above.
+		slog.Info("demo mode: skipping host-status job (seeded hosts have no real heartbeat)")
+	} else {
+		bg.Add(background.NewHostStatusJob(db, eventBus))
+	}
 	bg.Add(background.NewAlertEvalJob(db, cfg, dispatcher, notifHub, pushSvc))
 	// Metric downsampling is handled by the TimescaleDB continuous aggregate
 	// (system_metrics_5min); metric retention/compression by Timescale policies.
@@ -125,8 +134,12 @@ func main() {
 	bg.Add(background.NewMetricsRetentionJob(db, cfg))
 	bg.Add(background.NewWebLogsRetentionJob(db, cfg))
 	bg.Add(background.NewNetworkFlowsRetentionJob(db, cfg))
-	bg.Add(background.NewUptimeWorkerJob(db))
-	bg.Add(background.NewSSLWorkerJob(db))
+	if cfg.DemoMode {
+		slog.Info("demo mode: skipping uptime/SSL probe workers (no outbound network calls)")
+	} else {
+		bg.Add(background.NewUptimeWorkerJob(db))
+		bg.Add(background.NewSSLWorkerJob(db))
+	}
 	// Separate Service instance from the one wired into the router/completion
 	// listener — CheckStalledRuns only needs repo+notify, no HTTP-facing state.
 	backupStallSvc := backupsvc.NewService(db, dispatcher, cfg, notifHub, pushSvc)
@@ -140,19 +153,23 @@ func main() {
 	// Background pollers: the handlers expose the unit of work + a fire-and-forget
 	// ctx; the poller package owns the scheduling loop. rootCtx cancellation
 	// (SIGINT/SIGTERM) stops both loops, so no explicit Stop is needed.
-	releaseTrackerH.SetBackgroundContext(rootCtx)
-	poller.Every(rootCtx, releaseTrackerH.PollInterval(), true, "release-tracker", releaseTrackerH.CheckAll)
-	// Ambient Docker image-version engine: one registry check per distinct
-	// image:tag running anywhere, so every container gets an up-to-date/outdated
-	// badge — not just the ones with a release tracker. Much slower cadence than
-	// the tracker poller above (it scans the whole fleet, and registries rate
-	// limit per source IP); the tracker poller reads its cache instead of
-	// calling a registry itself.
-	poller.Every(rootCtx, releaseTrackerH.DockerImagePollInterval(), true, "docker-image-versions", releaseTrackerH.RefreshDockerImageVersions)
-	proxmoxH.SetBackgroundContext(rootCtx)
-	poller.Every(rootCtx, handlers.ProxmoxPollInterval, true, "proxmox", proxmoxH.PollOnce)
-	npmH.SetBackgroundContext(rootCtx)
-	poller.Every(rootCtx, handlers.NPMPollInterval, false, "npm-sync", npmH.PollOnce)
+	if cfg.DemoMode {
+		slog.Info("demo mode: skipping release-tracker/docker-image-versions/proxmox/npm pollers (no outbound network calls)")
+	} else {
+		releaseTrackerH.SetBackgroundContext(rootCtx)
+		poller.Every(rootCtx, releaseTrackerH.PollInterval(), true, "release-tracker", releaseTrackerH.CheckAll)
+		// Ambient Docker image-version engine: one registry check per distinct
+		// image:tag running anywhere, so every container gets an up-to-date/outdated
+		// badge — not just the ones with a release tracker. Much slower cadence than
+		// the tracker poller above (it scans the whole fleet, and registries rate
+		// limit per source IP); the tracker poller reads its cache instead of
+		// calling a registry itself.
+		poller.Every(rootCtx, releaseTrackerH.DockerImagePollInterval(), true, "docker-image-versions", releaseTrackerH.RefreshDockerImageVersions)
+		proxmoxH.SetBackgroundContext(rootCtx)
+		poller.Every(rootCtx, handlers.ProxmoxPollInterval, true, "proxmox", proxmoxH.PollOnce)
+		npmH.SetBackgroundContext(rootCtx)
+		poller.Every(rootCtx, handlers.NPMPollInterval, false, "npm-sync", npmH.PollOnce)
+	}
 
 	// Start server
 	srv := &http.Server{
