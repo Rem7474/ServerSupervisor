@@ -94,17 +94,23 @@
           <h3 class="card-title mb-0">
             Disponibilité
           </h3>
-          <div class="btn-group btn-group-sm">
-            <button
-              v-for="w in STATS_WINDOWS"
-              :key="w.hours"
-              type="button"
-              class="btn"
-              :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
-              @click="setStatsWindow(w.hours)"
-            >
-              {{ w.label }}
-            </button>
+          <div class="d-flex align-items-center gap-2">
+            <span
+              v-if="statsLoading"
+              class="spinner-border spinner-border-sm text-muted"
+            />
+            <div class="btn-group btn-group-sm">
+              <button
+                v-for="w in STATS_WINDOWS"
+                :key="w.hours"
+                type="button"
+                class="btn"
+                :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
+                @click="setStatsWindow(w.hours)"
+              >
+                {{ w.label }}
+              </button>
+            </div>
           </div>
         </div>
         <div class="card-body">
@@ -140,17 +146,23 @@
           <h3 class="card-title mb-0">
             Latence ({{ STATS_WINDOWS.find((w) => w.hours === statsWindow)?.label }})
           </h3>
-          <div class="btn-group btn-group-sm">
-            <button
-              v-for="w in STATS_WINDOWS"
-              :key="w.hours"
-              type="button"
-              class="btn"
-              :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
-              @click="setStatsWindow(w.hours)"
-            >
-              {{ w.label }}
-            </button>
+          <div class="d-flex align-items-center gap-2">
+            <span
+              v-if="statsLoading"
+              class="spinner-border spinner-border-sm text-muted"
+            />
+            <div class="btn-group btn-group-sm">
+              <button
+                v-for="w in STATS_WINDOWS"
+                :key="w.hours"
+                type="button"
+                class="btn"
+                :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
+                @click="setStatsWindow(w.hours)"
+              >
+                {{ w.label }}
+              </button>
+            </div>
           </div>
         </div>
         <div

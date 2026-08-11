@@ -19,6 +19,10 @@
           {{ p.label }}
         </button>
       </div>
+      <span
+        v-if="loading"
+        class="spinner-border spinner-border-sm text-muted"
+      />
     </div>
 
     <ExposureDomainsPanel
