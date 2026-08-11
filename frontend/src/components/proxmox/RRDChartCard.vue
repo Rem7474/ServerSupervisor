@@ -6,11 +6,12 @@
       </h3>
     </div>
     <div class="card-body proxmox-chart-body">
-      <Line
-        v-if="chartData"
-        :data="(chartData as any)"
-        :options="(options as any)"
-        class="h-100"
+      <ApexChart
+        v-if="series && series.length"
+        type="area"
+        height="100%"
+        :options="options"
+        :series="series"
       />
       <div
         v-else
@@ -24,20 +25,20 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
+import type { ApexOptions } from 'apexcharts'
 
-defineProps({
-  title: { type: String, required: true },
-  chartData: { type: Object, default: null },
-  options: { type: Object, default: () => ({}) },
-  emptyText: { type: String, default: 'Aucune donnée' },
+export type RRDChartSeries = NonNullable<ApexOptions['series']>
+
+withDefaults(defineProps<{
+  title: string
+  series?: RRDChartSeries | null
+  options?: ApexOptions
+  emptyText?: string
+}>(), {
+  series: null,
+  options: () => ({}),
+  emptyText: 'Aucune donnée',
 })
 
-const Line = defineAsyncComponent(async () => {
-  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
-  return Line
-})
+const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 </script>
