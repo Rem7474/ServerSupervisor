@@ -76,13 +76,33 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # Tags aren't attached to a branch in git, so this resolves the branch
+      # the release was actually cut from (the one whose tip currently *is*
+      # the tagged commit) instead of assuming "main" — which broke as soon
+      # as a tag landed anywhere else, and would have raced any push to main
+      # that happened to land while this job was building/capturing.
+      - name: Determine target branch
+        id: target
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --depth=1 --quiet
+          BRANCHES=$(git for-each-ref --points-at="${GITHUB_SHA}" --format='%(refname:short)' refs/remotes/origin | grep -vx 'origin/HEAD' | sed 's#^origin/##')
+          COUNT=$(printf '%s\n' "$BRANCHES" | grep -c .)
+          if [ "$COUNT" -ne 1 ]; then
+            echo "::error::Could not resolve a single branch tip for ${GITHUB_SHA} (found: ${BRANCHES:-none}). The release tag must point at the current tip of the branch the screenshots should be pushed back to."
+            exit 1
+          fi
+          echo "branch=${BRANCHES}" >> "$GITHUB_OUTPUT"
+
       - name: Commit and push
         if: steps.diff.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "docs: update screenshots for ${GITHUB_REF_NAME}"
-          git push origin HEAD:main
+          git fetch origin "${{ steps.target.outputs.branch }}" --depth=1 --quiet
+          git rebase "origin/${{ steps.target.outputs.branch }}"
+          git push origin "HEAD:refs/heads/${{ steps.target.outputs.branch }}"
 
       - name: Cleanup
         if: always()
