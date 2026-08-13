@@ -116,6 +116,21 @@ export function isWebAuthnSupported(): boolean {
   return typeof window !== 'undefined' && !!window.PublicKeyCredential
 }
 
+// Whether this browser can show passkeys as an autofill suggestion on a form
+// field (mediation: "conditional") — required before starting a discoverable
+// login ceremony on page load, since older/other browsers support WebAuthn
+// generally but not this specific conditional-UI mode.
+export async function isConditionalMediationAvailable(): Promise<boolean> {
+  if (!isWebAuthnSupported() || typeof PublicKeyCredential.isConditionalMediationAvailable !== 'function') {
+    return false
+  }
+  try {
+    return await PublicKeyCredential.isConditionalMediationAvailable()
+  } catch {
+    return false
+  }
+}
+
 // Runs navigator.credentials.create() against server-issued options and
 // returns the JSON payload ready to POST to the register/finish endpoint.
 export async function createWebAuthnCredential(serverOptions: unknown): Promise<Record<string, unknown>> {
@@ -125,10 +140,24 @@ export async function createWebAuthnCredential(serverOptions: unknown): Promise<
   return encodeCredential(credential)
 }
 
+export interface GetWebAuthnAssertionOptions {
+  // "conditional" makes the browser present matching passkeys as a form-field
+  // autofill suggestion instead of a modal — used for the usernameless login.
+  mediation?: CredentialMediationRequirement
+  // Lets the caller cancel a long-lived conditional request (e.g. the login
+  // page unmounting, or the user submitting the classic form instead).
+  signal?: AbortSignal
+}
+
 // Runs navigator.credentials.get() against server-issued options and returns
 // the JSON payload ready to POST to the login/finish endpoint.
-export async function getWebAuthnAssertion(serverOptions: unknown): Promise<Record<string, unknown>> {
+export async function getWebAuthnAssertion(
+  serverOptions: unknown,
+  opts: GetWebAuthnAssertionOptions = {},
+): Promise<Record<string, unknown>> {
   const options = decodeRequestOptions(serverOptions as ServerRequestOptions)
+  if (opts.mediation) options.mediation = opts.mediation
+  if (opts.signal) options.signal = opts.signal
   const credential = await navigator.credentials.get(options) as PublicKeyCredential | null
   if (!credential) throw new Error('La vérification de la clé de sécurité a été annulée.')
   return encodeCredential(credential)

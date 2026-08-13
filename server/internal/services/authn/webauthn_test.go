@@ -167,6 +167,36 @@ func TestBeginWebAuthnLogin_FailsCleanlyWhenUnconfigured(t *testing.T) {
 	}
 }
 
+func TestBeginDiscoverableLogin_FailsCleanlyWhenUnconfigured(t *testing.T) {
+	svc := &Service{repo: &fakeRepo{}, webauthnSessions: newWebauthnSessionStore()}
+	_, _, err := svc.BeginDiscoverableLogin(context.Background())
+	if httpStatus(err) != 500 {
+		t.Fatalf("expected 500 when webauthn is unconfigured, got %v", err)
+	}
+}
+
+func TestFinishDiscoverableLogin_FailsCleanlyWhenUnconfigured(t *testing.T) {
+	svc := &Service{repo: &fakeRepo{}, webauthnSessions: newWebauthnSessionStore()}
+	_, err := svc.FinishDiscoverableLogin(context.Background(), "irrelevant", []byte(`{}`), "1.2.3.4", "ua")
+	if httpStatus(err) != 500 {
+		t.Fatalf("expected 500 when webauthn is unconfigured, got %v", err)
+	}
+}
+
+func TestFinishDiscoverableLogin_UnknownSessionTokenRejected(t *testing.T) {
+	wa, err := webauthn.New(&webauthn.Config{
+		RPDisplayName: "Test", RPID: "example.com", RPOrigins: []string{"https://example.com"},
+	})
+	if err != nil {
+		t.Fatalf("webauthn.New: %v", err)
+	}
+	svc := &Service{repo: &fakeRepo{}, wa: wa, webauthnSessions: newWebauthnSessionStore()}
+	_, err = svc.FinishDiscoverableLogin(context.Background(), "does-not-exist", []byte(`{}`), "1.2.3.4", "ua")
+	if httpStatus(err) != 401 {
+		t.Fatalf("expected 401 for an unknown/expired session token, got %v", err)
+	}
+}
+
 func TestHasWebAuthnCredentials_FalseWhenUnconfigured(t *testing.T) {
 	svc := &Service{}
 	if svc.HasWebAuthnCredentials(context.Background(), 1) {
