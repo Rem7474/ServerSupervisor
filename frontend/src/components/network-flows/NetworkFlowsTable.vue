@@ -29,6 +29,10 @@
               v-if="totalFlows > talkers.length"
               class="text-muted small ms-1"
             >({{ talkers.length }} affichés sur {{ totalFlows }} flux actifs)</span>
+            <span
+              class="text-muted small ms-1"
+              title="Ce tableau reflète le dernier cycle de rapport de l'agent — il n'est pas recalculé sur la plage sélectionnée dans le graphique ci-dessus."
+            >— instantané du dernier cycle</span>
           </h3>
           <div class="d-flex align-items-center gap-2">
             <select
@@ -82,25 +86,75 @@
           <table class="table table-vcenter card-table mb-0">
             <thead>
               <tr>
-                <th>Processus</th>
-                <th>IP distante</th>
-                <th>Port</th>
-                <th>Protocole</th>
-                <th>Direction</th>
-                <th class="text-end">
-                  Rx
+                <th>
+                  <SortableHeader
+                    label="Processus"
+                    :active="sortKey === 'process_name'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('process_name')"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="IP distante"
+                    :active="sortKey === 'remote_ip'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('remote_ip')"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Port"
+                    :active="sortKey === 'remote_port'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('remote_port')"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Protocole"
+                    :active="sortKey === 'protocol'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('protocol')"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Direction"
+                    :active="sortKey === 'direction'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('direction')"
+                  />
                 </th>
                 <th class="text-end">
-                  Tx
+                  <SortableHeader
+                    label="Rx"
+                    :active="sortKey === 'rx_bytes'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('rx_bytes')"
+                  />
                 </th>
                 <th class="text-end">
-                  Connexions
+                  <SortableHeader
+                    label="Tx"
+                    :active="sortKey === 'tx_bytes'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('tx_bytes')"
+                  />
+                </th>
+                <th class="text-end">
+                  <SortableHeader
+                    label="Connexions"
+                    :active="sortKey === 'connections'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('connections')"
+                  />
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="t in filteredTalkers"
+                v-for="t in sortedTalkers"
                 :key="`${t.is_others}-${t.remote_ip}-${t.remote_port}-${t.protocol}-${t.direction}`"
                 :class="t.is_others ? 'text-muted fst-italic' : 'clickable-row'"
                 :role="t.is_others ? undefined : 'button'"
@@ -201,10 +255,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { IconNetwork, IconWifiOff } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
+import SortableHeader from '../common/SortableHeader.vue'
 import NetworkFlowsHistoryChart from './NetworkFlowsHistoryChart.vue'
 import { useNetworkFlows } from '../../composables/useNetworkFlows'
 import { useModalChrome } from '../../composables/useModalChrome'
 import { formatBytes } from '../../utils/formatters'
+import { compareValues } from '../../utils/sort'
 import type { NetworkFlowMetric } from '../../types/networkFlows'
 
 const props = withDefaults(defineProps<{
@@ -246,6 +302,28 @@ const filteredTalkers = computed(() => {
     if (t.is_others) return false
     return (t.remote_ip ?? '').toLowerCase().includes(q) || (t.process_name ?? '').toLowerCase().includes(q)
   })
+})
+
+const sortKey = ref<keyof NetworkFlowMetric>('rx_bytes')
+const sortDir = ref<'asc' | 'desc'>('desc')
+
+function toggleSort(key: keyof NetworkFlowMetric): void {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortKey.value = key
+  sortDir.value = 'asc'
+}
+
+// The synthetic "Autres" aggregate row (is_others) always stays last — it
+// summarizes everything past the top-N cutoff, not a real talker to rank
+// alongside the rest.
+const sortedTalkers = computed(() => {
+  const real = filteredTalkers.value.filter((t) => !t.is_others)
+  const others = filteredTalkers.value.filter((t) => t.is_others)
+  real.sort((a, b) => compareValues(a[sortKey.value], b[sortKey.value], sortDir.value))
+  return [...real, ...others]
 })
 
 const drilldownTalker = ref<NetworkFlowMetric | null>(null)

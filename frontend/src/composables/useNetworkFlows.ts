@@ -7,7 +7,11 @@ export function useNetworkFlows(hostId: MaybeRef<string>, initialData?: NetworkF
   const loading = ref(!initialData)
 
   async function load(): Promise<void> {
-    loading.value = true
+    // Only show the big skeleton for a genuine first load (no rows yet) —
+    // a background refresh (NetworkFlowsTable's refreshTick watcher) swaps
+    // the rows in place instead of flashing the whole card, same guard as
+    // NetworkFlowsHistoryChart.vue/DiskHistoryChart.vue's loadHistory().
+    if (!talkers.value.length) loading.value = true
     try {
       const res = await api.getNetworkFlows(toValue(hostId))
       talkers.value = res.data || []
