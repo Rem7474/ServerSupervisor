@@ -240,7 +240,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			flows, err := collector.CollectNetworkFlows(ctx, r.cfg.NetworkFlowsTopN)
+			flows, err := collector.CollectNetworkFlows(ctx, r.cfg.NetworkFlowsTopN, r.cfg.NetworkFlowsL7Capture)
 			if err != nil {
 				slog.Warn("network flows collection skipped", "err", err)
 				return

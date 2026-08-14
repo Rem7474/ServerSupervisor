@@ -22,9 +22,15 @@ type DockerContainer struct {
 	EnvVars     map[string]string `json:"env_vars" db:"-"`
 	Volumes     []string          `json:"volumes" db:"-"`
 	Networks    []string          `json:"networks" db:"-"`
-	NetRxBytes  uint64            `json:"net_rx_bytes" db:"net_rx_bytes"`
-	NetTxBytes  uint64            `json:"net_tx_bytes" db:"net_tx_bytes"`
-	UpdatedAt   time.Time         `json:"updated_at" db:"updated_at"`
+	// IPAddresses are the container's Docker-assigned addresses across its
+	// attached networks. Reported by the agent (which needs them locally to
+	// attribute container traffic in the network-flow collector — see
+	// agent/internal/collector/container_ips.go) and accepted here as container
+	// metadata; not persisted, same as Labels/EnvVars/Volumes above.
+	IPAddresses []string  `json:"ip_addresses" db:"-"`
+	NetRxBytes  uint64    `json:"net_rx_bytes" db:"net_rx_bytes"`
+	NetTxBytes  uint64    `json:"net_tx_bytes" db:"net_tx_bytes"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type DockerReport struct {
@@ -153,12 +159,12 @@ type UnattendedUpgradesStatus struct {
 
 // UnattendedUpgradesDB is the persisted view returned by API endpoints.
 type UnattendedUpgradesDB struct {
-	Installed      bool      `json:"installed"`
-	Enabled        bool      `json:"enabled"`
-	RebootRequired bool      `json:"reboot_required"`
-	LastRunAt      *time.Time `json:"last_run_at"`
-	LastRunPackages int      `json:"last_run_packages"`
-	Config         UUConfig  `json:"config"`
+	Installed       bool       `json:"installed"`
+	Enabled         bool       `json:"enabled"`
+	RebootRequired  bool       `json:"reboot_required"`
+	LastRunAt       *time.Time `json:"last_run_at"`
+	LastRunPackages int        `json:"last_run_packages"`
+	Config          UUConfig   `json:"config"`
 }
 
 // UnattendedUpgradesConfigureRequest is the body for PUT /hosts/:id/apt/unattended-upgrades.

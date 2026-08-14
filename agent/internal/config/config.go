@@ -44,6 +44,14 @@ type Config struct {
 	// (see collector.CollectNetworkFlows), never configured from here.
 	CollectNetworkFlows bool `yaml:"collect_network_flows"`
 	NetworkFlowsTopN    int  `yaml:"network_flows_top_n"`
+	// NetworkFlowsL7Capture opts into a bounded packet-sampling pass that reads
+	// the TLS SNI hostname off outbound handshakes, so a talker can be labelled
+	// with the domain it actually contacted instead of just an IP and a port.
+	// Default false: it needs CAP_NET_RAW and reads packet headers off the
+	// wire, which is a materially bigger ask than the rest of the agent's
+	// /proc-and-netlink collection. Missing capability degrades to the UI's
+	// well-known-port heuristic — it never fails a report cycle.
+	NetworkFlowsL7Capture bool `yaml:"network_flows_l7_capture"`
 
 	// Restic backup supervision. Only paths and feature flags live here —
 	// credentials (repository password, storage backend keys) stay in the
@@ -226,6 +234,9 @@ func Load(path string) (*Config, error) {
 			cfg.NetworkFlowsTopN = n
 		}
 	}
+	if env := os.Getenv("SUPERVISOR_NETWORK_FLOWS_L7_CAPTURE"); env != "" {
+		cfg.NetworkFlowsL7Capture = env == "true" || env == "1"
+	}
 	if env := os.Getenv("SUPERVISOR_COLLECT_RESTIC"); env != "" {
 		cfg.CollectRestic = env == "true" || env == "1"
 	}
@@ -295,6 +306,7 @@ func defaultConfig() *Config {
 		LogFormat:                      "text",
 		CollectNetworkFlows:            true,
 		NetworkFlowsTopN:               50,
+		NetworkFlowsL7Capture:          false,
 		CollectRestic:                  false,
 		ResticEnableProgress:           true,
 		ResticProgressFPS:              0.1,
@@ -387,6 +399,16 @@ crowdsec_alerts_password: ""
 # collection and payload size; never pushed from the server.
 collect_network_flows: true
 network_flows_top_n: 50
+
+# OPTIONAL, off by default. Sample outbound TLS handshakes to label a talker
+# with the domain it actually contacted (SNI) instead of just an IP + port.
+# Requires CAP_NET_RAW on the agent binary:
+#   setcap cap_net_raw+ep /usr/local/bin/serversupervisor-agent
+# Without it the agent logs once, raises a diagnostic, and falls back to the
+# interface's port-based guess — it never fails a report cycle. Only TLS SNI is
+# extracted (no DNS, no HTTP); capture is bounded to a few seconds and a few
+# thousand packets per cycle.
+network_flows_l7_capture: false
 
 # Restic backup supervision. Only paths/flags — never put restic/Swift/SMTP
 # credentials here; they stay in resticconf on disk (restic_conf_path).

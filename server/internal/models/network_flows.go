@@ -34,9 +34,17 @@ type NetworkFlowTalker struct {
 	Protocol   string `json:"protocol"`  // "tcp" | "udp"
 	Direction  string `json:"direction"` // "inbound" | "outbound"
 	// ProcessName/PID are best-effort (socket→inode→pid via /proc), empty/0
-	// when attribution failed — never treated as a collection error.
+	// when attribution failed — never treated as a collection error. For a
+	// process inside a container the host's /proc can't see the socket at all,
+	// so ProcessName instead carries the agent's "conteneur: <name>" fallback
+	// (PID stays 0 — a container PID is meaningless outside its namespace).
 	ProcessName string `json:"process_name,omitempty"`
 	PID         int    `json:"pid,omitempty"`
+	// ServerName is the TLS SNI hostname observed on an outbound flow. Only
+	// ever populated when the agent's optional, off-by-default L7 capture is
+	// enabled (network_flows_l7_capture, needs CAP_NET_RAW); empty otherwise,
+	// in which case the frontend falls back to its own well-known-port guess.
+	ServerName  string `json:"server_name,omitempty"`
 	RxBytes     uint64 `json:"rx_bytes"`
 	TxBytes     uint64 `json:"tx_bytes"`
 	Packets     uint64 `json:"packets"`
@@ -65,6 +73,7 @@ type NetworkFlowMetric struct {
 	Direction   string    `json:"direction,omitempty" db:"direction"`
 	ProcessName string    `json:"process_name,omitempty" db:"process_name"`
 	PID         int       `json:"pid,omitempty" db:"pid"`
+	ServerName  string    `json:"server_name,omitempty" db:"server_name"`
 	RxBytes     uint64    `json:"rx_bytes" db:"rx_bytes"`
 	TxBytes     uint64    `json:"tx_bytes" db:"tx_bytes"`
 	Packets     uint64    `json:"packets" db:"packets"`

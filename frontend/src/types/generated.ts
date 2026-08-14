@@ -692,6 +692,14 @@ export interface DockerContainer {
   env_vars: { [key: string]: string};
   volumes: string[];
   networks: string[];
+  /**
+   * IPAddresses are the container's Docker-assigned addresses across its
+   * attached networks. Reported by the agent (which needs them locally to
+   * attribute container traffic in the network-flow collector — see
+   * agent/internal/collector/container_ips.go) and accepted here as container
+   * metadata; not persisted, same as Labels/EnvVars/Volumes above.
+   */
+  ip_addresses: string[];
   net_rx_bytes: number /* uint64 */;
   net_tx_bytes: number /* uint64 */;
   updated_at: string;
@@ -1190,10 +1198,20 @@ export interface NetworkFlowTalker {
   direction: string; // "inbound" | "outbound"
   /**
    * ProcessName/PID are best-effort (socket→inode→pid via /proc), empty/0
-   * when attribution failed — never treated as a collection error.
+   * when attribution failed — never treated as a collection error. For a
+   * process inside a container the host's /proc can't see the socket at all,
+   * so ProcessName instead carries the agent's "conteneur: <name>" fallback
+   * (PID stays 0 — a container PID is meaningless outside its namespace).
    */
   process_name?: string;
   pid?: number /* int */;
+  /**
+   * ServerName is the TLS SNI hostname observed on an outbound flow. Only
+   * ever populated when the agent's optional, off-by-default L7 capture is
+   * enabled (network_flows_l7_capture, needs CAP_NET_RAW); empty otherwise,
+   * in which case the frontend falls back to its own well-known-port guess.
+   */
+  server_name?: string;
   rx_bytes: number /* uint64 */;
   tx_bytes: number /* uint64 */;
   packets: number /* uint64 */;
@@ -1224,6 +1242,7 @@ export interface NetworkFlowMetric {
   direction?: string;
   process_name?: string;
   pid?: number /* int */;
+  server_name?: string;
   rx_bytes: number /* uint64 */;
   tx_bytes: number /* uint64 */;
   packets: number /* uint64 */;

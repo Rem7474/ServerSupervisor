@@ -43,19 +43,33 @@
               <option value="">
                 Tous protocoles
               </option>
-              <option value="tcp">
-                TCP
-              </option>
-              <option value="udp">
-                UDP
-              </option>
+              <optgroup label="Transport">
+                <option value="tcp">
+                  TCP
+                </option>
+                <option value="udp">
+                  UDP
+                </option>
+              </optgroup>
+              <optgroup
+                v-if="serviceOptions.length > 0"
+                label="Service (déduit du port)"
+              >
+                <option
+                  v-for="svc in serviceOptions"
+                  :key="svc"
+                  :value="`svc:${svc}`"
+                >
+                  {{ svc }}
+                </option>
+              </optgroup>
             </select>
             <input
               v-model="search"
               type="text"
               class="form-control form-control-sm"
               style="width: auto;"
-              placeholder="IP ou processus…"
+              placeholder="IP, processus ou service…"
             >
           </div>
         </div>
@@ -184,7 +198,21 @@
                   </td>
                   <td>{{ t.remote_port }}</td>
                   <td>
-                    <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ t.protocol }}</span>
+                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                      <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ t.protocol }}</span>
+                      <!-- A real SNI hostname is presented plainly; a port-based
+                           guess is muted + marked so it never reads as a fact. -->
+                      <span
+                        v-if="labelFor(t).source === 'sni'"
+                        class="badge bg-purple-lt text-purple"
+                        title="Nom de serveur TLS (SNI) observé sur le trafic"
+                      >{{ labelFor(t).text }}</span>
+                      <span
+                        v-else-if="labelFor(t).source === 'port'"
+                        class="text-muted small heuristic-label"
+                        :title="PORT_GUESS_HINT"
+                      >≈ {{ labelFor(t).text }}</span>
+                    </div>
                   </td>
                   <td>
                     <span
@@ -261,7 +289,8 @@ import { useNetworkFlows } from '../../composables/useNetworkFlows'
 import { useModalChrome } from '../../composables/useModalChrome'
 import { formatBytes } from '../../utils/formatters'
 import { compareValues } from '../../utils/sort'
-import type { NetworkFlowMetric } from '../../types/networkFlows'
+import { protocolLabelFor, PORT_GUESS_HINT, type ProtocolLabel } from '../../utils/portServices'
+import { SERVICE_FILTER_PREFIX, type NetworkFlowFilterValue, type NetworkFlowMetric } from '../../types/networkFlows'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -289,18 +318,56 @@ const props = withDefaults(defineProps<{
 
 const { talkers, loading, load } = useNetworkFlows(props.hostId, props.initialData)
 
-const protocolFilter = ref('')
+const protocolFilter = ref<NetworkFlowFilterValue>('')
 const search = ref('')
 
 const totalFlows = computed(() => talkers.value.length)
 
+/**
+ * Application-level label for a talker: the agent's observed TLS SNI hostname
+ * when the optional capture provided one, otherwise a well-known-port guess.
+ * Memoized per render pass — the template reads it up to three times per row.
+ */
+const labelCache = computed(() => {
+  const map = new Map<NetworkFlowMetric, ProtocolLabel>()
+  for (const t of talkers.value) {
+    map.set(t, protocolLabelFor(t.server_name, t.remote_port, t.protocol))
+  }
+  return map
+})
+
+function labelFor(t: NetworkFlowMetric): ProtocolLabel {
+  return labelCache.value.get(t) ?? { text: '', source: 'none' }
+}
+
+/** Distinct application labels present in the current data, for the filter. */
+const serviceOptions = computed(() => {
+  const seen = new Set<string>()
+  for (const t of talkers.value) {
+    if (t.is_others) continue
+    const label = labelFor(t)
+    if (label.source !== 'none') seen.add(label.text)
+  }
+  return [...seen].sort((a, b) => a.localeCompare(b, 'fr'))
+})
+
 const filteredTalkers = computed(() => {
   const q = search.value.trim().toLowerCase()
+  const filter = protocolFilter.value
   return talkers.value.filter((t) => {
-    if (protocolFilter.value && t.protocol !== protocolFilter.value) return false
+    if (filter.startsWith(SERVICE_FILTER_PREFIX)) {
+      // The "others" rollup has no remote port, so it can never match a
+      // service filter — same reasoning as the search branch below.
+      if (t.is_others) return false
+      if (labelFor(t).text !== filter.slice(SERVICE_FILTER_PREFIX.length)) return false
+    } else if (filter && t.protocol !== filter) {
+      return false
+    }
     if (!q) return true
     if (t.is_others) return false
-    return (t.remote_ip ?? '').toLowerCase().includes(q) || (t.process_name ?? '').toLowerCase().includes(q)
+    return (t.remote_ip ?? '').toLowerCase().includes(q)
+      || (t.process_name ?? '').toLowerCase().includes(q)
+      || labelFor(t).text.toLowerCase().includes(q)
   })
 })
 
@@ -357,3 +424,10 @@ watch(() => props.active, (isActive) => {
   if (isActive && props.collectorAvailable !== false) load()
 })
 </script>
+
+<style scoped>
+/* Signals "hover me for the caveat" on the port-derived guess. */
+.heuristic-label {
+  cursor: help;
+}
+</style>

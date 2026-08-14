@@ -16,6 +16,17 @@ export type NetworkFlowMetric = Omit<GeneratedNetworkFlowMetric, 'protocol' | 'd
   direction?: NetworkFlowDirection
 }
 
+/**
+ * Value of the table's protocol filter. Either a transport protocol, or a
+ * `svc:`-prefixed application label (a real TLS SNI hostname when the agent's
+ * optional capture provided one, otherwise the port-based guess — see
+ * utils/portServices.ts). The prefix keeps the two namespaces from colliding:
+ * without it a service literally named "tcp" would match the transport filter.
+ */
+export type NetworkFlowFilterValue = '' | NetworkFlowProtocol | `svc:${string}`
+
+export const SERVICE_FILTER_PREFIX = 'svc:'
+
 export type { NetworkFlowSummaryPoint }
 
 /** GET /v1/hosts/:id/network/flows/summary response envelope. */

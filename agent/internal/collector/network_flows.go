@@ -8,11 +8,16 @@
 // as the rest of this package (see system.go's /proc/net/dev network byte
 // counters).
 //
-// Forwarded/NAT traffic (neither side of a connection is a local IP — e.g.
-// docker0 container-to-container NAT) is deliberately excluded: this
-// collector answers "who is this host talking to", not general routed
-// traffic, and there is no single "remote peer" to attribute it to without
-// risking a wrong classification.
+// Forwarded/NAT traffic is deliberately excluded — this collector answers "who
+// is this host talking to", not general routed traffic, and there is no single
+// "remote peer" to attribute it to without risking a wrong classification. The
+// one sanctioned widening of "local" is Docker: a container's real source
+// address (its bridge IP, e.g. 172.17.0.4) is never a host interface address,
+// so before this exception every container-originated flow was dropped as pure
+// NAT and Docker traffic was entirely invisible. Only addresses Docker itself
+// enumerated as belonging to a container on this host are added (see
+// container_ips.go) — never a whole subnet, so genuinely routed traffic stays
+// excluded.
 package collector
 
 import (
@@ -52,12 +57,21 @@ type NetworkFlowsReport struct {
 // RxBytes/TxBytes/Packets are deltas since the previous cycle (see
 // deltaFlows), not conntrack's cumulative counters.
 type NetworkFlowTalker struct {
-	RemoteIP    string `json:"remote_ip"`
-	RemotePort  int    `json:"remote_port"`
-	Protocol    string `json:"protocol"`  // "tcp" | "udp"
-	Direction   string `json:"direction"` // "inbound" | "outbound"
+	RemoteIP   string `json:"remote_ip"`
+	RemotePort int    `json:"remote_port"`
+	Protocol   string `json:"protocol"`  // "tcp" | "udp"
+	Direction  string `json:"direction"` // "inbound" | "outbound"
+	// ProcessName is the owning host process (via /proc), or — only when that
+	// finds nothing, which is the normal case for a process inside a container
+	// whose sockets live in another namespace — the "conteneur: <name>"
+	// fallback (see containerLabelPrefix). Never overwrites a real match.
 	ProcessName string `json:"process_name,omitempty"`
 	PID         int    `json:"pid,omitempty"`
+	// ServerName is the TLS SNI hostname observed on this peer, populated only
+	// when the optional L7 capture is enabled (network_flows_l7_capture, off by
+	// default — see network_flows_l7.go). Empty otherwise; the UI falls back to
+	// its own well-known-port heuristic.
+	ServerName  string `json:"server_name,omitempty"`
 	RxBytes     uint64 `json:"rx_bytes"`
 	TxBytes     uint64 `json:"tx_bytes"`
 	Packets     uint64 `json:"packets"`
@@ -121,7 +135,7 @@ func checkConntrackAcct() (bool, string) {
 // returns an error for a degraded/unavailable kernel — that's reported via
 // Available/Reason instead, so one host without conntrack never breaks its
 // report cycle.
-func CollectNetworkFlows(ctx context.Context, topN int) (*NetworkFlowsReport, error) {
+func CollectNetworkFlows(ctx context.Context, topN int, l7Capture bool) (*NetworkFlowsReport, error) {
 	if topN <= 0 {
 		topN = 50
 	}
@@ -131,24 +145,43 @@ func CollectNetworkFlows(ctx context.Context, topN int) (*NetworkFlowsReport, er
 		return &NetworkFlowsReport{Available: false, Reason: reason, CollectedAt: now}, nil
 	}
 
+	// Start the optional L7 (TLS SNI) capture first so it samples packets
+	// *while* the conntrack/proc work below runs, rather than adding its window
+	// to the collection budget. Returns immediately (and a nil sniffer) when
+	// the feature is off or the capability is missing — never blocks or fails
+	// the cycle.
+	sniffer := startSNISniffer(ctx, l7Capture)
+
 	flows, err := listConntrackFlows()
 	if err != nil {
+		stopSNISniffer(sniffer)
 		return &NetworkFlowsReport{Available: false, Reason: err.Error(), CollectedAt: now}, nil
 	}
 	if flows == nil {
 		// conntrackTimeout or ctx cancellation — listConntrackFlows already
 		// logged nothing (no error to report either), just degrade quietly.
+		stopSNISniffer(sniffer)
 		return &NetworkFlowsReport{Available: false, Reason: "conntrack table read exceeded its collection budget", CollectedAt: now}, nil
 	}
 
+	// Widen "local" with this host's own container addresses so Docker traffic
+	// stops being dropped as pure NAT (see the package doc).
+	containerIPs := ContainerIPIndex()
+	local := localIPSet()
+	for ip := range containerIPs {
+		local[ip] = struct{}{}
+	}
+
 	raw := deltaFlows(flows)
-	classified := classifyFlows(raw, localIPSet())
+	classified := classifyFlows(raw, local)
 	if len(classified) == 0 {
+		stopSNISniffer(sniffer)
 		return &NetworkFlowsReport{Available: true, TopTalkers: []NetworkFlowTalker{}, CollectedAt: now}, nil
 	}
 
 	pa := newProcessAttribution(ctx)
-	talkers := aggregateTalkers(classified, pa)
+	talkers := aggregateTalkers(classified, pa, containerIPs)
+	mergeServerNames(talkers, stopSNISniffer(sniffer))
 
 	sort.Slice(talkers, func(i, j int) bool {
 		return talkers[i].RxBytes+talkers[i].TxBytes > talkers[j].RxBytes+talkers[j].TxBytes
@@ -372,10 +405,22 @@ type talkerKey struct {
 	direction  string
 }
 
+// containerLabelPrefix marks a talker whose traffic was attributed to a Docker
+// container rather than to a host process. French, like every other
+// user-visible string in this project — this value is rendered as-is in
+// NetworkFlowsTable.vue's "Processus" column.
+const containerLabelPrefix = "conteneur: "
+
 // aggregateTalkers groups classified flows by remote peer + protocol +
 // direction, summing bytes/packets/connections and attributing a best-effort
 // process name from the first connection in the group that resolves one.
-func aggregateTalkers(flows []classifiedFlow, pa processAttribution) []NetworkFlowTalker {
+//
+// containerIPs (IP → container name, see container_ips.go) is a strict
+// *fallback*: a containerized process's socket lives in its own network/PID
+// namespace and is simply not visible in the host's /proc, so pa.attribute
+// returns nothing for it. A real host-process match always wins — the fallback
+// is only consulted once /proc attribution has already come up empty.
+func aggregateTalkers(flows []classifiedFlow, pa processAttribution, containerIPs map[string]string) []NetworkFlowTalker {
 	agg := map[talkerKey]*NetworkFlowTalker{}
 	order := make([]talkerKey, 0, len(flows))
 
@@ -395,6 +440,10 @@ func aggregateTalkers(flows []classifiedFlow, pa processAttribution) []NetworkFl
 			if name, pid := pa.attribute(f.protocol, f.localIP, f.localPort, f.remoteIP, f.remotePort); name != "" {
 				t.ProcessName = name
 				t.PID = pid
+			} else if container, ok := containerIPs[f.localIP]; ok && container != "" {
+				// No PID: the container's process id is meaningful only inside
+				// its own namespace, so reporting one here would be misleading.
+				t.ProcessName = containerLabelPrefix + container
 			}
 		}
 	}
