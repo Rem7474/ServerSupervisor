@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
@@ -22,6 +21,14 @@ import (
 	"github.com/serversupervisor/server/internal/ws"
 )
 
+// imageVersions is the port onto the ambient Docker image-version engine
+// (internal/services/dockerversions). The tracker poller no longer talks to a
+// registry itself: it asks this shared cache what the latest digest is and
+// limits itself to "is that new, and should I dispatch/notify for it".
+type imageVersions interface {
+	Latest(ctx context.Context, image, tag string) (models.DockerImageVersion, error)
+}
+
 // Poller runs the background release-tracking pipeline (poll → detect → dispatch →
 // notify). Background work, so it uses the concrete *database.DB.
 type Poller struct {
@@ -30,12 +37,14 @@ type Poller struct {
 	dispatcher *dispatch.Dispatcher
 	notifHub   *ws.NotificationHub
 	dispatch   *notifychannels.Dispatcher
+	images     imageVersions
 }
 
-func NewPoller(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub, pushSvc *push.Service) *Poller {
+func NewPoller(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub, pushSvc *push.Service, images imageVersions) *Poller {
 	return &Poller{
 		db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub,
 		dispatch: notifychannels.NewDispatcher(cfg, pushSvc),
+		images:   images,
 	}
 }
 
@@ -120,32 +129,30 @@ func (s *Poller) checkOneDocker(ctx context.Context, t models.ReleaseTracker) {
 	}
 	cooldown := time.Duration(t.CooldownHours) * time.Hour
 
-	var regUser, regPass string
-	if t.RegistryCredentialsID != "" {
-		regUser, regPass, _ = s.db.GetRegistryCredentialAuth(ctx, t.RegistryCredentialsID)
-	}
-	digest, err := gitprovider.FetchDockerManifestDigestWithAuth(t.DockerImage, tag, s.cfg.GitHubToken, regUser, regPass)
+	// Single source of truth: the ambient engine owns every registry call and
+	// its own credential matching, so a tracker's explicit
+	// registry_credentials_id no longer drives a second, independent fetch.
+	latest, err := s.images.Latest(ctx, t.DockerImage, tag)
 	if err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("Docker tracker %s (%s:%s): fetch error: %v", t.Name, t.DockerImage, tag, err))
-		errMsg := err.Error()
-		if tag == "latest" && strings.Contains(strings.ToLower(errMsg), "status 404") {
-			errMsg = "tag latest introuvable pour cette image; utilisez un tag versionne (ex: v4, v4.4, v4.4.1)"
+		_ = s.db.UpdateReleaseTrackerError(ctx, t.ID, err.Error())
+		return
+	}
+	digest := latest.LatestDigest
+	if digest == "" {
+		errMsg := latest.LastError
+		if errMsg == "" {
+			errMsg = "digest vide retourné par le registre"
 		}
 		_ = s.db.UpdateReleaseTrackerError(ctx, t.ID, errMsg)
 		return
 	}
-	if digest == "" {
-		_ = s.db.UpdateReleaseTrackerError(ctx, t.ID, "digest vide retourné par le registre")
-		return
-	}
 
 	resolvedVersion := tag
-	if shouldResolveDockerTag(tag) {
-		if v := gitprovider.FetchDockerVersionForDigestWithAuth(t.DockerImage, digest, s.cfg.GitHubToken, regUser, regPass); v != "" {
-			resolvedVersion = v
-			if v != tag {
-				slog.InfoContext(ctx, fmt.Sprintf("Docker tracker %s: resolved mutable tag %q to %q", t.Name, tag, v))
-			}
+	if latest.LatestTag != "" {
+		resolvedVersion = latest.LatestTag
+		if resolvedVersion != tag {
+			slog.InfoContext(ctx, fmt.Sprintf("Docker tracker %s: resolved mutable tag %q to %q", t.Name, tag, resolvedVersion))
 		}
 	}
 
@@ -416,27 +423,4 @@ func trackerHasDispatchTarget(t models.ReleaseTracker) bool {
 		return t.HostID != "" && t.ComposeProject != ""
 	}
 	return t.HostID != "" && t.CustomTaskID != ""
-}
-
-func shouldResolveDockerTag(tag string) bool {
-	t := strings.TrimSpace(strings.ToLower(tag))
-	if t == "" || t == "latest" {
-		return true
-	}
-	t = strings.TrimPrefix(t, "v")
-	parts := strings.Split(t, ".")
-	if len(parts) != 1 && len(parts) != 2 {
-		return false
-	}
-	for _, p := range parts {
-		if p == "" {
-			return false
-		}
-		for _, ch := range p {
-			if ch < '0' || ch > '9' {
-				return false
-			}
-		}
-	}
-	return true
 }

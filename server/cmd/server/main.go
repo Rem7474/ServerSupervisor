@@ -142,6 +142,13 @@ func main() {
 	// (SIGINT/SIGTERM) stops both loops, so no explicit Stop is needed.
 	releaseTrackerH.SetBackgroundContext(rootCtx)
 	poller.Every(rootCtx, releaseTrackerH.PollInterval(), true, "release-tracker", releaseTrackerH.CheckAll)
+	// Ambient Docker image-version engine: one registry check per distinct
+	// image:tag running anywhere, so every container gets an up-to-date/outdated
+	// badge — not just the ones with a release tracker. Much slower cadence than
+	// the tracker poller above (it scans the whole fleet, and registries rate
+	// limit per source IP); the tracker poller reads its cache instead of
+	// calling a registry itself.
+	poller.Every(rootCtx, releaseTrackerH.DockerImagePollInterval(), true, "docker-image-versions", releaseTrackerH.RefreshDockerImageVersions)
 	proxmoxH.SetBackgroundContext(rootCtx)
 	poller.Every(rootCtx, handlers.ProxmoxPollInterval, true, "proxmox", proxmoxH.PollOnce)
 	npmH.SetBackgroundContext(rootCtx)

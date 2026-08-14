@@ -301,6 +301,51 @@ func (db *DB) ListTrackableContainers(ctx context.Context) ([]models.TrackableCo
 	return out, rows.Err()
 }
 
+// ListPickableContainers returns every running container across hosts, for the
+// single-tracker container picker that replaced the free-text image/tag inputs.
+// Unlike ListTrackableContainers it applies no compose-label filter and does not
+// hide already-tracked images: a manual tracker only needs an image reference,
+// and hiding a container because some other tracker already watches its image
+// would make the picker silently incomplete (a second tracker with a different
+// update action on the same image is legitimate). Tracked flags the ones that
+// already have a docker tracker so the UI can say so instead of hiding them.
+func (db *DB) ListPickableContainers(ctx context.Context) ([]models.TrackableContainer, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT DISTINCT
+		    dc.host_id,
+		    COALESCE(h.name, '') AS host_name,
+		    dc.name AS container_name,
+		    dc.image,
+		    COALESCE(NULLIF(dc.image_tag, ''), 'latest') AS image_tag,
+		    COALESCE(dc.labels->>'com.docker.compose.project', '') AS compose_project,
+		    COALESCE(dc.labels->>'com.docker.compose.service', '') AS compose_service,
+		    EXISTS (
+		      SELECT 1 FROM release_trackers rt
+		      WHERE rt.tracker_type = 'docker'
+		        AND rt.docker_image = dc.image
+		        AND COALESCE(rt.host_id, '') = dc.host_id
+		    ) AS tracked
+		FROM docker_containers dc
+		JOIN hosts h ON h.id = dc.host_id
+		WHERE dc.image <> ''
+		ORDER BY host_name, container_name, dc.image`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]models.TrackableContainer, 0)
+	for rows.Next() {
+		var tc models.TrackableContainer
+		if err := rows.Scan(&tc.HostID, &tc.HostName, &tc.ContainerName, &tc.Image, &tc.ImageTag,
+			&tc.ComposeProject, &tc.ComposeService, &tc.Tracked); err != nil {
+			return nil, err
+		}
+		out = append(out, tc)
+	}
+	return out, rows.Err()
+}
+
 // GetDeployedImageDigest returns the manifest digest of a container currently
 // running image:tag on the given host, or "" if none is found. Used for drift
 // detection: if the deployed digest already matches the registry's latest, a
