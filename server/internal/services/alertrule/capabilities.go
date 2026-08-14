@@ -19,6 +19,7 @@ func (s *Service) AgentCapabilities() []models.AlertMetricCapability {
 		{Metric: "memory", Label: "RAM", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
 		{Metric: "disk", Label: "Disque", Unit: "%", Icon: "\U0001f4be", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
 		{Metric: "load", Label: "Load avg", Unit: "", Icon: "\U0001f4c8", BadgeClass: "bg-purple-lt text-purple", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		{Metric: "bandwidth_vs_rolling_avg", Label: "Bande passante vs moyenne glissante", Unit: "%", Icon: "\U0001f4e1", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true, SupportsBaselineWindow: true},
 		{Metric: "heartbeat_timeout", Label: "Heartbeat", Unit: "s", Icon: "\U0001fac0", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
 		{Metric: "status_offline", Label: "Hote hors ligne", Unit: "", Icon: "\U0001f50c", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
 		{Metric: "disk_smart_status", Label: "SMART disque", Unit: "", Icon: "\U0001f6e1", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
@@ -131,6 +132,7 @@ func filterMetricsByCollectors(all []models.AlertMetricCapability, collectors ma
 	alwaysAvailable := map[string]bool{
 		"cpu": true, "memory": true, "disk": true, "load": true,
 		"heartbeat_timeout": true, "status_offline": true,
+		"bandwidth_vs_rolling_avg": true,
 	}
 	requiresCollector := map[string]string{
 		"cpu_temperature":         "cpu_temp",
