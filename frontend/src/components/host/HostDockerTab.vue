@@ -40,17 +40,18 @@
               <template v-if="containerVersion(c)">
                 <br>
                 <span
-                  v-if="containerVersion(c)?.is_up_to_date"
+                  v-if="containerVersion(c)?.status === 'up_to_date'"
                   class="badge bg-success-lt text-success mt-1"
                 >À jour</span>
                 <span
-                  v-else-if="containerVersion(c)?.running_version || containerVersion(c)?.update_confirmed"
+                  v-else-if="containerVersion(c)?.status === 'update_available'"
                   class="badge bg-warning-lt text-warning mt-1"
                   :title="`Dernière version : ${containerVersion(c)?.latest_version}`"
                 >Mise à jour disponible</span>
                 <span
                   v-else
                   class="badge bg-secondary-lt text-secondary mt-1"
+                  :title="unknownVersionTitle(containerVersion(c))"
                 >Version inconnue</span>
               </template>
             </td>
@@ -185,6 +186,7 @@ import { useDockerContainerPorts } from '../../composables/useDockerContainerPor
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { addToast } from '../../composables/useGlobalToast'
 import apiClient, { getApiErrorMessage } from '../../api'
+import type { VersionComparisonStatus } from '../../types/docker'
 
 interface Container {
   id: string
@@ -199,12 +201,15 @@ interface Container {
 
 interface VersionComparison {
   docker_image: string
+  image_tag?: string
   tracker_id?: string
   custom_task_id?: string
+  status?: VersionComparisonStatus
   is_up_to_date?: boolean
   running_version?: string
   latest_version?: string
   update_confirmed?: boolean
+  last_error?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -228,16 +233,29 @@ const actionLoading = ref<Record<string, string | null>>({})
 
 const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
 
+// This tab is already host-scoped, so rows are keyed by image[+tag] only.
+// Ambient rows (one per image+tag group) carry image_tag and win over the
+// tag-agnostic tracker row, which stays reachable as the fallback.
 const versionMap = computed<Record<string, VersionComparison>>(() => {
   const map: Record<string, VersionComparison> = {}
   for (const vc of props.versionComparisons) {
-    map[vc.docker_image] = vc
+    if (vc.image_tag) map[`${vc.docker_image}|${vc.image_tag}`] = vc
+    else map[vc.docker_image] = vc
   }
   return map
 })
 
 function containerVersion(container: Container): VersionComparison | null {
-  return versionMap.value[container.image] || versionMap.value[`${container.image}:${container.image_tag}`] || null
+  return versionMap.value[`${container.image}|${container.image_tag || 'latest'}`] ||
+         versionMap.value[container.image] ||
+         versionMap.value[`${container.image}:${container.image_tag}`] ||
+         null
+}
+
+// The ambient engine records why it couldn't classify an image — surface it
+// instead of leaving "Version inconnue" unexplained.
+function unknownVersionTitle(vc: VersionComparison | null | undefined): string {
+  return vc?.last_error || "Aucune information de version disponible pour cette image (registre non interrogeable ou pas encore vérifié)."
 }
 
 function containerKey(container: Container): string {

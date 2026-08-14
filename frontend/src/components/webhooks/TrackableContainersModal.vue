@@ -11,7 +11,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">
-            Conteneurs détectés
+            Activer la mise à jour automatique
           </h5>
           <button
             type="button"
@@ -28,7 +28,9 @@
           </div>
 
           <p class="text-muted small">
-            Conteneurs gérés par compose, sans tracker de release. Sélectionnez ceux à suivre :
+            La détection des mises à jour est désormais automatique pour tous les conteneurs
+            (badge de version dans l'onglet Docker) : cette liste sert à activer en plus la
+            <strong>mise à jour automatique</strong>. Conteneurs gérés par compose, sans tracker :
             un tracker Docker en mode <strong>Compose</strong> sera créé pour chacun (pull + up -d
             automatique à chaque nouvelle image).
           </p>

@@ -16,7 +16,10 @@ export const trackersApi = {
   createReleaseTracker: (payload: Partial<ReleaseTrackerRequest>) => api.post('/v1/release-trackers', payload),
   createReleaseTrackersBulk: (trackers: Partial<ReleaseTrackerRequest>[]) =>
     api.post('/v1/release-trackers/bulk', { trackers }),
+  /** Compose-managed containers without a tracker yet — bulk auto-update opt-in. */
   getTrackableContainers: () => api.get<{ containers: TrackableContainer[] }>('/v1/release-trackers/trackable-containers'),
+  /** Every running container — backs the single-tracker container picker. */
+  getPickableContainers: () => api.get<{ containers: TrackableContainer[] }>('/v1/release-trackers/pickable-containers'),
   updateReleaseTracker: (id: string, payload: Partial<ReleaseTrackerRequest>) =>
     api.put(`/v1/release-trackers/${id}`, payload),
   deleteReleaseTracker: (id: string) => api.delete(`/v1/release-trackers/${id}`),

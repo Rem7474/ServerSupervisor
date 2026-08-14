@@ -372,6 +372,7 @@ import DataToolbar from '../common/DataToolbar.vue'
 import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 import { useModalChrome } from '../../composables/useModalChrome'
+import type { VersionComparisonStatus } from '../../types/docker'
 
 interface ComposeProject {
   id: string | number
@@ -397,8 +398,10 @@ interface VersionComparison {
   tracker_id?: string
   host_id: string
   docker_image: string
+  image_tag?: string
   running_version?: string
   latest_version?: string
+  status?: VersionComparisonStatus
   is_up_to_date?: boolean
   update_confirmed?: boolean
 }
@@ -455,10 +458,13 @@ function getComposeStatus(project: ComposeProject): string {
   return composeProjectStatus.value[`${project.host_id}:${project.name}`] || 'stopped'
 }
 
+// Same two-shaped index as the containers table: ambient rows are keyed with
+// their exact tag, tracker rows (tag-agnostic) without one.
 const vcByImage = computed<Record<string, VersionComparison>>(() => {
   const m: Record<string, VersionComparison> = {}
   for (const vc of props.versionComparisons) {
-    m[`${vc.host_id}|${vc.docker_image}`] = vc
+    if (vc.image_tag) m[`${vc.host_id}|${vc.docker_image}|${vc.image_tag}`] = vc
+    else m[`${vc.host_id}|${vc.docker_image}`] = vc
   }
   return m
 })
@@ -470,10 +476,11 @@ function getComposeUpdates(project: ComposeProject): VersionComparison[] {
   const updates: VersionComparison[] = []
   const seen = new Set<string>()
   for (const c of projectContainers) {
-    const vc = vcByImage.value[`${c.host_id}|${c.image}`] ||
+    const vc = vcByImage.value[`${c.host_id}|${c.image}|${c.image_tag || 'latest'}`] ||
+               vcByImage.value[`${c.host_id}|${c.image}`] ||
                vcByImage.value[`${c.host_id}|${c.image}:${c.image_tag}`]
-    if (vc && !vc.is_up_to_date && (vc.running_version || vc.update_confirmed)) {
-      const key = vc.tracker_id || `${vc.host_id}|${vc.docker_image}`
+    if (vc && vc.status === 'update_available') {
+      const key = vc.tracker_id || `${vc.host_id}|${vc.docker_image}|${vc.image_tag || ''}`
       if (!seen.has(key)) {
         seen.add(key)
         updates.push(vc)

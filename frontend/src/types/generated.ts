@@ -677,11 +677,53 @@ export interface ComposeProject {
   raw_config: string;
   updated_at: string;
 }
+/**
+ * DockerImageRef is a normalized (image, tag) pair — the cache key of the
+ * ambient image-version engine and the unit of work of its refresh job.
+ */
+export interface DockerImageRef {
+  image: string;
+  image_tag: string;
+}
+/**
+ * DockerImageVersion is one row of the docker_image_versions cache: the latest
+ * digest a registry published for an (image, tag), refreshed on a slow ticker
+ * by internal/services/dockerversions. It is the single source of truth for
+ * "is there something newer upstream" — both the WS version badges and the
+ * release-tracker poller read it instead of calling a registry themselves.
+ */
+export interface DockerImageVersion {
+  image: string;
+  image_tag: string;
+  registry: string;
+  latest_digest: string;
+  latest_tag: string;
+  registry_credentials_id?: string;
+  checked_at?: string;
+  last_error?: string;
+}
+/**
+ * Version comparison statuses, computed server-side so the host Docker tab and
+ * the global Docker page can't drift on how they classify the same row.
+ */
+export const VersionStatusUpToDate = "up_to_date";
+/**
+ * Version comparison statuses, computed server-side so the host Docker tab and
+ * the global Docker page can't drift on how they classify the same row.
+ */
+export const VersionStatusUpdateAvailable = "update_available";
+/**
+ * Version comparison statuses, computed server-side so the host Docker tab and
+ * the global Docker page can't drift on how they classify the same row.
+ */
+export const VersionStatusUnknown = "unknown";
 export interface VersionComparison {
   tracker_id: string;
   docker_image: string;
+  image_tag: string; // container tag this row describes; empty on tracker-aggregated rows
   running_version: string;
   latest_version: string;
+  status: string; // up_to_date | update_available | unknown
   is_up_to_date: boolean;
   update_confirmed: boolean; // true when digest comparison confirms an update (even if running version is unknown)
   container_count: number /* int */; // number of containers using this image on the host
@@ -691,6 +733,13 @@ export interface VersionComparison {
   release_url: string;
   host_id: string;
   hostname: string;
+  /**
+   * LastError explains an "unknown" status coming from the ambient engine
+   * (private registry with no matching credential, registry unreachable, …).
+   * Always empty on tracker-derived rows, which surface their own error on
+   * the tracker itself.
+   */
+  last_error?: string;
 }
 /**
  * DockerNetwork represents a Docker network and its connected containers
@@ -2093,8 +2142,14 @@ export interface RegistryCredentialRequest {
   password?: string;
 }
 /**
- * TrackableContainer is a compose-managed container discovered across hosts
- * that does not yet have a release tracker — used to pre-fill bulk creation.
+ * TrackableContainer is a running container discovered across hosts, used both
+ * to pre-fill bulk creation (ListTrackableContainers: compose-managed and not
+ * yet tracked — the "activer la mise à jour auto" flow, which can only auto-update
+ * what compose owns) and to back the single-tracker container picker
+ * (ListPickableContainers: every running container, tracked or not, compose or
+ * not — a manual tracker only needs an image ref, so the compose restriction
+ * would hide legitimate targets). ContainerName/Tracked are populated by the
+ * picker query only; they stay zero-valued in the bulk-create listing.
  */
 export interface TrackableContainer {
   host_id: string;
@@ -2103,6 +2158,8 @@ export interface TrackableContainer {
   image_tag: string;
   compose_project: string;
   compose_service: string;
+  container_name?: string;
+  tracked?: boolean;
 }
 export interface ReleaseVersionHistoryItem {
   version: string;
