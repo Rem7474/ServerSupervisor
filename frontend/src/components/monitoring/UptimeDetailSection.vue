@@ -1,6 +1,7 @@
 <template>
   <div>
     <PageRefreshBar
+      v-if="!hideRefreshBar"
       v-model="autoRefresh"
       label="Sonde uptime"
       :interval-sec="PROBE_REFRESH_SEC"
@@ -261,7 +262,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, watch } from 'vue'
+import { computed, defineAsyncComponent, watch } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import EmptyState from '../EmptyState.vue'
@@ -270,10 +271,25 @@ import { getChartPalette } from '../../utils/chartTheme'
 import { useUptimeProbeDetail, STATS_WINDOWS } from '../../composables/useUptimeProbeDetail'
 import type { UptimeProbe, UptimeHistoryBucket } from '../../types/generated'
 
-const props = defineProps<{ probeId: string }>()
+// hideRefreshBar/autoRefresh: set together by MonitoringHostDetailView when
+// both a probe and a cert are configured, so the two sections share one
+// PageRefreshBar instead of each rendering its own "dernière MAJ" + dot.
+// Neither is passed by the standalone /monitoring/probes/:id route, which
+// keeps its own independent bar exactly as before.
+const props = defineProps<{
+  probeId: string
+  hideRefreshBar?: boolean
+  autoRefresh?: boolean
+}>()
 const emit = defineEmits<{
   (e: 'loaded', probe: UptimeProbe | null): void
+  (e: 'update:autoRefresh', value: boolean): void
 }>()
+
+const autoRefreshOverride = props.autoRefresh === undefined ? undefined : computed({
+  get: () => props.autoRefresh as boolean,
+  set: (v) => emit('update:autoRefresh', v),
+})
 
 function bucketColorClass(b: UptimeHistoryBucket): string {
   if (b.total_checks === 0) return 'bg-secondary-lt'
@@ -317,9 +333,13 @@ const {
   autoRefresh,
   lastUpdatedAt,
   PROBE_REFRESH_SEC,
-} = useUptimeProbeDetail(props.probeId)
+} = useUptimeProbeDetail(props.probeId, autoRefreshOverride)
 
 watch(probe, (p) => emit('loaded', p), { immediate: true })
+
+// Read by MonitoringHostDetailView's merged PageRefreshBar to compute the
+// most-recent of this section's and SslDetailSection's own lastUpdatedAt.
+defineExpose({ lastUpdatedAt })
 
 const palette = getChartPalette()
 const chartOptions = {

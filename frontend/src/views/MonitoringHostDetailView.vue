@@ -58,6 +58,19 @@
         </router-link>.
       </div>
 
+      <!-- Merged refresh bar — when both a probe and a cert are configured,
+           UptimeDetailSection/SslDetailSection each hide their own
+           PageRefreshBar (which used to duplicate the "dernière MAJ" text +
+           status dot side by side) in favor of this single one, showing the
+           most recent of the two updates and pausing both together. -->
+      <PageRefreshBar
+        v-if="host.uptime_probe_id && host.ssl_certificate_id"
+        v-model="autoRefresh"
+        label="Monitoring"
+        :interval-sec="PROBE_REFRESH_SEC"
+        :last-updated-at="lastUpdatedAt"
+      />
+
       <!-- Combined at-a-glance summary — both detail sections below already
            carry their own full KPI row, but each only covers its own domain;
            this is the one place on the page a NPM-linked host's uptime AND
@@ -107,7 +120,11 @@
             Disponibilité
           </h3>
           <UptimeDetailSection
+            ref="uptimeSectionRef"
             :probe-id="host.uptime_probe_id"
+            :hide-refresh-bar="!!host.ssl_certificate_id"
+            :auto-refresh="host.ssl_certificate_id ? autoRefresh : undefined"
+            @update:auto-refresh="autoRefresh = $event"
             @loaded="probeLoaded = $event"
           />
         </div>
@@ -120,7 +137,11 @@
             Certificat SSL
           </h3>
           <SslDetailSection
+            ref="sslSectionRef"
             :cert-id="host.ssl_certificate_id"
+            :hide-refresh-bar="!!host.uptime_probe_id"
+            :auto-refresh="host.uptime_probe_id ? autoRefresh : undefined"
+            @update:auto-refresh="autoRefresh = $event"
             @loaded="certLoaded = $event"
           />
         </div>
@@ -130,15 +151,31 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import UptimeDetailSection from '../components/monitoring/UptimeDetailSection.vue'
 import SslDetailSection from '../components/monitoring/SslDetailSection.vue'
 import { useMonitoringHostDetail } from '../composables/useMonitoringHostDetail'
+import { PROBE_REFRESH_SEC } from '../composables/useUptimeProbeDetail'
 import type { UptimeProbe } from '../types/uptime'
 import type { SSLCertificate } from '../types/ssl'
 
 const { host, loading, error } = useMonitoringHostDetail()
+
+// Shared pause/resume + "dernière MAJ" state for the merged PageRefreshBar,
+// only used when both a probe and a cert are configured (see the template's
+// v-if) — otherwise the single configured section keeps its own independent
+// bar exactly as on the standalone /monitoring/probes|ssl/:id routes.
+const uptimeSectionRef = useTemplateRef<InstanceType<typeof UptimeDetailSection>>('uptimeSectionRef')
+const sslSectionRef = useTemplateRef<InstanceType<typeof SslDetailSection>>('sslSectionRef')
+const autoRefresh = ref(true)
+const lastUpdatedAt = computed<Date | null>(() => {
+  const a = uptimeSectionRef.value?.lastUpdatedAt ?? null
+  const b = sslSectionRef.value?.lastUpdatedAt ?? null
+  if (a && b) return a > b ? a : b
+  return a ?? b
+})
 
 // Fed by UptimeDetailSection/SslDetailSection's own `@loaded` emit — reused
 // here rather than re-fetched, purely to drive the combined summary row

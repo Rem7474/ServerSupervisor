@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
@@ -39,7 +39,7 @@ interface ResultGroup {
   avgLatency?: number
 }
 
-const PROBE_REFRESH_SEC = 30
+export const PROBE_REFRESH_SEC = 30
 
 export const STATS_WINDOWS = [
   { hours: 1, label: '1h' },
@@ -51,8 +51,12 @@ export const STATS_WINDOWS = [
 // probeIdOverride lets MonitoringHostDetailView's unified per-host page reuse
 // this composable keyed by an id it already resolved (the NPM proxy host's
 // linked probe) instead of route.params.id, which only exists on the
-// standalone /monitoring/probes/:id route.
-export function useUptimeProbeDetail(probeIdOverride?: string) {
+// standalone /monitoring/probes/:id route. autoRefreshOverride lets that same
+// page drive the pause/resume toggle from one shared control (see
+// MonitoringHostDetailView.vue's merged PageRefreshBar) instead of this
+// composable's own independent ref — standalone routes never pass it, so
+// their behavior is unchanged.
+export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverride?: Ref<boolean>) {
   const route = useRoute()
   const probeId = probeIdOverride ?? (route.params.id as string)
   const signal = useAbortSignal()
@@ -132,7 +136,7 @@ export function useUptimeProbeDetail(probeIdOverride?: string) {
     return 'text-secondary'
   })
 
-  const autoRefresh = ref(true)
+  const autoRefresh = autoRefreshOverride ?? ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
 
   // Bucket-based availability bar, oldest-first (reading left-to-right ends on
