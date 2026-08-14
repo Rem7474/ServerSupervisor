@@ -10,11 +10,12 @@ vi.mock('./NetworkFlowsHistoryChart.vue', () => ({
 }))
 
 function makeTalkers(): NetworkFlowMetric[] {
+  const base = { id: 0, host_id: 'h1', timestamp: '2026-08-14T12:00:00Z', packets: 0 }
   return [
-    { remote_ip: '10.0.0.5', remote_port: 443, protocol: 'tcp', direction: 'outbound', process_name: 'nginx', pid: 100, rx_bytes: 500, tx_bytes: 100, connections: 2, is_others: false },
-    { remote_ip: '10.0.0.9', remote_port: 22, protocol: 'tcp', direction: 'inbound', process_name: 'sshd', pid: 200, rx_bytes: 2000, tx_bytes: 50, connections: 1, is_others: false },
-    { remote_ip: '10.0.0.1', remote_port: 53, protocol: 'udp', direction: 'outbound', process_name: '', pid: 0, rx_bytes: 10, tx_bytes: 10, connections: 5, is_others: false },
-    { remote_ip: '', remote_port: 0, protocol: 'tcp', direction: 'outbound', process_name: '', pid: 0, rx_bytes: 0, tx_bytes: 0, connections: 3, is_others: true },
+    { ...base, id: 1, remote_ip: '10.0.0.5', remote_port: 443, protocol: 'tcp', direction: 'outbound', process_name: 'nginx', pid: 100, rx_bytes: 500, tx_bytes: 100, connections: 2, is_others: false },
+    { ...base, id: 2, remote_ip: '10.0.0.9', remote_port: 22, protocol: 'tcp', direction: 'inbound', process_name: 'sshd', pid: 200, rx_bytes: 2000, tx_bytes: 50, connections: 1, is_others: false },
+    { ...base, id: 3, remote_ip: '10.0.0.1', remote_port: 53, protocol: 'udp', direction: 'outbound', process_name: '', pid: 0, rx_bytes: 10, tx_bytes: 10, connections: 5, is_others: false },
+    { ...base, id: 4, remote_ip: '', remote_port: 0, protocol: 'tcp', direction: 'outbound', process_name: '', pid: 0, rx_bytes: 0, tx_bytes: 0, connections: 3, is_others: true },
   ]
 }
 
