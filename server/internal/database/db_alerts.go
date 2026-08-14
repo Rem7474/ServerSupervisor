@@ -18,10 +18,10 @@ func (db *DB) CreateAlertRule(ctx context.Context, rule *models.AlertRule) error
 	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
 	dockerScopeJSON, _ := json.Marshal(rule.DockerScope)
 	return db.conn.QueryRowContext(ctx,
-		`INSERT INTO alert_rules (name, source_type, host_id, proxmox_scope, docker_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, enabled)
- VALUES ($1,$2,$3,CAST($4 AS JSONB),CAST($5 AS JSONB),$6,$7,$8,$9,$10,$11,$12,CAST($13 AS JSONB),$14)
+		`INSERT INTO alert_rules (name, source_type, host_id, proxmox_scope, docker_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, enabled, baseline_window_seconds)
+ VALUES ($1,$2,$3,CAST($4 AS JSONB),CAST($5 AS JSONB),$6,$7,$8,$9,$10,$11,$12,CAST($13 AS JSONB),$14,$15)
  RETURNING id, created_at, updated_at`,
-		rule.Name, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled,
+		rule.Name, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled, rule.BaselineWindowSeconds,
 	).Scan(&rule.ID, &rule.CreatedAt, &rule.UpdatedAt)
 }
 
@@ -46,9 +46,10 @@ threshold_clear_crit = $11,
 duration_seconds = $12,
 actions = CAST($13 AS JSONB),
 enabled = $14,
+baseline_window_seconds = $15,
 updated_at = NOW()
- WHERE id = $15`,
-		rule.Name, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled, rule.ID,
+ WHERE id = $16`,
+		rule.Name, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled, rule.BaselineWindowSeconds, rule.ID,
 	)
 	return err
 }
@@ -63,6 +64,7 @@ func (db *DB) GetAlertRules(ctx context.Context) ([]models.AlertRule, error) {
 		`SELECT ar.id, ar.name, ar.source_type, ar.host_id, ar.proxmox_scope, ar.docker_scope, ar.metric, ar.operator,
         ar.threshold_warn, ar.threshold_crit, ar.threshold_clear_warn, ar.threshold_clear_crit,
         ar.duration_seconds, ar.actions, ar.last_fired, ar.enabled, ar.created_at, ar.updated_at,
+        ar.baseline_window_seconds,
         COALESCE(ic.active_count, 0)
  FROM alert_rules ar
  LEFT JOIN (
@@ -85,11 +87,13 @@ func (db *DB) GetAlertRules(ctx context.Context) ([]models.AlertRule, error) {
 		var thresholdWarn, thresholdCrit, thresholdClearWarn, thresholdClearCrit sql.NullFloat64
 		var actionsJSON, proxmoxScopeJSON, dockerScopeJSON []byte
 		var lastFired, updatedAt sql.NullTime
+		var baselineWindowSeconds sql.NullInt64
 
 		if err := rows.Scan(
 			&r.ID, &name, &sourceType, &hostID, &proxmoxScopeJSON, &dockerScopeJSON, &r.Metric, &r.Operator, &thresholdWarn, &thresholdCrit,
 			&thresholdClearWarn, &thresholdClearCrit, &r.DurationSeconds,
 			&actionsJSON, &lastFired, &r.Enabled, &r.CreatedAt, &updatedAt,
+			&baselineWindowSeconds,
 			&r.ActiveIncidentCount,
 		); err != nil {
 			continue
@@ -121,6 +125,10 @@ func (db *DB) GetAlertRules(ctx context.Context) ([]models.AlertRule, error) {
 		}
 		if updatedAt.Valid {
 			r.UpdatedAt = &updatedAt.Time
+		}
+		if baselineWindowSeconds.Valid {
+			v := int(baselineWindowSeconds.Int64)
+			r.BaselineWindowSeconds = &v
 		}
 		if len(actionsJSON) > 0 {
 			_ = json.Unmarshal(actionsJSON, &r.Actions)

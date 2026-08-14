@@ -64,6 +64,13 @@ export interface AlertMetricCapability {
   supports_threshold: boolean;
   supports_duration: boolean;
   supports_host_filter: boolean;
+  /**
+   * SupportsBaselineWindow tells the frontend to render the 1h/6h/24h
+   * rolling-baseline window picker (AlertRule.BaselineWindowSeconds)
+   * instead of/alongside the duration field — currently only
+   * bandwidth_vs_rolling_avg sets this.
+   */
+  supports_baseline_window?: boolean;
 }
 /**
  * AlertScopeOption is a selectable {id,label} scope entry (Proxmox connection,
@@ -166,6 +173,14 @@ export interface AlertRule {
   threshold_clear_warn?: number /* float64 */; // hysteresis for warn
   threshold_clear_crit?: number /* float64 */; // hysteresis for crit
   duration_seconds: number /* int */;
+  /**
+   * BaselineWindowSeconds is the rolling-average window used by
+   * bandwidth_vs_rolling_avg (one of 3600/21600/86400 = 1h/6h/24h — see
+   * validateBaselineWindow in internal/services/alertrule/service.go).
+   * Nil/unset for every other metric; GetMetricValue defaults to 3600 when
+   * nil so it never needs to reject an old rule of a different metric.
+   */
+  baseline_window_seconds?: number /* int */;
   actions: AlertActions; // stored as JSONB in DB
   last_fired?: string;
   enabled: boolean;
@@ -291,6 +306,10 @@ export interface AlertRuleCreate {
   threshold_clear_warn?: number /* float64 */;
   threshold_clear_crit?: number /* float64 */;
   duration: number /* int */;
+  /**
+   * BaselineWindowSeconds — see AlertRule's field doc.
+   */
+  baseline_window_seconds?: number /* int */;
   actions: AlertActions;
 }
 /**
@@ -314,6 +333,10 @@ export interface AlertRuleTemplate {
   threshold_clear_warn?: number /* float64 */;
   threshold_clear_crit?: number /* float64 */;
   duration_seconds: number /* int */;
+  /**
+   * BaselineWindowSeconds — see AlertRule's field doc.
+   */
+  baseline_window_seconds?: number /* int */;
   actions: AlertActions;
   created_at: string;
   updated_at: string;
@@ -327,6 +350,10 @@ export interface AlertRuleTemplateRequest {
   threshold_clear_warn?: number /* float64 */;
   threshold_clear_crit?: number /* float64 */;
   duration: number /* int */;
+  /**
+   * BaselineWindowSeconds — see AlertRule's field doc.
+   */
+  baseline_window_seconds?: number /* int */;
   actions: AlertActions;
 }
 /**
@@ -361,6 +388,14 @@ export interface AlertRuleUpdate {
   threshold_clear_warn?: number /* float64 */;
   threshold_clear_crit?: number /* float64 */;
   duration?: number /* int */;
+  /**
+   * BaselineWindowSeconds — see AlertRule's field doc. A pointer-to-pointer
+   * isn't needed: nil means "leave unchanged" like every other field here,
+   * and the metric using this (bandwidth_vs_rolling_avg) always requires a
+   * preset value from the frontend, so there's no "explicitly clear it"
+   * case to support.
+   */
+  baseline_window_seconds?: number /* int */;
   actions?: AlertActions;
 }
 

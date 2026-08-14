@@ -102,6 +102,9 @@ func (s *Service) Create(ctx context.Context, req models.AlertRuleCreate) (*mode
 	if err := validateAlertRuleMetricOperator(req.Metric, req.Operator); err != nil {
 		return nil, err
 	}
+	if err := validateBaselineWindow(req.Metric, req.BaselineWindowSeconds); err != nil {
+		return nil, err
+	}
 	if err := validateAlertActions(&req.Actions); err != nil {
 		return nil, err
 	}
@@ -111,20 +114,21 @@ func (s *Service) Create(ctx context.Context, req models.AlertRuleCreate) (*mode
 
 	name := req.Name
 	rule := models.AlertRule{
-		Name:               &name,
-		Enabled:            req.Enabled,
-		SourceType:         req.SourceType,
-		HostID:             req.HostID,
-		ProxmoxScope:       req.ProxmoxScope,
-		DockerScope:        req.DockerScope,
-		Metric:             req.Metric,
-		Operator:           req.Operator,
-		ThresholdWarn:      &req.ThresholdWarn,
-		ThresholdCrit:      &req.ThresholdCrit,
-		ThresholdClearWarn: req.ThresholdClearWarn,
-		ThresholdClearCrit: req.ThresholdClearCrit,
-		DurationSeconds:    req.Duration,
-		Actions:            req.Actions,
+		Name:                  &name,
+		Enabled:               req.Enabled,
+		SourceType:            req.SourceType,
+		HostID:                req.HostID,
+		ProxmoxScope:          req.ProxmoxScope,
+		DockerScope:           req.DockerScope,
+		Metric:                req.Metric,
+		Operator:              req.Operator,
+		ThresholdWarn:         &req.ThresholdWarn,
+		ThresholdCrit:         &req.ThresholdCrit,
+		ThresholdClearWarn:    req.ThresholdClearWarn,
+		ThresholdClearCrit:    req.ThresholdClearCrit,
+		DurationSeconds:       req.Duration,
+		BaselineWindowSeconds: req.BaselineWindowSeconds,
+		Actions:               req.Actions,
 	}
 	if err := rule.Validate(); err != nil {
 		return nil, apperr.Validation(err.Error())
@@ -184,6 +188,9 @@ func (s *Service) Update(ctx context.Context, id int64, req models.AlertRuleUpda
 	if req.Duration != nil {
 		next.DurationSeconds = *req.Duration
 	}
+	if req.BaselineWindowSeconds != nil {
+		next.BaselineWindowSeconds = req.BaselineWindowSeconds
+	}
 	if req.Actions != nil {
 		next.Actions = *req.Actions
 	}
@@ -195,6 +202,9 @@ func (s *Service) Update(ctx context.Context, id int64, req models.AlertRuleUpda
 	}
 
 	if err := validateAlertRuleMetricOperator(next.Metric, next.Operator); err != nil {
+		return err
+	}
+	if err := validateBaselineWindow(next.Metric, next.BaselineWindowSeconds); err != nil {
 		return err
 	}
 	if err := validateAlertActions(&next.Actions); err != nil {
@@ -381,6 +391,7 @@ var validAlertMetrics = map[string]bool{
 	"proxmox_disk_failed_count":       true, "proxmox_disk_min_wearout_percent": true,
 	"docker_container_state": true, "docker_compose_degraded_services": true,
 	"restic_backup_age_hours": true, "restic_repo_size_bytes": true,
+	"bandwidth_vs_rolling_avg": true,
 }
 
 func validateAlertRuleMetricOperator(metric, operator string) error {
@@ -389,6 +400,28 @@ func validateAlertRuleMetricOperator(metric, operator string) error {
 	}
 	if !validAlertMetrics[metric] {
 		return apperr.Validation("Metrique invalide.")
+	}
+	return nil
+}
+
+// validBaselineWindowsSeconds are the only presets the frontend offers for
+// bandwidth_vs_rolling_avg's rolling-baseline window: 1h/6h/24h.
+var validBaselineWindowsSeconds = map[int]bool{3600: true, 21600: true, 86400: true}
+
+// validateBaselineWindow checks AlertRule.BaselineWindowSeconds when set —
+// only bandwidth_vs_rolling_avg uses it today. A nil value is always valid
+// (the engine defaults it to 3600/1h), and any metric may safely leave it
+// nil; only a non-nil value on a metric that doesn't understand it, or an
+// off-preset value, is rejected.
+func validateBaselineWindow(metric string, windowSeconds *int) error {
+	if windowSeconds == nil {
+		return nil
+	}
+	if metric != "bandwidth_vs_rolling_avg" {
+		return apperr.Validation("La fenêtre de moyenne glissante n'est pas applicable à cette métrique.")
+	}
+	if !validBaselineWindowsSeconds[*windowSeconds] {
+		return apperr.Validation("Fenêtre de moyenne glissante invalide (valeurs autorisées : 1h, 6h, 24h).")
 	}
 	return nil
 }

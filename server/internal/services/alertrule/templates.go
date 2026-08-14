@@ -29,6 +29,9 @@ func validateTemplateRequest(req *models.AlertRuleTemplateRequest) error {
 	if !isTemplatableMetric(req.Metric) {
 		return apperr.Validation("Les métriques Docker, Proxmox ou synthétiques ne peuvent pas être utilisées dans un template — elles ne s'appliquent pas hôte par hôte.")
 	}
+	if err := validateBaselineWindow(req.Metric, req.BaselineWindowSeconds); err != nil {
+		return err
+	}
 	return validateAlertActions(&req.Actions)
 }
 
@@ -44,7 +47,7 @@ func (s *Service) CreateTemplate(ctx context.Context, req models.AlertRuleTempla
 		Name: req.Name, Metric: req.Metric, Operator: req.Operator,
 		ThresholdWarn: req.ThresholdWarn, ThresholdCrit: req.ThresholdCrit,
 		ThresholdClearWarn: req.ThresholdClearWarn, ThresholdClearCrit: req.ThresholdClearCrit,
-		DurationSeconds: req.Duration, Actions: req.Actions,
+		DurationSeconds: req.Duration, Actions: req.Actions, BaselineWindowSeconds: req.BaselineWindowSeconds,
 	}
 	if err := s.repo.CreateAlertRuleTemplate(ctx, t); err != nil {
 		return nil, apperr.Failed("failed to create template: " + err.Error())
@@ -92,7 +95,7 @@ func (s *Service) UpdateTemplate(ctx context.Context, id int64, req models.Alert
 		ID: id, Name: req.Name, Metric: req.Metric, Operator: req.Operator,
 		ThresholdWarn: req.ThresholdWarn, ThresholdCrit: req.ThresholdCrit,
 		ThresholdClearWarn: req.ThresholdClearWarn, ThresholdClearCrit: req.ThresholdClearCrit,
-		DurationSeconds: req.Duration, Actions: req.Actions,
+		DurationSeconds: req.Duration, Actions: req.Actions, BaselineWindowSeconds: req.BaselineWindowSeconds,
 	}
 	if err := s.repo.UpdateAlertRuleTemplate(ctx, t); err != nil {
 		return nil, apperr.Failed("failed to update template: " + err.Error())
@@ -126,7 +129,7 @@ func (s *Service) ApplyTemplate(ctx context.Context, id int64, req models.ApplyA
 			Metric: t.Metric, Operator: t.Operator,
 			ThresholdWarn: t.ThresholdWarn, ThresholdCrit: t.ThresholdCrit,
 			ThresholdClearWarn: t.ThresholdClearWarn, ThresholdClearCrit: t.ThresholdClearCrit,
-			Duration: t.DurationSeconds, Actions: t.Actions,
+			Duration: t.DurationSeconds, Actions: t.Actions, BaselineWindowSeconds: t.BaselineWindowSeconds,
 		})
 		if err != nil {
 			result.Errors[hostID] = err.Error()

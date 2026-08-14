@@ -80,6 +80,11 @@ type AlertMetricCapability struct {
 	SupportsThreshold  bool   `json:"supports_threshold"`
 	SupportsDuration   bool   `json:"supports_duration"`
 	SupportsHostFilter bool   `json:"supports_host_filter"`
+	// SupportsBaselineWindow tells the frontend to render the 1h/6h/24h
+	// rolling-baseline window picker (AlertRule.BaselineWindowSeconds)
+	// instead of/alongside the duration field — currently only
+	// bandwidth_vs_rolling_avg sets this.
+	SupportsBaselineWindow bool `json:"supports_baseline_window,omitempty"`
 }
 
 // AlertScopeOption is a selectable {id,label} scope entry (Proxmox connection,
@@ -159,25 +164,31 @@ type AlertActions struct {
 }
 
 type AlertRule struct {
-	ID                  int64               `json:"id" db:"id"`
-	Name                *string             `json:"name,omitempty" db:"name"`
-	SourceType          AlertSourceType     `json:"source_type,omitempty" db:"source_type"`
-	HostID              *string             `json:"host_id" db:"host_id"`
-	ProxmoxScope        *ProxmoxMetricScope `json:"proxmox_scope,omitempty" db:"proxmox_scope"`
-	DockerScope         *DockerMetricScope  `json:"docker_scope,omitempty" db:"docker_scope"`
-	Metric              string              `json:"metric" db:"metric"`
-	Operator            string              `json:"operator" db:"operator"`
-	ThresholdWarn       *float64            `json:"threshold_warn" db:"threshold_warn"`
-	ThresholdCrit       *float64            `json:"threshold_crit" db:"threshold_crit"`
-	ThresholdClearWarn  *float64            `json:"threshold_clear_warn,omitempty" db:"threshold_clear_warn"` // hysteresis for warn
-	ThresholdClearCrit  *float64            `json:"threshold_clear_crit,omitempty" db:"threshold_clear_crit"` // hysteresis for crit
-	DurationSeconds     int                 `json:"duration_seconds" db:"duration_seconds"`
-	Actions             AlertActions        `json:"actions" db:"-"` // stored as JSONB in DB
-	LastFired           *time.Time          `json:"last_fired,omitempty" db:"last_fired"`
-	Enabled             bool                `json:"enabled" db:"enabled"`
-	CreatedAt           time.Time           `json:"created_at" db:"created_at"`
-	UpdatedAt           *time.Time          `json:"updated_at,omitempty" db:"updated_at"`
-	ActiveIncidentCount int                 `json:"active_incident_count" db:"-"`
+	ID                 int64               `json:"id" db:"id"`
+	Name               *string             `json:"name,omitempty" db:"name"`
+	SourceType         AlertSourceType     `json:"source_type,omitempty" db:"source_type"`
+	HostID             *string             `json:"host_id" db:"host_id"`
+	ProxmoxScope       *ProxmoxMetricScope `json:"proxmox_scope,omitempty" db:"proxmox_scope"`
+	DockerScope        *DockerMetricScope  `json:"docker_scope,omitempty" db:"docker_scope"`
+	Metric             string              `json:"metric" db:"metric"`
+	Operator           string              `json:"operator" db:"operator"`
+	ThresholdWarn      *float64            `json:"threshold_warn" db:"threshold_warn"`
+	ThresholdCrit      *float64            `json:"threshold_crit" db:"threshold_crit"`
+	ThresholdClearWarn *float64            `json:"threshold_clear_warn,omitempty" db:"threshold_clear_warn"` // hysteresis for warn
+	ThresholdClearCrit *float64            `json:"threshold_clear_crit,omitempty" db:"threshold_clear_crit"` // hysteresis for crit
+	DurationSeconds    int                 `json:"duration_seconds" db:"duration_seconds"`
+	// BaselineWindowSeconds is the rolling-average window used by
+	// bandwidth_vs_rolling_avg (one of 3600/21600/86400 = 1h/6h/24h — see
+	// validateBaselineWindow in internal/services/alertrule/service.go).
+	// Nil/unset for every other metric; GetMetricValue defaults to 3600 when
+	// nil so it never needs to reject an old rule of a different metric.
+	BaselineWindowSeconds *int         `json:"baseline_window_seconds,omitempty" db:"baseline_window_seconds"`
+	Actions               AlertActions `json:"actions" db:"-"` // stored as JSONB in DB
+	LastFired             *time.Time   `json:"last_fired,omitempty" db:"last_fired"`
+	Enabled               bool         `json:"enabled" db:"enabled"`
+	CreatedAt             time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt             *time.Time   `json:"updated_at,omitempty" db:"updated_at"`
+	ActiveIncidentCount   int          `json:"active_incident_count" db:"-"`
 }
 
 // DisplayName returns the human-readable label for a rule: its custom Name if
@@ -305,7 +316,9 @@ type AlertRuleCreate struct {
 	ThresholdClearWarn *float64            `json:"threshold_clear_warn"`
 	ThresholdClearCrit *float64            `json:"threshold_clear_crit"`
 	Duration           int                 `json:"duration"`
-	Actions            AlertActions        `json:"actions"`
+	// BaselineWindowSeconds — see AlertRule's field doc.
+	BaselineWindowSeconds *int         `json:"baseline_window_seconds"`
+	Actions               AlertActions `json:"actions"`
 }
 
 // AlertRuleTemplate is a reusable rule "recipe" for agent metrics — no host,
@@ -318,30 +331,34 @@ type AlertRuleCreate struct {
 // scope's host_id is required per rule and Proxmox scope is cluster-level
 // already, so neither fits "apply the same recipe to N hosts."
 type AlertRuleTemplate struct {
-	ID                 int64        `json:"id" db:"id"`
-	Name               string       `json:"name" db:"name"`
-	Metric             string       `json:"metric" db:"metric"`
-	Operator           string       `json:"operator" db:"operator"`
-	ThresholdWarn      float64      `json:"threshold_warn" db:"threshold_warn"`
-	ThresholdCrit      float64      `json:"threshold_crit" db:"threshold_crit"`
-	ThresholdClearWarn *float64     `json:"threshold_clear_warn,omitempty" db:"threshold_clear_warn"`
-	ThresholdClearCrit *float64     `json:"threshold_clear_crit,omitempty" db:"threshold_clear_crit"`
-	DurationSeconds    int          `json:"duration_seconds" db:"duration_seconds"`
-	Actions            AlertActions `json:"actions" db:"-"`
-	CreatedAt          time.Time    `json:"created_at" db:"created_at"`
-	UpdatedAt          time.Time    `json:"updated_at" db:"updated_at"`
+	ID                 int64    `json:"id" db:"id"`
+	Name               string   `json:"name" db:"name"`
+	Metric             string   `json:"metric" db:"metric"`
+	Operator           string   `json:"operator" db:"operator"`
+	ThresholdWarn      float64  `json:"threshold_warn" db:"threshold_warn"`
+	ThresholdCrit      float64  `json:"threshold_crit" db:"threshold_crit"`
+	ThresholdClearWarn *float64 `json:"threshold_clear_warn,omitempty" db:"threshold_clear_warn"`
+	ThresholdClearCrit *float64 `json:"threshold_clear_crit,omitempty" db:"threshold_clear_crit"`
+	DurationSeconds    int      `json:"duration_seconds" db:"duration_seconds"`
+	// BaselineWindowSeconds — see AlertRule's field doc.
+	BaselineWindowSeconds *int         `json:"baseline_window_seconds,omitempty" db:"baseline_window_seconds"`
+	Actions               AlertActions `json:"actions" db:"-"`
+	CreatedAt             time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt             time.Time    `json:"updated_at" db:"updated_at"`
 }
 
 type AlertRuleTemplateRequest struct {
-	Name               string       `json:"name" binding:"required"`
-	Metric             string       `json:"metric" binding:"required"`
-	Operator           string       `json:"operator" binding:"required"`
-	ThresholdWarn      float64      `json:"threshold_warn" binding:"required"`
-	ThresholdCrit      float64      `json:"threshold_crit" binding:"required"`
-	ThresholdClearWarn *float64     `json:"threshold_clear_warn"`
-	ThresholdClearCrit *float64     `json:"threshold_clear_crit"`
-	Duration           int          `json:"duration"`
-	Actions            AlertActions `json:"actions"`
+	Name               string   `json:"name" binding:"required"`
+	Metric             string   `json:"metric" binding:"required"`
+	Operator           string   `json:"operator" binding:"required"`
+	ThresholdWarn      float64  `json:"threshold_warn" binding:"required"`
+	ThresholdCrit      float64  `json:"threshold_crit" binding:"required"`
+	ThresholdClearWarn *float64 `json:"threshold_clear_warn"`
+	ThresholdClearCrit *float64 `json:"threshold_clear_crit"`
+	Duration           int      `json:"duration"`
+	// BaselineWindowSeconds — see AlertRule's field doc.
+	BaselineWindowSeconds *int         `json:"baseline_window_seconds"`
+	Actions               AlertActions `json:"actions"`
 }
 
 // ApplyAlertRuleTemplateRequest is the body of POST /alert-rule-templates/:id/apply.
@@ -374,7 +391,13 @@ type AlertRuleUpdate struct {
 	ThresholdClearWarn *float64            `json:"threshold_clear_warn"`
 	ThresholdClearCrit *float64            `json:"threshold_clear_crit"`
 	Duration           *int                `json:"duration"`
-	Actions            *AlertActions       `json:"actions"`
+	// BaselineWindowSeconds — see AlertRule's field doc. A pointer-to-pointer
+	// isn't needed: nil means "leave unchanged" like every other field here,
+	// and the metric using this (bandwidth_vs_rolling_avg) always requires a
+	// preset value from the frontend, so there's no "explicitly clear it"
+	// case to support.
+	BaselineWindowSeconds *int          `json:"baseline_window_seconds"`
+	Actions               *AlertActions `json:"actions"`
 }
 
 func IsDockerMetric(metric string) bool {

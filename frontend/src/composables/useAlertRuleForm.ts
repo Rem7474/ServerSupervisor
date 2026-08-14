@@ -77,6 +77,10 @@ export interface AlertRuleFormData {
   threshold_clear_warn?: number
   threshold_clear_crit?: number
   duration: number
+  // baseline_window_seconds is only meaningful for bandwidth_vs_rolling_avg
+  // (one of 3600/21600/86400 = 1h/6h/24h) — undefined for every other
+  // metric, same as threshold_clear_warn/crit above.
+  baseline_window_seconds?: number
   actions: AlertRuleFormActions
 }
 
@@ -94,6 +98,7 @@ export interface AlertRuleInput {
   threshold_clear_warn?: number
   threshold_clear_crit?: number
   duration_seconds?: number
+  baseline_window_seconds?: number
   actions?: {
     channels?: string[]
     smtp_to?: string
@@ -166,6 +171,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     threshold_clear_warn: undefined,
     threshold_clear_crit: undefined,
     duration: 300,
+    baseline_window_seconds: undefined,
     actions: {
       channels: [],
       smtp_to: '',
@@ -234,6 +240,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       threshold_clear_warn: rule.threshold_clear_warn,
       threshold_clear_crit: rule.threshold_clear_crit,
       duration: rule.duration_seconds ?? 300,
+      baseline_window_seconds: rule.baseline_window_seconds ?? (metric === 'bandwidth_vs_rolling_avg' ? 3600 : undefined),
       actions: {
         channels: actions.channels || [],
         smtp_to: actions.smtp_to || '',
@@ -338,6 +345,24 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       form.value.threshold_warn = 0.5
       form.value.threshold_crit = 0.5
       form.value.duration = 0
+    }
+
+    if (form.value.metric === 'bandwidth_vs_rolling_avg') {
+      form.value.operator = '>'
+      if (!form.value.threshold_crit || form.value.threshold_crit === 85) {
+        form.value.threshold_warn = 150
+        form.value.threshold_crit = 200
+      }
+      form.value.duration = 0
+      if (!form.value.baseline_window_seconds) {
+        form.value.baseline_window_seconds = 3600
+      }
+    } else {
+      // Only bandwidth_vs_rolling_avg understands this field — clear it for
+      // every other metric so a stale value from a previous selection never
+      // gets submitted (server-side validateBaselineWindow rejects a non-nil
+      // value on any other metric).
+      form.value.baseline_window_seconds = undefined
     }
   }
 
