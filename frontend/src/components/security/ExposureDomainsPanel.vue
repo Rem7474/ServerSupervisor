@@ -85,7 +85,6 @@
               <th>Domaine</th>
               <th>Connexion NPM</th>
               <th>Cible</th>
-              <th>Monitoring</th>
               <th>Disponibilité</th>
               <th class="text-end">
                 Requêtes
@@ -135,38 +134,34 @@
                 <router-link
                   v-if="row.probe || row.cert"
                   :to="`/monitoring/host/${row.d.proxy_host_id}`"
-                  class="d-inline-flex align-items-center gap-1 text-decoration-none"
+                  class="d-inline-flex flex-column gap-1 text-decoration-none"
                   title="Voir le détail monitoring de ce domaine"
                 >
-                  <span
-                    v-if="row.probe"
-                    :class="['badge', probeBadge(row.probe)]"
-                  >{{ probeStatusLabel(row.probe) }}</span>
-                  <span
-                    v-if="row.cert"
-                    :class="['badge', daysBadge(row.cert.days_remaining)]"
-                  >SSL {{ daysLabel(row.cert.days_remaining) }}</span>
-                </router-link>
-                <span
-                  v-else
-                  class="text-secondary small"
-                >—</span>
-              </td>
-              <td>
-                <div
-                  v-if="row.probe && probeHistory[row.probe.id]?.length"
-                  class="d-flex align-items-end gap-1"
-                  style="height: 20px; min-width: 110px;"
-                >
+                  <span class="d-flex align-items-center gap-1">
+                    <span
+                      v-if="row.probe"
+                      :class="['badge', probeBadge(row.probe)]"
+                    >{{ probeStatusLabel(row.probe) }}</span>
+                    <span
+                      v-if="row.cert"
+                      :class="['badge', daysBadge(row.cert.days_remaining)]"
+                    >SSL {{ daysLabel(row.cert.days_remaining) }}</span>
+                  </span>
                   <div
-                    v-for="tick in probeHistory[row.probe.id]"
-                    :key="tick.id"
-                    class="flex-fill rounded-1"
-                    :class="tick.success ? 'bg-success' : 'bg-danger'"
-                    style="height: 100%; min-width: 2px;"
-                    :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? 'OK' : 'KO'}`"
-                  />
-                </div>
+                    v-if="row.probe && probeHistory[row.probe.id]?.length"
+                    class="d-flex align-items-end gap-1"
+                    style="height: 20px; min-width: 110px;"
+                  >
+                    <div
+                      v-for="tick in probeHistory[row.probe.id]"
+                      :key="tick.id"
+                      class="flex-fill rounded-1"
+                      :class="tick.success ? 'bg-success' : 'bg-danger'"
+                      style="height: 100%; min-width: 2px;"
+                      :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? 'OK' : 'KO'}`"
+                    />
+                  </div>
+                </router-link>
                 <span
                   v-else
                   class="text-secondary small"
