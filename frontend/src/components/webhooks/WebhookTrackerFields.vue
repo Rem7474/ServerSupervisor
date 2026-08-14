@@ -79,38 +79,68 @@
     </div>
   </template>
 
-  <!-- Docker-specific fields -->
+  <!-- Docker-specific fields: the image reference comes from a running
+       container, never from free text — the ambient engine already knows every
+       running image, and typing one by hand was the main source of trackers
+       that silently watched an image nobody was running. -->
   <template v-else>
-    <div class="col-md-8">
-      <label class="form-label required">Image Docker</label>
-      <input
-        v-model="form.docker_image"
-        type="text"
-        class="form-control"
-        placeholder="ex: homeassistant/home-assistant, nginx, ghcr.io/user/app"
-        aria-describedby="docker-image-hint"
+    <div class="col-md-5">
+      <label class="form-label required">Hôte</label>
+      <select
+        v-model="containerSourceHostId"
+        class="form-select"
       >
-      <div
-        id="docker-image-hint"
-        class="form-hint"
-      >
-        Nom de l'image sans le tag (registre Docker Hub par defaut).
+        <option value="">
+          Sélectionner un hôte…
+        </option>
+        <option
+          v-for="h in containerHosts"
+          :key="h.id"
+          :value="h.id"
+        >
+          {{ h.name }}
+        </option>
+      </select>
+      <div class="form-hint">
+        Hôte sur lequel tourne le conteneur à suivre.
       </div>
     </div>
-    <div class="col-md-4">
-      <label class="form-label required">Tag surveille</label>
-      <input
-        v-model="form.docker_tag"
-        type="text"
-        class="form-control"
-        placeholder="latest"
-        aria-describedby="docker-tag-hint"
+    <div class="col-md-7">
+      <label class="form-label required">Conteneur</label>
+      <select
+        class="form-select"
+        :disabled="!containerSourceHostId"
+        :value="selectedContainerKey"
+        aria-describedby="docker-container-hint"
+        @change="onContainerChange"
       >
+        <option value="">
+          {{ containerSourceHostId ? 'Sélectionner un conteneur…' : 'Choisissez d’abord un hôte' }}
+        </option>
+        <option
+          v-if="selectedContainerMissing"
+          :value="selectedContainerKey"
+        >
+          {{ form.docker_image }}:{{ form.docker_tag || 'latest' }} (aucun conteneur en cours)
+        </option>
+        <option
+          v-for="c in containersForHost"
+          :key="containerKey(c)"
+          :value="containerKey(c)"
+        >
+          {{ c.container_name || c.image }} — {{ c.image }}:{{ c.image_tag || 'latest' }}{{ c.tracked ? ' (déjà suivi)' : '' }}
+        </option>
+      </select>
       <div
-        id="docker-tag-hint"
+        id="docker-container-hint"
         class="form-hint"
       >
-        Tag de l'image a surveiller.
+        <template v-if="form.docker_image">
+          Image surveillée : <code>{{ form.docker_image }}:{{ form.docker_tag || 'latest' }}</code>
+        </template>
+        <template v-else>
+          L'image et le tag surveillés sont déduits du conteneur choisi.
+        </template>
       </div>
     </div>
 
@@ -139,7 +169,12 @@
     <div class="col-12">
       <div class="border rounded p-2">
         <div class="fw-medium mb-2">
-          Repo Git lie (optionnel, pour les release notes)
+          Dépôt Git lié <span class="text-muted">(optionnel)</span>
+        </div>
+        <div class="form-hint mb-2">
+          Purement informatif : les notes de version du dépôt sont affichées à côté
+          de l'historique des digests. La détection des mises à jour reste basée
+          sur le registre Docker.
         </div>
         <div class="row g-2">
           <div class="col-md-4">
@@ -184,12 +219,30 @@
 </template>
 
 <script setup lang="ts">
-import type { WebhookFormData, RegistryCredential } from '../../composables/useWebhookForm'
+import type { WebhookFormData, RegistryCredential, PickableContainer } from '../../composables/useWebhookForm'
 
-defineProps<{
+const props = defineProps<{
   form: WebhookFormData
   registryCredentials: RegistryCredential[]
+  containerHosts: { id: string, name: string }[]
+  containersForHost: PickableContainer[]
+  containerKey: (c: PickableContainer) => string
+  selectedContainerKey: string
+  selectedContainerMissing: boolean
 }>()
+
+// containerSourceHostId lives in the composable (it drives the container list
+// and is reset on hydrate), so it is bound through as an explicit v-model.
+const containerSourceHostId = defineModel<string>('containerSourceHostId', { default: '' })
+
+const emit = defineEmits<{ (e: 'select-container', key: string): void }>()
+
+function onContainerChange(event: Event): void {
+  const key = (event.target as HTMLSelectElement).value
+  // Re-selecting the "aucun conteneur en cours" placeholder keeps the stored
+  // image as-is; only a real container selection rewrites the form.
+  if (key && key !== props.selectedContainerKey) emit('select-container', key)
+}
 </script>
 
 <style scoped>

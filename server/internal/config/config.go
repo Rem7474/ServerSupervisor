@@ -59,6 +59,14 @@ type Config struct {
 	GitHubToken        string
 	GitHubPollInterval time.Duration
 
+	// DockerImagePollInterval is the cadence of the ambient Docker image-version
+	// engine (internal/services/dockerversions), which refreshes one registry
+	// digest per distinct image:tag running across the whole fleet. Deliberately
+	// much slower than GitHubPollInterval: this scans every image, not just the
+	// handful with a release tracker, and anonymous Docker Hub pulls are rate
+	// limited per source IP.
+	DockerImagePollInterval time.Duration
+
 	// Alerts
 	NotifyURL     string
 	NtfyAuthToken string
@@ -186,6 +194,8 @@ func Load() *Config {
 
 		GitHubToken:        getEnv("GITHUB_TOKEN", ""),
 		GitHubPollInterval: getDurationEnv("GITHUB_POLL_INTERVAL", 15*time.Minute),
+
+		DockerImagePollInterval: getDurationEnv("DOCKER_IMAGE_POLL_INTERVAL", 6*time.Hour),
 
 		NotifyURL:     getEnv("NOTIFY_URL", ""),
 		NtfyAuthToken: getEnv("NTFY_AUTH_TOKEN", ""),

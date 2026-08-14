@@ -63,3 +63,88 @@ describe('DockerContainersTab mount/unmount', () => {
     expect(() => wrapper.unmount()).not.toThrow()
   })
 })
+
+describe('DockerContainersTab version badges', () => {
+  const container = (over: Record<string, unknown> = {}) => ({
+    id: 'c0', name: 'web', hostname: 'host-1', host_id: 'h1',
+    image: 'nginx', image_tag: 'latest', state: 'running',
+    labels: {}, env_vars: {}, volumes: [], networks: [], ports: '80/tcp',
+    ...over,
+  })
+
+  function badgeText(props: Record<string, unknown>): string {
+    const wrapper = mount(DockerContainersTab, {
+      props: { canRunDocker: false, actionLoading: {}, ...props },
+    })
+    return wrapper.find('tbody tr').text()
+  }
+
+  // The ambient engine emits a row for every running container, tracker or
+  // not — that's the whole point of the shared engine, so an untracked
+  // container must render a real verdict instead of no badge at all.
+  it('renders a badge for a container with no tracker, from an ambient row', () => {
+    expect(badgeText({
+      containers: [container()],
+      versionComparisons: [{
+        host_id: 'h1', docker_image: 'nginx', image_tag: 'latest',
+        status: 'update_available', running_version: '1.25.0', latest_version: '1.27.4',
+        is_up_to_date: false, update_confirmed: true,
+      }],
+    })).toContain('Mise à jour disponible')
+
+    expect(badgeText({
+      containers: [container()],
+      versionComparisons: [{
+        host_id: 'h1', docker_image: 'nginx', image_tag: 'latest',
+        status: 'up_to_date', running_version: '1.27.4', latest_version: '1.27.4', is_up_to_date: true,
+      }],
+    })).toContain('À jour')
+  })
+
+  // An image the engine could not check (private registry, no credential) is
+  // explicitly unknown — never silently classified as up to date.
+  it('renders "Version inconnue" when the ambient row carries no verdict', () => {
+    expect(badgeText({
+      containers: [container()],
+      versionComparisons: [{
+        host_id: 'h1', docker_image: 'nginx', image_tag: 'latest',
+        status: 'unknown', running_version: '', latest_version: '',
+        last_error: 'registre privé : aucun identifiant enregistré',
+      }],
+    })).toContain('Version inconnue')
+  })
+
+  // Two containers of the same image on different tags must not share a badge.
+  it('keys ambient rows by tag', () => {
+    const wrapper = mount(DockerContainersTab, {
+      props: {
+        canRunDocker: false,
+        actionLoading: {},
+        containers: [
+          container({ id: 'a', name: 'a', image_tag: 'latest' }),
+          container({ id: 'b', name: 'b', image_tag: '1.25' }),
+        ],
+        versionComparisons: [
+          { host_id: 'h1', docker_image: 'nginx', image_tag: 'latest', status: 'up_to_date', is_up_to_date: true },
+          { host_id: 'h1', docker_image: 'nginx', image_tag: '1.25', status: 'update_available', running_version: '1.25', latest_version: '1.27.4' },
+        ],
+      },
+    })
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows[0].text()).toContain('À jour')
+    expect(rows[1].text()).toContain('Mise à jour disponible')
+  })
+
+  // A tracker row is tag-agnostic (it aggregates every tag of its image), so it
+  // stays reachable as the fallback for containers it covers.
+  it('falls back to a tracker row when no tag-specific row exists', () => {
+    expect(badgeText({
+      containers: [container()],
+      versionComparisons: [{
+        tracker_id: 't1', host_id: 'h1', docker_image: 'nginx',
+        status: 'update_available', running_version: '1.25.0', latest_version: '1.27.4',
+        is_up_to_date: false, update_confirmed: true,
+      }],
+    })).toContain('Mise à jour disponible')
+  })
+})
