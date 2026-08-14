@@ -182,6 +182,11 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.D
 	// re-verifies the password itself (see BeginWebAuthnLogin's doc comment).
 	r.POST("/api/auth/webauthn/login/begin", h.BeginWebAuthnLogin)
 	r.POST("/api/auth/webauthn/login/finish", h.FinishWebAuthnLogin)
+	// Usernameless "conditional UI" passkey login: no password re-verification
+	// up front (there's no username yet), the account is resolved from the
+	// credential itself — see BeginDiscoverableLogin's doc comment.
+	r.POST("/api/auth/webauthn/login/discoverable/begin", h.BeginDiscoverableWebAuthnLogin)
+	r.POST("/api/auth/webauthn/login/discoverable/finish", h.FinishDiscoverableWebAuthnLogin)
 	r.GET("/api/health", func(c *gin.Context) {
 		if err := db.Ping(); err != nil {
 			c.JSON(503, gin.H{"status": "degraded", "db": "unreachable", "error": err.Error()})

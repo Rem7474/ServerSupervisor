@@ -79,4 +79,11 @@ export const authApi = {
     api.post<{ options: unknown; session_token: string }>('/auth/webauthn/login/begin', { username, password }),
   finishWebAuthnLogin: (username: string, sessionToken: string, credential: unknown) =>
     api.post('/auth/webauthn/login/finish', { username, session_token: sessionToken, credential }),
+
+  // Usernameless "conditional UI" passkey login: no username/password needed
+  // up front, the browser offers a matching passkey as an autofill suggestion.
+  beginDiscoverableWebAuthnLogin: () =>
+    api.post<{ options: unknown; session_token: string }>('/auth/webauthn/login/discoverable/begin', {}),
+  finishDiscoverableWebAuthnLogin: (sessionToken: string, credential: unknown) =>
+    api.post('/auth/webauthn/login/discoverable/finish', { session_token: sessionToken, credential }),
 }

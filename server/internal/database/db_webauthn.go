@@ -67,6 +67,27 @@ func (db *DB) ListWebAuthnCredentials(ctx context.Context, userID int64) ([]mode
 	return out, rows.Err()
 }
 
+// GetWebAuthnCredentialByCredentialID looks up a credential (and its owning
+// user_id) by the raw credential ID alone, globally across all users — needed
+// to resolve a discoverable/usernameless login, where the client never tells
+// the server which account it's attempting to authenticate as.
+func (db *DB) GetWebAuthnCredentialByCredentialID(ctx context.Context, credentialID []byte) (*models.WebAuthnCredential, error) {
+	var c models.WebAuthnCredential
+	var data []byte
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT id, user_id, name, credential_data, created_at, last_used_at
+		 FROM webauthn_credentials WHERE credential_id = $1`,
+		credentialID,
+	).Scan(&c.ID, &c.UserID, &c.Name, &data, &c.CreatedAt, &c.LastUsedAt)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, &c.Credential); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
 // DeleteWebAuthnCredential removes a credential, scoped to its owner so a user
 // can only ever delete their own passkeys.
 func (db *DB) DeleteWebAuthnCredential(ctx context.Context, id string, userID int64) error {

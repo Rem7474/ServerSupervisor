@@ -25,7 +25,7 @@
               class="form-control"
               placeholder="admin"
               name="username"
-              autocomplete="username"
+              autocomplete="username webauthn"
               required
               :disabled="loading || needsMFA"
             >

@@ -1,10 +1,10 @@
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
 import type { MFAMethods } from '../types/webauthn'
-import { getWebAuthnAssertion, isWebAuthnSupported } from '../utils/webauthn'
+import { getWebAuthnAssertion, isConditionalMediationAvailable, isWebAuthnSupported } from '../utils/webauthn'
 
 // Deliberately does not own the username/TOTP template refs or their focus
 // management: those are DOM/template concerns specific to LoginView's own
@@ -92,6 +92,42 @@ export function useLogin() {
       webauthnLoading.value = false
     }
   }
+
+  // Usernameless "conditional UI" passkey login: fires as soon as the page
+  // mounts, before the user has typed anything. navigator.credentials.get()
+  // with mediation "conditional" doesn't pop a modal — it just makes the
+  // browser offer a matching passkey as an autofill suggestion on the
+  // username field (see LoginView's autocomplete="username webauthn"); the
+  // returned promise only settles once the user actually picks one (or
+  // aborts it, e.g. by navigating away). One-step login: no separate
+  // username/password/MFA round trip if they do.
+  let conditionalAbort: AbortController | null = null
+
+  async function startConditionalWebAuthn(): Promise<void> {
+    if (!webauthnAvailable || !(await isConditionalMediationAvailable())) return
+    conditionalAbort = new AbortController()
+    try {
+      const begin = await api.beginDiscoverableWebAuthnLogin()
+      const credential = await getWebAuthnAssertion(begin.data.options, {
+        mediation: 'conditional',
+        signal: conditionalAbort.signal,
+      })
+      const { data } = await api.finishDiscoverableWebAuthnLogin(begin.data.session_token, credential)
+      completeLogin(data)
+    } catch (e: unknown) {
+      // Aborted (unmount) or dismissed/failed by the user — the classic
+      // username/password form underneath is still fully usable either way.
+      if (e instanceof DOMException && e.name === 'AbortError') return
+    }
+  }
+
+  onMounted(() => {
+    void startConditionalWebAuthn()
+  })
+
+  onUnmounted(() => {
+    conditionalAbort?.abort()
+  })
 
   return {
     username,
