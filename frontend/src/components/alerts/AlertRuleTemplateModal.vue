@@ -74,8 +74,30 @@
                     </option>
                   </select>
                 </div>
+                <div
+                  v-if="form.metric === 'bandwidth_vs_rolling_avg'"
+                  class="col-12"
+                >
+                  <label class="form-label required">Fenêtre de moyenne glissante</label>
+                  <select
+                    v-model.number="form.baseline_window_seconds"
+                    class="form-select"
+                  >
+                    <option :value="3600">
+                      1 heure
+                    </option>
+                    <option :value="21600">
+                      6 heures
+                    </option>
+                    <option :value="86400">
+                      24 heures
+                    </option>
+                  </select>
+                </div>
                 <div class="col-6 col-md-3">
-                  <label class="form-label required">Seuil avertissement</label>
+                  <label class="form-label required">
+                    {{ form.metric === 'bandwidth_vs_rolling_avg' ? 'Seuil avertissement (% moyenne)' : 'Seuil avertissement' }}
+                  </label>
                   <input
                     v-model.number="form.threshold_warn"
                     type="number"
@@ -85,7 +107,9 @@
                   >
                 </div>
                 <div class="col-6 col-md-3">
-                  <label class="form-label required">Seuil critique</label>
+                  <label class="form-label required">
+                    {{ form.metric === 'bandwidth_vs_rolling_avg' ? 'Seuil critique (% moyenne)' : 'Seuil critique' }}
+                  </label>
                   <input
                     v-model.number="form.threshold_crit"
                     type="number"
@@ -94,7 +118,10 @@
                     required
                   >
                 </div>
-                <div class="col-6 col-md-3">
+                <div
+                  v-if="form.metric !== 'bandwidth_vs_rolling_avg'"
+                  class="col-6 col-md-3"
+                >
                   <label class="form-label">Durée (secondes)</label>
                   <input
                     v-model.number="form.duration"
@@ -241,6 +268,7 @@ watch(() => props.template, (t) => {
       threshold_warn: t.threshold_warn, threshold_crit: t.threshold_crit,
       threshold_clear_warn: t.threshold_clear_warn, threshold_clear_crit: t.threshold_clear_crit,
       duration: t.duration_seconds,
+      baseline_window_seconds: t.baseline_window_seconds ?? (t.metric === 'bandwidth_vs_rolling_avg' ? 3600 : undefined),
       actions: { ...t.actions, channels: [...(t.actions.channels || [])] },
     })
   } else {
@@ -250,6 +278,18 @@ watch(() => props.template, (t) => {
   channelNtfy.value = form.actions.channels?.includes('ntfy') || false
   channelBrowser.value = form.actions.channels?.includes('browser') || false
 }, { immediate: true })
+
+// bandwidth_vs_rolling_avg is the only templatable metric that understands
+// baseline_window_seconds — default it in when selected, clear it out for
+// every other metric so a stale value never gets submitted (server-side
+// validateBaselineWindow rejects a non-nil value on any other metric).
+watch(() => form.metric, (metric) => {
+  if (metric === 'bandwidth_vs_rolling_avg') {
+    if (!form.baseline_window_seconds) form.baseline_window_seconds = 3600
+  } else {
+    form.baseline_window_seconds = undefined
+  }
+})
 
 function submit(): void {
   const channels: string[] = []
