@@ -32,10 +32,10 @@ func (db *DB) InsertNetworkFlowMetrics(ctx context.Context, hostID string, repor
 		_, err := db.conn.ExecContext(ctx,
 			`INSERT INTO network_flow_metrics (
 				host_id, timestamp, is_others, remote_ip, remote_port, protocol, direction,
-				process_name, pid, rx_bytes, tx_bytes, packets, connections
-			) VALUES ($1, $2, false, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+				process_name, pid, server_name, rx_bytes, tx_bytes, packets, connections
+			) VALUES ($1, $2, false, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 			hostID, ts, t.RemoteIP, t.RemotePort, t.Protocol, t.Direction,
-			t.ProcessName, t.PID, t.RxBytes, t.TxBytes, t.Packets, t.Connections,
+			t.ProcessName, t.PID, t.ServerName, t.RxBytes, t.TxBytes, t.Packets, t.Connections,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert network flow talker: %w", err)
@@ -60,7 +60,7 @@ func (db *DB) InsertNetworkFlowMetrics(ctx context.Context, hostID string, repor
 func (db *DB) GetLatestNetworkFlowMetrics(ctx context.Context, hostID string) ([]models.NetworkFlowMetric, error) {
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT id, host_id, timestamp, is_others, remote_ip, remote_port, protocol, direction,
-			process_name, pid, rx_bytes, tx_bytes, packets, connections
+			process_name, pid, server_name, rx_bytes, tx_bytes, packets, connections
 		FROM network_flow_metrics
 		WHERE host_id = $1
 		  AND timestamp = (
@@ -82,7 +82,7 @@ func scanNetworkFlowMetrics(rows *sql.Rows) ([]models.NetworkFlowMetric, error) 
 		var m models.NetworkFlowMetric
 		if err := rows.Scan(
 			&m.ID, &m.HostID, &m.Timestamp, &m.IsOthers, &m.RemoteIP, &m.RemotePort, &m.Protocol, &m.Direction,
-			&m.ProcessName, &m.PID, &m.RxBytes, &m.TxBytes, &m.Packets, &m.Connections,
+			&m.ProcessName, &m.PID, &m.ServerName, &m.RxBytes, &m.TxBytes, &m.Packets, &m.Connections,
 		); err != nil {
 			return nil, err
 		}
