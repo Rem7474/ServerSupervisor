@@ -13,6 +13,15 @@ on:
       - 'frontend/package.json'
       - 'frontend/package-lock.json'
       - '**/Dockerfile'
+  pull_request:
+    paths:
+      - 'server/go.mod'
+      - 'server/go.sum'
+      - 'agent/go.mod'
+      - 'agent/go.sum'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '**/Dockerfile'
   workflow_dispatch:        # déclenchable manuellement depuis l'UI GitHub
 
 permissions:
