@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div
-      class="ss-toast-container"
+      class="toast-container position-fixed bottom-0 end-0 p-3"
       aria-live="polite"
       aria-label="Notifications"
     >
@@ -9,42 +9,45 @@
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="ss-toast"
+          class="toast show ss-toast"
           :class="`ss-toast--${toast.type}`"
           role="alert"
+          aria-atomic="true"
         >
-          <IconCircleCheck
-            v-if="toast.type === 'success'"
-            :size="18"
-            class="ss-toast-icon"
-          />
-          <IconCircleX
-            v-else-if="toast.type === 'error'"
-            :size="18"
-            class="ss-toast-icon"
-          />
-          <IconAlertTriangle
-            v-else-if="toast.type === 'warning'"
-            :size="18"
-            class="ss-toast-icon"
-          />
-          <IconInfoCircle
-            v-else
-            :size="18"
-            class="ss-toast-icon"
-          />
-          <span class="ss-toast-message">{{ toast.message }}</span>
-          <button
-            type="button"
-            class="ss-toast-close"
-            aria-label="Fermer"
-            @click="removeToast(toast.id)"
-          >
-            <IconX
-              :size="14"
-              :stroke-width="2.5"
+          <div class="toast-body d-flex align-items-center gap-2">
+            <IconCircleCheck
+              v-if="toast.type === 'success'"
+              :size="18"
+              class="ss-toast-icon flex-shrink-0"
             />
-          </button>
+            <IconCircleX
+              v-else-if="toast.type === 'error'"
+              :size="18"
+              class="ss-toast-icon flex-shrink-0"
+            />
+            <IconAlertTriangle
+              v-else-if="toast.type === 'warning'"
+              :size="18"
+              class="ss-toast-icon flex-shrink-0"
+            />
+            <IconInfoCircle
+              v-else
+              :size="18"
+              class="ss-toast-icon flex-shrink-0"
+            />
+            <span class="flex-fill ss-toast-message">{{ toast.message }}</span>
+            <button
+              type="button"
+              class="ss-toast-close flex-shrink-0"
+              aria-label="Fermer"
+              @click="removeToast(toast.id)"
+            >
+              <IconX
+                :size="14"
+                :stroke-width="2.5"
+              />
+            </button>
+          </div>
         </div>
       </TransitionGroup>
     </div>
@@ -59,61 +62,54 @@ const { toasts, removeToast } = useGlobalToast()
 </script>
 
 <style scoped>
-.ss-toast-container {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-width: 24rem;
+/*
+ * .toast/.toast-container already supply background/border/border-radius/
+ * box-shadow/width/font-size/z-index (see the app-wide `.toast { z-index:
+ * var(--z-index-toast) }` rule in style.css) via Tabler's tokens. Only the
+ * per-type accent (a colored left border + matching icon, which Tabler's
+ * .toast has no variant system for) and pointer-events (so empty gaps in the
+ * fixed container don't block clicks on the page beneath) stay custom here.
+ */
+.toast-container {
   pointer-events: none;
 }
 
 .ss-toast {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: 0.4rem;
-  border: 1px solid;
-  background: var(--tblr-bg-surface);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  pointer-events: all;
-  min-width: 16rem;
+  pointer-events: auto;
+  border-left: 3px solid transparent;
 }
 
 .ss-toast--success {
-  border-color: var(--tblr-success);
-  color: var(--tblr-success);
+  border-left-color: var(--tblr-success);
 }
 .ss-toast--error {
-  border-color: var(--tblr-danger);
-  color: var(--tblr-danger);
+  border-left-color: var(--tblr-danger);
 }
 .ss-toast--warning {
-  border-color: var(--tblr-warning);
-  color: var(--tblr-warning);
+  border-left-color: var(--tblr-warning);
 }
 .ss-toast--info {
-  border-color: var(--tblr-info);
+  border-left-color: var(--tblr-info);
+}
+
+.ss-toast--success .ss-toast-icon {
+  color: var(--tblr-success);
+}
+.ss-toast--error .ss-toast-icon {
+  color: var(--tblr-danger);
+}
+.ss-toast--warning .ss-toast-icon {
+  color: var(--tblr-warning);
+}
+.ss-toast--info .ss-toast-icon {
   color: var(--tblr-info);
 }
 
-.ss-toast-icon {
-  flex-shrink: 0;
-}
-
 .ss-toast-message {
-  flex: 1;
-  font-size: 0.875rem;
-  color: var(--tblr-body-color);
   word-break: break-word;
 }
 
 .ss-toast-close {
-  flex-shrink: 0;
   background: none;
   border: none;
   padding: 0.1rem;
