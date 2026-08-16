@@ -106,42 +106,50 @@
               </h3>
             </div>
             <div class="card-body">
-              <dl class="row mb-0">
-                <dt class="col-5 text-secondary">
-                  Sujet
-                </dt>
-                <dd class="col-7 mb-2 text-break">
-                  {{ shortDN(cert.subject) || '—' }}
-                </dd>
-                <dt class="col-5 text-secondary">
-                  Émetteur
-                </dt>
-                <dd class="col-7 mb-2 text-break">
-                  {{ shortDN(cert.issuer) || '—' }}
-                </dd>
-                <dt class="col-5 text-secondary">
-                  Numéro de série
-                </dt>
-                <dd class="col-7 mb-2 font-monospace small text-break">
-                  {{ cert.serial_number || '—' }}
-                </dd>
-                <dt class="col-5 text-secondary">
-                  SAN / DNS
-                </dt>
-                <dd class="col-7 mb-0">
-                  <template v-if="cert.dns_names && cert.dns_names.length">
-                    <code
-                      v-for="n in cert.dns_names"
-                      :key="n"
-                      class="me-1 small"
-                    >{{ n }}</code>
-                  </template>
-                  <span
-                    v-else
-                    class="text-secondary"
-                  >—</span>
-                </dd>
-              </dl>
+              <div class="datagrid">
+                <div class="datagrid-item">
+                  <div class="datagrid-title">
+                    Sujet
+                  </div>
+                  <div class="datagrid-content text-break">
+                    {{ shortDN(cert.subject) || '—' }}
+                  </div>
+                </div>
+                <div class="datagrid-item">
+                  <div class="datagrid-title">
+                    Émetteur
+                  </div>
+                  <div class="datagrid-content text-break">
+                    {{ shortDN(cert.issuer) || '—' }}
+                  </div>
+                </div>
+                <div class="datagrid-item">
+                  <div class="datagrid-title">
+                    Numéro de série
+                  </div>
+                  <div class="datagrid-content font-monospace small text-break">
+                    {{ cert.serial_number || '—' }}
+                  </div>
+                </div>
+                <div class="datagrid-item">
+                  <div class="datagrid-title">
+                    SAN / DNS
+                  </div>
+                  <div class="datagrid-content">
+                    <template v-if="cert.dns_names && cert.dns_names.length">
+                      <code
+                        v-for="n in cert.dns_names"
+                        :key="n"
+                        class="me-1 small"
+                      >{{ n }}</code>
+                    </template>
+                    <span
+                      v-else
+                      class="text-secondary"
+                    >—</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
