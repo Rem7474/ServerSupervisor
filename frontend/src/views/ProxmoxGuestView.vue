@@ -301,11 +301,12 @@
             v-if="summaryLoading"
             variant="chart"
           />
-          <Line
-            v-else-if="chartData"
-            :data="chartData"
+          <ApexChart
+            v-else-if="series"
+            type="area"
+            height="100%"
             :options="chartOptions"
-            class="h-100"
+            :series="series"
           />
           <div
             v-else
@@ -332,7 +333,6 @@ import { useAuthStore } from '../stores/auth'
 import { useProxmoxGuest } from '../composables/useProxmoxGuest'
 import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses'
 import { getMetricColorClass } from '../utils/metricColor'
-import type { ChartOptions, TooltipItem } from 'chart.js'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -344,7 +344,8 @@ const {
   summaryLoading,
   error,
   hours,
-  chartData,
+  series,
+  chartOptions,
   autoRefresh,
   lastUpdatedAt,
   GUEST_REFRESH_SEC,
@@ -393,42 +394,7 @@ const guestPrimaryIp = computed(() => {
   return ''
 })
 
-const Line = defineAsyncComponent(async () => {
-  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend)
-  return Line
-})
-
-const chartOptions = computed((): ChartOptions<'line'> => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: true, position: 'top', labels: { color: '#6b7280', boxWidth: 12, padding: 12 } },
-    tooltip: {
-      enabled: true,
-      mode: 'index',
-      intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-      titleColor: '#fff',
-      bodyColor: '#fff',
-      borderColor: '#555',
-      borderWidth: 1,
-      padding: 10,
-      callbacks: {
-        label: (ctx: TooltipItem<'line'>) => `${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toFixed(1)}%`,
-      },
-    },
-  },
-  scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
-    y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest' as const, axis: 'x' as const, intersect: false },
-}))
+const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'

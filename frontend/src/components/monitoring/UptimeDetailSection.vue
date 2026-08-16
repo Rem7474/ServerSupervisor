@@ -170,10 +170,12 @@
           class="card-body chart-body position-relative"
           style="height: 220px;"
         >
-          <Line
+          <ApexChart
             v-if="chartData"
-            :data="chartData"
+            type="area"
+            height="100%"
             :options="chartOptions"
+            :series="chartData.series"
           />
           <LoadingSkeleton
             v-else
@@ -263,11 +265,12 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, watch } from 'vue'
+import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import EmptyState from '../EmptyState.vue'
 import { formatDateTime } from '../../utils/formatters'
-import { getChartPalette } from '../../utils/chartTheme'
+import { getApexChartPalette } from '../../utils/apexChartTheme'
 import { useUptimeProbeDetail, STATS_WINDOWS } from '../../composables/useUptimeProbeDetail'
 import type { UptimeProbe, UptimeHistoryBucket } from '../../types/generated'
 
@@ -310,17 +313,7 @@ function bucketTitle(b: UptimeHistoryBucket): string {
   return `${when} — ${outcome}${latency}`
 }
 
-const Line = defineAsyncComponent(async () => {
-  const [{ Line: LineComponent }, chart] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  chart.Chart.register(
-    chart.LineElement, chart.PointElement, chart.LineController,
-    chart.CategoryScale, chart.LinearScale, chart.Tooltip, chart.Legend, chart.Filler,
-  )
-  return LineComponent
-})
+const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 const {
   probe,
@@ -347,25 +340,41 @@ watch(probe, (p) => emit('loaded', p), { immediate: true })
 // most-recent of this section's and SslDetailSection's own lastUpdatedAt.
 defineExpose({ lastUpdatedAt })
 
-const palette = getChartPalette()
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: palette.tooltipBackground,
-      titleColor: palette.tooltipText,
-      bodyColor: palette.tooltipText,
-      borderColor: palette.tooltipBorder,
-      borderWidth: 1,
-      padding: 8,
-    },
-  },
-  scales: {
-    x: { grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v} ms` } },
-  },
-  elements: { point: { radius: 0, hitRadius: 8 }, line: { tension: 0.3 } },
+function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
+  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
+    + `<div>${body}</div>`
+    + '</div>'
 }
+
+const chartOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  const categories = chartData.value?.categories ?? []
+  return {
+    chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    fill: { type: 'solid', opacity: 0.15 },
+    stroke: { curve: 'smooth', width: 2 },
+    markers: { size: 0, hover: { size: 4 } },
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    grid: { borderColor: palette.grid },
+    xaxis: {
+      type: 'category',
+      categories,
+      labels: { style: { colors: palette.tickText }, rotate: 0 },
+      tickAmount: 8,
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
+    yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${Math.round(v)} ms` } },
+    tooltip: {
+      custom: ({ series, seriesIndex, dataPointIndex }) => {
+        const y = series[seriesIndex]?.[dataPointIndex]
+        const title = categories[dataPointIndex] ?? ''
+        const body = y != null ? `${Number(y)} ms` : '—'
+        return tooltipHtml(palette, String(title), body)
+      },
+    },
+  }
+})
 </script>

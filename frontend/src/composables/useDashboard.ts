@@ -1,5 +1,6 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import type { ApexOptions } from 'apexcharts'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useDashboardStore } from '../stores/dashboard'
@@ -13,6 +14,8 @@ import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { translateError } from '../utils/translateError'
 import { formatRelativeTime } from './useDateFormatter'
 import dayjs from '../utils/dayjs'
+import { useReactiveApexChartPalette, type ApexChartPalette } from '../utils/apexChartTheme'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
 
 interface DashboardCveSummary {
   critical_count?: number
@@ -65,162 +68,8 @@ export interface DashboardProxmoxLinkRecord {
   mem_usage?: number
 }
 
-interface TooltipContext {
-  dataset: { label?: string }
-  parsed: { x?: number; y: number }
-}
-
-interface SummaryDataset {
-  label: string
-  data: Array<{ x: number; y: number }>
-  borderColor: string
-  backgroundColor: string
-  fill: boolean
-  spanGaps?: boolean
-}
-
-interface SummaryChartData {
-  datasets: SummaryDataset[]
-}
-
-interface DashboardChartPalette {
-  legendText: string
-  tickText: string
-  grid: string
-  tooltipBackground: string
-  tooltipText: string
-  tooltipBorder: string
-  cpuBorder: string
-  cpuBackground: string
-  ramBorder: string
-  ramBackground: string
-}
-
-const FALLBACK_CHART_PALETTE: DashboardChartPalette = {
-  legendText: '#1f2937',
-  tickText: '#1f2937',
-  grid: 'rgba(107,114,128,0.15)',
-  tooltipBackground: 'rgba(17,24,39,0.90)',
-  tooltipText: '#ffffff',
-  tooltipBorder: '#4b5563',
-  cpuBorder: '#206bc4',
-  cpuBackground: 'rgba(32,107,196,0.12)',
-  ramBorder: '#2fb344',
-  ramBackground: 'rgba(47,179,68,0.12)',
-}
-
-function getThemeStyles(): { body: CSSStyleDeclaration | null; root: CSSStyleDeclaration | null } | null {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return null
-  return {
-    body: document.body ? window.getComputedStyle(document.body) : null,
-    root: window.getComputedStyle(document.documentElement),
-  }
-}
-
-function getCssVarValue(name: string, fallback: string): string {
-  const styles = getThemeStyles()
-  if (!styles) return fallback
-  const value = styles.body?.getPropertyValue(name).trim() || styles.root?.getPropertyValue(name).trim() || ''
-  return value || fallback
-}
-
-function isDarkRgbColor(color: string): boolean {
-  const rgb = color.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i)
-  const rgba = color.match(/^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9]*\.?[0-9]+)\s*\)$/i)
-  const values = rgb || rgba
-  if (!values) return false
-
-  const r = Number(values[1])
-  const g = Number(values[2])
-  const b = Number(values[3])
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance < 0.5
-}
-
-function resolveCssColorForCanvas(color: string, fallback: string): string {
-  if (!color) return fallback
-  if (typeof window === 'undefined' || typeof document === 'undefined') return fallback
-
-  const probe = document.createElement('span')
-  probe.style.color = color
-  probe.style.position = 'fixed'
-  probe.style.left = '-9999px'
-  probe.style.top = '-9999px'
-  probe.style.visibility = 'hidden'
-
-  document.body.appendChild(probe)
-  const resolved = window.getComputedStyle(probe).color.trim()
-  document.body.removeChild(probe)
-
-  if (!resolved || resolved === 'rgba(0, 0, 0, 0)' || resolved === 'transparent') {
-    return fallback
-  }
-  return resolved
-}
-
-function toRgba(color: string, alpha: number, fallback: string): string {
-  const clamped = Math.max(0, Math.min(1, alpha))
-  const hex = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)
-  if (hex) {
-    const raw = hex[1]
-    const normalized = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw
-    const int = Number.parseInt(normalized, 16)
-    const r = (int >> 16) & 255
-    const g = (int >> 8) & 255
-    const b = int & 255
-    return `rgba(${r},${g},${b},${clamped})`
-  }
-
-  const rgb = color.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i)
-  if (rgb) {
-    return `rgba(${rgb[1]},${rgb[2]},${rgb[3]},${clamped})`
-  }
-
-  const rgba = color.match(/^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9]*\.?[0-9]+)\s*\)$/i)
-  if (rgba) {
-    return `rgba(${rgba[1]},${rgba[2]},${rgba[3]},${clamped})`
-  }
-
-  return fallback
-}
-
-function getDashboardChartPalette(): DashboardChartPalette {
-  const pageBackground = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-bg-surface', getCssVarValue('--tblr-body-bg', '#111827')),
-    '#111827',
-  )
-  const lightText = resolveCssColorForCanvas(getCssVarValue('--tblr-light', '#f8fafc'), '#f8fafc')
-  const darkText = resolveCssColorForCanvas(getCssVarValue('--tblr-dark', '#111827'), '#111827')
-  const textOnPage = isDarkRgbColor(pageBackground) ? lightText : darkText
-  const legendText = textOnPage
-  const tickText = toRgba(textOnPage, 0.82, textOnPage)
-  const gridBase = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-border-color', FALLBACK_CHART_PALETTE.tooltipBorder),
-    FALLBACK_CHART_PALETTE.tooltipBorder,
-  )
-  const tooltipText = textOnPage
-  const primary = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-primary', FALLBACK_CHART_PALETTE.cpuBorder),
-    FALLBACK_CHART_PALETTE.cpuBorder,
-  )
-  const success = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-success', FALLBACK_CHART_PALETTE.ramBorder),
-    FALLBACK_CHART_PALETTE.ramBorder,
-  )
-
-  return {
-    legendText,
-    tickText,
-    grid: toRgba(gridBase, 0.35, FALLBACK_CHART_PALETTE.grid),
-    tooltipBackground: pageBackground,
-    tooltipText,
-    tooltipBorder: resolveCssColorForCanvas(gridBase, FALLBACK_CHART_PALETTE.tooltipBorder),
-    cpuBorder: primary,
-    cpuBackground: toRgba(primary, 0.12, FALLBACK_CHART_PALETTE.cpuBackground),
-    ramBorder: success,
-    ramBackground: toRgba(success, 0.12, FALLBACK_CHART_PALETTE.ramBackground),
-  }
-}
+interface ChartPoint { x: number; y: number }
+type SummaryChartSeries = { name: string; data: ChartPoint[]; color: string }[]
 
 export function useDashboard() {
   const dashboardStore = useDashboardStore()
@@ -259,7 +108,7 @@ export function useDashboard() {
   const showDockerVersions = ref(false)
 
   const summaryHours = ref(24)
-  const summaryChartData = ref<SummaryChartData | null>(null)
+  const summaryChartSeries = ref<SummaryChartSeries | null>(null)
   const summaryLoading = ref(false)
   const chartSource = ref('agents')
   const chartSources = [
@@ -405,83 +254,49 @@ export function useDashboard() {
     return list
   })
 
-  function getSummaryMaxTimestamp(data: SummaryChartData | null) {
-    if (!data?.datasets?.length) return undefined
-    let max = -Infinity
-    for (const dataset of data.datasets) {
-      for (const point of dataset.data || []) {
-        const x = typeof point === 'object' && point ? (point as { x?: number }).x : undefined
-        if (Number.isFinite(x) && (x as number) > max) max = x as number
-      }
-    }
-    if (!Number.isFinite(max)) return undefined
-    return Math.min(Date.now(), max)
+  const chartPalette = useReactiveApexChartPalette()
+
+  function tooltipHtml(palette: ApexChartPalette, title: string, body: string): string {
+    return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+      + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
+      + body
+      + '</div>'
   }
 
-  function getSummaryMinTimestamp(data: SummaryChartData | null) {
-    if (!data?.datasets?.length) return undefined
-    let min = Infinity
-    for (const dataset of data.datasets) {
-      for (const point of dataset.data || []) {
-        const x = typeof point === 'object' && point ? (point as { x?: number }).x : undefined
-        if (Number.isFinite(x) && (x as number) < min) min = x as number
-      }
-    }
-    if (!Number.isFinite(min)) return undefined
-    return min
-  }
-
-  // Palette is expensive to compute (probes the DOM via getComputedStyle) so we
-  // memoize it and only recompute when the document theme actually changes.
-  const chartPalette = ref<DashboardChartPalette>(FALLBACK_CHART_PALETTE)
-  let themeObserver: MutationObserver | null = null
-
-  function refreshChartPalette() {
-    chartPalette.value = getDashboardChartPalette()
-  }
-
-  const summaryChartOptions = computed(() => {
+  const summaryChartOptions = computed((): ApexOptions => {
     const colors = chartPalette.value
-    const minX = getSummaryMinTimestamp(summaryChartData.value)
-    const maxX = getSummaryMaxTimestamp(summaryChartData.value)
+    const allPoints = (summaryChartSeries.value ?? []).flatMap((s) => s.data)
     return {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true, position: 'top', labels: { color: colors.legendText, boxWidth: 12, padding: 12 } },
-        tooltip: {
-          enabled: true,
-          mode: 'index',
-          intersect: false,
-          backgroundColor: colors.tooltipBackground,
-          titleColor: colors.tooltipText,
-          bodyColor: colors.tooltipText,
-          borderColor: colors.tooltipBorder,
-          borderWidth: 1,
-          padding: 10,
-          callbacks: {
-            title: (items: Array<{ parsed?: { x?: number } }>) => formatSummaryChartTime(items[0]?.parsed?.x),
-            label: (ctx: TooltipContext) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
-          },
+      chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+      fill: { type: 'solid', opacity: 0.12 },
+      stroke: { curve: 'smooth', width: 2 },
+      markers: { size: 0, hover: { size: 5 } },
+      dataLabels: { enabled: false },
+      legend: { show: true, position: 'top', labels: { colors: colors.legendText }, markers: { size: 5 } },
+      grid: { borderColor: colors.grid },
+      xaxis: {
+        type: 'datetime',
+        min: getMinPointTimestamp(allPoints),
+        max: getMaxPointTimestamp(allPoints),
+        labels: { style: { colors: colors.tickText }, formatter: (v: string) => formatSummaryChartTime(Number(v)) },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        tooltip: { enabled: false },
+      },
+      yaxis: { min: 0, max: 100, labels: { style: { colors: colors.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
+      tooltip: {
+        shared: true,
+        custom: ({ series: s, seriesIndex, dataPointIndex, w }) => {
+          const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
+          const rows = w.globals.seriesNames
+            .map((name: string, idx: number) => {
+              const y = s[idx]?.[dataPointIndex]
+              return `<div>${name}: ${y != null ? Number(y).toFixed(1) : '—'}%</div>`
+            })
+            .join('')
+          return tooltipHtml(colors, formatSummaryChartTime(Number(ts)), rows)
         },
       },
-      scales: {
-        x: {
-          type: 'linear',
-          display: true,
-          grid: { color: colors.grid },
-          min: minX,
-          max: maxX,
-          ticks: {
-            color: colors.tickText,
-            maxTicksLimit: 10,
-            callback: (value: string | number) => formatSummaryChartTime(Number(value)),
-          },
-        },
-        y: { display: true, min: 0, max: 100, grid: { color: colors.grid }, ticks: { color: colors.tickText, callback: (v: number | string) => `${v}%` } },
-      },
-      elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
-      interaction: { mode: 'nearest', axis: 'x', intersect: false },
     }
   })
 
@@ -559,13 +374,7 @@ export function useDashboard() {
     return date.format('DD/MM')
   }
 
-  function clampTimestamp(timestampMs: number) {
-    if (!Number.isFinite(timestampMs)) return NaN
-    const now = Date.now()
-    return Math.min(timestampMs, now)
-  }
-
-  function toSummaryPoint(point: DashboardMetricPoint, key: 'cpu_avg' | 'memory_avg') {
+  function toSummaryPoint(point: DashboardMetricPoint, key: 'cpu_avg' | 'memory_avg'): ChartPoint | null {
     const timestamp = clampTimestamp(dayjs(point.timestamp).valueOf())
     const value = Number(point[key] ?? 0)
     if (!Number.isFinite(timestamp)) return null
@@ -584,32 +393,24 @@ export function useDashboard() {
 
       const points: DashboardMetricPoint[] = Array.isArray(res.data) ? res.data : []
       if (!points.length) {
-        summaryChartData.value = null
+        summaryChartSeries.value = null
         return
       }
 
-      summaryChartData.value = {
-        datasets: [
-          {
-            label: 'CPU %',
-            data: points.map((p: DashboardMetricPoint) => toSummaryPoint(p, 'cpu_avg')).filter(Boolean) as Array<{ x: number; y: number }>,
-            borderColor: colors.cpuBorder,
-            backgroundColor: colors.cpuBackground,
-            fill: true,
-            spanGaps: false,
-          },
-          {
-            label: 'RAM %',
-            data: points.map((p: DashboardMetricPoint) => toSummaryPoint(p, 'memory_avg')).filter(Boolean) as Array<{ x: number; y: number }>,
-            borderColor: colors.ramBorder,
-            backgroundColor: colors.ramBackground,
-            fill: true,
-            spanGaps: false,
-          },
-        ],
-      }
+      summaryChartSeries.value = [
+        {
+          name: 'CPU %',
+          data: points.map((p: DashboardMetricPoint) => toSummaryPoint(p, 'cpu_avg')).filter((p): p is ChartPoint => p != null),
+          color: colors.cpu,
+        },
+        {
+          name: 'RAM %',
+          data: points.map((p: DashboardMetricPoint) => toSummaryPoint(p, 'memory_avg')).filter((p): p is ChartPoint => p != null),
+          color: colors.ram,
+        },
+      ]
     } catch {
-      summaryChartData.value = null
+      summaryChartSeries.value = null
     } finally {
       summaryLoading.value = false
     }
@@ -696,18 +497,6 @@ export function useDashboard() {
   }
 
   onMounted(() => {
-    refreshChartPalette()
-    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
-      themeObserver = new MutationObserver(refreshChartPalette)
-      themeObserver.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ['data-bs-theme', 'class'],
-      })
-      themeObserver.observe(document.body, {
-        attributes: true,
-        attributeFilter: ['data-bs-theme', 'class'],
-      })
-    }
     loading.value = true
     fetchSummary()
     fetchProxmoxSummary()
@@ -727,10 +516,6 @@ export function useDashboard() {
   onUnmounted(() => {
     if (cveRefreshTimer) clearInterval(cveRefreshTimer)
     if (summaryRefreshTimer) clearInterval(summaryRefreshTimer)
-    if (themeObserver) {
-      themeObserver.disconnect()
-      themeObserver = null
-    }
     wsEvents.off('reconnected', refreshDashboardOnReconnect)
   })
 
@@ -761,7 +546,7 @@ export function useDashboard() {
     aptLoading,
     showDockerVersions,
     summaryHours,
-    summaryChartData,
+    summaryChartSeries,
     summaryLoading,
     chartSource,
     chartSources,

@@ -15,11 +15,12 @@
       class="card-body"
       :style="{ height: mode === 'summary' ? '13rem' : '10rem' }"
     >
-      <Line
-        v-if="chartData"
-        :data="chartData"
+      <ApexChart
+        v-if="series"
+        type="area"
+        height="100%"
         :options="chartOptions"
-        class="h-100"
+        :series="series"
       />
       <LoadingSkeleton
         v-else-if="loading"
@@ -37,7 +38,7 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, watch, onMounted, defineAsyncComponent } from 'vue'
-import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
+import type { ApexOptions } from 'apexcharts'
 import { fetchNetworkFlowsSummary, fetchNetworkFlowsHistory } from '../../composables/useNetworkFlowsHistory'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import TimeRangePicker from '../common/TimeRangePicker.vue'
@@ -45,28 +46,15 @@ import type { TimeRangeModel, TimeRangePreset } from '../../types/timeRange'
 import dayjs from '../../utils/dayjs'
 import { formatBytes } from '../../utils/formatters'
 import { getApiErrorMessage } from '../../api/client'
-
-// RX/TX are a fixed-identity categorical pair (not a magnitude ramp), so hue
-// is assigned in a fixed order and validated for CVD safety — see the
-// dataviz skill's color-formula check (ΔE 15.9 deutan / 17.8 normal-vision
-// for this azure/teal pair against the dark surface, both well above the
-// floor). Never cycle or reassign these per filter.
-const RX_COLOR = 'var(--tblr-azure)' // #4299e1 — inbound
-const TX_COLOR = 'var(--tblr-teal)' // #0ca678 — outbound
+import { getApexChartPalette } from '../../utils/apexChartTheme'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
 
 interface ChartPoint {
   x: number
   y: number
 }
 
-const Line = defineAsyncComponent(async () => {
-  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend)
-  return Line
-})
+const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -84,7 +72,7 @@ const props = withDefaults(defineProps<{
 
 const rxPoints = ref<ChartPoint[]>([])
 const txPoints = ref<ChartPoint[]>([])
-const chartData = shallowRef<ChartData<'line'> | null>(null)
+const series = shallowRef<{ name: string; data: ChartPoint[]; color: string }[] | null>(null)
 const loading = ref(false)
 
 const timeRangeOptions: TimeRangePreset[] = [
@@ -115,80 +103,51 @@ function formatChartTime(timestamp: number | string | undefined): string {
   return d.format('DD/MM HH:mm')
 }
 
-function clampTimestamp(timestampMs: number): number {
-  if (!Number.isFinite(timestampMs)) return NaN
-  return Math.min(timestampMs, Date.now())
+function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
+  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
+    + body
+    + '</div>'
 }
 
-function getMaxPointTimestamp(list: ChartPoint[]): number | undefined {
-  let max = -Infinity
-  for (const p of list) if (Number.isFinite(p.x) && p.x > max) max = p.x
-  return Number.isFinite(max) ? Math.min(Date.now(), max) : undefined
-}
+const chartOptions = ref<ApexOptions>()
 
-function getMinPointTimestamp(list: ChartPoint[]): number | undefined {
-  let min = Infinity
-  for (const p of list) if (Number.isFinite(p.x) && p.x < min) min = p.x
-  return Number.isFinite(min) ? min : undefined
-}
-
-const chartOptions = ref<ChartOptions<'line'>>()
-
-function buildChartOptions(): ChartOptions<'line'> {
+function buildChartOptions(): ApexOptions {
+  const palette = getApexChartPalette()
   const allPoints = [...rxPoints.value, ...txPoints.value]
   return {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: true,
-        position: 'top',
-        align: 'end',
-        labels: { color: '#9ca3af', boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded' },
-      },
-      tooltip: {
-        enabled: true,
-        mode: 'index',
-        intersect: false,
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        borderColor: '#555',
-        borderWidth: 1,
-        padding: 10,
-        callbacks: {
-          title: (items: TooltipItem<'line'>[]) => formatChartTime(items[0]?.parsed?.x ?? undefined),
-          label: (ctx: TooltipItem<'line'>) => `${ctx.dataset.label}: ${formatBytes(ctx.parsed.y ?? 0)}`,
-        },
+    chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    fill: { type: 'solid', opacity: 0.12 },
+    stroke: { curve: 'smooth', width: 2 },
+    markers: { size: 0, hover: { size: 4 } },
+    dataLabels: { enabled: false },
+    legend: { show: true, position: 'top', horizontalAlign: 'right', labels: { colors: palette.legendText }, markers: { size: 5 } },
+    grid: { borderColor: palette.grid },
+    xaxis: {
+      type: 'datetime',
+      min: getMinPointTimestamp(allPoints),
+      max: getMaxPointTimestamp(allPoints),
+      labels: { style: { colors: palette.tickText }, formatter: (v: string) => formatChartTime(Number(v)) },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      tooltip: { enabled: false },
+    },
+    yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => formatBytes(v) } },
+    tooltip: {
+      shared: true,
+      custom: ({ series: s, seriesIndex, dataPointIndex, w }) => {
+        const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
+        const rows = w.globals.seriesNames
+          .map((name: string, idx: number) => `<div>${name}: ${formatBytes(Number(s[idx]?.[dataPointIndex] ?? 0))}</div>`)
+          .join('')
+        return tooltipHtml(palette, formatChartTime(Number(ts)), rows)
       },
     },
-    scales: {
-      x: {
-        type: 'linear',
-        display: true,
-        grid: { color: 'rgba(255,255,255,0.05)' },
-        min: getMinPointTimestamp(allPoints),
-        max: getMaxPointTimestamp(allPoints),
-        ticks: { color: '#6b7280', maxTicksLimit: 8, callback: (v: number | string) => formatChartTime(Number(v)) },
-      },
-      y: {
-        display: true,
-        min: 0,
-        grid: { color: 'rgba(255,255,255,0.05)' },
-        ticks: { color: '#6b7280', callback: (v: number | string) => formatBytes(Number(v)) },
-      },
-    },
-    elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-    interaction: { mode: 'nearest', axis: 'x', intersect: false },
   }
 }
 
-function cssVar(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-}
-
 async function loadHistory(): Promise<void> {
-  if (!chartData.value) loading.value = true
+  if (!series.value) loading.value = true
   try {
     const period = timeRange.value.period || '24h'
     const range = timeRange.value.mode === 'custom' && timeRange.value.from && timeRange.value.to
@@ -206,36 +165,19 @@ async function loadHistory(): Promise<void> {
       .filter((p) => Number.isFinite(p.x))
 
     if (!rxPoints.value.length && !txPoints.value.length) {
-      chartData.value = null
+      series.value = null
       return
     }
 
-    chartData.value = {
-      datasets: [
-        {
-          label: 'Entrant (Rx)',
-          data: rxPoints.value,
-          borderColor: RX_COLOR,
-          backgroundColor: `rgba(${cssVar('--tblr-azure-rgb')},0.12)`,
-          fill: true,
-          tension: 0.3,
-          spanGaps: false,
-        },
-        {
-          label: 'Sortant (Tx)',
-          data: txPoints.value,
-          borderColor: TX_COLOR,
-          backgroundColor: `rgba(${cssVar('--tblr-teal-rgb')},0.12)`,
-          fill: true,
-          tension: 0.3,
-          spanGaps: false,
-        },
-      ],
-    }
+    const palette = getApexChartPalette()
+    series.value = [
+      { name: 'Entrant (Rx)', data: rxPoints.value, color: palette.networkRx },
+      { name: 'Sortant (Tx)', data: txPoints.value, color: palette.networkTx },
+    ]
     chartOptions.value = buildChartOptions()
   } catch (e: unknown) {
     console.error('Failed to load network flows history:', getApiErrorMessage(e))
-    chartData.value = null
+    series.value = null
   } finally {
     loading.value = false
   }

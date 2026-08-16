@@ -9,6 +9,10 @@ import api from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
 import type { ProxmoxBackupJob, ProxmoxBackupRun } from '../types/proxmox'
+import { getApexChartPalette } from '../utils/apexChartTheme'
+import type { RRDChartSeries } from '../components/proxmox/RRDChartCard.vue'
+
+interface RRDPoint { x: number; y: number }
 
 export function useProxmoxNode() {
   const route = useRoute()
@@ -34,12 +38,12 @@ export function useProxmoxNode() {
 
   const nodeTempLoading = ref(false)
   const nodeTempError = ref('')
-  const nodeTempChart = shallowRef<any>(null)
+  const nodeTempChart = shallowRef<RRDChartSeries | null>(null)
   const nodeCpuTempCurrent = ref(0)
 
   const nodeFanLoading = ref(false)
   const nodeFanError = ref('')
-  const nodeFanChart = shallowRef<any>(null)
+  const nodeFanChart = shallowRef<RRDChartSeries | null>(null)
   const nodeFanRPMCurrent = ref(0)
 
   // apt refresh
@@ -76,10 +80,10 @@ export function useProxmoxNode() {
     month: 24 * 30,
     year: 24 * 365,
   }
-  const rrdCpuChart = shallowRef<any>(null)
-  const rrdRamChart = shallowRef<any>(null)
-  const rrdIowaitChart = shallowRef<any>(null)
-  const rrdNetChart = shallowRef<any>(null)
+  const rrdCpuChart = shallowRef<RRDChartSeries | null>(null)
+  const rrdRamChart = shallowRef<RRDChartSeries | null>(null)
+  const rrdIowaitChart = shallowRef<RRDChartSeries | null>(null)
+  const rrdNetChart = shallowRef<RRDChartSeries | null>(null)
   const rrdLoading = ref(false)
   const rrdError = ref('')
 
@@ -212,26 +216,9 @@ export function useProxmoxNode() {
         return
       }
 
-      const labels = points.map((p: any) => {
-        const d = new Date(p.timestamp)
-        if (hours <= 24) {
-          return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-        }
-        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-      })
-      const data = points.map((p: any) => Number(p.cpu_temperature))
-      nodeCpuTempCurrent.value = data[data.length - 1] || 0
-      nodeTempChart.value = {
-        labels,
-        datasets: [{
-          data,
-          borderColor: cssVar('--tblr-red'),
-          backgroundColor: `rgba(${cssVar('--tblr-red-rgb')},0.12)`,
-          fill: true,
-          tension: 0.3,
-          spanGaps: true,
-        }],
-      }
+      const data: RRDPoint[] = points.map((p: any) => ({ x: new Date(p.timestamp).getTime(), y: Number(p.cpu_temperature) }))
+      nodeCpuTempCurrent.value = data[data.length - 1]?.y || 0
+      nodeTempChart.value = [{ name: 'Température', data, color: cssVar('--tblr-red') }]
     } catch (e: unknown) {
       nodeTempError.value = getApiErrorMessage(e, 'Erreur lors du chargement de la température CPU.')
     } finally {
@@ -257,26 +244,9 @@ export function useProxmoxNode() {
         return
       }
 
-      const labels = points.map((p: any) => {
-        const d = new Date(p.timestamp)
-        if (hours <= 24) {
-          return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-        }
-        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-      })
-      const data = points.map((p: any) => Number(p.fan_rpm))
-      nodeFanRPMCurrent.value = data[data.length - 1] || 0
-      nodeFanChart.value = {
-        labels,
-        datasets: [{
-          data,
-          borderColor: cssVar('--tblr-azure'),
-          backgroundColor: `rgba(${cssVar('--tblr-azure-rgb')},0.12)`,
-          fill: true,
-          tension: 0.3,
-          spanGaps: true,
-        }],
-      }
+      const data: RRDPoint[] = points.map((p: any) => ({ x: new Date(p.timestamp).getTime(), y: Number(p.fan_rpm) }))
+      nodeFanRPMCurrent.value = data[data.length - 1]?.y || 0
+      nodeFanChart.value = [{ name: 'RPM', data, color: cssVar('--tblr-azure') }]
     } catch (e: unknown) {
       nodeFanError.value = getApiErrorMessage(e, 'Erreur lors du chargement des RPM ventilateurs.')
     } finally {
@@ -331,7 +301,7 @@ export function useProxmoxNode() {
     rrdError.value = ''
     try {
       const res = await api.getProxmoxNodeRRD(String(route.params.id), timeframe)
-      buildRRDCharts(res.data ?? [], timeframe)
+      buildRRDCharts(res.data ?? [])
     } catch (e: unknown) {
       rrdError.value = getApiErrorMessage(e, 'Erreur lors du chargement des métriques.')
       rrdCpuChart.value = null
@@ -347,68 +317,35 @@ export function useProxmoxNode() {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   }
 
-  function buildRRDCharts(points: any[], timeframe: string): void {
-    const labels = points.map((p: any) => {
-      const d = new Date(p.time * 1000)
-      if (timeframe === 'hour' || timeframe === 'day')
-        return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-      if (timeframe === 'week')
-        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
-    })
+  function buildRRDCharts(points: any[]): void {
+    const palette = getApexChartPalette()
 
-    rrdCpuChart.value = {
-      labels,
-      datasets: [{
-        data: points.map((p: any) => p.cpu != null ? p.cpu * 100 : null),
-        borderColor: cssVar('--tblr-blue'), backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.1)`,
-        fill: true, tension: 0.3, spanGaps: true,
-      }],
-    }
+    const cpuData: RRDPoint[] = points
+      .filter((p: any) => p.cpu != null)
+      .map((p: any) => ({ x: p.time * 1000, y: p.cpu * 100 }))
+    rrdCpuChart.value = cpuData.length ? [{ name: 'CPU', data: cpuData, color: palette.cpu }] : null
 
     // RAM: memused / memtotal are raw bytes from PVE RRD (JSON keys: memused, memtotal)
-    const ramData = points.map((p: any) =>
-      (p.memused != null && p.memtotal != null && p.memtotal > 0)
-        ? (p.memused / p.memtotal) * 100
-        : null
-    )
-    rrdRamChart.value = ramData.some((v: any) => v != null) ? {
-      labels,
-      datasets: [{
-        data: ramData,
-        borderColor: cssVar('--tblr-green'), backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.1)`,
-        fill: true, tension: 0.3, spanGaps: true,
-      }],
-    } : null
+    const ramData: RRDPoint[] = points
+      .filter((p: any) => p.memused != null && p.memtotal != null && p.memtotal > 0)
+      .map((p: any) => ({ x: p.time * 1000, y: (p.memused / p.memtotal) * 100 }))
+    rrdRamChart.value = ramData.length ? [{ name: 'RAM', data: ramData, color: palette.ram }] : null
 
-    const hasIowait = points.some((p: any) => p.iowait != null)
-    rrdIowaitChart.value = hasIowait ? {
-      labels,
-      datasets: [{
-        data: points.map((p: any) => p.iowait != null ? p.iowait * 100 : null),
-        borderColor: cssVar('--tblr-yellow'), backgroundColor: `rgba(${cssVar('--tblr-yellow-rgb')},0.1)`,
-        fill: true, tension: 0.3, spanGaps: true,
-      }],
-    } : null
+    const iowaitData: RRDPoint[] = points
+      .filter((p: any) => p.iowait != null)
+      .map((p: any) => ({ x: p.time * 1000, y: p.iowait * 100 }))
+    rrdIowaitChart.value = iowaitData.length ? [{ name: 'IO Wait', data: iowaitData, color: cssVar('--tblr-yellow') }] : null
 
-    const hasNet = points.some((p: any) => p.netin != null || p.netout != null)
-    rrdNetChart.value = hasNet ? {
-      labels,
-      datasets: [
-        {
-          label: 'Entrante',
-          data: points.map((p: any) => p.netin ?? null),
-          borderColor: cssVar('--tblr-indigo'), backgroundColor: `rgba(${cssVar('--tblr-indigo-rgb')},0.1)`,
-          fill: true, tension: 0.3, spanGaps: true,
-        },
-        {
-          label: 'Sortante',
-          data: points.map((p: any) => p.netout ?? null),
-          borderColor: cssVar('--tblr-pink'), backgroundColor: `rgba(${cssVar('--tblr-pink-rgb')},0.05)`,
-          fill: false, tension: 0.3, spanGaps: true,
-        },
-      ],
-    } : null
+    const rxData: RRDPoint[] = points
+      .filter((p: any) => p.netin != null)
+      .map((p: any) => ({ x: p.time * 1000, y: p.netin }))
+    const txData: RRDPoint[] = points
+      .filter((p: any) => p.netout != null)
+      .map((p: any) => ({ x: p.time * 1000, y: p.netout }))
+    rrdNetChart.value = (rxData.length || txData.length) ? [
+      { name: 'Entrante', data: rxData, color: cssVar('--tblr-indigo') },
+      { name: 'Sortante', data: txData, color: cssVar('--tblr-pink') },
+    ] : null
   }
 
   async function loadLiveStatus(): Promise<void> {

@@ -3,8 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 
-// Real-browser test: Chart.js + the D3/topojson world map actually render here
-// (Chromium provides a real 2D canvas context + layout), unlike happy-dom.
+// Real-browser test: ApexCharts (SVG-based) + the D3/topojson world map
+// actually render here (Chromium provides real layout), unlike happy-dom.
 // Only the API is mocked; charting and map libraries run for real.
 const summaryData = {
   data: {
@@ -31,8 +31,8 @@ vi.mock('../../api', () => ({
     getWebLogsTimeseries: vi.fn(async () => ({
       data: {
         points: [
-          { ts: '2026-05-29T10:00:00Z', total: 100, bots: 10 },
-          { ts: '2026-05-29T11:00:00Z', total: 140, bots: 25 },
+          { timestamp: '2026-05-29T10:00:00Z', human: 90, bot: 10 },
+          { timestamp: '2026-05-29T11:00:00Z', human: 115, bot: 25 },
         ],
       },
     })),
@@ -71,13 +71,20 @@ describe('TrafficOverviewPanel (browser / real render)', () => {
     await new Promise((r) => setTimeout(r, 50))
     window.dispatchEvent(new Event('resize'))
 
-    // The two Chart.js canvases (requests + status) are present and laid out
-    // with real dimensions — proof the extracted chart sub-components rendered.
-    await expect.poll(() => host.querySelectorAll('canvas').length, { timeout: 8000 })
+    // The two ApexCharts instances (requests + status) are present and laid
+    // out with real dimensions — proof the extracted chart sub-components
+    // rendered. ApexCharts draws into an SVG (svg.apexcharts-svg is the root
+    // SVG ApexCharts assigns each chart instance), not a <canvas>, so this
+    // checks clientWidth on that SVG instead of the old canvas.width check.
+    // A broader '.apexcharts-canvas svg' selector also matches nested legend
+    // marker <svg> icons (16px, no class, part of the same chart's DOM), so
+    // it's not used here — it would make the "every element is sized" check
+    // depend on legend marker layout rather than the chart itself.
+    await expect.poll(() => host.querySelectorAll('svg.apexcharts-svg').length, { timeout: 8000 })
       .toBeGreaterThanOrEqual(2)
-    const canvasesSized = Array.from(host.querySelectorAll('canvas'))
-      .every((c) => (c as HTMLCanvasElement).width > 0)
-    expect(canvasesSized).toBe(true)
+    const chartsSized = Array.from(host.querySelectorAll('svg.apexcharts-svg'))
+      .every((svg) => (svg as SVGSVGElement).clientWidth > 0)
+    expect(chartsSized).toBe(true)
 
     // The D3 world map renders one <path class="country"> per country feature
     // (≈177). This is the assertion happy-dom cannot satisfy — it proves the

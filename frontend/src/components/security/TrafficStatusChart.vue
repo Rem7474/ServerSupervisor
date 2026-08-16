@@ -6,16 +6,24 @@
       class="position-absolute inset-0"
     />
   </Transition>
-  <canvas
-    ref="canvasEl"
+  <div
+    class="apex-chart-wrap"
     :style="{ opacity: (chartReady && !loading) ? 1 : 0, transition: 'opacity 0.3s' }"
-  />
+  >
+    <ApexChart
+      type="donut"
+      height="100%"
+      :options="chartOptions"
+      :series="series"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { Chart, ChartEvent, LegendItem, LegendElement } from 'chart.js'
+import { computed, defineAsyncComponent } from 'vue'
+import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import { getApexChartPalette } from '../../utils/apexChartTheme'
 
 type StatusDistribution = Record<string, number>
 
@@ -25,73 +33,51 @@ const props = defineProps<{
   loading: boolean
 }>()
 
-const canvasEl = ref<HTMLCanvasElement | null>(null)
-let chart: Chart | null = null
-let chartLib: typeof Chart | null = null
+const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
-async function ensureChartLib() {
-  if (chartLib) return chartLib
-  const mod = await import('chart.js')
-  mod.Chart.register(...mod.registerables)
-  chartLib = mod.Chart
-  return chartLib
+function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
+  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
+    + `<div>${body}</div>`
+    + '</div>'
 }
 
-async function render() {
-  const Chart = await ensureChartLib()
-  if (!canvasEl.value) return
-  if (chart) {
-    chart.destroy()
-    chart = null
-  }
+const series = computed(() => {
   const d = props.statusDistribution || {}
-  chart = new Chart(canvasEl.value, {
-    type: 'doughnut',
-    data: {
-      labels: ['2xx', '3xx', '4xx', '5xx'],
-      datasets: [{
-        data: [
-          Number(d['2xx']) || 0,
-          Number(d['3xx']) || 0,
-          Number(d['4xx']) || 0,
-          Number(d['5xx']) || 0,
-        ],
-        backgroundColor: ['#639922', '#185FA5', '#BA7517', '#E24B4A'],
-        borderWidth: 0,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '70%',
-      plugins: {
-        legend: {
-          position: 'bottom',
-          onHover: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'doughnut'>) => {
-            legend.chart.canvas.style.cursor = 'pointer'
-          },
-          onLeave: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'doughnut'>) => {
-            legend.chart.canvas.style.cursor = 'default'
-          },
-        },
+  return [
+    Number(d['2xx']) || 0,
+    Number(d['3xx']) || 0,
+    Number(d['4xx']) || 0,
+    Number(d['5xx']) || 0,
+  ]
+})
+
+const chartOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  return {
+    chart: { type: 'donut', animations: { enabled: false } },
+    labels: ['2xx', '3xx', '4xx', '5xx'],
+    colors: ['#639922', '#185FA5', '#BA7517', '#E24B4A'],
+    stroke: { width: 0 },
+    dataLabels: { enabled: false },
+    plotOptions: { pie: { donut: { size: '70%' } } },
+    legend: { show: true, position: 'bottom', labels: { colors: palette.legendText } },
+    tooltip: {
+      custom: ({ series: s, seriesIndex, w }) => {
+        const label = w.globals.labels[seriesIndex] ?? ''
+        return tooltipHtml(palette, String(label), String(s[seriesIndex] ?? 0))
       },
     },
-  })
-}
-
-onMounted(() => {
-  void render()
-})
-
-watch(
-  () => props.statusDistribution,
-  () => {
-    void render()
-  },
-  { deep: true }
-)
-
-onBeforeUnmount(() => {
-  if (chart) chart.destroy()
+  }
 })
 </script>
+
+<style scoped>
+.apex-chart-wrap {
+  height: 100%;
+}
+
+:deep(.apexcharts-legend-series) {
+  cursor: pointer;
+}
+</style>

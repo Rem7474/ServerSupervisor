@@ -119,11 +119,12 @@
           class="card-body"
           style="height: 12rem;"
         >
-          <Line
-            v-if="cpuChartData"
-            :data="cpuChartData"
-            :options="chartOptions"
-            class="h-100"
+          <ApexChart
+            v-if="cpuSeries"
+            type="area"
+            height="100%"
+            :options="cpuChartOptions"
+            :series="cpuSeries"
           />
           <div
             v-else
@@ -145,11 +146,12 @@
           class="card-body"
           style="height: 12rem;"
         >
-          <Line
-            v-if="memChartData"
-            :data="memChartData"
+          <ApexChart
+            v-if="memSeries"
+            type="area"
+            height="100%"
             :options="memChartOptions"
-            class="h-100"
+            :series="memSeries"
           />
           <div
             v-else
@@ -165,11 +167,12 @@
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
-import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
+import type { ApexOptions } from 'apexcharts'
 import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import { fetchMetricsHistory, type MetricsHistoryPoint } from '../../composables/useHostMetricsHistory'
 import dayjs from '../../utils/dayjs'
-import { getChartPalette } from '../../utils/chartTheme'
+import { getApexChartPalette } from '../../utils/apexChartTheme'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
 
 interface MetricsData {
   cpu_cores?: number
@@ -187,16 +190,10 @@ interface MetricsData {
 
 type HistoryPoint = MetricsHistoryPoint
 
-const palette = getChartPalette()
+interface ChartPoint { x: number; y: number }
+interface MemChartPoint extends ChartPoint { memory_used?: number; memory_total?: number }
 
-const Line = defineAsyncComponent(async () => {
-  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
-  return Line
-})
+const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -214,8 +211,10 @@ const props = withDefaults(defineProps<{
 const chartHours = ref(24)
 const historyLoading = ref(false)
 const metricsHistory = ref<HistoryPoint[]>([])
-const cpuChartData = shallowRef<ChartData<'line'> | null>(null)
-const memChartData = shallowRef<ChartData<'line'> | null>(null)
+const cpuPoints = ref<ChartPoint[]>([])
+const memPoints = ref<MemChartPoint[]>([])
+const cpuSeries = shallowRef<{ data: ChartPoint[] }[] | null>(null)
+const memSeries = shallowRef<{ data: MemChartPoint[] }[] | null>(null)
 
 const hasCpuTemp = computed(() => Number(props.metrics?.cpu_temperature) > 0)
 
@@ -229,83 +228,78 @@ const timeRangeOptions = [
   { hours: 8760, label: '1y' },
 ]
 
-function getMaxHistoryTimestamp(list: HistoryPoint[]): number | undefined {
-  let max = -Infinity
-  for (const metric of list || []) {
-    const ts = dayjs(metric.timestamp).valueOf()
-    if (Number.isFinite(ts) && ts > max) max = ts
-  }
-  if (!Number.isFinite(max)) return undefined
-  return Math.min(Date.now(), max)
+function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
+  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
+    + `<div>${body}</div>`
+    + '</div>'
 }
 
-function getMinHistoryTimestamp(list: HistoryPoint[]): number | undefined {
-  let min = Infinity
-  for (const metric of list || []) {
-    const ts = dayjs(metric.timestamp).valueOf()
-    if (Number.isFinite(ts) && ts < min) min = ts
+const cpuChartOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  return {
+    chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    colors: [palette.cpu],
+    fill: { type: 'solid', opacity: 0.1 },
+    stroke: { curve: 'smooth', width: 2 },
+    markers: { size: 0, hover: { size: 5 } },
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    grid: { borderColor: palette.grid },
+    xaxis: {
+      type: 'datetime',
+      min: getMinPointTimestamp(cpuPoints.value),
+      max: getMaxPointTimestamp(cpuPoints.value),
+      labels: { style: { colors: palette.tickText }, formatter: (v: string) => formatChartTime(Number(v)) },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      tooltip: { enabled: false },
+    },
+    yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
+    tooltip: {
+      custom: ({ dataPointIndex }) => {
+        const p = cpuPoints.value[dataPointIndex]
+        if (!p) return ''
+        return tooltipHtml(palette, formatChartTime(p.x), `${p.y.toFixed(1)}%`)
+      },
+    },
   }
-  if (!Number.isFinite(min)) return undefined
-  return min
-}
+})
 
-const chartOptions = computed((): ChartOptions<'line'> => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
+const memChartOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  return {
+    chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    colors: [palette.ram],
+    fill: { type: 'solid', opacity: 0.1 },
+    stroke: { curve: 'smooth', width: 2 },
+    markers: { size: 0, hover: { size: 5 } },
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    grid: { borderColor: palette.grid },
+    xaxis: {
+      type: 'datetime',
+      min: getMinPointTimestamp(memPoints.value),
+      max: getMaxPointTimestamp(memPoints.value),
+      labels: { style: { colors: palette.tickText }, formatter: (v: string) => formatChartTime(Number(v)) },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      tooltip: { enabled: false },
+    },
+    yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
     tooltip: {
-      enabled: true, mode: 'index', intersect: false,
-      backgroundColor: palette.tooltipBackground,
-      titleColor: palette.tooltipText,
-      bodyColor: palette.tooltipText,
-      borderColor: palette.tooltipBorder,
-      borderWidth: 1, padding: 10, displayColors: false,
-      callbacks: {
-        title: (items: TooltipItem<'line'>[]) => formatChartTime(items[0]?.parsed?.x ?? undefined),
-        label: (ctx: TooltipItem<'line'>) => `${(ctx.parsed.y ?? 0).toFixed(1)}%`,
+      custom: ({ dataPointIndex }) => {
+        const p = memPoints.value[dataPointIndex]
+        if (!p) return ''
+        const pct = p.y.toFixed(1)
+        const body = p.memory_used && p.memory_total
+          ? `${pct}%  (${formatBytes(p.memory_used)} / ${formatBytes(p.memory_total)})`
+          : `${pct}%`
+        return tooltipHtml(palette, formatChartTime(p.x), body)
       },
     },
-  },
-  scales: {
-    x: {
-      type: 'linear',
-      display: true,
-      grid: { color: palette.grid },
-      min: getMinHistoryTimestamp(metricsHistory.value),
-      max: getMaxHistoryTimestamp(metricsHistory.value),
-      ticks: {
-        color: palette.tickText,
-        maxTicksLimit: 10,
-        callback: (value: number | string) => formatChartTime(Number(value)),
-      },
-    },
-    y: { display: true, min: 0, max: 100, grid: { color: palette.grid }, ticks: { color: palette.tickText } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}))
-
-const memChartOptions = computed((): ChartOptions<'line'> => ({
-  ...chartOptions.value,
-  plugins: {
-    ...chartOptions.value.plugins,
-    tooltip: {
-      ...chartOptions.value.plugins?.tooltip,
-      callbacks: {
-        title: (items: TooltipItem<'line'>[]) => formatChartTime(items[0]?.parsed?.x ?? undefined),
-        label: (ctx: TooltipItem<'line'>) => {
-          const pct = (ctx.parsed.y ?? 0).toFixed(1)
-          const m = metricsHistory.value[ctx.dataIndex]
-          if (m?.memory_used && m?.memory_total) {
-            return `${pct}%  (${formatBytes(m.memory_used)} / ${formatBytes(m.memory_total)})`
-          }
-          return `${pct}%`
-        },
-      },
-    },
-  },
-}))
+  }
+})
 
 function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
@@ -354,12 +348,6 @@ function formatChartTime(timestamp: number | string | undefined): string {
   return date.format('DD/MM')
 }
 
-function clampTimestamp(timestampMs: number): number {
-  if (!Number.isFinite(timestampMs)) return NaN
-  const now = Date.now()
-  return Math.min(timestampMs, now)
-}
-
 function toChartPoint(metric: HistoryPoint, field: keyof HistoryPoint): { x: number; y: number } | null {
   const timestamp = clampTimestamp(dayjs(metric.timestamp).valueOf())
   const value = metric[field] as number | undefined
@@ -382,7 +370,7 @@ async function loadHistory(hours: number): Promise<void> {
   try {
     const history = await fetchMetricsHistory(props.hostId, hours, props.metricsSource, props.proxmoxGuestId)
     metricsHistory.value = history
-    if (!history.length) { cpuChartData.value = null; memChartData.value = null; return }
+    if (!history.length) { cpuSeries.value = null; memSeries.value = null; return }
     buildCharts()
   } catch (e: unknown) {
     const err = e as { response?: { data?: unknown }; message?: string }
@@ -392,37 +380,21 @@ async function loadHistory(hours: number): Promise<void> {
   }
 }
 
-function cssVar(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-}
-
 function buildCharts(): void {
-  const cpuPoints = metricsHistory.value
+  cpuPoints.value = metricsHistory.value
     .map(m => toChartPoint(m, 'cpu_usage_percent'))
-    .filter(Boolean)
-  const memPoints = metricsHistory.value
-    .map(m => toChartPoint(m, 'memory_percent'))
-    .filter(Boolean)
-  cpuChartData.value = {
-    datasets: [{
-      data: cpuPoints,
-      borderColor: cssVar('--tblr-blue'),
-      backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.1)`,
-      fill: true,
-      tension: 0.3,
-      spanGaps: false,
-    }],
-  }
-  memChartData.value = {
-    datasets: [{
-      data: memPoints,
-      borderColor: cssVar('--tblr-green'),
-      backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.1)`,
-      fill: true,
-      tension: 0.3,
-      spanGaps: false,
-    }],
-  }
+    .filter((p): p is ChartPoint => p != null)
+
+  memPoints.value = metricsHistory.value
+    .map((m): MemChartPoint | null => {
+      const base = toChartPoint(m, 'memory_percent')
+      if (!base) return null
+      return { ...base, memory_used: m.memory_used, memory_total: m.memory_total }
+    })
+    .filter((p): p is MemChartPoint => p != null)
+
+  cpuSeries.value = [{ data: cpuPoints.value }]
+  memSeries.value = [{ data: memPoints.value }]
 }
 
 // Reload chart when the metrics source changes (e.g. user switches agent ↔ proxmox).

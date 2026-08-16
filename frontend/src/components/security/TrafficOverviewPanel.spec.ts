@@ -28,16 +28,11 @@ vi.mock('../../api', () => ({
   },
 }))
 
-// chart.js + topojson are imperative/canvas-bound; stub them so mounting in
-// happy-dom does not throw (no real 2d context / no world atlas).
-vi.mock('chart.js', () => ({
-  Chart: class {
-    static register = vi.fn()
-    destroy = vi.fn()
-    update = vi.fn()
-  },
-  registerables: [],
-}))
+// topojson is imperative/canvas-bound (D3 world map); stub it so mounting in
+// happy-dom does not throw (no world atlas). The two ApexCharts-based traffic
+// charts are stubbed at the component level below instead of mocking
+// vue3-apexcharts here — TrafficRequestsChart/TrafficStatusChart's own
+// <script setup> never runs, so there's nothing chart-library-specific to mock.
 vi.mock('topojson-client', () => ({
   feature: () => ({ features: [] }),
 }))
@@ -62,8 +57,9 @@ describe('TrafficOverviewPanel (characterization)', () => {
     routes: [{ path: '/', component: { template: '<div/>' } }],
   })
 
-  // Charts + world map render imperatively (Chart.js / D3) and are verified in
-  // the real-browser test; stub them here so the happy-dom shell test stays clean.
+  // Charts (ApexCharts, SVG-based) + world map (D3, canvas-adjacent) need a
+  // real browser to render meaningfully and are verified in the real-browser
+  // test; stub them here so the happy-dom shell test stays clean.
   const mountOpts = {
     global: {
       plugins: [router],

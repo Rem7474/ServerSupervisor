@@ -497,11 +497,12 @@
             v-if="summaryLoading || !chartVisible"
             variant="chart"
           />
-          <Line
-            v-else-if="summaryChartData"
-            :data="(summaryChartData as any)"
-            :options="(summaryChartOptions as any)"
-            class="h-100"
+          <ApexChart
+            v-else-if="summaryChartSeries"
+            type="area"
+            height="100%"
+            :options="summaryChartOptions"
+            :series="summaryChartSeries"
           />
           <div
             v-else
@@ -575,14 +576,7 @@ import { pluralize } from '../utils/formatters'
 import { useDashboard, type DashboardProxmoxLinkRecord } from '../composables/useDashboard'
 import { useAttentionCenter } from '../composables/useAttentionCenter'
 
-const Line = defineAsyncComponent(async () => {
-  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend)
-  return Line
-})
+const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 const {
   hosts,
   versionComparisons,
@@ -604,7 +598,7 @@ const {
   selectedHostIds,
   aptLoading,
   summaryHours,
-  summaryChartData,
+  summaryChartSeries,
   summaryLoading,
   chartSource,
   chartSources,
@@ -769,7 +763,7 @@ watch(totalHostPages, (pages) => {
   }
 })
 
-// Lazy-mount the chart: defer loading chart.js + vue-chartjs until the chart
+// Lazy-mount the chart: defer loading vue3-apexcharts until the chart
 // card is actually scrolled into view. The card is above the fold for most
 // users, so the observer fires almost immediately — but on smaller viewports
 // or when the user scrolls past quickly, we skip the work entirely.
