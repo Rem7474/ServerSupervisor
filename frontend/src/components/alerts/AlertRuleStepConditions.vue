@@ -121,6 +121,62 @@
       </div>
     </template>
 
+    <!-- ── bandwidth_vs_rolling_avg ─────────────────────────────────── -->
+    <template v-else-if="form.metric === 'bandwidth_vs_rolling_avg'">
+      <div class="alert alert-light py-2 small mb-3 border">
+        La valeur est la <strong>bande passante actuelle (moyenne sur 5 min) exprimée en % de sa propre moyenne glissante</strong>
+        sur la fenêtre choisie ci-dessous. 100&nbsp;% = trafic normal, 150&nbsp;% = 1,5× la moyenne habituelle.
+      </div>
+      <div class="row">
+        <div class="col-md-12 mb-3">
+          <label class="form-label required">Fenêtre de moyenne glissante</label>
+          <select
+            v-model.number="form.baseline_window_seconds"
+            class="form-select"
+          >
+            <option :value="3600">
+              1 heure
+            </option>
+            <option :value="21600">
+              6 heures
+            </option>
+            <option :value="86400">
+              24 heures
+            </option>
+          </select>
+          <small class="form-hint">
+            Période de référence utilisée pour calculer la bande passante "normale" de l'hôte.
+          </small>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label required">Seuil d'avertissement (% de la moyenne glissante)</label>
+          <input
+            v-model.number="form.threshold_warn"
+            type="number"
+            step="1"
+            min="0"
+            class="form-control"
+            placeholder="150"
+          >
+          <small class="form-hint">Ex. 150 = alerte dès que le trafic dépasse 1,5× la moyenne.</small>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label required">Seuil critique (% de la moyenne glissante)</label>
+          <input
+            v-model.number="form.threshold_crit"
+            type="number"
+            step="1"
+            min="0"
+            class="form-control"
+            placeholder="200"
+          >
+          <small class="form-hint">Ex. 200 = alerte critique dès que le trafic double par rapport à la moyenne.</small>
+        </div>
+      </div>
+    </template>
+
     <!-- ── heartbeat_timeout ────────────────────────────────────────── -->
     <template v-else-if="form.metric === 'heartbeat_timeout'">
       <div class="row">

@@ -29,6 +29,10 @@
               v-if="totalFlows > talkers.length"
               class="text-muted small ms-1"
             >({{ talkers.length }} affichés sur {{ totalFlows }} flux actifs)</span>
+            <span
+              class="text-muted small ms-1"
+              title="Ce tableau reflète le dernier cycle de rapport de l'agent — il n'est pas recalculé sur la plage sélectionnée dans le graphique ci-dessus."
+            >— instantané du dernier cycle</span>
           </h3>
           <div class="d-flex align-items-center gap-2">
             <select
@@ -39,19 +43,33 @@
               <option value="">
                 Tous protocoles
               </option>
-              <option value="tcp">
-                TCP
-              </option>
-              <option value="udp">
-                UDP
-              </option>
+              <optgroup label="Transport">
+                <option value="tcp">
+                  TCP
+                </option>
+                <option value="udp">
+                  UDP
+                </option>
+              </optgroup>
+              <optgroup
+                v-if="serviceOptions.length > 0"
+                label="Service (déduit du port)"
+              >
+                <option
+                  v-for="svc in serviceOptions"
+                  :key="svc"
+                  :value="`svc:${svc}`"
+                >
+                  {{ svc }}
+                </option>
+              </optgroup>
             </select>
             <input
               v-model="search"
               type="text"
               class="form-control form-control-sm"
               style="width: auto;"
-              placeholder="IP ou processus…"
+              placeholder="IP, processus ou service…"
             >
           </div>
         </div>
@@ -82,25 +100,75 @@
           <table class="table table-vcenter card-table mb-0">
             <thead>
               <tr>
-                <th>Processus</th>
-                <th>IP distante</th>
-                <th>Port</th>
-                <th>Protocole</th>
-                <th>Direction</th>
-                <th class="text-end">
-                  Rx
+                <th>
+                  <SortableHeader
+                    label="Processus"
+                    :active="sortKey === 'process_name'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('process_name')"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="IP distante"
+                    :active="sortKey === 'remote_ip'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('remote_ip')"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Port"
+                    :active="sortKey === 'remote_port'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('remote_port')"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Protocole"
+                    :active="sortKey === 'protocol'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('protocol')"
+                  />
+                </th>
+                <th>
+                  <SortableHeader
+                    label="Direction"
+                    :active="sortKey === 'direction'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('direction')"
+                  />
                 </th>
                 <th class="text-end">
-                  Tx
+                  <SortableHeader
+                    label="Rx"
+                    :active="sortKey === 'rx_bytes'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('rx_bytes')"
+                  />
                 </th>
                 <th class="text-end">
-                  Connexions
+                  <SortableHeader
+                    label="Tx"
+                    :active="sortKey === 'tx_bytes'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('tx_bytes')"
+                  />
+                </th>
+                <th class="text-end">
+                  <SortableHeader
+                    label="Connexions"
+                    :active="sortKey === 'connections'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('connections')"
+                  />
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="t in filteredTalkers"
+                v-for="t in sortedTalkers"
                 :key="`${t.is_others}-${t.remote_ip}-${t.remote_port}-${t.protocol}-${t.direction}`"
                 :class="t.is_others ? 'text-muted fst-italic' : 'clickable-row'"
                 :role="t.is_others ? undefined : 'button'"
@@ -130,7 +198,21 @@
                   </td>
                   <td>{{ t.remote_port }}</td>
                   <td>
-                    <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ t.protocol }}</span>
+                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                      <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ t.protocol }}</span>
+                      <!-- A real SNI hostname is presented plainly; a port-based
+                           guess is muted + marked so it never reads as a fact. -->
+                      <span
+                        v-if="labelFor(t).source === 'sni'"
+                        class="badge bg-purple-lt text-purple"
+                        title="Nom de serveur TLS (SNI) observé sur le trafic"
+                      >{{ labelFor(t).text }}</span>
+                      <span
+                        v-else-if="labelFor(t).source === 'port'"
+                        class="text-muted small heuristic-label"
+                        :title="PORT_GUESS_HINT"
+                      >≈ {{ labelFor(t).text }}</span>
+                    </div>
                   </td>
                   <td>
                     <span
@@ -201,11 +283,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { IconNetwork, IconWifiOff } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
+import SortableHeader from '../common/SortableHeader.vue'
 import NetworkFlowsHistoryChart from './NetworkFlowsHistoryChart.vue'
 import { useNetworkFlows } from '../../composables/useNetworkFlows'
 import { useModalChrome } from '../../composables/useModalChrome'
 import { formatBytes } from '../../utils/formatters'
-import type { NetworkFlowMetric } from '../../types/networkFlows'
+import { compareValues } from '../../utils/sort'
+import { protocolLabelFor, PORT_GUESS_HINT, type ProtocolLabel } from '../../utils/portServices'
+import { SERVICE_FILTER_PREFIX, type NetworkFlowFilterValue, type NetworkFlowMetric } from '../../types/networkFlows'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -233,19 +318,79 @@ const props = withDefaults(defineProps<{
 
 const { talkers, loading, load } = useNetworkFlows(props.hostId, props.initialData)
 
-const protocolFilter = ref('')
+const protocolFilter = ref<NetworkFlowFilterValue>('')
 const search = ref('')
 
 const totalFlows = computed(() => talkers.value.length)
 
+/**
+ * Application-level label for a talker: the agent's observed TLS SNI hostname
+ * when the optional capture provided one, otherwise a well-known-port guess.
+ * Memoized per render pass — the template reads it up to three times per row.
+ */
+const labelCache = computed(() => {
+  const map = new Map<NetworkFlowMetric, ProtocolLabel>()
+  for (const t of talkers.value) {
+    map.set(t, protocolLabelFor(t.server_name, t.remote_port, t.protocol))
+  }
+  return map
+})
+
+function labelFor(t: NetworkFlowMetric): ProtocolLabel {
+  return labelCache.value.get(t) ?? { text: '', source: 'none' }
+}
+
+/** Distinct application labels present in the current data, for the filter. */
+const serviceOptions = computed(() => {
+  const seen = new Set<string>()
+  for (const t of talkers.value) {
+    if (t.is_others) continue
+    const label = labelFor(t)
+    if (label.source !== 'none') seen.add(label.text)
+  }
+  return [...seen].sort((a, b) => a.localeCompare(b, 'fr'))
+})
+
 const filteredTalkers = computed(() => {
   const q = search.value.trim().toLowerCase()
+  const filter = protocolFilter.value
   return talkers.value.filter((t) => {
-    if (protocolFilter.value && t.protocol !== protocolFilter.value) return false
+    if (filter.startsWith(SERVICE_FILTER_PREFIX)) {
+      // The "others" rollup has no remote port, so it can never match a
+      // service filter — same reasoning as the search branch below.
+      if (t.is_others) return false
+      if (labelFor(t).text !== filter.slice(SERVICE_FILTER_PREFIX.length)) return false
+    } else if (filter && t.protocol !== filter) {
+      return false
+    }
     if (!q) return true
     if (t.is_others) return false
-    return (t.remote_ip ?? '').toLowerCase().includes(q) || (t.process_name ?? '').toLowerCase().includes(q)
+    return (t.remote_ip ?? '').toLowerCase().includes(q)
+      || (t.process_name ?? '').toLowerCase().includes(q)
+      || labelFor(t).text.toLowerCase().includes(q)
   })
+})
+
+const sortKey = ref<keyof NetworkFlowMetric>('rx_bytes')
+const sortDir = ref<'asc' | 'desc'>('desc')
+
+function toggleSort(key: keyof NetworkFlowMetric): void {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortKey.value = key
+  sortDir.value = 'asc'
+}
+
+// The synthetic "Autres" aggregate row (is_others) always stays last — it
+// summarizes everything past the top-N cutoff, not a real talker to rank
+// alongside the rest.
+const sortedTalkers = computed(() => {
+  const real = filteredTalkers.value.filter((t) => !t.is_others)
+  const others = filteredTalkers.value.filter((t) => t.is_others)
+  real.sort((a, b) => compareValues(a[sortKey.value], b[sortKey.value], sortDir.value))
+  return [...real, ...others]
 })
 
 const drilldownTalker = ref<NetworkFlowMetric | null>(null)
@@ -279,3 +424,10 @@ watch(() => props.active, (isActive) => {
   if (isActive && props.collectorAvailable !== false) load()
 })
 </script>
+
+<style scoped>
+/* Signals "hover me for the caveat" on the port-derived guess. */
+.heuristic-label {
+  cursor: help;
+}
+</style>

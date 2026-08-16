@@ -442,6 +442,7 @@ func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTracker
 	g.POST("/release-trackers", h.Create)
 	g.POST("/release-trackers/bulk", h.CreateBulk)
 	g.GET("/release-trackers/trackable-containers", h.ListTrackableContainers)
+	g.GET("/release-trackers/pickable-containers", h.ListPickableContainers)
 	g.GET("/release-trackers/:id", h.Get)
 	g.PUT("/release-trackers/:id", h.Update)
 	g.DELETE("/release-trackers/:id", h.Delete)

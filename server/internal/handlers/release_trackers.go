@@ -35,6 +35,20 @@ func (h *ReleaseTrackerHandler) CheckAll(ctx context.Context) {
 	h.svc.CheckAll(ctx)
 }
 
+// DockerImagePollInterval is the ambient image-version engine's cadence (6h by
+// default, DOCKER_IMAGE_POLL_INTERVAL).
+func (h *ReleaseTrackerHandler) DockerImagePollInterval() time.Duration {
+	return h.svc.ImagePollInterval()
+}
+
+// RefreshDockerImageVersions runs one ambient sweep over every image running in
+// the fleet. Exposed here — rather than as its own handler — so main wires a
+// single shared dockerversions.Service instance: the tracker poller reads the
+// same engine on demand, and two instances could issue duplicate registry calls.
+func (h *ReleaseTrackerHandler) RefreshDockerImageVersions(ctx context.Context) {
+	h.svc.RefreshImageVersions(ctx)
+}
+
 // HandleCommandCompletion implements CommandCompletionListener: it notifies the
 // service when a tracker-triggered command reaches a terminal state.
 func (h *ReleaseTrackerHandler) HandleCommandCompletion(commandID, status string) {

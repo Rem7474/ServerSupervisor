@@ -87,7 +87,7 @@ type wsAuthMessage struct {
 }
 
 func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub, bus *events.Bus, latestAgentVersion func() string) *WSHandler {
-	return &WSHandler{
+	h := &WSHandler{
 		db:                 db,
 		cfg:                cfg,
 		streamHub:          NewCommandStreamHub(),
@@ -97,6 +97,41 @@ func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub
 		latestAgentVersion: latestAgentVersion,
 		ipConns:            make(map[string]int),
 	}
+	h.agentHub.SetOnDisconnect(h.handleAgentDisconnect)
+	return h
+}
+
+// agentDisconnectGrace is how long handleAgentDisconnect waits before
+// trusting an agentws close as a real disconnect. Long enough to absorb an
+// agent process restart (reconnect backoff starts at 3s, see
+// agent/internal/agentws) without flapping the dashboard; short enough to
+// still beat the 2-minute last-seen fallback (background.NewHostStatusJob)
+// by a wide margin.
+const agentDisconnectGrace = 10 * time.Second
+
+// handleAgentDisconnect reacts to an agentws socket closing (AgentHub's
+// onDisconnect hook) by checking, after agentDisconnectGrace, whether the
+// host has gone genuinely quiet — no reconnect, no fresh report — and if so
+// marks it offline immediately instead of waiting out the periodic
+// last-seen sweep. Purely a latency optimization: hosts with no live
+// agentws connection (older agents, proxies blocking WS upgrades) are
+// unaffected and keep relying on that sweep exactly as before.
+func (h *WSHandler) handleAgentDisconnect(hostID string) {
+	safego.Go(context.Background(), "ws.agent-disconnect-check", func() {
+		time.Sleep(agentDisconnectGrace)
+		if h.agentHub.Connected(hostID) {
+			return // reconnected within the grace window
+		}
+		ctx := context.Background()
+		changed, err := h.db.MarkHostOfflineIfStale(ctx, hostID, agentDisconnectGrace)
+		if err != nil {
+			slog.Error("agentws disconnect: host status check failed", slog.String("host_id", hostID), slog.Any("err", err))
+			return
+		}
+		if changed {
+			h.events.PublishAll(events.TopicDashboard, events.TopicNetwork, events.TopicApt)
+		}
+	})
 }
 
 func (h *WSHandler) acquireConn(ip string) bool {

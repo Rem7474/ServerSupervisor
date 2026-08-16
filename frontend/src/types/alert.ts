@@ -27,5 +27,6 @@ export interface AlertRulePayload {
   threshold_clear_warn?: number
   threshold_clear_crit?: number
   duration?: number
+  baseline_window_seconds?: number
   actions?: AlertActions
 }

@@ -16,6 +16,23 @@ export interface RegistryCredential {
   registry_host?: string
 }
 
+/**
+ * A running container offered by the docker tracker's container picker, which
+ * replaced the free-text image/tag inputs: the ambient version engine already
+ * knows every running image, so a tracker is configured by pointing at a real
+ * container rather than by retyping its image reference.
+ */
+export interface PickableContainer {
+  host_id: string
+  host_name?: string
+  container_name?: string
+  image: string
+  image_tag?: string
+  compose_project?: string
+  compose_service?: string
+  tracked?: boolean
+}
+
 export interface WebhookItem {
   name?: string
   tracker_type?: string
@@ -116,6 +133,7 @@ export interface WebhookFormProps {
 export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: WebhookFormData) => void) {
   const customTasks = ref<CustomTask[]>([])
   const registryCredentials = ref<RegistryCredential[]>([])
+  const pickableContainers = ref<PickableContainer[]>([])
   const validationError = ref('')
 
   const defaultWebhookForm = (): WebhookFormData => ({
@@ -255,6 +273,75 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
     }
   }
 
+  async function loadPickableContainers(): Promise<void> {
+    try {
+      const response = await api.getPickableContainers()
+      pickableContainers.value = Array.isArray(response.data?.containers) ? response.data.containers : []
+    } catch {
+      pickableContainers.value = []
+    }
+  }
+
+  // ===== docker container picker =====
+  //
+  // Replaces the free-text image/tag inputs: a docker tracker now points at a
+  // real running container. The image reference is still what gets stored (the
+  // update action needs to know exactly what it targets) — it is just derived
+  // from the selection instead of retyped.
+
+  /** Host whose containers the picker lists. Not necessarily the dispatch target yet. */
+  const containerSourceHostId = ref('')
+
+  const containerHosts = computed(() => {
+    const seen = new Map<string, string>()
+    for (const c of pickableContainers.value) {
+      if (!seen.has(c.host_id)) seen.set(c.host_id, c.host_name || c.host_id)
+    }
+    return [...seen].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  })
+
+  const containersForHost = computed(() =>
+    pickableContainers.value.filter((c) => c.host_id === containerSourceHostId.value),
+  )
+
+  function containerKey(c: PickableContainer): string {
+    return `${c.host_id}|${c.image}|${c.image_tag || 'latest'}`
+  }
+
+  const selectedContainerKey = computed(() =>
+    form.value.docker_image
+      ? `${containerSourceHostId.value}|${form.value.docker_image}|${form.value.docker_tag || 'latest'}`
+      : '',
+  )
+
+  /**
+   * True when the tracker already targets an image no running container
+   * exposes (container stopped, host removed, tracker created before the
+   * picker existed). The form keeps that value instead of silently dropping
+   * it, and the picker offers it as an explicit extra option.
+   */
+  const selectedContainerMissing = computed(() =>
+    !!form.value.docker_image &&
+    !containersForHost.value.some((c) => containerKey(c) === selectedContainerKey.value),
+  )
+
+  function selectContainer(key: string): void {
+    const picked = containersForHost.value.find((c) => containerKey(c) === key)
+    if (!picked) return
+    form.value.docker_image = picked.image
+    form.value.docker_tag = picked.image_tag || 'latest'
+    // The container's own host is the only sensible dispatch target, and its
+    // compose coordinates are what a compose-mode update would act on.
+    form.value.host_id = picked.host_id
+    if (picked.compose_project) {
+      form.value.compose_project = picked.compose_project
+      form.value.compose_service = picked.compose_service || ''
+    }
+    if (!form.value.name) {
+      form.value.name = picked.container_name || picked.image
+    }
+  }
+
   function validate(): string {
     if (props.mode === 'tracker') {
       if (!form.value.name) return 'Le nom est obligatoire.'
@@ -270,7 +357,7 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
         }
       } else {
         if (!form.value.docker_image) {
-          return "L'image Docker est obligatoire pour un tracker Docker."
+          return 'Sélectionnez le conteneur à suivre.'
         }
         if ((form.value.repo_owner && !form.value.repo_name) || (!form.value.repo_owner && form.value.repo_name)) {
           return 'Pour le repo Git lie, renseignez owner et depot ensemble (ou laissez les deux vides).'
@@ -342,8 +429,20 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
       if (!props.visible) return
       validationError.value = ''
       hydrateForm()
+      // The picker starts on the tracker's own host so an existing tracker
+      // opens with its container already selected.
+      containerSourceHostId.value = form.value.host_id || ''
       await loadCustomTasks(form.value.host_id)
-      if (props.mode === 'tracker') await loadRegistryCredentials()
+      if (props.mode === 'tracker') {
+        await Promise.all([loadRegistryCredentials(), loadPickableContainers()])
+        // A tracker created before the picker existed (or a monitor-only one)
+        // has no host_id: fall back to the host actually running its image so
+        // the selection isn't lost on edit.
+        if (!containerSourceHostId.value && form.value.docker_image) {
+          const owner = pickableContainers.value.find((c) => c.image === form.value.docker_image)
+          if (owner) containerSourceHostId.value = owner.host_id
+        }
+      }
     },
     { immediate: true, deep: true },
   )
@@ -371,6 +470,14 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
     form,
     customTasks,
     registryCredentials,
+    pickableContainers,
+    containerSourceHostId,
+    containerHosts,
+    containersForHost,
+    containerKey,
+    selectedContainerKey,
+    selectedContainerMissing,
+    selectContainer,
     validationError,
     currentEnvVars,
     isComposeMode,

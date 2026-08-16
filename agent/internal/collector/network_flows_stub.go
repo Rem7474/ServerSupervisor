@@ -26,6 +26,7 @@ type NetworkFlowTalker struct {
 	Direction   string `json:"direction"`
 	ProcessName string `json:"process_name,omitempty"`
 	PID         int    `json:"pid,omitempty"`
+	ServerName  string `json:"server_name,omitempty"`
 	RxBytes     uint64 `json:"rx_bytes"`
 	TxBytes     uint64 `json:"tx_bytes"`
 	Packets     uint64 `json:"packets"`
@@ -41,7 +42,7 @@ type NetworkFlowBucket struct {
 // CollectNetworkFlows is unavailable on non-Linux platforms (conntrack is a
 // Linux-only kernel facility) — always reports the capability as absent
 // rather than erroring, same contract as the Linux implementation.
-func CollectNetworkFlows(_ context.Context, _ int) (*NetworkFlowsReport, error) {
+func CollectNetworkFlows(_ context.Context, _ int, _ bool) (*NetworkFlowsReport, error) {
 	return &NetworkFlowsReport{Available: false, Reason: "unsupported platform", CollectedAt: time.Now()}, nil
 }
 

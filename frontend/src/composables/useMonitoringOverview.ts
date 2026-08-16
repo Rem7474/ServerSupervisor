@@ -194,7 +194,8 @@ export function useMonitoringOverview() {
     autoRefresh,
     lastUpdatedAt,
     REFRESH_SEC: uptime.REFRESH_SEC,
-    // probe CRUD (modal shared with the merged table's "Nouvelle sonde" action)
+    // probe CRUD (modal shared with the merged table's single "Nouveau
+    // suivi" entry point, MonitoringOverviewPanel.vue's openCreateProbe)
     probeModalOpen: uptime.probeModalOpen,
     savingProbe: uptime.savingProbe,
     probeFormError: uptime.probeFormError,
@@ -204,12 +205,14 @@ export function useMonitoringOverview() {
     closeProbeModal: uptime.closeProbeModal,
     saveProbe: uptime.saveProbe,
     confirmDeleteProbe: uptime.confirmDeleteProbe,
-    // cert CRUD (modal shared with the merged table's "Ajouter un certificat" action)
+    // cert CRUD — creation goes through the same shared modal (toggle to
+    // "Certificat SSL" from openCreateProbe's default); only editing an
+    // existing cert has its own direct entry point (openEditCert, from the
+    // row's own edit button).
     certModalOpen: ssl.certModalOpen,
     savingCert: ssl.savingCert,
     certFormError: ssl.certFormError,
     certForm: ssl.certForm,
-    openCreateCert: ssl.openCreateCert,
     openEditCert: ssl.openEditCert,
     closeCertModal: ssl.closeCertModal,
     saveCert: ssl.saveCert,

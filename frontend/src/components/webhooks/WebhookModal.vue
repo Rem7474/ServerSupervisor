@@ -103,8 +103,15 @@
             <!-- ===== TRACKER FIELDS ===== -->
             <template v-else>
               <WebhookTrackerFields
+                v-model:container-source-host-id="containerSourceHostId"
                 :form="form"
                 :registry-credentials="registryCredentials"
+                :container-hosts="containerHosts"
+                :containers-for-host="containersForHost"
+                :container-key="containerKey"
+                :selected-container-key="selectedContainerKey"
+                :selected-container-missing="selectedContainerMissing"
+                @select-container="selectContainer"
               />
             </template>
 
@@ -537,6 +544,13 @@ const {
   form,
   customTasks,
   registryCredentials,
+  containerSourceHostId,
+  containerHosts,
+  containersForHost,
+  containerKey,
+  selectedContainerKey,
+  selectedContainerMissing,
+  selectContainer,
   currentEnvVars,
   isComposeMode,
   title,

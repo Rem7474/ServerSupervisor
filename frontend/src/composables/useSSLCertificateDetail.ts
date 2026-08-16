@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
 import { isApiAbort } from '../api/client'
@@ -11,7 +11,10 @@ type SSLCert = SSLCertificate
 // certIdOverride mirrors useUptimeProbeDetail's probeIdOverride — lets
 // MonitoringHostDetailView reuse this composable keyed by an id it already
 // resolved (the NPM proxy host's linked cert) instead of route.params.id.
-export function useSSLCertificateDetail(certIdOverride?: string) {
+// autoRefreshOverride mirrors useUptimeProbeDetail's, letting that same page
+// drive pause/resume from one shared control — standalone routes never pass
+// it, so their behavior is unchanged.
+export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOverride?: Ref<boolean>) {
   const route = useRoute()
   const certId = certIdOverride ?? (route.params.id as string)
   const signal = useAbortSignal()
@@ -21,7 +24,7 @@ export function useSSLCertificateDetail(certIdOverride?: string) {
   const loading = ref(false)
   const loadingEvents = ref(false)
   const error = ref('')
-  const autoRefresh = ref(true)
+  const autoRefresh = autoRefreshOverride ?? ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
   const REFRESH_SEC = 60
 

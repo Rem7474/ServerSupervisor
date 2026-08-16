@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -32,8 +33,14 @@ type DockerContainer struct {
 	EnvVars     map[string]string `json:"env_vars,omitempty"`
 	Volumes     []string          `json:"volumes,omitempty"`
 	Networks    []string          `json:"networks,omitempty"`
-	NetRxBytes  uint64            `json:"net_rx_bytes,omitempty"`
-	NetTxBytes  uint64            `json:"net_tx_bytes,omitempty"`
+	// IPAddresses holds every address Docker assigned this container across its
+	// attached networks (one IPv4 and/or one IPv6 per network), sorted for a
+	// stable payload. Used locally by the network-flow collector to recognize
+	// container-originated traffic (see container_ips.go) and reported to the
+	// server as container metadata.
+	IPAddresses []string `json:"ip_addresses,omitempty"`
+	NetRxBytes  uint64   `json:"net_rx_bytes,omitempty"`
+	NetTxBytes  uint64   `json:"net_tx_bytes,omitempty"`
 }
 
 const containerShutdownTimeoutSecs uint = 10 // seconds to wait before SIGKILL
@@ -182,9 +189,25 @@ func CollectDocker() ([]DockerContainer, error) {
 			}
 
 			var networks []string
-			for netName := range container.NetworkSettings.Networks {
+			var ipAddresses []string
+			for netName, endpoint := range container.NetworkSettings.Networks {
 				networks = append(networks, netName)
+				if endpoint.IPAddress != "" {
+					ipAddresses = append(ipAddresses, endpoint.IPAddress)
+				}
+				if endpoint.GlobalIPv6Address != "" {
+					ipAddresses = append(ipAddresses, endpoint.GlobalIPv6Address)
+				}
 			}
+			// Pre-1.10 / default-bridge containers report their address on
+			// NetworkSettings itself rather than under Networks.
+			if len(ipAddresses) == 0 && container.NetworkSettings.IPAddress != "" {
+				ipAddresses = append(ipAddresses, container.NetworkSettings.IPAddress)
+			}
+			// Networks is a map: sort both slices so the reported payload (and
+			// the contract-test golden fixture) doesn't churn between cycles.
+			sort.Strings(networks)
+			sort.Strings(ipAddresses)
 
 			var imageDigest string
 			imageDigestCacheMu.RLock()
@@ -231,6 +254,7 @@ func CollectDocker() ([]DockerContainer, error) {
 				EnvVars:     envVars,
 				Volumes:     volumes,
 				Networks:    networks,
+				IPAddresses: ipAddresses,
 			}, valid: true}
 		}(i, ac.ID)
 	}
@@ -264,6 +288,11 @@ func CollectDocker() ([]DockerContainer, error) {
 		}(i)
 	}
 	wg.Wait()
+
+	// Share the container IP → name mapping with the network-flow collector,
+	// which runs in a sibling goroutine and can't call back into Docker itself
+	// without duplicating this whole inspect pass (see container_ips.go).
+	publishContainerIPs(containers)
 
 	slog.Debug("docker containers collected", "count", len(containers))
 	return containers, nil
@@ -697,4 +726,3 @@ func ExecuteComposeCommand(action, projectName, workingDir string, chunkCB func(
 	cmdErr := cmd.Wait()
 	return fullOutput.String(), cmdErr
 }
-

@@ -169,8 +169,14 @@ func (r RegistryCredentialRequest) ToModel() RegistryCredential {
 	}
 }
 
-// TrackableContainer is a compose-managed container discovered across hosts
-// that does not yet have a release tracker — used to pre-fill bulk creation.
+// TrackableContainer is a running container discovered across hosts, used both
+// to pre-fill bulk creation (ListTrackableContainers: compose-managed and not
+// yet tracked — the "activer la mise à jour auto" flow, which can only auto-update
+// what compose owns) and to back the single-tracker container picker
+// (ListPickableContainers: every running container, tracked or not, compose or
+// not — a manual tracker only needs an image ref, so the compose restriction
+// would hide legitimate targets). ContainerName/Tracked are populated by the
+// picker query only; they stay zero-valued in the bulk-create listing.
 type TrackableContainer struct {
 	HostID         string `json:"host_id"`
 	HostName       string `json:"host_name"`
@@ -178,6 +184,8 @@ type TrackableContainer struct {
 	ImageTag       string `json:"image_tag"`
 	ComposeProject string `json:"compose_project"`
 	ComposeService string `json:"compose_service"`
+	ContainerName  string `json:"container_name,omitempty"`
+	Tracked        bool   `json:"tracked,omitempty"`
 }
 
 type ReleaseVersionHistoryItem struct {

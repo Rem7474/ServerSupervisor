@@ -179,17 +179,18 @@
                 <code>{{ containerVersion(c)?.running_version || c.image_tag }}</code>
                 <template v-if="containerVersion(c)">
                   <span
-                    v-if="containerVersion(c)?.is_up_to_date"
+                    v-if="containerVersion(c)?.status === 'up_to_date'"
                     class="badge bg-success-lt text-success"
                   >À jour</span>
                   <span
-                    v-else-if="containerVersion(c)?.running_version || containerVersion(c)?.update_confirmed"
+                    v-else-if="containerVersion(c)?.status === 'update_available'"
                     class="badge bg-warning-lt text-warning"
                     :title="`Dernière version : ${containerVersion(c)?.latest_version}`"
                   >Mise à jour disponible</span>
                   <span
                     v-else
                     class="badge bg-secondary-lt text-secondary"
+                    :title="unknownVersionTitle(containerVersion(c))"
                   >Version inconnue</span>
                 </template>
               </div>
@@ -716,6 +717,7 @@ import { useDockerContainerPorts } from '../../composables/useDockerContainerPor
 import { usePagination } from '../../composables/usePagination'
 import { getApiErrorMessage } from '../../api/client'
 import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
+import type { VersionComparisonStatus } from '../../types/docker'
 import {
   getComposeInfo as getComposeInfoFromLabels,
   isComposeContainer as isComposeContainerFromLabels,
@@ -742,10 +744,13 @@ interface VersionComparison {
   tracker_id?: string
   host_id: string
   docker_image: string
+  image_tag?: string
   running_version?: string
   latest_version?: string
+  status?: VersionComparisonStatus
   is_up_to_date?: boolean
   update_confirmed?: boolean
+  last_error?: string
 }
 
 const router = useRouter()
@@ -766,17 +771,24 @@ const props = withDefaults(defineProps<{
 
 const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers') as any)
 
+// Two kinds of rows land here: ambient ones (one per host+image+tag group,
+// carrying image_tag) and tracker ones (aggregated across tags, image_tag
+// empty). Indexing both under distinct keys keeps the exact-tag ambient row
+// preferred while the tracker row stays reachable as the fallback — the server
+// never emits both for the same container group.
 const versionMap = computed<Record<string, VersionComparison>>(() => {
   const m: Record<string, VersionComparison> = {}
   for (const vc of props.versionComparisons) {
-    m[vc.host_id + '|' + vc.docker_image] = vc
+    if (vc.image_tag) m[`${vc.host_id}|${vc.docker_image}|${vc.image_tag}`] = vc
+    else m[`${vc.host_id}|${vc.docker_image}`] = vc
   }
   return m
 })
 
 function containerVersion(c: Container): VersionComparison | null {
-  return versionMap.value[c.host_id + '|' + c.image] ||
-         versionMap.value[c.host_id + '|' + c.image + ':' + c.image_tag] ||
+  return versionMap.value[`${c.host_id}|${c.image}|${c.image_tag || 'latest'}`] ||
+         versionMap.value[`${c.host_id}|${c.image}`] ||
+         versionMap.value[`${c.host_id}|${c.image}:${c.image_tag}`] ||
          null
 }
 
@@ -898,6 +910,13 @@ function formatBytes(bytes: number | undefined): string {
 function openTracker(trackerId: string | undefined): void {
   if (!trackerId) return
   router.push(`/release-trackers/${trackerId}`)
+}
+
+// The ambient engine records why it couldn't classify an image (private
+// registry with no matching credential, registry unreachable, not swept yet) —
+// surface it rather than leaving "Version inconnue" unexplained.
+function unknownVersionTitle(vc: VersionComparison | null | undefined): string {
+  return vc?.last_error || "Aucune information de version disponible pour cette image (registre non interrogeable ou pas encore vérifié)."
 }
 
 function canRunTracker(vc: VersionComparison | null | undefined): boolean {

@@ -277,6 +277,25 @@ func (db *DB) UpdateHostStatusBasedOnLastSeen(ctx context.Context, maxOfflineMin
 	return n, nil
 }
 
+// MarkHostOfflineIfStale flips a single host to 'offline' if its last_seen is
+// older than minStale, and reports whether it actually flipped. Used by the
+// agentws disconnect hook to react far faster than
+// UpdateHostStatusBasedOnLastSeen's 2-minute sweep when the socket close
+// gives us direct evidence — still gated on last_seen so a report that lands
+// concurrently with a transient WS drop is not treated as a false offline.
+func (db *DB) MarkHostOfflineIfStale(ctx context.Context, hostID string, minStale time.Duration) (bool, error) {
+	cutoffTime := time.Now().Add(-minStale)
+	res, err := db.conn.ExecContext(ctx,
+		`UPDATE hosts SET status = 'offline' WHERE id = $1 AND status != 'offline' AND last_seen < $2`,
+		hostID, cutoffTime,
+	)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // UpdateHostCollectors updates which collectors/metrics are available on a host.
 // collectorsJSON must be a valid JSON object (e.g. `{"docker":true,"smart":false,"cpu_temp":true}`).
 func (db *DB) UpdateHostCollectors(ctx context.Context, hostID, collectorsJSON string) error {

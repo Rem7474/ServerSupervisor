@@ -14,17 +14,10 @@
           v-if="auth.role === 'admin'"
           class="d-flex gap-2"
         >
-          <button
-            type="button"
-            class="btn btn-outline-primary btn-sm"
-            @click="panelRef?.openCreateCert()"
-          >
-            <IconPlus
-              :size="14"
-              class="icon me-1"
-            />
-            Certificat SSL
-          </button>
+          <!-- One entry point into the shared create modal (see
+               MonitoringOverviewPanel.vue), which already lets the user pick
+               uptime, SSL, or both inside — two separate buttons here used to
+               just pre-select a type the modal's own toggle already covers. -->
           <button
             type="button"
             class="btn btn-primary btn-sm"
@@ -34,7 +27,7 @@
               :size="14"
               class="icon me-1"
             />
-            Nouvelle sonde
+            Nouveau suivi
           </button>
         </div>
       </div>

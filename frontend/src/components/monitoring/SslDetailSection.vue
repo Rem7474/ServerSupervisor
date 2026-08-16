@@ -1,6 +1,7 @@
 <template>
   <div>
     <PageRefreshBar
+      v-if="!hideRefreshBar"
       v-model="autoRefresh"
       label="Certificat SSL"
       :interval-sec="REFRESH_SEC"
@@ -243,7 +244,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import RelativeTime from '../RelativeTime.vue'
@@ -251,10 +252,31 @@ import PageRefreshBar from '../PageRefreshBar.vue'
 import { useSSLCertificateDetail } from '../../composables/useSSLCertificateDetail'
 import type { SSLCertificate } from '../../types/ssl'
 
-const props = defineProps<{ certId: string }>()
+// hideRefreshBar/autoRefresh: set together by MonitoringHostDetailView when
+// both a probe and a cert are configured, so the two sections share one
+// PageRefreshBar instead of each rendering its own "dernière MAJ" + dot.
+// Neither is passed by the standalone /monitoring/ssl/:id route, which keeps
+// its own independent bar exactly as before.
+const props = defineProps<{
+  certId: string
+  hideRefreshBar?: boolean
+  autoRefresh?: boolean
+}>()
 const emit = defineEmits<{
   (e: 'loaded', cert: SSLCertificate | null): void
+  (e: 'update:autoRefresh', value: boolean): void
 }>()
+
+// Gated on hideRefreshBar, not on `props.autoRefresh === undefined`: Vue
+// casts an optional `boolean` prop that isn't bound at all (every caller
+// except MonitoringHostDetailView's merged-bar case) to `false`, not
+// `undefined` — checking the raw value here would permanently freeze
+// autoRefresh off on every standalone route. hideRefreshBar and autoRefresh
+// are always set together by the one caller that uses either.
+const autoRefreshOverride = props.hideRefreshBar ? computed({
+  get: () => props.autoRefresh as boolean,
+  set: (v) => emit('update:autoRefresh', v),
+}) : undefined
 
 const {
   cert,
@@ -272,7 +294,11 @@ const {
   statusColor,
   daysColor,
   daysLabel,
-} = useSSLCertificateDetail(props.certId)
+} = useSSLCertificateDetail(props.certId, autoRefreshOverride)
 
 watch(cert, (c) => emit('loaded', c), { immediate: true })
+
+// Read by MonitoringHostDetailView's merged PageRefreshBar to compute the
+// most-recent of this section's and UptimeDetailSection's own lastUpdatedAt.
+defineExpose({ lastUpdatedAt })
 </script>

@@ -124,21 +124,24 @@
                   @toggle="toggleSort('npm_enabled')"
                 />
               </th>
-              <th class="text-center">
-                <SortableHeader
-                  label="Uptime"
-                  :active="sortKey === 'uptime_status'"
-                  :direction="sortDir"
-                  @toggle="toggleSort('uptime_status')"
-                />
-              </th>
-              <th class="text-center">
-                <SortableHeader
-                  label="SSL"
-                  :active="sortKey === 'ssl_days_remaining'"
-                  :direction="sortDir"
-                  @toggle="toggleSort('ssl_days_remaining')"
-                />
+              <th
+                class="text-center"
+                title="Suivi uptime et certificat SSL de ce proxy host"
+              >
+                <div class="d-flex justify-content-center gap-3">
+                  <SortableHeader
+                    label="Uptime"
+                    :active="sortKey === 'uptime_status'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('uptime_status')"
+                  />
+                  <SortableHeader
+                    label="SSL"
+                    :active="sortKey === 'ssl_days_remaining'"
+                    :direction="sortDir"
+                    @toggle="toggleSort('ssl_days_remaining')"
+                  />
+                </div>
               </th>
             </tr>
           </thead>
@@ -201,71 +204,76 @@
                 </label>
               </td>
 
-              <!-- Uptime sub-toggle + badge -->
+              <!-- Monitoring — uptime + SSL sub-toggles and badges grouped
+                   under one column instead of two, since they're both just
+                   "is monitoring active for this proxy host" controls (see
+                   ExposureDomainsPanel.vue's Disponibilité column for the
+                   same merge on the host exposure tab). Each sub-toggle
+                   still applies independently (a proxy host can monitor
+                   uptime only, SSL only, both, or neither). -->
               <td class="text-center">
-                <div class="d-flex flex-column align-items-center gap-1">
-                  <label class="form-check form-switch mb-0">
-                    <input
-                      class="form-check-input"
-                      type="checkbox"
-                      :checked="h.uptime_monitoring_enabled"
-                      :disabled="toggling[h.id] || !h.npm_enabled"
-                      @change="toggle(h, 'uptime_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
+                <div class="d-flex justify-content-center gap-3">
+                  <div class="d-flex flex-column align-items-center gap-1">
+                    <label class="form-check form-switch mb-0">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        :checked="h.uptime_monitoring_enabled"
+                        :disabled="toggling[h.id] || !h.npm_enabled"
+                        title="Activer le suivi uptime"
+                        @change="toggle(h, 'uptime_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
+                      >
+                    </label>
+                    <router-link
+                      v-if="h.uptime_probe_id && h.uptime_status"
+                      :to="`/monitoring/host/${h.id}`"
+                      class="badge small text-decoration-none"
+                      :class="uptimeBadge(h.uptime_status)"
+                      title="Voir la sonde uptime"
                     >
-                  </label>
-                  <router-link
-                    v-if="h.uptime_probe_id && h.uptime_status"
-                    :to="`/monitoring/host/${h.id}`"
-                    class="badge small text-decoration-none"
-                    :class="uptimeBadge(h.uptime_status)"
-                    title="Voir la sonde uptime"
-                  >
-                    {{ h.uptime_status }}
+                      {{ h.uptime_status }}
+                      <span
+                        v-if="h.uptime_last_latency_ms"
+                        class="ms-1 opacity-75"
+                      >{{ h.uptime_last_latency_ms }}ms</span>
+                    </router-link>
                     <span
-                      v-if="h.uptime_last_latency_ms"
-                      class="ms-1 opacity-75"
-                    >{{ h.uptime_last_latency_ms }}ms</span>
-                  </router-link>
-                  <span
-                    v-else-if="!h.uptime_probe_id"
-                    class="text-muted"
-                    style="font-size:0.7rem"
-                  >—</span>
-                </div>
-              </td>
-
-              <!-- SSL sub-toggle + badge -->
-              <td class="text-center">
-                <div class="d-flex flex-column align-items-center gap-1">
-                  <label class="form-check form-switch mb-0">
-                    <input
-                      class="form-check-input"
-                      type="checkbox"
-                      :checked="h.ssl_monitoring_enabled"
-                      :disabled="toggling[h.id] || !h.ssl_enabled || !h.npm_enabled"
-                      :title="!h.ssl_enabled ? 'Ce proxy host n\'utilise pas SSL' : ''"
-                      @change="toggle(h, 'ssl_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
+                      v-else-if="!h.uptime_probe_id"
+                      class="text-muted"
+                      style="font-size:0.7rem"
+                    >—</span>
+                  </div>
+                  <div class="d-flex flex-column align-items-center gap-1">
+                    <label class="form-check form-switch mb-0">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        :checked="h.ssl_monitoring_enabled"
+                        :disabled="toggling[h.id] || !h.ssl_enabled || !h.npm_enabled"
+                        :title="!h.ssl_enabled ? 'Ce proxy host n\'utilise pas SSL' : 'Activer le suivi du certificat SSL'"
+                        @change="toggle(h, 'ssl_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
+                      >
+                    </label>
+                    <router-link
+                      v-if="h.ssl_certificate_id && h.ssl_days_remaining !== null && h.ssl_days_remaining !== undefined"
+                      :to="`/monitoring/host/${h.id}`"
+                      class="badge small text-decoration-none"
+                      :class="sslBadge(h.ssl_days_remaining)"
+                      title="Voir le certificat SSL"
                     >
-                  </label>
-                  <router-link
-                    v-if="h.ssl_certificate_id && h.ssl_days_remaining !== null && h.ssl_days_remaining !== undefined"
-                    :to="`/monitoring/host/${h.id}`"
-                    class="badge small text-decoration-none"
-                    :class="sslBadge(h.ssl_days_remaining)"
-                    title="Voir le certificat SSL"
-                  >
-                    {{ h.ssl_days_remaining }}j
-                  </router-link>
-                  <span
-                    v-else-if="!h.ssl_enabled"
-                    class="text-muted"
-                    style="font-size:0.7rem"
-                  >HTTP</span>
-                  <span
-                    v-else-if="!h.ssl_certificate_id"
-                    class="text-muted"
-                    style="font-size:0.7rem"
-                  >—</span>
+                      {{ h.ssl_days_remaining }}j
+                    </router-link>
+                    <span
+                      v-else-if="!h.ssl_enabled"
+                      class="text-muted"
+                      style="font-size:0.7rem"
+                    >HTTP</span>
+                    <span
+                      v-else-if="!h.ssl_certificate_id"
+                      class="text-muted"
+                      style="font-size:0.7rem"
+                    >—</span>
+                  </div>
                 </div>
               </td>
             </tr>
