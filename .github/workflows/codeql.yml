@@ -41,18 +41,30 @@ jobs:
 
     strategy:
       fail-fast: false
-      # build-mode: none analyse la source directement. Pour Go, cela couvre les
-      # DEUX modules (server/ + agent/) en une seule passe — ce que autobuild
-      # manquait faute de go.work à la racine (l'agent échappait au scan).
+      # Go dropped support for build-mode: none on current CodeQL CLI/Action
+      # versions (only autobuild/manual remain) — manual + an explicit build
+      # of both modules covers server/ + agent/ in one pass, same coverage
+      # build-mode: none used to give without needing a go.work at the root
+      # (which would change dependency resolution for every other Go command
+      # run from a subdirectory, not just CodeQL).
       matrix:
         include:
           - language: go
-            build-mode: none
+            build-mode: manual
           - language: javascript
             build-mode: none
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Setup Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: |
+            server/go.sum
+            agent/go.sum
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -61,6 +73,12 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
           # Règles supplémentaires pour la sécurité web
           queries: security-extended
+
+      - name: Build Go modules
+        if: matrix.language == 'go'
+        run: |
+          (cd server && go build ./...)
+          (cd agent && go build ./...)
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
