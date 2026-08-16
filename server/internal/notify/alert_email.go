@@ -16,11 +16,15 @@ var alertEmailTemplate = template.Must(template.New("alert_email").Parse(alertEm
 // package doesn't need to depend on internal/models — the caller (alerts
 // package) formats domain values into display strings first.
 type AlertEmailData struct {
-	RuleName        string
-	RuleID          int64
-	HostName        string
-	Metric          string
-	Operator        string
+	RuleName string
+	RuleID   int64
+	HostName string
+	Metric   string
+	Operator string
+	// Severity is "crit" or "warn" (see alerts.DetermineSeverity) — drives the
+	// template's accent color/badge. Any other value renders as crit (red),
+	// same fail-safe-loud default the pre-severity-aware template always used.
+	Severity        string
 	Threshold       string
 	Value           string
 	Unit            string

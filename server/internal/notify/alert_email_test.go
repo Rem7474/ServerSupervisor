@@ -46,7 +46,7 @@ func TestRenderAlertEmail_OmitsCooldownLineWhenNotSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RenderAlertEmail() error = %v", err)
 	}
-	if strings.Contains(html, "No further notifications") {
+	if strings.Contains(html, "Aucune nouvelle notification") {
 		t.Error("cooldown footer line should be omitted when CooldownMessage is empty")
 	}
 }
