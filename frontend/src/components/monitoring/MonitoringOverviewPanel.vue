@@ -868,7 +868,6 @@ const {
   savingCert,
   certFormError,
   certForm,
-  openCreateCert,
   openEditCert,
   closeCertModal,
   saveCert,
@@ -911,9 +910,12 @@ function closeCreateModal(): void {
 const createIncludeProbe = ref(true)
 const createIncludeCert = ref(false)
 
-// Whichever of the two header buttons opened the modal (openCreateProbe/
-// openCreateCert, via switchCreateType or MonitoringView's own buttons)
-// decides the starting selection each time it opens fresh.
+// openCreateProbe (the one entry point, MonitoringView's "Nouveau suivi"
+// button and this panel's empty-state CTA) always opens with probe
+// pre-selected; the toggle buttons above let the user add/switch to cert
+// from there. openEditCert (an existing cert's own row) still opens
+// cert-only, unaffected — isEditingCreateModal skips this watcher's effect
+// entirely for edits.
 watch(createModalOpen, (open) => {
   if (!open || isEditingCreateModal.value) return
   createIncludeProbe.value = probeModalOpen.value
@@ -989,5 +991,9 @@ function rowLink(row: MonitoringRow): string {
   return `/monitoring/ssl/${row.cert!.id}`
 }
 
-defineExpose({ openCreateProbe, openCreateCert })
+// Only openCreateProbe is called from outside (MonitoringView's single
+// "Nouveau suivi" button) — the cert-only entry point was removed when the
+// two header buttons were merged into one (the modal's own toggle covers
+// it), don't re-expose openCreateCert here without a real caller again.
+defineExpose({ openCreateProbe })
 </script>
