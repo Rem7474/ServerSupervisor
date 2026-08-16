@@ -115,9 +115,17 @@
           </div>
         </div>
         <div class="card-body">
+          <!--
+            .tracking for the flex/gap layout, but items stay plain
+            flex-fill + bg-* rather than .tracking-block: in Tabler's
+            compiled CSS .tracking-block's own `background` rule is
+            defined after the bg-* utilities, so it would win over
+            bg-success/bg-danger at equal specificity and paint every
+            block gray.
+          -->
           <div
             v-if="heartbeatBar.length"
-            class="d-flex align-items-end gap-1"
+            class="tracking"
             style="height: 40px;"
           >
             <div
