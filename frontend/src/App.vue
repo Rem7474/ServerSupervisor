@@ -10,7 +10,7 @@
     <div v-if="auth.isAuthenticated">
       <!-- Row 1: brand + global status/actions (always visible, never collapses) -->
       <header class="navbar navbar-expand-md navbar-dark">
-        <div class="container-xl">
+        <div class="container-xl flex-nowrap">
           <button
             class="navbar-toggler"
             type="button"
@@ -23,10 +23,10 @@
           </button>
           <router-link
             to="/"
-            class="navbar-brand navbar-brand-autodark"
+            class="navbar-brand navbar-brand-autodark text-truncate"
           >
-            <IconServer class="icon me-2" />
-            ServerSupervisor
+            <IconServer class="icon me-sm-2" />
+            <span class="d-none d-sm-inline">ServerSupervisor</span>
           </router-link>
 
           <span
@@ -37,7 +37,7 @@
             {{ hostsDownCount }} HORS LIGNE
           </span>
 
-          <div class="navbar-nav flex-row order-md-last">
+          <div class="navbar-nav flex-row order-last">
             <div class="nav-item d-flex flex-row align-items-center gap-2">
               <button
                 type="button"
