@@ -8,7 +8,8 @@
 
     <!-- Sidebar + Main -->
     <div v-if="auth.isAuthenticated">
-      <header class="navbar navbar-expand-lg navbar-dark">
+      <!-- Row 1: brand + global status/actions (always visible, never collapses) -->
+      <header class="navbar navbar-expand-md navbar-dark">
         <div class="container-xl">
           <button
             class="navbar-toggler"
@@ -28,15 +29,100 @@
             ServerSupervisor
           </router-link>
 
+          <span
+            v-if="hostsDownCount > 0"
+            class="badge bg-danger-lt text-danger ms-2 py-2 hosts-down-badge d-none d-md-inline-flex align-items-center"
+          >
+            <IconAlertTriangle class="icon icon-sm me-1" />
+            {{ hostsDownCount }} HORS LIGNE
+          </span>
+
+          <div class="navbar-nav flex-row order-md-last">
+            <div class="nav-item d-flex flex-row align-items-center gap-2">
+              <button
+                type="button"
+                class="btn btn-outline-secondary d-none d-sm-flex align-items-center gap-2 command-palette-trigger"
+                title="Rechercher (Ctrl+K)"
+                @click="paletteToggle"
+              >
+                <IconSearch
+                  :size="16"
+                  class="icon"
+                />
+                <span class="text-secondary small">Rechercher…</span>
+                <kbd class="ms-2">Ctrl K</kbd>
+              </button>
+              <button
+                type="button"
+                class="btn btn-icon d-sm-none"
+                aria-label="Rechercher"
+                @click="paletteToggle"
+              >
+                <IconSearch :size="18" />
+              </button>
+              <NotificationBell />
+              <div
+                ref="userMenuRef"
+                class="position-relative user-menu"
+              >
+                <button
+                  class="btn btn-outline-secondary d-flex align-items-center px-2 px-sm-3"
+                  @click="toggleUserMenu"
+                >
+                  <span class="avatar avatar-sm bg-secondary-lt d-none d-sm-flex me-sm-2">
+                    {{ auth.username?.slice(0, 2).toUpperCase() }}
+                  </span>
+                  <span class="d-none d-md-inline me-2">{{ auth.username }}</span>
+                  <IconUser
+                    :size="18"
+                    class="d-sm-none"
+                  />
+                  <span class="caret d-none d-sm-inline" />
+                </button>
+
+                <div
+                  v-if="userMenuOpen"
+                  class="dropdown-menu dropdown-menu-end show user-dropdown"
+                >
+                  <div class="dropdown-header">
+                    Compte
+                  </div>
+                  <div class="dropdown-item text-secondary small">
+                    Rôle: {{ auth.role || 'inconnu' }}
+                  </div>
+                  <router-link
+                    to="/account"
+                    class="dropdown-item"
+                    @click="userMenuOpen = false"
+                  >
+                    Mon compte
+                  </router-link>
+                  <div class="dropdown-divider" />
+                  <button
+                    class="dropdown-item text-danger"
+                    @click="handleLogout"
+                  >
+                    Déconnexion
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Row 2: the 6 intent sections (config/navigation.ts) — collapses on mobile -->
+      <header class="navbar navbar-expand-md navbar-light navbar-secondary">
+        <div class="container-xl">
           <div
             id="navbar-menu"
             :class="['collapse navbar-collapse', { show: navbarOpen }]"
           >
             <ul class="navbar-nav">
-              <!-- Badge hôtes hors ligne -->
+              <!-- Badge hôtes hors ligne (mobile: row 1's copy is hidden below md) -->
               <li
                 v-if="hostsDownCount > 0"
-                class="nav-item d-flex align-items-center"
+                class="nav-item d-flex d-md-none align-items-center"
               >
                 <span class="badge bg-danger-lt text-danger ms-2 py-2 hosts-down-badge">
                   <IconAlertTriangle class="icon icon-sm me-1" />
@@ -44,7 +130,6 @@
                 </span>
               </li>
 
-              <!-- 6 sections d'intention (config/navigation.ts) -->
               <li
                 v-for="section in visibleSections"
                 :key="section.key"
@@ -95,72 +180,6 @@
                 </div>
               </li>
             </ul>
-
-            <div class="ms-auto d-flex align-items-center gap-2">
-              <button
-                type="button"
-                class="btn btn-outline-secondary d-none d-sm-flex align-items-center gap-2 command-palette-trigger"
-                title="Rechercher (Ctrl+K)"
-                @click="paletteToggle"
-              >
-                <IconSearch
-                  :size="16"
-                  class="icon"
-                />
-                <span class="text-secondary small">Rechercher…</span>
-                <kbd class="ms-2">Ctrl K</kbd>
-              </button>
-              <button
-                type="button"
-                class="btn btn-icon d-sm-none"
-                aria-label="Rechercher"
-                @click="paletteToggle"
-              >
-                <IconSearch :size="18" />
-              </button>
-              <NotificationBell />
-              <div
-                ref="userMenuRef"
-                class="position-relative user-menu"
-              >
-                <button
-                  class="btn btn-outline-secondary d-flex align-items-center"
-                  @click="toggleUserMenu"
-                >
-                  <span class="avatar avatar-sm bg-secondary-lt me-2">
-                    {{ auth.username?.slice(0, 2).toUpperCase() }}
-                  </span>
-                  <span class="me-2">{{ auth.username }}</span>
-                  <span class="caret" />
-                </button>
-
-                <div
-                  v-if="userMenuOpen"
-                  class="dropdown-menu dropdown-menu-end show user-dropdown"
-                >
-                  <div class="dropdown-header">
-                    Compte
-                  </div>
-                  <div class="dropdown-item text-secondary small">
-                    Rôle: {{ auth.role || 'inconnu' }}
-                  </div>
-                  <router-link
-                    to="/account"
-                    class="dropdown-item"
-                    @click="userMenuOpen = false"
-                  >
-                    Mon compte
-                  </router-link>
-                  <div class="dropdown-divider" />
-                  <button
-                    class="dropdown-item text-danger"
-                    @click="handleLogout"
-                  >
-                    Déconnexion
-                  </button>
-                </div>
-              </div>
-            </div><!-- end ms-auto wrapper -->
           </div>
         </div>
       </header>
@@ -234,7 +253,7 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
-import { IconAlertTriangle, IconServer, IconSearch } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconServer, IconSearch, IconUser } from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import { subscribeHttpErrors, subscribeNetworkOk } from './utils/httpErrorBus'
@@ -430,6 +449,27 @@ onUnmounted(() => {
   overflow: visible;
 }
 
+/* Row 2 (the 6 intent-section links) — Tabler ships no .navbar-light in this
+   dark-only app (body[data-bs-theme=dark] forces dark navbar colors on every
+   .navbar regardless of that class), so the two-row split needs its own
+   subtle shade step to read as a distinct row rather than one tall bar.
+   --tblr-bg-surface-secondary (one step darker than --tblr-bg-surface, which
+   row 1/cards use) is Tabler's own token for exactly this "secondary surface"
+   role. */
+.navbar-secondary {
+  background-color: var(--tblr-bg-surface-secondary);
+  border-top: 1px solid var(--tblr-border-color);
+  /* Lower than row 1's shared .navbar z-index (1030): row 1's dropdowns
+     (notification bell, user menu) are absolutely positioned within row 1
+     but visually extend down past row 1's own bottom edge, into row 2's
+     screen area. Row 2 is a sibling stacking context at the same z-index,
+     later in DOM order — without this, it paints over the top of row 1's
+     open dropdowns instead of sitting behind them. Confirmed via
+     elementFromPoint() during visual QA: the "Compte" dropdown-header text
+     was there in the DOM with correct color/position, just painted over. */
+  z-index: 1020;
+}
+
 .nav-dropdown-toggle {
   background: transparent;
   border: 0;
@@ -537,34 +577,19 @@ onUnmounted(() => {
   transform: rotate(45deg);
 }
 
-@media (max-width: 991.98px) {
-  .ms-auto.d-flex.align-items-center.gap-2 {
-    width: 100%;
-    justify-content: space-between;
-    margin-top: 0.5rem;
-  }
-
-  .nav-item.dropdown .dropdown-menu,
-  .user-dropdown {
+/* Row 1's icon cluster (search/bell/user) lives outside #navbar-menu now —
+   it's a compact, always-visible header row at every viewport width, same as
+   NotificationBell's own dropdown, so it needs none of the old full-width/
+   static-position mobile treatment. Only row 2's section dropdowns still
+   collapse into a stacked vertical list on mobile. */
+@media (max-width: 767.98px) {
+  .nav-item.dropdown .dropdown-menu {
     position: static;
     width: 100%;
     margin-top: 0.35rem;
     box-shadow: none;
     border: 1px solid var(--tblr-border-color);
     border-radius: 0.6rem;
-  }
-
-  .user-dropdown::before {
-    display: none;
-  }
-
-  .user-menu {
-    width: 100%;
-  }
-
-  .user-menu > .btn {
-    width: 100%;
-    justify-content: flex-start;
   }
 }
 
