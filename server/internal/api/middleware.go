@@ -282,7 +282,14 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("Content-Security-Policy",
 			"default-src 'self'; "+
 				"script-src 'self'; "+
-				"style-src 'self'; "+
+				// ApexCharts (SVG+DOM based, unlike the canvas-based Chart.js it
+				// replaced) positions tooltips and drives hover/legend highlight
+				// states via direct .style / style="" mutation — it has no CSP
+				// nonce support yet (an upstream PR for that is still open) and
+				// the values change on every mouse move, so a hash allowlist
+				// isn't feasible either. 'unsafe-inline' here is scoped to
+				// style-src only; script-src stays strict.
+				"style-src 'self' 'unsafe-inline'; "+
 				"img-src 'self' data: blob:; "+
 				"connect-src 'self' ws: wss:; "+
 				"font-src 'self'; "+
