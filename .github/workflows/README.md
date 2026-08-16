@@ -47,13 +47,26 @@ lint bloquant (`agent/.golangci.yml`).
   `vitest.browser.config.ts`). À lancer en local ; rajouter un job
   `browser-tests` une fois le correctif amont disponible.
 
-### Security (`security.yml`) — lundi 6h UTC + push sur les manifests + manuel
+### Security (`security.yml`) — lundi 6h UTC + push/PR sur les manifests + manuel
+
+Scanners de dépendances/image — ne se déclenchent que quand un manifest
+(`go.mod`/`go.sum`/`package.json`/`package-lock.json`/`Dockerfile`) change,
+en push sur `main` **et** sur PR (pour bloquer une dépendance vulnérable
+avant le merge, pas après).
 
 - `govulncheck` (server + agent), version épinglée — **bloquant**
 - `nancy` (CVE des deps Go, server + agent) — **bloquant**
 - `npm audit --audit-level=moderate` (frontend) — **bloquant**
 - Trivy sur l'image server (SARIF → onglet Security) — informatif
-- CodeQL (`go`, `javascript`, `security-extended`)
+
+### CodeQL (`codeql.yml`) — lundi 6h UTC + push/PR sur `server|agent|frontend/**` + manuel
+
+Scan du code source lui-même (`go`, `javascript`, `security-extended`) —
+volontairement dans son **propre** workflow, pas dans `security.yml` :
+contrairement aux scanners de dépendances ci-dessus, CodeQL doit tourner sur
+tout changement de code (injection SQL, XSS, etc.), pas seulement quand un
+manifest bouge — sans pour autant faire tourner govulncheck/nancy/trivy sur
+chaque commit de code.
 
 ### Release (`release.yml`) — tags `vX.Y.Z[-pre]`
 
