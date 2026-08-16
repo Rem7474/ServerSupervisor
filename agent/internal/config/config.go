@@ -37,6 +37,22 @@ type Config struct {
 	CrowdSecAlertsMachineID    string `yaml:"crowdsec_alerts_machine_id"`
 	CrowdSecAlertsPassword     string `yaml:"crowdsec_alerts_password"`
 
+	// Network flows ("top talkers"): per-host bandwidth by remote peer,
+	// derived from conntrack accounting. CollectNetworkFlows only controls
+	// whether the collector runs at all — kernel-level availability
+	// (nf_conntrack_acct) is detected and reported separately every cycle
+	// (see collector.CollectNetworkFlows), never configured from here.
+	CollectNetworkFlows bool `yaml:"collect_network_flows"`
+	NetworkFlowsTopN    int  `yaml:"network_flows_top_n"`
+	// NetworkFlowsL7Capture opts into a bounded packet-sampling pass that reads
+	// the TLS SNI hostname off outbound handshakes, so a talker can be labelled
+	// with the domain it actually contacted instead of just an IP and a port.
+	// Default false: it needs CAP_NET_RAW and reads packet headers off the
+	// wire, which is a materially bigger ask than the rest of the agent's
+	// /proc-and-netlink collection. Missing capability degrades to the UI's
+	// well-known-port heuristic — it never fails a report cycle.
+	NetworkFlowsL7Capture bool `yaml:"network_flows_l7_capture"`
+
 	// Restic backup supervision. Only paths and feature flags live here —
 	// credentials (repository password, storage backend keys) stay in the
 	// resticconf file on disk (ResticConfPath) and are never read into this
@@ -210,6 +226,17 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_CROWDSEC_ALERTS_PASSWORD"); env != "" {
 		cfg.CrowdSecAlertsPassword = strings.TrimSpace(env)
 	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_NETWORK_FLOWS"); env != "" {
+		cfg.CollectNetworkFlows = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_NETWORK_FLOWS_TOP_N"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			cfg.NetworkFlowsTopN = n
+		}
+	}
+	if env := os.Getenv("SUPERVISOR_NETWORK_FLOWS_L7_CAPTURE"); env != "" {
+		cfg.NetworkFlowsL7Capture = env == "true" || env == "1"
+	}
 	if env := os.Getenv("SUPERVISOR_COLLECT_RESTIC"); env != "" {
 		cfg.CollectRestic = env == "true" || env == "1"
 	}
@@ -277,6 +304,9 @@ func defaultConfig() *Config {
 		DisableWSPush:                  false,
 		LogLevel:                       "info",
 		LogFormat:                      "text",
+		CollectNetworkFlows:            true,
+		NetworkFlowsTopN:               50,
+		NetworkFlowsL7Capture:          false,
 		CollectRestic:                  false,
 		ResticEnableProgress:           true,
 		ResticProgressFPS:              0.1,
@@ -362,6 +392,23 @@ crowdsec_api_key: ""
 # Fill with machine_id/password from /etc/crowdsec/local_api_credentials.yaml
 crowdsec_alerts_machine_id: ""
 crowdsec_alerts_password: ""
+
+# Network flows ("top talkers"): per-host bandwidth by remote peer, derived
+# from conntrack accounting (requires nf_conntrack_acct=1, checked at runtime
+# — see the host's diagnostics banner if this stays empty). Only bounds
+# collection and payload size; never pushed from the server.
+collect_network_flows: true
+network_flows_top_n: 50
+
+# OPTIONAL, off by default. Sample outbound TLS handshakes to label a talker
+# with the domain it actually contacted (SNI) instead of just an IP + port.
+# Requires CAP_NET_RAW on the agent binary:
+#   setcap cap_net_raw+ep /usr/local/bin/serversupervisor-agent
+# Without it the agent logs once, raises a diagnostic, and falls back to the
+# interface's port-based guess — it never fails a report cycle. Only TLS SNI is
+# extracted (no DNS, no HTTP); capture is bounded to a few seconds and a few
+# thousand packets per cycle.
+network_flows_l7_capture: false
 
 # Restic backup supervision. Only paths/flags — never put restic/Swift/SMTP
 # credentials here; they stay in resticconf on disk (restic_conf_path).

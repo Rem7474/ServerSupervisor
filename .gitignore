@@ -19,6 +19,8 @@ server/server.exe
 server/main
 server/main.exe
 server/test.exe
+server/seed-demo
+server/seed-demo.exe
 
 # Frontend test artifacts (Vitest browser / Playwright)
 frontend/**/__screenshots__/
@@ -33,3 +35,6 @@ frontend/.eslint-tmp.json
 frontend/.eslint-scope.json
 frontend/eslint-report.json
 frontend/eslint-pass2.json
+
+# Agent worktrees (isolated git worktrees for background subagents)
+.claude/worktrees/

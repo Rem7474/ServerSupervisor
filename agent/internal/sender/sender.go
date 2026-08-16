@@ -25,14 +25,15 @@ type Sender struct {
 // server-side models.AgentCapabilities; the JSON tags MUST stay in sync — this is
 // enforced by the cross-module contract test (see protocol/agent_report.golden.json).
 type Capabilities struct {
-	Docker  bool `json:"docker"`
-	APT     bool `json:"apt"`
-	SMART   bool `json:"smart"`
-	CPUTemp bool `json:"cpu_temp"`
-	WebLogs bool `json:"web_logs"`
-	Systemd bool `json:"systemd"`
-	Journal bool `json:"journal"`
-	Restic  bool `json:"restic"`
+	Docker       bool `json:"docker"`
+	APT          bool `json:"apt"`
+	SMART        bool `json:"smart"`
+	CPUTemp      bool `json:"cpu_temp"`
+	WebLogs      bool `json:"web_logs"`
+	Systemd      bool `json:"systemd"`
+	Journal      bool `json:"journal"`
+	Restic       bool `json:"restic"`
+	NetworkFlows bool `json:"network_flows"`
 }
 
 // DockerPayload is the "docker" section of a report. The server decodes it into
@@ -61,18 +62,19 @@ type Report struct {
 	// slower CVE-enriched security_updates/cve_list refresh is triggered
 	// alongside this (see reporter.Send) but pushed separately and
 	// out-of-band via SendAptStatus, same as after a live-dispatched command.
-	AptStatus       *collector.AptStatus       `json:"apt_status,omitempty"`
-	WebLogs         *collector.WebLogReport    `json:"web_logs,omitempty"`
-	DockerNetworks  []collector.DockerNetwork  `json:"docker_networks,omitempty"`   // Network topology data
-	ComposeProjects []collector.ComposeProject `json:"compose_projects,omitempty"`  // Docker Compose projects
-	DiskMetrics     []collector.DiskMetrics    `json:"disk_metrics,omitempty"`      // Detailed disk usage with inodes
-	DiskHealth      []collector.DiskHealth     `json:"disk_health,omitempty"`       // SMART disk health data
-	CustomTasks     []config.TaskSummary       `json:"custom_tasks,omitempty"`      // Available custom tasks from tasks.yaml
-	TasksConfigYAML string                     `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
-	Restic          *collector.ResticStatus    `json:"restic,omitempty"`
-	ResticProfiles  []string                   `json:"restic_profiles,omitempty"` // Profile names from resticprofile.yaml
-	ResticGroups    []string                   `json:"restic_groups,omitempty"`   // Group names from resticprofile.yaml's "groups" section
-	Timestamp       time.Time                  `json:"timestamp"`
+	AptStatus       *collector.AptStatus          `json:"apt_status,omitempty"`
+	WebLogs         *collector.WebLogReport       `json:"web_logs,omitempty"`
+	DockerNetworks  []collector.DockerNetwork     `json:"docker_networks,omitempty"`   // Network topology data
+	ComposeProjects []collector.ComposeProject    `json:"compose_projects,omitempty"`  // Docker Compose projects
+	DiskMetrics     []collector.DiskMetrics       `json:"disk_metrics,omitempty"`      // Detailed disk usage with inodes
+	DiskHealth      []collector.DiskHealth        `json:"disk_health,omitempty"`       // SMART disk health data
+	CustomTasks     []config.TaskSummary          `json:"custom_tasks,omitempty"`      // Available custom tasks from tasks.yaml
+	TasksConfigYAML string                        `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
+	Restic          *collector.ResticStatus       `json:"restic,omitempty"`
+	ResticProfiles  []string                      `json:"restic_profiles,omitempty"` // Profile names from resticprofile.yaml
+	ResticGroups    []string                      `json:"restic_groups,omitempty"`   // Group names from resticprofile.yaml's "groups" section
+	NetworkFlows    *collector.NetworkFlowsReport `json:"network_flows,omitempty"`   // Per-cycle "top talkers" (conntrack-derived), see collector.CollectNetworkFlows
+	Timestamp       time.Time                     `json:"timestamp"`
 }
 
 type ReportResponse struct {

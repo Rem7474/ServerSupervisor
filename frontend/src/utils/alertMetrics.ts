@@ -42,6 +42,13 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
     badgeClass: 'bg-purple-lt text-purple',
     category: 'host',
   },
+  bandwidth_vs_rolling_avg: {
+    label: 'Bande passante vs moyenne glissante',
+    unit: '%',
+    icon: '\ud83d\udce1',
+    badgeClass: 'bg-cyan-lt text-cyan',
+    category: 'host',
+  },
   heartbeat_timeout: {
     label: 'Heartbeat',
     unit: 's',
@@ -190,6 +197,7 @@ export const ALERT_METRIC_ORDER = [
   'memory',
   'disk',
   'load',
+  'bandwidth_vs_rolling_avg',
   'disk_smart_status',
   'disk_temperature',
   'heartbeat_timeout',

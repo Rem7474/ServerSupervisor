@@ -353,6 +353,85 @@ func (s *Service) FinishWebAuthnLogin(ctx context.Context, username, sessionToke
 	return user, nil
 }
 
+// ===== discoverable login (usernameless — browser passkey autofill) =====
+
+// BeginDiscoverableLogin starts a "conditional UI" WebAuthn ceremony with no
+// username/password up front, so the frontend can fire it as soon as the
+// login page mounts: the browser silently offers any resident passkey it
+// holds for this origin as an autocomplete suggestion on the username field,
+// and picking one authenticates in a single interaction. Unlike
+// BeginWebAuthnLogin, this has no password to re-verify before issuing a
+// challenge (there's no username yet to look one up by) — the security
+// boundary is entirely the passkey's own private-key possession plus
+// (preferred) authenticator user verification, which is the intended threat
+// model for discoverable/passwordless WebAuthn.
+func (s *Service) BeginDiscoverableLogin(ctx context.Context) (*protocol.CredentialAssertion, string, error) {
+	if err := s.requireWebAuthn(); err != nil {
+		return nil, "", err
+	}
+	assertion, session, err := s.wa.BeginDiscoverableMediatedLogin(protocol.MediationConditional,
+		webauthn.WithUserVerification(protocol.VerificationPreferred))
+	if err != nil {
+		return nil, "", apperr.Internal(err)
+	}
+	token, err := s.webauthnSessions.put(*session)
+	if err != nil {
+		return nil, "", apperr.Internal(err)
+	}
+	return assertion, token, nil
+}
+
+// FinishDiscoverableLogin verifies the assertion and resolves the account
+// from the credential's own ID (no username was ever supplied) via the
+// handler callback go-webauthn invokes mid-validation. Otherwise mirrors
+// FinishWebAuthnLogin's tail: records the login event and returns the user so
+// the handler can IssueSession. Failed attempts intentionally aren't run
+// through recordFailure's IP-block bookkeeping — a forged assertion isn't
+// brute-forceable the way a guessed password/TOTP code is, and with no
+// resolved username there is nothing meaningful to attribute a failure to.
+func (s *Service) FinishDiscoverableLogin(ctx context.Context, sessionToken string, rawResponse []byte, ip, userAgent string) (*models.User, error) {
+	if err := s.requireWebAuthn(); err != nil {
+		return nil, err
+	}
+	session, ok := s.webauthnSessions.take(sessionToken)
+	if !ok {
+		return nil, apperr.Unauthorized("login challenge expired, please retry")
+	}
+	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(rawResponse))
+	if err != nil {
+		return nil, apperr.Unauthorized("invalid credential response")
+	}
+
+	var resolved *models.User
+	handler := func(rawID, _ []byte) (webauthn.User, error) {
+		cred, err := s.repo.GetWebAuthnCredentialByCredentialID(ctx, rawID)
+		if err != nil {
+			return nil, err
+		}
+		user, err := s.repo.GetUserByID(ctx, cred.UserID)
+		if err != nil {
+			return nil, err
+		}
+		creds, err := s.repo.ListWebAuthnCredentials(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		resolved = user
+		return newWebauthnUser(user.ID, user.Username, creds), nil
+	}
+
+	updatedCred, err := s.wa.ValidateDiscoverableLogin(handler, session, parsed)
+	if err != nil || resolved == nil {
+		return nil, apperr.Unauthorized("security key verification failed")
+	}
+	if err := s.repo.UpdateWebAuthnCredentialUsage(ctx, updatedCred.ID, *updatedCred); err != nil {
+		slog.ErrorContext(ctx, "failed to persist webauthn sign-count update", slog.String("user", resolved.Username), slog.Any("err", err))
+	}
+
+	_ = s.repo.CreateLoginEvent(ctx, resolved.Username, ip, userAgent, true)
+	return resolved, nil
+}
+
 // HasWebAuthnCredentials reports whether username has at least one registered
 // passkey — used by Authenticate to decide whether the MFA step should be
 // offered even for a user with TOTP disabled.

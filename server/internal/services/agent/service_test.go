@@ -82,8 +82,11 @@ func (f *fakeRepo) UpsertDockerNetworks(context.Context, string, []models.Docker
 func (f *fakeRepo) UpsertComposeProjects(context.Context, string, []models.ComposeProject) error {
 	return nil
 }
-func (f *fakeRepo) InsertDiskMetrics(context.Context, []models.DiskMetrics) error   { return nil }
-func (f *fakeRepo) InsertDiskHealth(context.Context, []models.DiskHealth) error     { return nil }
+func (f *fakeRepo) InsertDiskMetrics(context.Context, []models.DiskMetrics) error { return nil }
+func (f *fakeRepo) InsertDiskHealth(context.Context, []models.DiskHealth) error   { return nil }
+func (f *fakeRepo) InsertNetworkFlowMetrics(context.Context, string, *models.NetworkFlowsReport) error {
+	return nil
+}
 func (f *fakeRepo) UpdateHostCustomTasks(context.Context, string, string) error     { return nil }
 func (f *fakeRepo) UpdateHostTasksConfigYAML(context.Context, string, string) error { return nil }
 func (f *fakeRepo) UpdateHostResticProfiles(context.Context, string, string) error  { return nil }

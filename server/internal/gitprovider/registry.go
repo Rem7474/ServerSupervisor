@@ -81,6 +81,13 @@ func fetchDockerManifestDigest(client *http.Client, imageRef, tag string, creds 
 	return digest, nil
 }
 
+// ParseDockerImageRef is the exported form of parseDockerRegistry, used by the
+// ambient image-version engine to match an image against a stored
+// RegistryCredential's registry_host before it ever calls a registry.
+func ParseDockerImageRef(imageRef string) (registry, image string) {
+	return parseDockerRegistry(imageRef)
+}
+
 // parseDockerRegistry splits a Docker image reference into registry and image name.
 // Examples:
 //

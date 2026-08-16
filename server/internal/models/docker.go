@@ -22,9 +22,15 @@ type DockerContainer struct {
 	EnvVars     map[string]string `json:"env_vars" db:"-"`
 	Volumes     []string          `json:"volumes" db:"-"`
 	Networks    []string          `json:"networks" db:"-"`
-	NetRxBytes  uint64            `json:"net_rx_bytes" db:"net_rx_bytes"`
-	NetTxBytes  uint64            `json:"net_tx_bytes" db:"net_tx_bytes"`
-	UpdatedAt   time.Time         `json:"updated_at" db:"updated_at"`
+	// IPAddresses are the container's Docker-assigned addresses across its
+	// attached networks. Reported by the agent (which needs them locally to
+	// attribute container traffic in the network-flow collector — see
+	// agent/internal/collector/container_ips.go) and accepted here as container
+	// metadata; not persisted, same as Labels/EnvVars/Volumes above.
+	IPAddresses []string  `json:"ip_addresses" db:"-"`
+	NetRxBytes  uint64    `json:"net_rx_bytes" db:"net_rx_bytes"`
+	NetTxBytes  uint64    `json:"net_tx_bytes" db:"net_tx_bytes"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type DockerReport struct {
@@ -47,13 +53,48 @@ type ComposeProject struct {
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 }
 
+// ========== Docker image version cache (ambient update detection) ==========
+
+// DockerImageRef is a normalized (image, tag) pair — the cache key of the
+// ambient image-version engine and the unit of work of its refresh job.
+type DockerImageRef struct {
+	Image    string `json:"image"`
+	ImageTag string `json:"image_tag"`
+}
+
+// DockerImageVersion is one row of the docker_image_versions cache: the latest
+// digest a registry published for an (image, tag), refreshed on a slow ticker
+// by internal/services/dockerversions. It is the single source of truth for
+// "is there something newer upstream" — both the WS version badges and the
+// release-tracker poller read it instead of calling a registry themselves.
+type DockerImageVersion struct {
+	Image                 string     `json:"image"`
+	ImageTag              string     `json:"image_tag"`
+	Registry              string     `json:"registry"`
+	LatestDigest          string     `json:"latest_digest"`
+	LatestTag             string     `json:"latest_tag"`
+	RegistryCredentialsID string     `json:"registry_credentials_id,omitempty"`
+	CheckedAt             *time.Time `json:"checked_at,omitempty"`
+	LastError             string     `json:"last_error,omitempty"`
+}
+
 // ========== Version Comparison ==========
+
+// Version comparison statuses, computed server-side so the host Docker tab and
+// the global Docker page can't drift on how they classify the same row.
+const (
+	VersionStatusUpToDate        = "up_to_date"
+	VersionStatusUpdateAvailable = "update_available"
+	VersionStatusUnknown         = "unknown"
+)
 
 type VersionComparison struct {
 	TrackerID       string `json:"tracker_id"`
 	DockerImage     string `json:"docker_image"`
+	ImageTag        string `json:"image_tag"` // container tag this row describes; empty on tracker-aggregated rows
 	RunningVersion  string `json:"running_version"`
 	LatestVersion   string `json:"latest_version"`
+	Status          string `json:"status"`           // up_to_date | update_available | unknown
 	IsUpToDate      bool   `json:"is_up_to_date"`
 	UpdateConfirmed bool   `json:"update_confirmed"` // true when digest comparison confirms an update (even if running version is unknown)
 	ContainerCount  int    `json:"container_count"`  // number of containers using this image on the host
@@ -63,6 +104,11 @@ type VersionComparison struct {
 	ReleaseURL      string `json:"release_url"`
 	HostID          string `json:"host_id"`
 	Hostname        string `json:"hostname"`
+	// LastError explains an "unknown" status coming from the ambient engine
+	// (private registry with no matching credential, registry unreachable, …).
+	// Always empty on tracker-derived rows, which surface their own error on
+	// the tracker itself.
+	LastError string `json:"last_error,omitempty"`
 }
 
 // ========== Network Topology (Docker Networks) ==========
@@ -153,12 +199,12 @@ type UnattendedUpgradesStatus struct {
 
 // UnattendedUpgradesDB is the persisted view returned by API endpoints.
 type UnattendedUpgradesDB struct {
-	Installed      bool      `json:"installed"`
-	Enabled        bool      `json:"enabled"`
-	RebootRequired bool      `json:"reboot_required"`
-	LastRunAt      *time.Time `json:"last_run_at"`
-	LastRunPackages int      `json:"last_run_packages"`
-	Config         UUConfig  `json:"config"`
+	Installed       bool       `json:"installed"`
+	Enabled         bool       `json:"enabled"`
+	RebootRequired  bool       `json:"reboot_required"`
+	LastRunAt       *time.Time `json:"last_run_at"`
+	LastRunPackages int        `json:"last_run_packages"`
+	Config          UUConfig   `json:"config"`
 }
 
 // UnattendedUpgradesConfigureRequest is the body for PUT /hosts/:id/apt/unattended-upgrades.

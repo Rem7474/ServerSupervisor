@@ -17,6 +17,7 @@ type fakeRepo struct {
 	getResult   *models.ReleaseTracker
 	listResult  []models.ReleaseTracker
 	driftResult bool
+	pickable    []models.TrackableContainer
 }
 
 func (f *fakeRepo) ListRegistryCredentials(context.Context) ([]models.RegistryCredential, error) {
@@ -49,6 +50,9 @@ func (f *fakeRepo) ListReleaseTrackerExecutions(context.Context, string, int) ([
 }
 func (f *fakeRepo) ListTrackableContainers(context.Context) ([]models.TrackableContainer, error) {
 	return nil, nil
+}
+func (f *fakeRepo) ListPickableContainers(context.Context) ([]models.TrackableContainer, error) {
+	return f.pickable, nil
 }
 func (f *fakeRepo) ListTrackerTagDigests(context.Context, string, int) ([]models.ReleaseVersionHistoryItem, error) {
 	return nil, nil
@@ -83,6 +87,10 @@ func TestCreate_Validation(t *testing.T) {
 		{"git bad provider", models.ReleaseTrackerRequest{Name: "x", TrackerType: "git", Provider: "bitbucket", RepoOwner: "o", RepoName: "r"}},
 		{"git half-dispatch", models.ReleaseTrackerRequest{Name: "x", TrackerType: "git", Provider: "github", RepoOwner: "o", RepoName: "r", HostID: "h"}},
 		{"docker no image", models.ReleaseTrackerRequest{Name: "x", TrackerType: "docker"}},
+		// The optional git link a docker tracker may carry for release notes is
+		// all-or-nothing, and its provider is still validated.
+		{"docker half git link", models.ReleaseTrackerRequest{Name: "x", TrackerType: "docker", DockerImage: "nginx", RepoOwner: "o"}},
+		{"docker git link bad provider", models.ReleaseTrackerRequest{Name: "x", TrackerType: "docker", DockerImage: "nginx", Provider: "bitbucket", RepoOwner: "o", RepoName: "r"}},
 		{"cooldown out of range", models.ReleaseTrackerRequest{Name: "x", TrackerType: "git", Provider: "github", RepoOwner: "o", RepoName: "r", CooldownHours: 999}},
 	}
 	for _, tc := range cases {
@@ -109,6 +117,61 @@ func TestCreate_GitMonitorOnlyValid(t *testing.T) {
 	}
 	if !repo.created {
 		t.Error("valid tracker should be persisted")
+	}
+}
+
+// A docker tracker's git link is optional: no repo at all stays valid, and a
+// complete one is accepted (and defaults its provider) without turning the
+// tracker into a git tracker.
+func TestCreate_DockerOptionalGitLink(t *testing.T) {
+	cases := []struct {
+		name         string
+		req          models.ReleaseTrackerRequest
+		wantProvider string
+	}{
+		{
+			"no git link",
+			models.ReleaseTrackerRequest{Name: "x", TrackerType: "docker", DockerImage: "nginx", DockerTag: "latest"},
+			"",
+		},
+		{
+			"full link defaults the provider to github",
+			models.ReleaseTrackerRequest{Name: "x", TrackerType: "docker", DockerImage: "nginx", DockerTag: "latest", RepoOwner: "o", RepoName: "r"},
+			"github",
+		},
+		{
+			"explicit provider is kept",
+			models.ReleaseTrackerRequest{Name: "x", TrackerType: "docker", DockerImage: "nginx", DockerTag: "latest", Provider: "gitea", RepoOwner: "o", RepoName: "r"},
+			"gitea",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			created, err := newSvc(&fakeRepo{}).Create(context.Background(), tc.req)
+			if err != nil {
+				t.Fatalf("expected a valid docker tracker, got %v", err)
+			}
+			if created.TrackerType != "docker" {
+				t.Errorf("tracker_type = %q, want docker", created.TrackerType)
+			}
+			if created.Provider != tc.wantProvider {
+				t.Errorf("provider = %q, want %q", created.Provider, tc.wantProvider)
+			}
+		})
+	}
+}
+
+func TestPickableContainers_NotRestrictedToCompose(t *testing.T) {
+	repo := &fakeRepo{pickable: []models.TrackableContainer{
+		{HostID: "h1", ContainerName: "standalone", Image: "nginx", ImageTag: "latest"},
+		{HostID: "h1", ContainerName: "svc", Image: "redis", ImageTag: "7", ComposeProject: "proj", Tracked: true},
+	}}
+	got, err := newSvc(repo).PickableContainers(context.Background())
+	if err != nil {
+		t.Fatalf("PickableContainers: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d containers, want both the standalone and the already-tracked compose one", len(got))
 	}
 }
 

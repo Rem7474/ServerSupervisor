@@ -80,17 +80,16 @@
         :last-updated-at="lastUpdatedAt"
       >
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          <span class="small text-secondary">Période :</span>
-          <button
-            v-for="p in periodOptions"
-            :key="p.value"
-            type="button"
-            class="btn btn-sm"
-            :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
-            @click="setPeriod(p.value)"
-          >
-            {{ p.label }}
-          </button>
+          <TimeRangePicker
+            v-model="timeRange"
+            :presets="periodOptions"
+            :loading="loading"
+            @change="onRangeChange"
+          />
+          <span
+            v-if="loading"
+            class="spinner-border spinner-border-sm text-muted"
+          />
         </div>
       </PageRefreshBar>
 
@@ -528,6 +527,7 @@ import TrafficStatusChart from './TrafficStatusChart.vue'
 import { useTraffic } from '../../composables/useTraffic'
 import DomainDetailsModal from './DomainDetailsModal.vue'
 import IPTimelineModal from './IPTimelineModal.vue'
+import TimeRangePicker from '../common/TimeRangePicker.vue'
 
 const {
   periodOptions,
@@ -535,6 +535,7 @@ const {
   period,
   source,
   hostId,
+  timeRange,
   autoRefresh,
   loading,
   compare,
@@ -563,7 +564,7 @@ const {
   formatDate,
   statusClass,
   hostWidth,
-  setPeriod,
+  onRangeChange,
   loadAll,
   openDomain,
   openIP,

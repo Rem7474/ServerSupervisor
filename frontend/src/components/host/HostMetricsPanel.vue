@@ -97,16 +97,22 @@
           <h3 class="card-title">
             CPU
           </h3>
-          <div class="btn-group btn-group-sm">
-            <button
-              v-for="opt in timeRangeOptions"
-              :key="opt.hours"
-              type="button"
-              :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-              @click="loadHistory(opt.hours)"
-            >
-              {{ opt.label }}
-            </button>
+          <div class="d-flex align-items-center gap-2">
+            <span
+              v-if="historyLoading"
+              class="spinner-border spinner-border-sm text-muted"
+            />
+            <div class="btn-group btn-group-sm">
+              <button
+                v-for="opt in timeRangeOptions"
+                :key="opt.hours"
+                type="button"
+                :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+                @click="loadHistory(opt.hours)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
         </div>
         <div
@@ -206,6 +212,7 @@ const props = withDefaults(defineProps<{
 })
 
 const chartHours = ref(24)
+const historyLoading = ref(false)
 const metricsHistory = ref<HistoryPoint[]>([])
 const cpuChartData = shallowRef<ChartData<'line'> | null>(null)
 const memChartData = shallowRef<ChartData<'line'> | null>(null)
@@ -371,6 +378,7 @@ watch(() => props.refreshTick, () => {
 
 async function loadHistory(hours: number): Promise<void> {
   chartHours.value = hours
+  historyLoading.value = true
   try {
     const history = await fetchMetricsHistory(props.hostId, hours, props.metricsSource, props.proxmoxGuestId)
     metricsHistory.value = history
@@ -379,6 +387,8 @@ async function loadHistory(hours: number): Promise<void> {
   } catch (e: unknown) {
     const err = e as { response?: { data?: unknown }; message?: string }
     console.error(`Failed to fetch metrics history (${hours}h):`, err?.response?.data || err?.message)
+  } finally {
+    historyLoading.value = false
   }
 }
 

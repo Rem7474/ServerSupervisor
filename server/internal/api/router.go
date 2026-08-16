@@ -182,6 +182,11 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.D
 	// re-verifies the password itself (see BeginWebAuthnLogin's doc comment).
 	r.POST("/api/auth/webauthn/login/begin", h.BeginWebAuthnLogin)
 	r.POST("/api/auth/webauthn/login/finish", h.FinishWebAuthnLogin)
+	// Usernameless "conditional UI" passkey login: no password re-verification
+	// up front (there's no username yet), the account is resolved from the
+	// credential itself — see BeginDiscoverableLogin's doc comment.
+	r.POST("/api/auth/webauthn/login/discoverable/begin", h.BeginDiscoverableWebAuthnLogin)
+	r.POST("/api/auth/webauthn/login/discoverable/finish", h.FinishDiscoverableWebAuthnLogin)
 	r.GET("/api/health", func(c *gin.Context) {
 		if err := db.Ping(); err != nil {
 			c.JSON(503, gin.H{"status": "degraded", "db": "unreachable", "error": err.Error()})
@@ -263,6 +268,9 @@ func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *han
 	hostViewer.GET("/disk/metrics/history", h.GetDiskMetricsHistory)
 	hostViewer.GET("/disk/metrics/aggregated", h.GetDiskMetricsAggregated)
 	hostViewer.GET("/disk/health", h.GetDiskHealth)
+	hostViewer.GET("/network/flows", h.GetNetworkFlows)
+	hostViewer.GET("/network/flows/history", h.GetNetworkFlowsHistory)
+	hostViewer.GET("/network/flows/summary", h.GetNetworkFlowsSummary)
 	hostViewer.GET("/complete", h.GetHostComplete)
 	hostViewer.GET("/exposure", h.GetHostExposure)
 
@@ -434,6 +442,7 @@ func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTracker
 	g.POST("/release-trackers", h.Create)
 	g.POST("/release-trackers/bulk", h.CreateBulk)
 	g.GET("/release-trackers/trackable-containers", h.ListTrackableContainers)
+	g.GET("/release-trackers/pickable-containers", h.ListPickableContainers)
 	g.GET("/release-trackers/:id", h.Get)
 	g.PUT("/release-trackers/:id", h.Update)
 	g.DELETE("/release-trackers/:id", h.Delete)

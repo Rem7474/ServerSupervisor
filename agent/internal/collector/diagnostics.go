@@ -92,6 +92,28 @@ func CheckConfig(cfg *config.Config) []DiagnosticIssue {
 		issues = append(issues, checkResticConfig(cfg)...)
 	}
 
+	if cfg.CollectNetworkFlows {
+		if ok, reason := checkConntrackAcct(); !ok {
+			issues = append(issues, DiagnosticIssue{
+				Collector: "network_flows", Severity: DiagnosticWarning,
+				Message: "collect_network_flows est activé mais aucun compteur d'octets par connexion n'est disponible : " + reason,
+			})
+		}
+		// The optional L7 capture reports through its last real attempt rather
+		// than a static config check: whether CAP_NET_RAW is actually granted
+		// can't be known without trying to open the socket, and CheckConfig is
+		// contractually side-effect-free (os.Stat/LookPath only). Empty until
+		// the first cycle has tried, then self-clearing once it succeeds.
+		if cfg.NetworkFlowsL7Capture {
+			if reason := L7CaptureError(); reason != "" {
+				issues = append(issues, DiagnosticIssue{
+					Collector: "network_flows", Severity: DiagnosticWarning,
+					Message: "network_flows_l7_capture est activé mais " + reason,
+				})
+			}
+		}
+	}
+
 	return issues
 }
 

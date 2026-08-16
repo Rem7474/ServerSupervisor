@@ -65,6 +65,46 @@ func ListSystemdServices() ([]SystemdService, error) {
 	return services, nil
 }
 
+// SelfServiceUnit is the systemd unit name install.sh registers the agent
+// under. A restart/stop command targeting it needs different handling than
+// any other unit — see ExecuteSelfRestart.
+const SelfServiceUnit = "serversupervisor-agent"
+
+// IsSelfServiceUnit reports whether name refers to the agent's own systemd
+// unit, tolerating the optional ".service" suffix systemd accepts either way.
+func IsSelfServiceUnit(name string) bool {
+	return strings.TrimSuffix(name, ".service") == SelfServiceUnit
+}
+
+// ExecuteSelfRestart runs a restart or stop of the agent's own systemd unit
+// via a detached systemd-run transient unit rather than a direct child
+// process. systemd's default KillMode=control-group sends SIGTERM to every
+// process in the service's cgroup when the unit stops (as part of a
+// restart or a plain stop) — including a direct `systemctl restart` child
+// and the agent process itself — so running it the same way
+// ExecuteSystemdCommand does would race the command's own report against
+// the agent being killed mid-flight, which is exactly why this action used
+// to come back as a failure to the server. systemd-run launches the actual
+// systemctl call in a new transient unit outside that cgroup, so it
+// survives the agent going down. Since the agent cannot wait for or observe
+// the eventual outcome (it's about to be torn down), this only reports
+// whether the detached job was launched, not whether the service actually
+// came back up.
+func ExecuteSelfRestart(action string) error {
+	if action != "restart" && action != "stop" {
+		return fmt.Errorf("unsupported self-service action: %q", action)
+	}
+	if _, err := exec.LookPath("systemd-run"); err != nil {
+		return fmt.Errorf("systemd-run not available: %w", err)
+	}
+	unitName := fmt.Sprintf("%s-%s-%d", SelfServiceUnit, action, time.Now().UnixNano())
+	cmd := exec.Command("systemd-run", "--unit="+unitName, "--collect", "systemctl", action, SelfServiceUnit)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to launch detached systemctl %s: %w", action, err)
+	}
+	return nil
+}
+
 // ExecuteSystemdCommand runs a systemctl action on a service and streams its output.
 // Valid actions: start, stop, restart, enable, disable, status.
 func ExecuteSystemdCommand(serviceName, action string, chunkCB func(string)) (string, error) {

@@ -16,14 +16,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/config"
 	"github.com/serversupervisor/agent/internal/sender"
 )
 
 const (
-	agentUpdateServiceName = "serversupervisor-agent"
-	agentUpdateBinaryPath  = "/usr/local/bin/serversupervisor-agent"
-	agentReleaseRepo       = "Rem7474/ServerSupervisor"
+	agentUpdateBinaryPath = "/usr/local/bin/serversupervisor-agent"
+	agentReleaseRepo      = "Rem7474/ServerSupervisor"
 )
 
 type agentUpdatePayload struct {
@@ -194,20 +194,20 @@ func runInternalUpdate(cfgPath, commandID, targetVersion string) error {
 		return finalizeUpdateFailure(s, ctx, commandID, progress, fmt.Errorf("post-install healthcheck failed: %w", err))
 	}
 
-	progress("Restarting %s", agentUpdateServiceName)
-	if err := exec.Command("systemctl", "restart", agentUpdateServiceName).Run(); err != nil {
+	progress("Restarting %s", collector.SelfServiceUnit)
+	if err := exec.Command("systemctl", "restart", collector.SelfServiceUnit).Run(); err != nil {
 		if rollbackErr := restorePreviousBinary(targetBinary, backupBinary); rollbackErr != nil {
 			return finalizeUpdateFailure(s, ctx, commandID, progress, fmt.Errorf("service restart failed (%v) and rollback failed: %w", err, rollbackErr))
 		}
-		_ = exec.Command("systemctl", "restart", agentUpdateServiceName).Run()
+		_ = exec.Command("systemctl", "restart", collector.SelfServiceUnit).Run()
 		return finalizeUpdateFailure(s, ctx, commandID, progress, fmt.Errorf("service restart failed: %w", err))
 	}
 
-	if err := waitForServiceActive(agentUpdateServiceName, 30*time.Second); err != nil {
+	if err := waitForServiceActive(collector.SelfServiceUnit, 30*time.Second); err != nil {
 		if rollbackErr := restorePreviousBinary(targetBinary, backupBinary); rollbackErr != nil {
 			return finalizeUpdateFailure(s, ctx, commandID, progress, fmt.Errorf("service did not become active (%v) and rollback failed: %w", err, rollbackErr))
 		}
-		_ = exec.Command("systemctl", "restart", agentUpdateServiceName).Run()
+		_ = exec.Command("systemctl", "restart", collector.SelfServiceUnit).Run()
 		return finalizeUpdateFailure(s, ctx, commandID, progress, fmt.Errorf("service did not become active: %w", err))
 	}
 

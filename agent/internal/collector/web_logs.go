@@ -3,6 +3,7 @@ package collector
 import (
 	"bufio"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -142,7 +143,7 @@ var commonAccessLogRegex = regexp.MustCompile(
 	`^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^\s"]+) [^"]+" (\d{3}) (\d+|-) "[^"]*" "([^"]*)"`,
 )
 
-func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, crowdSecConnectionString string, crowdSecAPIKey string, crowdSecAlertsMachineID string, crowdSecAlertsPassword string, crowdSecEnabled bool) (*WebLogReport, error) {
+func CollectWebLogs(ctx context.Context, logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, crowdSecConnectionString string, crowdSecAPIKey string, crowdSecAlertsMachineID string, crowdSecAlertsPassword string, crowdSecEnabled bool) (*WebLogReport, error) {
 	if tailLines <= 0 {
 		tailLines = 5000
 	}
@@ -176,9 +177,16 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 	sourceHits := map[string]int{}
 
 	for _, file := range files {
+		// A stuck/very slow file (huge un-rotated NPM access log, stalled
+		// network mount) must not keep this collector running forever after
+		// reporter.go's safety timeout gives up waiting for it — bail out and
+		// report on whatever was gathered from files scanned so far.
+		if ctx.Err() != nil {
+			break
+		}
 		seenFiles[file] = struct{}{}
 		entry, hasEntry := cursor.Files[file]
-		lines, nextEntry, err := readLinesForFile(file, tailLines, entry, hasEntry)
+		lines, nextEntry, err := readLinesForFile(ctx, file, tailLines, entry, hasEntry)
 		if err != nil {
 			continue
 		}
@@ -483,14 +491,14 @@ func expandGlobs(globs []string) []string {
 	return out
 }
 
-func readLinesForFile(path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
+func readLinesForFile(ctx context.Context, path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
 	if strings.HasSuffix(strings.ToLower(path), ".gz") {
-		return readCompressedLines(path, prev, hasPrev)
+		return readCompressedLines(ctx, path, prev, hasPrev)
 	}
-	return readIncrementalLines(path, maxLines, prev, hasPrev)
+	return readIncrementalLines(ctx, path, maxLines, prev, hasPrev)
 }
 
-func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
+func readCompressedLines(ctx context.Context, path string, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, prev, err
@@ -525,7 +533,10 @@ func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]s
 	s := bufio.NewScanner(gz)
 	buf := make([]byte, 0, 64*1024)
 	s.Buffer(buf, 4*1024*1024)
-	for s.Scan() {
+	for i := 0; s.Scan(); i++ {
+		if i%4096 == 0 && ctx.Err() != nil {
+			return lines, next, ctx.Err()
+		}
 		lines = append(lines, s.Text())
 	}
 	if err := s.Err(); err != nil {
@@ -539,7 +550,7 @@ func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]s
 	return lines, next, nil
 }
 
-func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
+func readIncrementalLines(ctx context.Context, path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, prev, err
@@ -556,7 +567,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 	}
 
 	bootstrap := func() ([]string, webLogCursorEntry, error) {
-		tailLines, tailStartOffset, err := readLastLinesWithStart(path, maxLines)
+		tailLines, tailStartOffset, err := readLastLinesWithStart(ctx, path, maxLines)
 		if err != nil {
 			return nil, next, err
 		}
@@ -568,7 +579,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		next.BackfillDone = tailStartOffset <= 0
 
 		if !next.BackfillDone {
-			backfillLines, backfillOffset, done, err := readBackfillChunk(path, next.BackfillOffset, next.BackfillLimit, maxLines)
+			backfillLines, backfillOffset, done, err := readBackfillChunk(ctx, path, next.BackfillOffset, next.BackfillLimit, maxLines)
 			if err == nil {
 				headCount = len(backfillLines)
 				tailLines = append(tailLines, backfillLines...)
@@ -614,7 +625,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 
 	if info.Size() > prev.Offset {
 		// Always keep live tail fresh by processing new appended lines.
-		liveLines, err := readNewLinesFromOffset(path, prev.Offset, 0)
+		liveLines, err := readNewLinesFromOffset(ctx, path, prev.Offset, 0)
 		if err != nil {
 			return nil, next, err
 		}
@@ -624,7 +635,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 
 	if !next.BackfillDone {
 		// Progressively replay old history from the beginning in fixed chunks.
-		backfillLines, backfillOffset, done, err := readBackfillChunk(path, next.BackfillOffset, next.BackfillLimit, maxLines)
+		backfillLines, backfillOffset, done, err := readBackfillChunk(ctx, path, next.BackfillOffset, next.BackfillLimit, maxLines)
 		if err == nil {
 			headCount = len(backfillLines)
 			out = append(out, backfillLines...)
@@ -642,7 +653,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 	return out, next, nil
 }
 
-func readBackfillChunk(path string, startOffset int64, stopOffset int64, maxLines int) ([]string, int64, bool, error) {
+func readBackfillChunk(ctx context.Context, path string, startOffset int64, stopOffset int64, maxLines int) ([]string, int64, bool, error) {
 	if maxLines <= 0 {
 		maxLines = 5000
 	}
@@ -663,7 +674,10 @@ func readBackfillChunk(path string, startOffset int64, stopOffset int64, maxLine
 	r := bufio.NewReader(f)
 	lines := make([]string, 0, maxLines)
 	cursor := startOffset
-	for len(lines) < maxLines && cursor < stopOffset {
+	for i := 0; len(lines) < maxLines && cursor < stopOffset; i++ {
+		if i%4096 == 0 && ctx.Err() != nil {
+			return lines, cursor, false, ctx.Err()
+		}
 		raw, err := r.ReadString('\n')
 		if len(raw) > 0 {
 			nextCursor := cursor + int64(len(raw))
@@ -686,7 +700,7 @@ func readBackfillChunk(path string, startOffset int64, stopOffset int64, maxLine
 	return lines, cursor, done, nil
 }
 
-func readLastLinesWithStart(path string, n int) ([]string, int64, error) {
+func readLastLinesWithStart(ctx context.Context, path string, n int) ([]string, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, 0, err
@@ -701,7 +715,17 @@ func readLastLinesWithStart(path string, n int) ([]string, int64, error) {
 	ring := make([]lineEntry, 0, n)
 	r := bufio.NewReader(f)
 	var offset int64
-	for {
+	// This necessarily scans the whole file front-to-back (no other way to
+	// find "the last N lines" without seeking blindly through variable-length
+	// lines) — on a huge, un-rotated access log that's the dominant cost of a
+	// bootstrap scan, so it needs its own ctx check independent of the
+	// collectionTimeout-derived deadline the caller wraps around the whole
+	// collector: without this, a single oversized file could otherwise still
+	// run past the timeout uninterrupted.
+	for i := 0; ; i++ {
+		if i%4096 == 0 && ctx.Err() != nil {
+			return nil, 0, ctx.Err()
+		}
 		raw, err := r.ReadString('\n')
 		if len(raw) > 0 {
 			entry := lineEntry{start: offset, line: strings.TrimRight(raw, "\r\n")}
@@ -734,7 +758,7 @@ func readLastLinesWithStart(path string, n int) ([]string, int64, error) {
 	return lines, ring[0].start, nil
 }
 
-func readNewLinesFromOffset(path string, offset int64, maxLines int) ([]string, error) {
+func readNewLinesFromOffset(ctx context.Context, path string, offset int64, maxLines int) ([]string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -748,7 +772,10 @@ func readNewLinesFromOffset(path string, offset int64, maxLines int) ([]string, 
 	if maxLines <= 0 {
 		lines := make([]string, 0, 1024)
 		s := bufio.NewScanner(f)
-		for s.Scan() {
+		for i := 0; s.Scan(); i++ {
+			if i%4096 == 0 && ctx.Err() != nil {
+				return lines, ctx.Err()
+			}
 			lines = append(lines, s.Text())
 		}
 		if err := s.Err(); err != nil {
@@ -759,7 +786,10 @@ func readNewLinesFromOffset(path string, offset int64, maxLines int) ([]string, 
 
 	ring := make([]string, 0, maxLines)
 	s := bufio.NewScanner(f)
-	for s.Scan() {
+	for i := 0; s.Scan(); i++ {
+		if i%4096 == 0 && ctx.Err() != nil {
+			return ring, ctx.Err()
+		}
 		line := s.Text()
 		if len(ring) < maxLines {
 			ring = append(ring, line)

@@ -21,7 +21,7 @@
               :size="14"
               class="icon me-1"
             />
-            Découvrir
+            Mise à jour auto
           </button>
           <button
             type="button"

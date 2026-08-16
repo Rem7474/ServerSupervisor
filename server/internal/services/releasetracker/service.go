@@ -13,7 +13,11 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
+	// versionhelpers is internal/releasetracker, the pure version-comparison
+	// helpers; aliased because this package shares its name.
+	versionhelpers "github.com/serversupervisor/server/internal/releasetracker"
 	"github.com/serversupervisor/server/internal/safego"
+	"github.com/serversupervisor/server/internal/services/dockerversions"
 	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
@@ -35,6 +39,7 @@ type Repository interface {
 	DeleteReleaseTracker(ctx context.Context, id string) error
 	ListReleaseTrackerExecutions(ctx context.Context, trackerID string, limit int) ([]models.ReleaseTrackerExecution, error)
 	ListTrackableContainers(ctx context.Context) ([]models.TrackableContainer, error)
+	ListPickableContainers(ctx context.Context) ([]models.TrackableContainer, error)
 	ListTrackerTagDigests(ctx context.Context, trackerID string, limit int) ([]models.ReleaseVersionHistoryItem, error)
 	UpdateReleaseTrackerExecutionByCommandID(ctx context.Context, commandID, status string) (trackerID string, notifyOnRelease bool, channels []string, err error)
 	TrackerDriftDetected(ctx context.Context, t models.ReleaseTracker) (bool, error)
@@ -47,15 +52,22 @@ type Service struct {
 	notifHub *ws.NotificationHub
 	dispatch *notifychannels.Dispatcher
 	poller   *Poller
+	images   *dockerversions.Service
 }
 
 func NewService(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub, pushSvc *push.Service) *Service {
+	// One shared ambient engine instance: the release-tracker poller reads it
+	// on every docker tracker check, and main.go ticks its own background sweep
+	// through RefreshImageVersions below — same object, so the two never issue
+	// duplicate registry calls for the same image (see dockerversions.Service).
+	images := dockerversions.NewService(db, cfg)
 	return &Service{
 		repo:     db,
 		cfg:      cfg,
 		notifHub: notifHub,
 		dispatch: notifychannels.NewDispatcher(cfg, pushSvc),
-		poller:   NewPoller(db, cfg, dispatcher, notifHub, pushSvc),
+		poller:   NewPoller(db, cfg, dispatcher, notifHub, pushSvc, images),
+		images:   images,
 	}
 }
 
@@ -69,6 +81,23 @@ func (s *Service) PollInterval() time.Duration {
 
 // CheckAll polls every enabled tracker once (poller.Every ticks this).
 func (s *Service) CheckAll(ctx context.Context) { s.poller.CheckAll(ctx) }
+
+// ImagePollInterval is the ambient image-version engine's cadence (default 6h).
+func (s *Service) ImagePollInterval() time.Duration {
+	if s.images == nil {
+		return 6 * time.Hour
+	}
+	return s.images.RefreshInterval()
+}
+
+// RefreshImageVersions runs one ambient sweep of every running image (poller.Every
+// ticks this from main, same handler-exposes-a-poll-once shape as CheckAll).
+func (s *Service) RefreshImageVersions(ctx context.Context) {
+	if s.images == nil {
+		return
+	}
+	s.images.RefreshAll(ctx)
+}
 
 // ===== registry credentials =====
 
@@ -197,8 +226,18 @@ func (s *Service) Get(ctx context.Context, id string) (*models.ReleaseTracker, [
 	return t, execs, nil
 }
 
+// TrackableContainers backs the bulk "activer la mise à jour auto" flow:
+// compose-managed containers without a tracker yet, the only ones a compose
+// pull+up can actually auto-update.
 func (s *Service) TrackableContainers(ctx context.Context) ([]models.TrackableContainer, error) {
 	return s.repo.ListTrackableContainers(ctx)
+}
+
+// PickableContainers backs the single-tracker container picker that replaced
+// the free-text docker_image/docker_tag inputs — every running container, with
+// no compose restriction (a manual tracker only needs an image reference).
+func (s *Service) PickableContainers(ctx context.Context) ([]models.TrackableContainer, error) {
+	return s.repo.ListPickableContainers(ctx)
 }
 
 func (s *Service) Executions(ctx context.Context, id string) ([]models.ReleaseTrackerExecution, error) {
@@ -213,7 +252,10 @@ func (s *Service) Executions(ctx context.Context, id string) ([]models.ReleaseTr
 }
 
 // VersionHistory returns the recent versions (docker: stored digests; git: live
-// provider history).
+// provider history). A docker tracker with an optional git link keeps the digest
+// history as its spine — that's the deployed truth — and only borrows the
+// matching release's title/URL/date from the provider, so linking a repo never
+// changes which versions are listed, just how much context each one carries.
 func (s *Service) VersionHistory(ctx context.Context, id string, limit int) ([]models.ReleaseVersionHistoryItem, error) {
 	t, err := s.repo.GetReleaseTrackerByID(ctx, id)
 	if err == sql.ErrNoRows {
@@ -228,6 +270,7 @@ func (s *Service) VersionHistory(ctx context.Context, id string, limit int) ([]m
 		if err != nil {
 			return nil, err
 		}
+		s.enrichWithGitReleases(ctx, *t, history, limit)
 	} else {
 		releases, ferr := gitprovider.NewClient(t.Provider, s.cfg.GitHubToken).FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
 		if ferr != nil {
@@ -246,6 +289,43 @@ func (s *Service) VersionHistory(ctx context.Context, id string, limit int) ([]m
 		history = []models.ReleaseVersionHistoryItem{}
 	}
 	return history, nil
+}
+
+// enrichWithGitReleases fills in release notes for a docker tracker that opted
+// into a git link. Best-effort by design: an unreachable or wrong repo must not
+// fail the digest history that already works without it, so failures are
+// swallowed and the untouched history is returned.
+func (s *Service) enrichWithGitReleases(ctx context.Context, t models.ReleaseTracker, history []models.ReleaseVersionHistoryItem, limit int) {
+	if !hasGitLink(t) || len(history) == 0 {
+		return
+	}
+	releases, err := gitprovider.NewClient(t.Provider, s.cfg.GitHubToken).FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
+	if err != nil {
+		slog.WarnContext(ctx, fmt.Sprintf("Docker tracker %s: linked repo %s/%s release notes unavailable: %v", t.Name, t.RepoOwner, t.RepoName, err))
+		return
+	}
+	byVersion := make(map[string]gitprovider.Release, len(releases))
+	for _, r := range releases {
+		byVersion[versionhelpers.NormalizeVersion(r.TagName)] = r
+	}
+	for i := range history {
+		r, ok := byVersion[versionhelpers.NormalizeVersion(history[i].Version)]
+		if !ok {
+			continue
+		}
+		history[i].Name = r.Name
+		history[i].ReleaseURL = r.HTMLURL
+		if !r.PublishedAt.IsZero() {
+			published := r.PublishedAt
+			history[i].PublishedAt = &published
+		}
+	}
+}
+
+// hasGitLink reports whether a tracker names a git repository — required for a
+// git tracker, optional (release notes only) for a docker one.
+func hasGitLink(t models.ReleaseTracker) bool {
+	return t.RepoOwner != "" && t.RepoName != "" && validReleaseProviders[t.Provider]
 }
 
 // ===== check-now / manual run (delegated to the poller on pollCtx) =====
@@ -433,11 +513,18 @@ func validateDockerTracker(req *models.ReleaseTracker) string {
 	if req.UpdateAction != "custom" && req.UpdateAction != "compose" {
 		return "update_action must be 'custom' or 'compose'"
 	}
+	// Still required, and still stored — the update action needs to know exactly
+	// which image:tag it targets. It is no longer typed by hand though: the UI
+	// fills it from a picked running container (ListPickableContainers).
 	if req.DockerImage == "" {
-		return "docker_image is required for docker trackers"
+		return "docker_image is required for docker trackers (select a running container)"
 	}
 	if req.DockerTag == "" {
 		req.DockerTag = "latest"
+	}
+	// Optional git link, release notes only (see Service.enrichWithGitReleases).
+	if msg := validateOptionalGitLink(req); msg != "" {
+		return msg
 	}
 	if req.UpdateAction == "compose" {
 		if req.HostID == "" || req.ComposeProject == "" {
@@ -448,6 +535,27 @@ func validateDockerTracker(req *models.ReleaseTracker) string {
 	}
 	if req.HealthcheckTimeoutSec < 0 || req.HealthcheckTimeoutSec > 3600 {
 		return "healthcheck_timeout_sec must be between 0 and 3600"
+	}
+	return ""
+}
+
+// validateOptionalGitLink checks the optional repo a docker tracker may name to
+// surface release notes alongside its digest history. Leaving all three fields
+// empty is valid (no link); naming one without the others is not. Provider is
+// defaulted to github rather than rejected, matching the git-tracker create path.
+func validateOptionalGitLink(req *models.ReleaseTracker) string {
+	if req.RepoOwner == "" && req.RepoName == "" {
+		req.Provider = "" // don't persist a dangling provider with no repo
+		return ""
+	}
+	if req.RepoOwner == "" || req.RepoName == "" {
+		return "repo_owner and repo_name must be provided together for the optional git link"
+	}
+	if req.Provider == "" {
+		req.Provider = "github"
+	}
+	if !validReleaseProviders[req.Provider] {
+		return "invalid provider; must be github, gitlab, or gitea"
 	}
 	return ""
 }

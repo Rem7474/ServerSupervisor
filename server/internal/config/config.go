@@ -24,6 +24,17 @@ type Config struct {
 	Port       string
 	BaseURL    string
 	TLSEnabled bool // Whether HTTPS is enabled
+	// DemoMode disables every background job/poller that makes a real
+	// outbound network call (Proxmox VE, Nginx Proxy Manager, uptime/SSL
+	// probes, Git release tracking) — see main.go's job/poller wiring.
+	// Orthogonal to APP_ENV=dev (which only relaxes secret validation):
+	// a real local dev setup against a real Proxmox box must not have its
+	// pollers silently disabled just because APP_ENV=dev is convenient for
+	// the JWT secret auto-generation. Env-only by design — never read back
+	// from OverrideFromDB, so it can't be flipped at runtime via the
+	// Settings UI (that would defeat the "zero network calls" guarantee the
+	// demo/screenshot pipeline relies on).
+	DemoMode bool
 
 	// Logging
 	LogLevel  string // debug|info|warn|error
@@ -59,6 +70,14 @@ type Config struct {
 	GitHubToken        string
 	GitHubPollInterval time.Duration
 
+	// DockerImagePollInterval is the cadence of the ambient Docker image-version
+	// engine (internal/services/dockerversions), which refreshes one registry
+	// digest per distinct image:tag running across the whole fleet. Deliberately
+	// much slower than GitHubPollInterval: this scans every image, not just the
+	// handful with a release tracker, and anonymous Docker Hub pulls are rate
+	// limited per source IP.
+	DockerImagePollInterval time.Duration
+
 	// Alerts
 	NotifyURL     string
 	NtfyAuthToken string
@@ -74,6 +93,11 @@ type Config struct {
 	MetricsRetentionDays int
 	AuditRetentionDays   int
 	WebLogsRetentionDays int
+	// NetworkFlowsRetentionDays governs network_flow_metrics ("top talkers"),
+	// which stores remote IPs — a potentially identifying value, hence a
+	// short applicative-job retention (internal/background/network_flows.go)
+	// rather than a fixed TimescaleDB policy, same posture as WebLogsRetentionDays.
+	NetworkFlowsRetentionDays int
 	// AuditRetentionDaysByCategory overrides AuditRetentionDays per audit
 	// log category (models.AuditCategories' keys) — settings-only (no env
 	// var: a per-category map doesn't fit the flat KEY=value env shape the
@@ -153,6 +177,7 @@ func Load() *Config {
 		Port:       getEnv("SERVER_PORT", "8080"),
 		BaseURL:    getEnv("BASE_URL", "http://localhost:8080"),
 		TLSEnabled: getBoolEnv("TLS_ENABLED", false),
+		DemoMode:   getBoolEnv("DEMO_MODE", false),
 
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: logFormatDefault(),
@@ -182,6 +207,8 @@ func Load() *Config {
 		GitHubToken:        getEnv("GITHUB_TOKEN", ""),
 		GitHubPollInterval: getDurationEnv("GITHUB_POLL_INTERVAL", 15*time.Minute),
 
+		DockerImagePollInterval: getDurationEnv("DOCKER_IMAGE_POLL_INTERVAL", 6*time.Hour),
+
 		NotifyURL:     getEnv("NOTIFY_URL", ""),
 		NtfyAuthToken: getEnv("NTFY_AUTH_TOKEN", ""),
 		SMTPHost:      getEnv("SMTP_HOST", ""),
@@ -192,9 +219,10 @@ func Load() *Config {
 		SMTPTo:        getEnv("SMTP_TO", ""),
 		SMTPTLS:       getBoolEnv("SMTP_TLS", true),
 
-		MetricsRetentionDays: getIntEnv("METRICS_RETENTION_DAYS", 30),
-		AuditRetentionDays:   getIntEnv("AUDIT_RETENTION_DAYS", 90),
-		WebLogsRetentionDays: getIntEnv("WEB_LOGS_RETENTION_DAYS", 30),
+		MetricsRetentionDays:      getIntEnv("METRICS_RETENTION_DAYS", 30),
+		AuditRetentionDays:        getIntEnv("AUDIT_RETENTION_DAYS", 90),
+		WebLogsRetentionDays:      getIntEnv("WEB_LOGS_RETENTION_DAYS", 30),
+		NetworkFlowsRetentionDays: getIntEnv("NETWORK_FLOWS_RETENTION_DAYS", 14),
 
 		// Defaults below must match internal/threatdetect.DefaultWeights() —
 		// duplicated as literals rather than imported so this leaf config
@@ -279,6 +307,11 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 			c.WebLogsRetentionDays = i
 		}
 	}
+	if v, ok := settings["network_flows_retention_days"]; ok && v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			c.NetworkFlowsRetentionDays = i
+		}
+	}
 
 	overrideFloat(settings, "threat_weight_wordpress", &c.ThreatWeightWordPress)
 	overrideFloat(settings, "threat_weight_adminpanel", &c.ThreatWeightAdminPanel)
@@ -332,6 +365,9 @@ func (c *Config) Validate() []string {
 	}
 	if c.WebLogsRetentionDays <= 0 {
 		warnings = append(warnings, "WEB_LOGS_RETENTION_DAYS must be a positive integer")
+	}
+	if c.NetworkFlowsRetentionDays <= 0 {
+		warnings = append(warnings, "NETWORK_FLOWS_RETENTION_DAYS must be a positive integer")
 	}
 	return warnings
 }

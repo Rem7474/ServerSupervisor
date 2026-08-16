@@ -84,6 +84,8 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 			return metrics.LoadAvg1, true
 		}
 		return 0, false
+	case "bandwidth_vs_rolling_avg":
+		return resolveBandwidthVsRollingAvg(ctx, db, host.ID, rule)
 	case "disk_smart_status":
 		// Returns 1 if any disk has FAILED SMART status, 0 otherwise.
 		healthData, err := db.GetLatestDiskHealth(ctx, host.ID)
@@ -215,6 +217,53 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 		return float64(days), true
 	}
 	return 0, false
+}
+
+// bandwidthCurrentRateWindowSeconds is the short window used as "current
+// rate" for bandwidth_vs_rolling_avg — long enough to smooth over a single
+// noisy sample at the default 30s agent report_interval (~10 samples), short
+// enough to still react quickly to a real spike.
+const bandwidthCurrentRateWindowSeconds = 5 * 60
+
+// bandwidthDefaultBaselineWindowSeconds is used when
+// AlertRule.BaselineWindowSeconds is unset (nil) — 1h, the shortest of the
+// three presets the frontend offers (1h/6h/24h). Existing rules of every
+// other metric never set this field, so this default only matters for a
+// bandwidth_vs_rolling_avg rule created before the field existed.
+const bandwidthDefaultBaselineWindowSeconds = 3600
+
+// resolveBandwidthVsRollingAvg implements the bandwidth_vs_rolling_avg
+// metric: value = (current bandwidth rate / rolling baseline rate) * 100,
+// so the rule's existing threshold_warn/threshold_crit columns read
+// naturally as "N% of baseline" with zero changes to severity.go's generic
+// value-vs-threshold comparison. Both rates come from the same
+// GetBandwidthRateBytesPerSec primitive (MAX-MIN counter delta / elapsed
+// time), just over two different window lengths ending "now": a short one
+// for "current rate" and the rule's configured window for the baseline.
+//
+// Returns (0, false) — this package's standard "not applicable / no data
+// yet" signal (see e.g. cpu_temperature/disk_smart_status above) — when
+// either window has too few samples, or when the baseline rate is zero
+// (division-by-zero guard; a host with literally zero baseline traffic has
+// no meaningful "% of baseline" to report).
+func resolveBandwidthVsRollingAvg(ctx context.Context, db *database.DB, hostID string, rule models.AlertRule) (float64, bool) {
+	baselineWindowSeconds := bandwidthDefaultBaselineWindowSeconds
+	if rule.BaselineWindowSeconds != nil && *rule.BaselineWindowSeconds > 0 {
+		baselineWindowSeconds = *rule.BaselineWindowSeconds
+	}
+
+	currentRate, ok := db.GetBandwidthRateBytesPerSec(ctx, hostID, bandwidthCurrentRateWindowSeconds)
+	if !ok {
+		return 0, false
+	}
+	baselineRate, ok := db.GetBandwidthRateBytesPerSec(ctx, hostID, baselineWindowSeconds)
+	if !ok {
+		return 0, false
+	}
+	if baselineRate <= 0 {
+		return 0, false
+	}
+	return (currentRate / baselineRate) * 100, true
 }
 
 // parseDockerComposeScopeID splits the engine's synthetic compose-scope host

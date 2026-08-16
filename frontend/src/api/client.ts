@@ -4,6 +4,24 @@ import { emitHttpError, emitNetworkOk } from '../utils/httpErrorBus'
 
 export type JsonObject = Record<string, unknown>
 
+/**
+ * A precise custom time window (ISO 8601 UTC strings), as produced by
+ * components/common/TimeRangePicker.vue's `from`/`to`. Optional and additive
+ * everywhere it's accepted — the server ignores the accompanying `period`
+ * once both are present (see parseTimeRange, server/internal/handlers), so
+ * sending both at once is safe.
+ */
+export interface TimeRange {
+  from?: string | null
+  to?: string | null
+}
+
+/** Spreads a TimeRange into query params, omitting from/to when unset. */
+export function rangeParams(range?: TimeRange): { from?: string; to?: string } {
+  if (!range?.from || !range?.to) return {}
+  return { from: range.from, to: range.to }
+}
+
 type ApiErrorLike = {
   response?: {
     data?: {
@@ -125,6 +143,11 @@ api.interceptors.response.use(
       hardRedirectToLogin()
     } else if (status === 403) {
       emitHttpError(403, "Vous n'avez pas les droits nécessaires pour cette action")
+    } else if (status === 502) {
+      // apperr.BadGateway: an upstream dependency (Proxmox, a Git provider, …)
+      // failed or rejected our credentials — distinct from a genuine internal
+      // error, and retrying won't help until the upstream config is fixed.
+      emitHttpError(502, 'Un service externe est injoignable ou a refusé la connexion (identifiants/permissions à vérifier).')
     } else if (status && status >= 500) {
       emitHttpError(status, 'Le serveur a rencontré une erreur. Réessayez dans quelques instants.')
     } else if (status === null) {

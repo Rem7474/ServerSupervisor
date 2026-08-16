@@ -438,6 +438,51 @@ func (h *AuthHandler) FinishWebAuthnLogin(c *gin.Context) {
 	})
 }
 
+// BeginDiscoverableWebAuthnLogin starts a usernameless "conditional UI" login
+// ceremony — called by the frontend as soon as the login page mounts, before
+// the user has typed anything, so the browser can offer a matching passkey as
+// an autocomplete suggestion on the username field.
+func (h *AuthHandler) BeginDiscoverableWebAuthnLogin(c *gin.Context) {
+	assertion, sessionToken, err := h.svc.BeginDiscoverableLogin(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"options": assertion, "session_token": sessionToken})
+}
+
+// FinishDiscoverableWebAuthnLogin verifies a usernameless assertion (the
+// account is resolved from the credential itself) and, on success, issues a
+// session exactly like a successful password+TOTP login.
+func (h *AuthHandler) FinishDiscoverableWebAuthnLogin(c *gin.Context) {
+	var req struct {
+		SessionToken string          `json:"session_token" binding:"required"`
+		Credential   json.RawMessage `json:"credential" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, apperr.Validation("invalid request"))
+		return
+	}
+	user, err := h.svc.FinishDiscoverableLogin(c.Request.Context(), req.SessionToken, req.Credential, c.ClientIP(), c.GetHeader("User-Agent"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	tokens, err := h.svc.IssueSession(c.Request.Context(), user)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	h.writeSession(c, tokens)
+	c.JSON(http.StatusOK, gin.H{
+		"username":             user.Username,
+		"role":                 user.Role,
+		"expires_at":           tokens.AccessExpiresAt,
+		"must_change_password": user.MustChangePassword,
+		"csrf_token":           tokens.CSRFToken,
+	})
+}
+
 // GetAllLoginEventsAdmin returns paginated login events for all users (admin only).
 func (h *AuthHandler) GetAllLoginEventsAdmin(c *gin.Context) {
 	if c.GetString("role") != "admin" {

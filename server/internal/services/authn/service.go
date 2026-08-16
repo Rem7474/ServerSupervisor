@@ -63,6 +63,7 @@ type Repository interface {
 	DeleteWebAuthnCredential(ctx context.Context, id string, userID int64) error
 	CountWebAuthnCredentials(ctx context.Context, userID int64) (int, error)
 	UpdateWebAuthnCredentialUsage(ctx context.Context, credentialID []byte, cred webauthn.Credential) error
+	GetWebAuthnCredentialByCredentialID(ctx context.Context, credentialID []byte) (*models.WebAuthnCredential, error)
 }
 
 // Service holds the authentication use-cases.

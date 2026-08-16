@@ -1,6 +1,7 @@
 <template>
   <div>
     <PageRefreshBar
+      v-if="!hideRefreshBar"
       v-model="autoRefresh"
       label="Sonde uptime"
       :interval-sec="PROBE_REFRESH_SEC"
@@ -94,17 +95,23 @@
           <h3 class="card-title mb-0">
             Disponibilité
           </h3>
-          <div class="btn-group btn-group-sm">
-            <button
-              v-for="w in STATS_WINDOWS"
-              :key="w.hours"
-              type="button"
-              class="btn"
-              :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
-              @click="setStatsWindow(w.hours)"
-            >
-              {{ w.label }}
-            </button>
+          <div class="d-flex align-items-center gap-2">
+            <span
+              v-if="statsLoading"
+              class="spinner-border spinner-border-sm text-muted"
+            />
+            <div class="btn-group btn-group-sm">
+              <button
+                v-for="w in STATS_WINDOWS"
+                :key="w.hours"
+                type="button"
+                class="btn"
+                :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
+                @click="setStatsWindow(w.hours)"
+              >
+                {{ w.label }}
+              </button>
+            </div>
           </div>
         </div>
         <div class="card-body">
@@ -140,17 +147,23 @@
           <h3 class="card-title mb-0">
             Latence ({{ STATS_WINDOWS.find((w) => w.hours === statsWindow)?.label }})
           </h3>
-          <div class="btn-group btn-group-sm">
-            <button
-              v-for="w in STATS_WINDOWS"
-              :key="w.hours"
-              type="button"
-              class="btn"
-              :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
-              @click="setStatsWindow(w.hours)"
-            >
-              {{ w.label }}
-            </button>
+          <div class="d-flex align-items-center gap-2">
+            <span
+              v-if="statsLoading"
+              class="spinner-border spinner-border-sm text-muted"
+            />
+            <div class="btn-group btn-group-sm">
+              <button
+                v-for="w in STATS_WINDOWS"
+                :key="w.hours"
+                type="button"
+                class="btn"
+                :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
+                @click="setStatsWindow(w.hours)"
+              >
+                {{ w.label }}
+              </button>
+            </div>
           </div>
         </div>
         <div
@@ -249,7 +262,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, watch } from 'vue'
+import { computed, defineAsyncComponent, watch } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import EmptyState from '../EmptyState.vue'
@@ -258,10 +271,31 @@ import { getChartPalette } from '../../utils/chartTheme'
 import { useUptimeProbeDetail, STATS_WINDOWS } from '../../composables/useUptimeProbeDetail'
 import type { UptimeProbe, UptimeHistoryBucket } from '../../types/generated'
 
-const props = defineProps<{ probeId: string }>()
+// hideRefreshBar/autoRefresh: set together by MonitoringHostDetailView when
+// both a probe and a cert are configured, so the two sections share one
+// PageRefreshBar instead of each rendering its own "dernière MAJ" + dot.
+// Neither is passed by the standalone /monitoring/probes/:id route, which
+// keeps its own independent bar exactly as before.
+const props = defineProps<{
+  probeId: string
+  hideRefreshBar?: boolean
+  autoRefresh?: boolean
+}>()
 const emit = defineEmits<{
   (e: 'loaded', probe: UptimeProbe | null): void
+  (e: 'update:autoRefresh', value: boolean): void
 }>()
+
+// Gated on hideRefreshBar, not on `props.autoRefresh === undefined`: Vue
+// casts an optional `boolean` prop that isn't bound at all (every caller
+// except MonitoringHostDetailView's merged-bar case) to `false`, not
+// `undefined` — checking the raw value here would permanently freeze
+// autoRefresh off on every standalone route. hideRefreshBar and autoRefresh
+// are always set together by the one caller that uses either.
+const autoRefreshOverride = props.hideRefreshBar ? computed({
+  get: () => props.autoRefresh as boolean,
+  set: (v) => emit('update:autoRefresh', v),
+}) : undefined
 
 function bucketColorClass(b: UptimeHistoryBucket): string {
   if (b.total_checks === 0) return 'bg-secondary-lt'
@@ -305,9 +339,13 @@ const {
   autoRefresh,
   lastUpdatedAt,
   PROBE_REFRESH_SEC,
-} = useUptimeProbeDetail(props.probeId)
+} = useUptimeProbeDetail(props.probeId, autoRefreshOverride)
 
 watch(probe, (p) => emit('loaded', p), { immediate: true })
+
+// Read by MonitoringHostDetailView's merged PageRefreshBar to compute the
+// most-recent of this section's and SslDetailSection's own lastUpdatedAt.
+defineExpose({ lastUpdatedAt })
 
 const palette = getChartPalette()
 const chartOptions = {

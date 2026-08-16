@@ -33,8 +33,12 @@
           <tr>
             <th>Point de montage</th>
             <th>Utilisation</th>
-            <th>Utilisation espace</th>
-            <th>Inodes</th>
+            <th style="width: 220px;">
+              Utilisation espace
+            </th>
+            <th style="width: 220px;">
+              Inodes
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -54,15 +58,15 @@
               <span class="text-muted">{{ formatGB(metric.used_gb) }} / {{ formatGB(metric.size_gb) }}</span>
             </td>
             <td>
-              <div class="progress progress-sm">
-                <div 
-                  class="progress-bar" 
-                  :class="getProgressBarClass(metric.used_percent)"
-                  :style="{ width: metric.used_percent + '%' }"
-                />
-              </div>
-              <div class="text-muted small">
-                {{ metric.used_percent.toFixed(1) }}%
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress progress-xs flex-grow-1 disk-metrics-progress-min">
+                  <div
+                    class="progress-bar"
+                    :class="getProgressBarClass(metric.used_percent)"
+                    :style="{ width: metric.used_percent + '%' }"
+                  />
+                </div>
+                <span class="text-muted small">{{ metric.used_percent.toFixed(1) }}%</span>
               </div>
               <div
                 v-if="metric.forecast_days_until_full != null"
@@ -74,19 +78,19 @@
               </div>
             </td>
             <td>
-              <span
+              <div
                 v-if="metric.inodes_total > 0"
-                class="text-muted small"
+                class="d-flex align-items-center gap-2"
               >
-                {{ metric.inodes_used }} / {{ metric.inodes_total }}
-                <div class="progress progress-sm mt-1">
-                  <div 
-                    class="progress-bar" 
+                <div class="progress progress-xs flex-grow-1 disk-metrics-progress-min">
+                  <div
+                    class="progress-bar"
                     :class="getProgressBarClass(metric.inodes_percent)"
                     :style="{ width: metric.inodes_percent + '%' }"
                   />
                 </div>
-              </span>
+                <span class="text-muted small">{{ metric.inodes_used }} / {{ metric.inodes_total }}</span>
+              </div>
               <span
                 v-else
                 class="text-muted small"
@@ -137,4 +141,14 @@ function forecastClass(days: number): string {
   return 'text-muted'
 }
 </script>
+
+<style scoped>
+/* Same min-width convention as DiskHealthCard/ProxmoxNodeStorageTab's own
+   progress-bar columns — without it, "Utilisation espace" and "Inodes"
+   render at different widths depending on how much room the row's other
+   columns leave them, instead of lining up with each other. */
+.disk-metrics-progress-min {
+  min-width: 100px;
+}
+</style>
 

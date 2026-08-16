@@ -19,12 +19,23 @@ import (
 // a proxy that blocks WebSocket upgrades) keeps working exactly as before,
 // picking the command up on its next regularly scheduled poll.
 type AgentHub struct {
-	mu    sync.RWMutex
-	conns map[string]*websocket.Conn // host_id -> latest connection
+	mu           sync.RWMutex
+	conns        map[string]*websocket.Conn // host_id -> latest connection
+	onDisconnect func(hostID string)
 }
 
 func NewAgentHub() *AgentHub {
 	return &AgentHub{conns: make(map[string]*websocket.Conn)}
+}
+
+// SetOnDisconnect registers a callback fired whenever a host's live
+// connection is actually removed (not when it's superseded by a fresh
+// reconnect — see Unregister). Used to react faster than the last-seen sweep
+// when we have direct evidence the socket closed.
+func (h *AgentHub) SetOnDisconnect(fn func(hostID string)) {
+	h.mu.Lock()
+	h.onDisconnect = fn
+	h.mu.Unlock()
 }
 
 // Register stores hostID's connection, closing out any previous one for the
@@ -41,12 +52,21 @@ func (h *AgentHub) Register(hostID string, conn *websocket.Conn) {
 }
 
 // Unregister removes conn if it is still the registered connection for
-// hostID — a no-op if it was already replaced by a newer one.
+// hostID — a no-op if it was already replaced by a newer one (Register
+// closes the superseded connection directly, so that connection's own
+// eventual Unregister call here is correctly ignored rather than treated as
+// a disconnect of the still-live replacement).
 func (h *AgentHub) Unregister(hostID string, conn *websocket.Conn) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	removed := false
 	if h.conns[hostID] == conn {
 		delete(h.conns, hostID)
+		removed = true
+	}
+	fn := h.onDisconnect
+	h.mu.Unlock()
+	if removed && fn != nil {
+		fn(hostID)
 	}
 }
 

@@ -64,6 +64,13 @@ export interface AlertMetricCapability {
   supports_threshold: boolean;
   supports_duration: boolean;
   supports_host_filter: boolean;
+  /**
+   * SupportsBaselineWindow tells the frontend to render the 1h/6h/24h
+   * rolling-baseline window picker (AlertRule.BaselineWindowSeconds)
+   * instead of/alongside the duration field — currently only
+   * bandwidth_vs_rolling_avg sets this.
+   */
+  supports_baseline_window?: boolean;
 }
 /**
  * AlertScopeOption is a selectable {id,label} scope entry (Proxmox connection,
@@ -166,6 +173,14 @@ export interface AlertRule {
   threshold_clear_warn?: number /* float64 */; // hysteresis for warn
   threshold_clear_crit?: number /* float64 */; // hysteresis for crit
   duration_seconds: number /* int */;
+  /**
+   * BaselineWindowSeconds is the rolling-average window used by
+   * bandwidth_vs_rolling_avg (one of 3600/21600/86400 = 1h/6h/24h — see
+   * validateBaselineWindow in internal/services/alertrule/service.go).
+   * Nil/unset for every other metric; GetMetricValue defaults to 3600 when
+   * nil so it never needs to reject an old rule of a different metric.
+   */
+  baseline_window_seconds?: number /* int */;
   actions: AlertActions; // stored as JSONB in DB
   last_fired?: string;
   enabled: boolean;
@@ -291,6 +306,10 @@ export interface AlertRuleCreate {
   threshold_clear_warn?: number /* float64 */;
   threshold_clear_crit?: number /* float64 */;
   duration: number /* int */;
+  /**
+   * BaselineWindowSeconds — see AlertRule's field doc.
+   */
+  baseline_window_seconds?: number /* int */;
   actions: AlertActions;
 }
 /**
@@ -314,6 +333,10 @@ export interface AlertRuleTemplate {
   threshold_clear_warn?: number /* float64 */;
   threshold_clear_crit?: number /* float64 */;
   duration_seconds: number /* int */;
+  /**
+   * BaselineWindowSeconds — see AlertRule's field doc.
+   */
+  baseline_window_seconds?: number /* int */;
   actions: AlertActions;
   created_at: string;
   updated_at: string;
@@ -327,6 +350,10 @@ export interface AlertRuleTemplateRequest {
   threshold_clear_warn?: number /* float64 */;
   threshold_clear_crit?: number /* float64 */;
   duration: number /* int */;
+  /**
+   * BaselineWindowSeconds — see AlertRule's field doc.
+   */
+  baseline_window_seconds?: number /* int */;
   actions: AlertActions;
 }
 /**
@@ -361,6 +388,14 @@ export interface AlertRuleUpdate {
   threshold_clear_warn?: number /* float64 */;
   threshold_clear_crit?: number /* float64 */;
   duration?: number /* int */;
+  /**
+   * BaselineWindowSeconds — see AlertRule's field doc. A pointer-to-pointer
+   * isn't needed: nil means "leave unchanged" like every other field here,
+   * and the metric using this (bandwidth_vs_rolling_avg) always requires a
+   * preset value from the frontend, so there's no "explicitly clear it"
+   * case to support.
+   */
+  baseline_window_seconds?: number /* int */;
   actions?: AlertActions;
 }
 
@@ -657,6 +692,14 @@ export interface DockerContainer {
   env_vars: { [key: string]: string};
   volumes: string[];
   networks: string[];
+  /**
+   * IPAddresses are the container's Docker-assigned addresses across its
+   * attached networks. Reported by the agent (which needs them locally to
+   * attribute container traffic in the network-flow collector — see
+   * agent/internal/collector/container_ips.go) and accepted here as container
+   * metadata; not persisted, same as Labels/EnvVars/Volumes above.
+   */
+  ip_addresses: string[];
   net_rx_bytes: number /* uint64 */;
   net_tx_bytes: number /* uint64 */;
   updated_at: string;
@@ -677,11 +720,53 @@ export interface ComposeProject {
   raw_config: string;
   updated_at: string;
 }
+/**
+ * DockerImageRef is a normalized (image, tag) pair — the cache key of the
+ * ambient image-version engine and the unit of work of its refresh job.
+ */
+export interface DockerImageRef {
+  image: string;
+  image_tag: string;
+}
+/**
+ * DockerImageVersion is one row of the docker_image_versions cache: the latest
+ * digest a registry published for an (image, tag), refreshed on a slow ticker
+ * by internal/services/dockerversions. It is the single source of truth for
+ * "is there something newer upstream" — both the WS version badges and the
+ * release-tracker poller read it instead of calling a registry themselves.
+ */
+export interface DockerImageVersion {
+  image: string;
+  image_tag: string;
+  registry: string;
+  latest_digest: string;
+  latest_tag: string;
+  registry_credentials_id?: string;
+  checked_at?: string;
+  last_error?: string;
+}
+/**
+ * Version comparison statuses, computed server-side so the host Docker tab and
+ * the global Docker page can't drift on how they classify the same row.
+ */
+export const VersionStatusUpToDate = "up_to_date";
+/**
+ * Version comparison statuses, computed server-side so the host Docker tab and
+ * the global Docker page can't drift on how they classify the same row.
+ */
+export const VersionStatusUpdateAvailable = "update_available";
+/**
+ * Version comparison statuses, computed server-side so the host Docker tab and
+ * the global Docker page can't drift on how they classify the same row.
+ */
+export const VersionStatusUnknown = "unknown";
 export interface VersionComparison {
   tracker_id: string;
   docker_image: string;
+  image_tag: string; // container tag this row describes; empty on tracker-aggregated rows
   running_version: string;
   latest_version: string;
+  status: string; // up_to_date | update_available | unknown
   is_up_to_date: boolean;
   update_confirmed: boolean; // true when digest comparison confirms an update (even if running version is unknown)
   container_count: number /* int */; // number of containers using this image on the host
@@ -691,6 +776,13 @@ export interface VersionComparison {
   release_url: string;
   host_id: string;
   hostname: string;
+  /**
+   * LastError explains an "unknown" status coming from the ambient engine
+   * (private registry with no matching credential, registry unreachable, …).
+   * Always empty on tracker-derived rows, which surface their own error on
+   * the tracker itself.
+   */
+  last_error?: string;
 }
 /**
  * DockerNetwork represents a Docker network and its connected containers
@@ -1113,6 +1205,109 @@ export interface NetworkIPInventory {
 }
 
 //////////
+// source: network_flows.go
+
+/**
+ * NetworkFlowsReport is the agent-reported "top talkers" block for one report
+ * cycle: the busiest remote peers this host talked to, derived from conntrack
+ * accounting and aggregated agent-side into a bounded top-N + "others" bucket
+ * (see agent/internal/collector/network_flows.go). Mirrors
+ * agent/internal/collector.NetworkFlowsReport — kept in its own file rather
+ * than network.go, which already covers the unrelated logical-topology domain
+ * (server/internal/networkview).
+ */
+export interface NetworkFlowsReport {
+  /**
+   * Available is false when the host can't provide per-connection byte
+   * counters (nf_conntrack not loaded, accounting disabled, non-Linux, or
+   * collection disabled in agent.yaml) — never an error, a capability flag.
+   */
+  available: boolean;
+  /**
+   * Reason is an actionable message when Available is false.
+   */
+  reason?: string;
+  top_talkers?: NetworkFlowTalker[];
+  others?: NetworkFlowBucket;
+  total_flows: number /* int */;
+  collected_at: string;
+}
+/**
+ * NetworkFlowTalker is one aggregated remote peer for a report cycle.
+ * RxBytes/TxBytes/Packets are deltas since the previous cycle, not conntrack's
+ * own cumulative counters — see agent/internal/collector/network_flows.go's
+ * per-cycle delta tracking. This is why server-side history aggregation must
+ * SUM() these values per time_bucket, not MAX()-MIN() like system_metrics'
+ * truly-cumulative network_rx_bytes/network_tx_bytes.
+ */
+export interface NetworkFlowTalker {
+  remote_ip: string;
+  remote_port: number /* int */;
+  protocol: string; // "tcp" | "udp"
+  direction: string; // "inbound" | "outbound"
+  /**
+   * ProcessName/PID are best-effort (socket→inode→pid via /proc), empty/0
+   * when attribution failed — never treated as a collection error. For a
+   * process inside a container the host's /proc can't see the socket at all,
+   * so ProcessName instead carries the agent's "conteneur: <name>" fallback
+   * (PID stays 0 — a container PID is meaningless outside its namespace).
+   */
+  process_name?: string;
+  pid?: number /* int */;
+  /**
+   * ServerName is the TLS SNI hostname observed on an outbound flow. Only
+   * ever populated when the agent's optional, off-by-default L7 capture is
+   * enabled (network_flows_l7_capture, needs CAP_NET_RAW); empty otherwise,
+   * in which case the frontend falls back to its own well-known-port guess.
+   */
+  server_name?: string;
+  rx_bytes: number /* uint64 */;
+  tx_bytes: number /* uint64 */;
+  packets: number /* uint64 */;
+  connections: number /* int */;
+}
+/**
+ * NetworkFlowBucket aggregates every talker beyond the agent's top-N cutoff.
+ */
+export interface NetworkFlowBucket {
+  connections: number /* int */;
+  rx_bytes: number /* uint64 */;
+  tx_bytes: number /* uint64 */;
+}
+/**
+ * NetworkFlowMetric is one persisted row in network_flow_metrics: either a
+ * named talker (IsOthers=false) or the single per-cycle "others" rollup
+ * (IsOthers=true, RemoteIP/RemotePort/Protocol/Direction/ProcessName/PID all
+ * zero-valued).
+ */
+export interface NetworkFlowMetric {
+  id: number /* int64 */;
+  host_id: string;
+  timestamp: string;
+  is_others: boolean;
+  remote_ip?: string;
+  remote_port?: number /* int */;
+  protocol?: string;
+  direction?: string;
+  process_name?: string;
+  pid?: number /* int */;
+  server_name?: string;
+  rx_bytes: number /* uint64 */;
+  tx_bytes: number /* uint64 */;
+  packets: number /* uint64 */;
+  connections: number /* int */;
+}
+/**
+ * NetworkFlowSummaryPoint is one time-bucketed point of a host's total tracked
+ * bandwidth (all talkers summed), used for the overview chart.
+ */
+export interface NetworkFlowSummaryPoint {
+  timestamp: string;
+  rx_bytes: number /* uint64 */;
+  tx_bytes: number /* uint64 */;
+}
+
+//////////
 // source: npm.go
 
 /**
@@ -1488,6 +1683,11 @@ export interface AgentCapabilities {
   systemd: boolean; // Systemd unit monitoring enabled
   journal: boolean; // Journald log collection enabled
   restic: boolean; // Restic backup collector enabled
+  /**
+   * NetworkFlows only reflects whether the collector ran, not whether the
+   * kernel could actually provide byte counters — see NetworkFlowsReport.Available.
+   */
+  network_flows: boolean;
 }
 /**
  * DiagnosticIssue mirrors agent/internal/collector.DiagnosticIssue — one
@@ -1546,6 +1746,7 @@ export interface AgentReport {
   restic?: ResticStatus;
   restic_profiles?: string[];
   restic_groups?: string[];
+  network_flows?: NetworkFlowsReport;
   timestamp: string;
 }
 
@@ -1995,8 +2196,14 @@ export interface RegistryCredentialRequest {
   password?: string;
 }
 /**
- * TrackableContainer is a compose-managed container discovered across hosts
- * that does not yet have a release tracker — used to pre-fill bulk creation.
+ * TrackableContainer is a running container discovered across hosts, used both
+ * to pre-fill bulk creation (ListTrackableContainers: compose-managed and not
+ * yet tracked — the "activer la mise à jour auto" flow, which can only auto-update
+ * what compose owns) and to back the single-tracker container picker
+ * (ListPickableContainers: every running container, tracked or not, compose or
+ * not — a manual tracker only needs an image ref, so the compose restriction
+ * would hide legitimate targets). ContainerName/Tracked are populated by the
+ * picker query only; they stay zero-valued in the bulk-create listing.
  */
 export interface TrackableContainer {
   host_id: string;
@@ -2005,6 +2212,8 @@ export interface TrackableContainer {
   image_tag: string;
   compose_project: string;
   compose_service: string;
+  container_name?: string;
+  tracked?: boolean;
 }
 export interface ReleaseVersionHistoryItem {
   version: string;

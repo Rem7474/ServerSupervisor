@@ -85,7 +85,7 @@
               <th>Domaine</th>
               <th>Connexion NPM</th>
               <th>Cible</th>
-              <th>Monitoring</th>
+              <th>Disponibilité</th>
               <th class="text-end">
                 Requêtes
               </th>
@@ -134,17 +134,33 @@
                 <router-link
                   v-if="row.probe || row.cert"
                   :to="`/monitoring/host/${row.d.proxy_host_id}`"
-                  class="d-inline-flex align-items-center gap-1 text-decoration-none"
+                  class="d-inline-flex flex-column gap-1 text-decoration-none"
                   title="Voir le détail monitoring de ce domaine"
                 >
-                  <span
-                    v-if="row.probe"
-                    :class="['badge', probeBadge(row.probe)]"
-                  >{{ probeStatusLabel(row.probe) }}</span>
-                  <span
-                    v-if="row.cert"
-                    :class="['badge', daysBadge(row.cert.days_remaining)]"
-                  >SSL {{ daysLabel(row.cert.days_remaining) }}</span>
+                  <span class="d-flex align-items-center gap-1">
+                    <span
+                      v-if="row.probe"
+                      :class="['badge', probeBadge(row.probe)]"
+                    >{{ probeStatusLabel(row.probe) }}</span>
+                    <span
+                      v-if="row.cert"
+                      :class="['badge', daysBadge(row.cert.days_remaining)]"
+                    >SSL {{ daysLabel(row.cert.days_remaining) }}</span>
+                  </span>
+                  <div
+                    v-if="row.probe && probeHistory[row.probe.id]?.length"
+                    class="d-flex align-items-end gap-1"
+                    style="height: 20px; min-width: 110px;"
+                  >
+                    <div
+                      v-for="tick in probeHistory[row.probe.id]"
+                      :key="tick.id"
+                      class="flex-fill rounded-1"
+                      :class="tick.success ? 'bg-success' : 'bg-danger'"
+                      style="height: 100%; min-width: 2px;"
+                      :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? 'OK' : 'KO'}`"
+                    />
+                  </div>
                 </router-link>
                 <span
                   v-else
@@ -211,7 +227,7 @@ import { useSslCertificates } from '../../composables/useSslCertificates'
 import type { HostExposure, HostExposedDomain } from '../../types/host'
 import type { UptimeProbe } from '../../types/uptime'
 import type { SSLCertificate } from '../../types/ssl'
-import { formatBytes } from '../../utils/formatters'
+import { formatBytes, formatDateTime } from '../../utils/formatters'
 
 const props = defineProps<{
   exposure: HostExposure | null
@@ -240,7 +256,7 @@ function openDomain(domain: string): void {
 // blind to whether the domain it's reporting traffic for is actually up.
 // Domains with no monitoring configured just show "—" — this never creates
 // anything, only reads what already exists.
-const { probes, probeBadge, probeStatusLabel } = useUptimeProbes()
+const { probes, probeBadge, probeStatusLabel, probeHistory } = useUptimeProbes()
 const { certs, daysLabel, daysBadge } = useSslCertificates()
 
 const probeByProxyHost = computed(() => {

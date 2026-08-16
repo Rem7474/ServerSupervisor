@@ -327,6 +327,71 @@ func (db *DB) GetMetricsAggregatesByType(ctx context.Context, hostID string, hou
 	return metrics, nil
 }
 
+// GetBandwidthRateBytesPerSec returns the average combined (rx+tx) bandwidth
+// rate, in bytes/sec, for a host over the last windowSeconds — a
+// first-sample/last-sample counter-delta primitive, windowed in seconds and
+// summing rx+tx into one host-total rate. Used by the bandwidth_vs_rolling_avg
+// alert metric (internal/alerts/metrics.go) to compute both the short
+// "current rate" window and the longer rolling baseline window from the same
+// query shape.
+//
+// Deliberately NOT a plain MAX(counter)-MIN(counter) (the shape
+// GetMetricsAggregatesByType uses for its chart buckets): MIN/MAX aggregates
+// pick the smallest/largest *value* in the window regardless of which row is
+// chronologically first, so they can't detect a counter reset (an agent
+// restart zeroing rx/tx mid-window would read as a huge, wrong positive
+// delta instead of triggering the reset guard below). This query instead
+// takes the value at the earliest timestamp and the value at the latest
+// timestamp explicitly, via two single-row LIMIT 1 subqueries cross-joined
+// with a row count — chronological order is what makes the reset guard
+// correct, so it can't be inferred from unordered aggregates.
+//
+// ok is false when there isn't enough data to trust a rate: fewer than two
+// samples in the window (a single point has no delta, and the cross join
+// yields zero rows — sql.ErrNoRows — when there's no data at all), or the
+// counters went backward (rx/tx reset) which would otherwise read as a bogus
+// negative rate.
+func (db *DB) GetBandwidthRateBytesPerSec(ctx context.Context, hostID string, windowSeconds int) (ratePerSec float64, ok bool) {
+	var rxFirst, rxLast, txFirst, txLast sql.NullInt64
+	var firstTS, lastTS sql.NullTime
+	var sampleCount int
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT f.network_rx_bytes, f.network_tx_bytes, f.timestamp,
+		        l.network_rx_bytes, l.network_tx_bytes, l.timestamp,
+		        cnt.n
+		 FROM
+		   (SELECT network_rx_bytes, network_tx_bytes, timestamp FROM system_metrics
+		    WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '1 second' * $2
+		    ORDER BY timestamp ASC LIMIT 1) f,
+		   (SELECT network_rx_bytes, network_tx_bytes, timestamp FROM system_metrics
+		    WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '1 second' * $2
+		    ORDER BY timestamp DESC LIMIT 1) l,
+		   (SELECT COUNT(*) AS n FROM system_metrics
+		    WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '1 second' * $2) cnt`,
+		hostID, windowSeconds,
+	).Scan(&rxFirst, &txFirst, &firstTS, &rxLast, &txLast, &lastTS, &sampleCount)
+	if err != nil {
+		// sql.ErrNoRows when the window has zero samples (the f/l subqueries
+		// return no rows, so the cross join is empty) — same "not ok" outcome.
+		return 0, false
+	}
+	if sampleCount < 2 || !rxFirst.Valid || !rxLast.Valid || !txFirst.Valid || !txLast.Valid || !firstTS.Valid || !lastTS.Valid {
+		return 0, false
+	}
+	elapsed := lastTS.Time.Sub(firstTS.Time).Seconds()
+	if elapsed <= 0 {
+		return 0, false
+	}
+	rxDelta := rxLast.Int64 - rxFirst.Int64
+	txDelta := txLast.Int64 - txFirst.Int64
+	if rxDelta < 0 || txDelta < 0 {
+		// Counter reset (agent restart) within the window — the delta is
+		// meaningless, don't report a bogus negative rate.
+		return 0, false
+	}
+	return float64(rxDelta+txDelta) / elapsed, true
+}
+
 // GetMetricsSummary returns the global CPU/RAM history used by the dashboard chart.
 // For buckets ≥ 5 minutes it reads the system_metrics_5min continuous aggregate
 // (materialized by TimescaleDB) instead of scanning raw rows across all hosts;

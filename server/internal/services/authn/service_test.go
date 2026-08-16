@@ -85,6 +85,9 @@ func (f *fakeRepo) CountWebAuthnCredentials(context.Context, int64) (int, error)
 func (f *fakeRepo) UpdateWebAuthnCredentialUsage(context.Context, []byte, webauthn.Credential) error {
 	return nil
 }
+func (f *fakeRepo) GetWebAuthnCredentialByCredentialID(context.Context, []byte) (*models.WebAuthnCredential, error) {
+	return nil, errors.New("not found")
+}
 
 func userWithPassword(t *testing.T, password string) *models.User {
 	t.Helper()

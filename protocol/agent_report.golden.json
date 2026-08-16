@@ -9,7 +9,8 @@
     "web_logs": true,
     "systemd": true,
     "journal": true,
-    "restic": true
+    "restic": true,
+    "network_flows": true
   },
   "diagnostics": [
     {
@@ -63,6 +64,9 @@
           "contract"
         ],
         "networks": [
+          "contract"
+        ],
+        "ip_addresses": [
           "contract"
         ],
         "net_rx_bytes": 7,
@@ -240,5 +244,31 @@
   "restic_groups": [
     "contract"
   ],
+  "network_flows": {
+    "available": true,
+    "reason": "contract",
+    "top_talkers": [
+      {
+        "remote_ip": "contract",
+        "remote_port": 7,
+        "protocol": "contract",
+        "direction": "contract",
+        "process_name": "contract",
+        "pid": 7,
+        "server_name": "contract",
+        "rx_bytes": 7,
+        "tx_bytes": 7,
+        "packets": 7,
+        "connections": 7
+      }
+    ],
+    "others": {
+      "connections": 7,
+      "rx_bytes": 7,
+      "tx_bytes": 7
+    },
+    "total_flows": 7,
+    "collected_at": "2024-01-02T03:04:05Z"
+  },
   "timestamp": "2024-01-02T03:04:05Z"
 }

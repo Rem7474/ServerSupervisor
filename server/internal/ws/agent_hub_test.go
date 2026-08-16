@@ -96,6 +96,46 @@ func TestAgentHub_UnregisterIsNoopForAlreadyReplacedConnection(t *testing.T) {
 	}
 }
 
+func TestAgentHub_OnDisconnectFiresOnGenuineUnregister(t *testing.T) {
+	hub := NewAgentHub()
+	server, _ := newTestAgentConn(t)
+	hub.Register("host-1", server)
+
+	fired := make(chan string, 1)
+	hub.SetOnDisconnect(func(hostID string) { fired <- hostID })
+
+	hub.Unregister("host-1", server)
+
+	select {
+	case hostID := <-fired:
+		if hostID != "host-1" {
+			t.Errorf("got hostID %q, want %q", hostID, "host-1")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected onDisconnect to fire for a genuine unregister")
+	}
+}
+
+func TestAgentHub_OnDisconnectDoesNotFireWhenSuperseded(t *testing.T) {
+	hub := NewAgentHub()
+	server1, _ := newTestAgentConn(t)
+	server2, _ := newTestAgentConn(t)
+
+	fired := make(chan string, 1)
+	hub.SetOnDisconnect(func(hostID string) { fired <- hostID })
+
+	hub.Register("host-1", server1)
+	hub.Register("host-1", server2) // simulates a reconnect
+	hub.Unregister("host-1", server1)
+
+	select {
+	case hostID := <-fired:
+		t.Fatalf("onDisconnect should not fire when superseded, got %q", hostID)
+	case <-time.After(200 * time.Millisecond):
+		// expected: no callback
+	}
+}
+
 func TestAgentHub_Notify(t *testing.T) {
 	hub := NewAgentHub()
 

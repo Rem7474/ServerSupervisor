@@ -15,6 +15,7 @@ vi.mock('../../composables/useUptimeProbes', () => ({
     probes: probesRef,
     probeBadge: (p: UptimeProbe) => (p.last_status === 'up' ? 'bg-success-lt text-success' : 'bg-danger-lt text-danger'),
     probeStatusLabel: (p: UptimeProbe) => (p.last_status === 'up' ? 'UP' : 'DOWN'),
+    probeHistory: {} as Record<string, { id: string | number; checked_at: string; success: boolean }[]>,
   }),
 }))
 
@@ -53,7 +54,7 @@ function mountPanel(exposure: HostExposure | null) {
   })
 }
 
-describe('ExposureDomainsPanel — monitoring column', () => {
+describe('ExposureDomainsPanel — disponibilité column', () => {
   it('shows a monitoring badge and detail link when the domain\'s NPM proxy host has a linked probe/cert', () => {
     probesRef.value = [{ id: 'p1', npm_proxy_host_id: 'proxy-1', last_status: 'up' } as UptimeProbe]
     certsRef.value = [{ id: 'c1', npm_proxy_host_id: 'proxy-1', days_remaining: 42 } as SSLCertificate]

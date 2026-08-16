@@ -36,9 +36,21 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"tracker": created})
 }
 
-// ListTrackableContainers returns compose-managed containers without a tracker.
+// ListTrackableContainers returns compose-managed containers without a tracker
+// (bulk auto-update opt-in).
 func (h *ReleaseTrackerHandler) ListTrackableContainers(c *gin.Context) {
 	containers, err := h.svc.TrackableContainers(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"containers": containers})
+}
+
+// ListPickableContainers returns every running container, for the single-tracker
+// container picker that replaced the free-text image/tag inputs.
+func (h *ReleaseTrackerHandler) ListPickableContainers(c *gin.Context) {
+	containers, err := h.svc.PickableContainers(c.Request.Context())
 	if err != nil {
 		respondError(c, err)
 		return
