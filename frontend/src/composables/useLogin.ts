@@ -47,6 +47,12 @@ export function useLogin() {
   }
 
   async function handleLogin(): Promise<void> {
+    // The classic form is now committed to — free up the still-pending
+    // conditional get() from startConditionalWebAuthn (a browsing context
+    // allows only one navigator.credentials.get() in flight at a time; left
+    // unaborted, a later loginWithWebAuthn() call below would fail with
+    // "a request is already pending").
+    abortConditionalWebAuthn()
     loading.value = true
     error.value = ''
     try {
@@ -79,6 +85,9 @@ export function useLogin() {
   // require_mfa step never issued a session — the server re-checks them
   // itself (see BeginWebAuthnLogin's doc comment).
   async function loginWithWebAuthn(): Promise<void> {
+    // Defensive: same conflict as in handleLogin, in case this is ever
+    // reached without it having run first.
+    abortConditionalWebAuthn()
     webauthnLoading.value = true
     error.value = ''
     try {
@@ -103,6 +112,11 @@ export function useLogin() {
   // username/password/MFA round trip if they do.
   let conditionalAbort: AbortController | null = null
 
+  function abortConditionalWebAuthn(): void {
+    conditionalAbort?.abort()
+    conditionalAbort = null
+  }
+
   async function startConditionalWebAuthn(): Promise<void> {
     if (!webauthnAvailable || !(await isConditionalMediationAvailable())) return
     conditionalAbort = new AbortController()
@@ -125,9 +139,7 @@ export function useLogin() {
     void startConditionalWebAuthn()
   })
 
-  onUnmounted(() => {
-    conditionalAbort?.abort()
-  })
+  onUnmounted(abortConditionalWebAuthn)
 
   return {
     username,
