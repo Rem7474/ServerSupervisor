@@ -61,7 +61,15 @@ const chartOptions = computed((): ApexOptions => {
     stroke: { width: 0 },
     dataLabels: { enabled: false },
     plotOptions: { pie: { donut: { size: '70%' } } },
-    legend: { show: true, position: 'bottom', labels: { colors: palette.legendText } },
+    // onItemHover.highlightDataSeries: false — ApexCharts' legend-hover
+    // highlight path (highlightSeries → getSeriesByName) throws on this
+    // donut chart's plain-number series ("Cannot read properties of
+    // undefined (reading 'toString')" in escapeString), since donut/pie
+    // series have no per-item .name the way category-chart series do
+    // (labels live in options.labels instead). Disabling the hover
+    // highlight avoids the crash; the legend itself still shows/toggles
+    // series on click.
+    legend: { show: true, position: 'bottom', labels: { colors: palette.legendText }, onItemHover: { highlightDataSeries: false } },
     tooltip: {
       custom: ({ series: s, seriesIndex, w }) => {
         const label = w.globals.labels[seriesIndex] ?? ''
