@@ -1,6 +1,6 @@
 module github.com/serversupervisor/agent
 
-go 1.25.11
+go 1.25.13
 
 require (
 	github.com/fsouza/go-dockerclient v1.13.2
@@ -16,7 +16,7 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/klauspost/compress v1.18.4 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
 	github.com/moby/moby/api v1.54.2 // indirect
 	github.com/moby/moby/client v0.4.1 // indirect
