@@ -82,7 +82,7 @@
       v-else-if="!pagedRows.length"
       :title="search ? 'Aucun résultat pour cette recherche' : 'Aucune sonde ni certificat configuré'"
       :subtitle="search ? 'Modifiez votre recherche.' : 'Créez une sonde uptime ou un certificat SSL pour commencer à surveiller un service.'"
-      :cta-label="!search && auth.role === 'admin' ? 'Nouvelle sonde' : ''"
+      :cta-label="!search && auth.role === 'admin' ? 'Nouveau suivi' : ''"
       @cta="openCreateProbe"
     />
 

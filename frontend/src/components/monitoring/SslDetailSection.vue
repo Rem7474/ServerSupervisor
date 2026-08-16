@@ -267,10 +267,16 @@ const emit = defineEmits<{
   (e: 'update:autoRefresh', value: boolean): void
 }>()
 
-const autoRefreshOverride = props.autoRefresh === undefined ? undefined : computed({
+// Gated on hideRefreshBar, not on `props.autoRefresh === undefined`: Vue
+// casts an optional `boolean` prop that isn't bound at all (every caller
+// except MonitoringHostDetailView's merged-bar case) to `false`, not
+// `undefined` — checking the raw value here would permanently freeze
+// autoRefresh off on every standalone route. hideRefreshBar and autoRefresh
+// are always set together by the one caller that uses either.
+const autoRefreshOverride = props.hideRefreshBar ? computed({
   get: () => props.autoRefresh as boolean,
   set: (v) => emit('update:autoRefresh', v),
-})
+}) : undefined
 
 const {
   cert,
