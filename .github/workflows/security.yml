@@ -168,8 +168,8 @@ jobs:
           push: false
           load: true
           tags: serversupervisor-server:scan
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=server-trivy
+          cache-to: type=gha,mode=max,scope=server-trivy
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
