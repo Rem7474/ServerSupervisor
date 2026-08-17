@@ -157,25 +157,14 @@ function baseChartOptions(palette: ReturnType<typeof getApexChartPalette>): Apex
   }
 }
 
-function tooltipHtml(title: string, body: string): string {
-  return '<div style="padding:6px 10px;font-size:12px;">'
-    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-    + `<div>${body}</div>`
-    + '</div>'
-}
-
 const pctOptions = computed((): ApexOptions => {
   const palette = getApexChartPalette()
   return {
     ...baseChartOptions(palette),
     yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
     tooltip: {
-      custom: ({ series, seriesIndex, dataPointIndex, w }) => {
-        const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
-        const y = series[seriesIndex]?.[dataPointIndex]
-        const body = y != null ? `${Number(y).toFixed(1)}%` : '—'
-        return tooltipHtml(formatAxisTime(String(ts)), body)
-      },
+      x: { formatter: formatAxisTime },
+      y: { formatter: (v: number) => (v != null ? `${Number(v).toFixed(1)}%` : '—') },
     },
   }
 })
@@ -189,13 +178,8 @@ const netOptions = computed((): ApexOptions => {
     yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => formatBytesPerSec(v) } },
     tooltip: {
       shared: true,
-      custom: ({ series, seriesIndex, dataPointIndex, w }) => {
-        const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
-        const rows = w.globals.seriesNames
-          .map((name: string, idx: number) => `<div>${name}: ${formatBytesPerSec(series[idx]?.[dataPointIndex])}</div>`)
-          .join('')
-        return tooltipHtml(formatAxisTime(String(ts)), rows)
-      },
+      x: { formatter: formatAxisTime },
+      y: { formatter: (v: number) => formatBytesPerSec(v) },
     },
   }
 })
@@ -206,12 +190,8 @@ const tempOptions = computed((): ApexOptions => {
     ...baseChartOptions(palette),
     yaxis: { labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}°C` } },
     tooltip: {
-      custom: ({ series, seriesIndex, dataPointIndex, w }) => {
-        const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
-        const y = series[seriesIndex]?.[dataPointIndex]
-        const body = y != null ? `${Number(y).toFixed(1)}°C` : '—'
-        return tooltipHtml(formatAxisTime(String(ts)), body)
-      },
+      x: { formatter: formatAxisTime },
+      y: { formatter: (v: number) => (v != null ? `${Number(v).toFixed(1)}°C` : '—') },
     },
   }
 })
@@ -222,12 +202,8 @@ const fanOptions = computed((): ApexOptions => {
     ...baseChartOptions(palette),
     yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${Math.round(v)} RPM` } },
     tooltip: {
-      custom: ({ series, seriesIndex, dataPointIndex, w }) => {
-        const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
-        const y = series[seriesIndex]?.[dataPointIndex]
-        const body = y != null ? `${Math.round(Number(y))} RPM` : '—'
-        return tooltipHtml(formatAxisTime(String(ts)), body)
-      },
+      x: { formatter: formatAxisTime },
+      y: { formatter: (v: number) => (v != null ? `${Math.round(Number(v))} RPM` : '—') },
     },
   }
 })

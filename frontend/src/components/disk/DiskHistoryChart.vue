@@ -114,7 +114,7 @@ const props = withDefaults(defineProps<{
 const chartHours = ref(24)
 const selectedMount = ref<string>(props.mounts[0] ?? '')
 const points = ref<ChartPoint[]>([])
-const series = shallowRef<{ data: ChartPoint[] }[] | null>(null)
+const series = shallowRef<{ name: string; data: ChartPoint[] }[] | null>(null)
 const chartOptions = shallowRef<ApexOptions | null>(null)
 const chartRef = ref<ApexChartInstance | null>(null)
 const loading = ref(false)
@@ -213,17 +213,14 @@ function buildChartOptions(): ApexOptions {
       },
     },
     tooltip: {
-      custom: ({ dataPointIndex }) => {
-        const p = points.value[dataPointIndex]
-        if (!p) return ''
-        const title = formatChartTime(p.x)
-        const body = p.used_gb != null && p.size_gb
-          ? `${p.y.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
-          : `${p.y.toFixed(1)}%`
-        return '<div style="padding:6px 10px;font-size:12px;">'
-          + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-          + `<div>${body}</div>`
-          + '</div>'
+      x: { formatter: (v: number) => formatChartTime(v) },
+      y: {
+        formatter: (v: number, opts?: { dataPointIndex: number }) => {
+          const p = opts ? points.value[opts.dataPointIndex] : undefined
+          return p?.used_gb != null && p?.size_gb
+            ? `${v.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
+            : `${v.toFixed(1)}%`
+        },
       },
     },
   }
@@ -249,7 +246,7 @@ async function loadHistory(hours: number): Promise<void> {
 
     if (!points.value.length) { series.value = null; return }
 
-    series.value = [{ data: points.value }]
+    series.value = [{ name: 'Utilisé', data: points.value }]
     if (!chartOptions.value) {
       chartOptions.value = buildChartOptions()
     } else {
