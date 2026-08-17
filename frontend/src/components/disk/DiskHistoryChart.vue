@@ -184,6 +184,7 @@ function buildChartOptions(): ApexOptions {
       animations: { enabled: false },
       parentHeightOffset: 0,
     },
+    theme: { mode: 'dark' },
     colors: [palette.disk],
     fill: { type: 'solid', opacity: 0.12 },
     stroke: { curve: 'smooth', width: 2 },
@@ -219,7 +220,7 @@ function buildChartOptions(): ApexOptions {
         const body = p.used_gb != null && p.size_gb
           ? `${p.y.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
           : `${p.y.toFixed(1)}%`
-        return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+        return '<div style="padding:6px 10px;font-size:12px;">'
           + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
           + `<div>${body}</div>`
           + '</div>'

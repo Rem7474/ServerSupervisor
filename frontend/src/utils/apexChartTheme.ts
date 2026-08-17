@@ -25,9 +25,6 @@ export interface ApexChartPalette {
   legendText: string
   tickText: string
   grid: string
-  tooltipBackground: string
-  tooltipText: string
-  tooltipBorder: string
   // Semantic series colors shared across every chart that needs one, so
   // color choices stay token-driven instead of each chart file hardcoding
   // its own --tblr-* read (the pre-migration state for disk/network charts).
@@ -38,13 +35,19 @@ export interface ApexChartPalette {
   networkTx: string
 }
 
-const FALLBACK_DARK: ApexChartPalette = {
+// `border` isn't part of the exported palette — it only seeds the
+// --tblr-border-color lookup used to compute `grid` below. Tooltip chrome
+// (background/border/text) is no longer resolved here: it's ApexCharts' own
+// theme-dark tooltip (see `theme: { mode: 'dark' }` in each chart's options),
+// which ships hardcoded --apx-tt-* colors in apexcharts.css rather than
+// reading Tabler tokens — there is no CSS-var passthrough for it to hook
+// into, so duplicating a Tabler-derived color here would just drift from
+// what's actually rendered.
+const FALLBACK_DARK: ApexChartPalette & { border: string } = {
   legendText: '#c9d6ea',
   tickText: '#9aa4b8',
   grid: 'rgba(148,163,184,0.12)',
-  tooltipBackground: 'rgba(15,23,42,0.95)',
-  tooltipText: '#f1f5f9',
-  tooltipBorder: 'rgba(148,163,184,0.35)',
+  border: 'rgba(148,163,184,0.35)',
   cpu: '#206bc4',
   ram: '#2fb344',
   disk: '#f59f00', // --tblr-yellow — matches DiskHistoryChart's pre-migration color
@@ -52,13 +55,11 @@ const FALLBACK_DARK: ApexChartPalette = {
   networkTx: '#0ca678', // --tblr-teal
 }
 
-const FALLBACK_LIGHT: ApexChartPalette = {
+const FALLBACK_LIGHT: ApexChartPalette & { border: string } = {
   legendText: '#1f2937',
   tickText: '#6b7280',
   grid: 'rgba(15,23,42,0.08)',
-  tooltipBackground: 'rgba(255,255,255,0.96)',
-  tooltipText: '#1f2937',
-  tooltipBorder: 'rgba(15,23,42,0.12)',
+  border: 'rgba(15,23,42,0.12)',
   cpu: '#206bc4',
   ram: '#2fb344',
   disk: '#f59f00',
@@ -161,8 +162,8 @@ export function getApexChartPalette(): ApexChartPalette {
   const textOnPage = dark ? lightText : darkText
 
   const gridBase = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-border-color', fallback.tooltipBorder),
-    fallback.tooltipBorder,
+    getCssVarValue('--tblr-border-color', fallback.border),
+    fallback.border,
   )
 
   const cpu = resolveCssColorForCanvas(getCssVarValue('--tblr-primary', fallback.cpu), fallback.cpu)
@@ -175,13 +176,6 @@ export function getApexChartPalette(): ApexChartPalette {
     legendText: textOnPage,
     tickText: toRgba(textOnPage, 0.82, textOnPage),
     grid: toRgba(gridBase, 0.35, fallback.grid),
-    // Force an opaque tooltip background regardless of what the resolved
-    // page background is, because a translucent/near-page-color tooltip is
-    // illegible over a chart of the same hue — deliberate override, not a
-    // pass-through, carried over verbatim from the pre-migration behavior.
-    tooltipBackground: pageBackground,
-    tooltipText: textOnPage,
-    tooltipBorder: resolveCssColorForCanvas(gridBase, fallback.tooltipBorder),
     cpu,
     ram,
     disk,

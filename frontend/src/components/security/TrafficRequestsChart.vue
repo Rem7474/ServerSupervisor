@@ -59,8 +59,8 @@ function bucketLabel(ts: string): string {
     : d.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit' })
 }
 
-function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
-  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+function tooltipHtml(title: string, body: string): string {
+  return '<div style="padding:6px 10px;font-size:12px;">'
     + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
     + body
     + '</div>'
@@ -90,6 +90,7 @@ function buildChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
     chart: { type: 'bar', stacked: true, toolbar: { show: false }, animations: { enabled: false } },
+    theme: { mode: 'dark' },
     colors: ['#378ADD', '#E24B4A'],
     plotOptions: { bar: { columnWidth: '60%' } },
     dataLabels: { enabled: false },
@@ -111,7 +112,7 @@ function buildChartOptions(): ApexOptions {
         const rows = w.globals.seriesNames
           .map((name: string, idx: number) => `<div>${name}: ${s[idx]?.[dataPointIndex] ?? 0}</div>`)
           .join('')
-        return tooltipHtml(palette, String(title), rows)
+        return tooltipHtml(String(title), rows)
       },
     },
   }

@@ -35,8 +35,8 @@ const props = defineProps<{
 
 const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
-function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
-  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+function tooltipHtml(title: string, body: string): string {
+  return '<div style="padding:6px 10px;font-size:12px;">'
     + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
     + `<div>${body}</div>`
     + '</div>'
@@ -56,6 +56,7 @@ const chartOptions = computed((): ApexOptions => {
   const palette = getApexChartPalette()
   return {
     chart: { type: 'donut', animations: { enabled: false } },
+    theme: { mode: 'dark' },
     labels: ['2xx', '3xx', '4xx', '5xx'],
     colors: ['#639922', '#185FA5', '#BA7517', '#E24B4A'],
     stroke: { width: 0 },
@@ -73,7 +74,7 @@ const chartOptions = computed((): ApexOptions => {
     tooltip: {
       custom: ({ series: s, seriesIndex, w }) => {
         const label = w.globals.labels[seriesIndex] ?? ''
-        return tooltipHtml(palette, String(label), String(s[seriesIndex] ?? 0))
+        return tooltipHtml(String(label), String(s[seriesIndex] ?? 0))
       },
     },
   }

@@ -14,7 +14,7 @@ import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { translateError } from '../utils/translateError'
 import { formatRelativeTime } from './useDateFormatter'
 import dayjs from '../utils/dayjs'
-import { useReactiveApexChartPalette, type ApexChartPalette } from '../utils/apexChartTheme'
+import { useReactiveApexChartPalette } from '../utils/apexChartTheme'
 import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
 
 interface DashboardCveSummary {
@@ -256,8 +256,8 @@ export function useDashboard() {
 
   const chartPalette = useReactiveApexChartPalette()
 
-  function tooltipHtml(palette: ApexChartPalette, title: string, body: string): string {
-    return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+  function tooltipHtml(title: string, body: string): string {
+    return '<div style="padding:6px 10px;font-size:12px;">'
       + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
       + body
       + '</div>'
@@ -268,6 +268,7 @@ export function useDashboard() {
     const allPoints = (summaryChartSeries.value ?? []).flatMap((s) => s.data)
     return {
       chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+      theme: { mode: 'dark' },
       fill: { type: 'solid', opacity: 0.12 },
       stroke: { curve: 'smooth', width: 2 },
       markers: { size: 0, hover: { size: 5 } },
@@ -294,7 +295,7 @@ export function useDashboard() {
               return `<div>${name}: ${y != null ? Number(y).toFixed(1) : '—'}%</div>`
             })
             .join('')
-          return tooltipHtml(colors, formatSummaryChartTime(Number(ts)), rows)
+          return tooltipHtml(formatSummaryChartTime(Number(ts)), rows)
         },
       },
     }

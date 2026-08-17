@@ -111,8 +111,8 @@ function formatChartTime(timestamp: number | string | undefined): string {
   return d.format('DD/MM HH:mm')
 }
 
-function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
-  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+function tooltipHtml(title: string, body: string): string {
+  return '<div style="padding:6px 10px;font-size:12px;">'
     + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
     + body
     + '</div>'
@@ -135,6 +135,7 @@ function buildChartOptions(): ApexOptions {
   const allPoints = [...rxPoints.value, ...txPoints.value]
   return {
     chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    theme: { mode: 'dark' },
     fill: { type: 'solid', opacity: 0.12 },
     stroke: { curve: 'smooth', width: 2 },
     markers: { size: 0, hover: { size: 4 } },
@@ -158,7 +159,7 @@ function buildChartOptions(): ApexOptions {
         const rows = w.globals.seriesNames
           .map((name: string, idx: number) => `<div>${name}: ${formatBytes(Number(s[idx]?.[dataPointIndex] ?? 0))}</div>`)
           .join('')
-        return tooltipHtml(palette, formatChartTime(Number(ts)), rows)
+        return tooltipHtml(formatChartTime(Number(ts)), rows)
       },
     },
   }
