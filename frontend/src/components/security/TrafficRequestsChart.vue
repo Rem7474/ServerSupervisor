@@ -82,7 +82,7 @@ const chartOptions = shallowRef<ApexOptions | null>(null)
 function buildChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
-    chart: { type: 'bar', stacked: true, toolbar: { show: false }, animations: { enabled: false } },
+    chart: { type: 'bar', background: 'transparent', stacked: true, toolbar: { show: false }, animations: { enabled: false } },
     theme: { mode: 'dark' },
     colors: ['#378ADD', '#E24B4A'],
     plotOptions: { bar: { columnWidth: '60%' } },

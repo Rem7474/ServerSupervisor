@@ -256,7 +256,7 @@ const timeRangeOptions = [
 function buildCpuChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
-    chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
     theme: { mode: 'dark' },
     colors: [palette.cpu],
     fill: { type: 'solid', opacity: 0.1 },
@@ -285,7 +285,7 @@ function buildCpuChartOptions(): ApexOptions {
 function buildMemChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
-    chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
     theme: { mode: 'dark' },
     colors: [palette.ram],
     fill: { type: 'solid', opacity: 0.1 },

@@ -179,6 +179,7 @@ function buildChartOptions(): ApexOptions {
   return {
     chart: {
       type: 'area',
+      background: 'transparent',
       toolbar: { show: false },
       zoom: { enabled: false },
       animations: { enabled: false },

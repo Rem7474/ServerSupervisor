@@ -218,7 +218,7 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
     const palette = getApexChartPalette()
     const allPoints = (series.value ?? []).flatMap((s) => s.data)
     return {
-      chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+      chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
       theme: { mode: 'dark' },
       fill: { type: 'solid', opacity: 0.1 },
       stroke: { curve: 'smooth', width: 2 },

@@ -48,7 +48,7 @@ const series = computed(() => {
 const chartOptions = computed((): ApexOptions => {
   const palette = getApexChartPalette()
   return {
-    chart: { type: 'donut', animations: { enabled: false } },
+    chart: { type: 'donut', background: 'transparent', animations: { enabled: false } },
     theme: { mode: 'dark' },
     labels: ['2xx', '3xx', '4xx', '5xx'],
     colors: ['#639922', '#185FA5', '#BA7517', '#E24B4A'],
