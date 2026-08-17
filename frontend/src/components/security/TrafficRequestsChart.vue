@@ -59,13 +59,6 @@ function bucketLabel(ts: string): string {
     : d.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit' })
 }
 
-function tooltipHtml(title: string, body: string): string {
-  return '<div style="padding:6px 10px;font-size:12px;">'
-    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-    + body
-    + '</div>'
-}
-
 const categories = computed(() => props.timeseries.map((p) => bucketLabel(p.timestamp)))
 
 const series = computed(() => [
@@ -107,13 +100,7 @@ function buildChartOptions(): ApexOptions {
     tooltip: {
       shared: true,
       intersect: false,
-      custom: ({ series: s, dataPointIndex, w }) => {
-        const title = categories.value[dataPointIndex] ?? ''
-        const rows = w.globals.seriesNames
-          .map((name: string, idx: number) => `<div>${name}: ${s[idx]?.[dataPointIndex] ?? 0}</div>`)
-          .join('')
-        return tooltipHtml(String(title), rows)
-      },
+      y: { formatter: (v: number) => `${v}` },
     },
   }
 }

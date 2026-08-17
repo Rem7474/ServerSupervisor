@@ -201,13 +201,6 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
     return hours.value >= 24 ? d.format('DD/MM HH:mm') : d.format('HH:mm')
   }
 
-  function tooltipHtml(title: string, body: string): string {
-    return '<div style="padding:6px 10px;font-size:12px;">'
-      + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-      + body
-      + '</div>'
-  }
-
   // Built once (on first data load) rather than as a `computed` over
   // `series`: vue3-apexcharts clones the whole `:options` prop via
   // JSON.parse(JSON.stringify(...)) on every *reactive* update after mount
@@ -245,16 +238,8 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
       yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
       tooltip: {
         shared: true,
-        custom: ({ series: s, seriesIndex, dataPointIndex, w }) => {
-          const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
-          const rows = w.globals.seriesNames
-            .map((name: string, idx: number) => {
-              const y = s[idx]?.[dataPointIndex]
-              return `<div>${name}: ${y != null ? Number(y).toFixed(1) : '—'}%</div>`
-            })
-            .join('')
-          return tooltipHtml(formatChartTime(Number(ts)), rows)
-        },
+        x: { formatter: (v: number) => formatChartTime(v) },
+        y: { formatter: (v: number) => (v != null ? `${Number(v).toFixed(1)}%` : '—') },
       },
     }
   }

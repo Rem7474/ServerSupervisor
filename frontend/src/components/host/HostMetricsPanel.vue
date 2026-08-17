@@ -222,8 +222,8 @@ const historyLoading = ref(false)
 const metricsHistory = ref<HistoryPoint[]>([])
 const cpuPoints = ref<ChartPoint[]>([])
 const memPoints = ref<MemChartPoint[]>([])
-const cpuSeries = shallowRef<{ data: ChartPoint[] }[] | null>(null)
-const memSeries = shallowRef<{ data: MemChartPoint[] }[] | null>(null)
+const cpuSeries = shallowRef<{ name: string; data: ChartPoint[] }[] | null>(null)
+const memSeries = shallowRef<{ name: string; data: MemChartPoint[] }[] | null>(null)
 const cpuChartOptions = shallowRef<ApexOptions | null>(null)
 const memChartOptions = shallowRef<ApexOptions | null>(null)
 const cpuChartRef = ref<ApexChartInstance | null>(null)
@@ -240,17 +240,6 @@ const timeRangeOptions = [
   { hours: 2160, label: '90d' },
   { hours: 8760, label: '1y' },
 ]
-
-// No background/border/color here: ApexCharts' own theme-dark tooltip
-// chrome (`theme: { mode: 'dark' }` below) already paints the box —
-// styling it again here just double-boxed the previously-mismatched
-// (default theme-light) wrapper around this dark inner content.
-function tooltipHtml(title: string, body: string): string {
-  return '<div style="padding:6px 10px;font-size:12px;">'
-    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-    + `<div>${body}</div>`
-    + '</div>'
-}
 
 // Built once (on first data load) rather than as a `computed` over
 // cpuPoints/memPoints: vue3-apexcharts clones the whole `:options` prop via
@@ -287,11 +276,8 @@ function buildCpuChartOptions(): ApexOptions {
     },
     yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
     tooltip: {
-      custom: ({ dataPointIndex }) => {
-        const p = cpuPoints.value[dataPointIndex]
-        if (!p) return ''
-        return tooltipHtml(formatChartTime(p.x), `${p.y.toFixed(1)}%`)
-      },
+      x: { formatter: (v: number) => formatChartTime(v) },
+      y: { formatter: (v: number) => `${v.toFixed(1)}%` },
     },
   }
 }
@@ -319,14 +305,15 @@ function buildMemChartOptions(): ApexOptions {
     },
     yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
     tooltip: {
-      custom: ({ dataPointIndex }) => {
-        const p = memPoints.value[dataPointIndex]
-        if (!p) return ''
-        const pct = p.y.toFixed(1)
-        const body = p.memory_used && p.memory_total
-          ? `${pct}%  (${formatBytes(p.memory_used)} / ${formatBytes(p.memory_total)})`
-          : `${pct}%`
-        return tooltipHtml(formatChartTime(p.x), body)
+      x: { formatter: (v: number) => formatChartTime(v) },
+      y: {
+        formatter: (v: number, opts?: { dataPointIndex: number }) => {
+          const p = opts ? memPoints.value[opts.dataPointIndex] : undefined
+          const pct = v.toFixed(1)
+          return p?.memory_used && p?.memory_total
+            ? `${pct}%  (${formatBytes(p.memory_used)} / ${formatBytes(p.memory_total)})`
+            : `${pct}%`
+        },
       },
     },
   }
@@ -424,8 +411,8 @@ function buildCharts(): void {
     })
     .filter((p): p is MemChartPoint => p != null)
 
-  cpuSeries.value = [{ data: cpuPoints.value }]
-  memSeries.value = [{ data: memPoints.value }]
+  cpuSeries.value = [{ name: 'CPU', data: cpuPoints.value }]
+  memSeries.value = [{ name: 'Mémoire', data: memPoints.value }]
 
   if (!cpuChartOptions.value) {
     cpuChartOptions.value = buildCpuChartOptions()

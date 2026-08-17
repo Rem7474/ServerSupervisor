@@ -111,13 +111,6 @@ function formatChartTime(timestamp: number | string | undefined): string {
   return d.format('DD/MM HH:mm')
 }
 
-function tooltipHtml(title: string, body: string): string {
-  return '<div style="padding:6px 10px;font-size:12px;">'
-    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-    + body
-    + '</div>'
-}
-
 const chartOptions = shallowRef<ApexOptions | null>(null)
 const chartRef = ref<ApexChartInstance | null>(null)
 
@@ -154,13 +147,8 @@ function buildChartOptions(): ApexOptions {
     yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => formatBytes(v) } },
     tooltip: {
       shared: true,
-      custom: ({ series: s, seriesIndex, dataPointIndex, w }) => {
-        const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
-        const rows = w.globals.seriesNames
-          .map((name: string, idx: number) => `<div>${name}: ${formatBytes(Number(s[idx]?.[dataPointIndex] ?? 0))}</div>`)
-          .join('')
-        return tooltipHtml(formatChartTime(Number(ts)), rows)
-      },
+      x: { formatter: (v: number) => formatChartTime(v) },
+      y: { formatter: (v: number) => formatBytes(v) },
     },
   }
 }

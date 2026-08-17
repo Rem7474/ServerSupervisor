@@ -35,13 +35,6 @@ const props = defineProps<{
 
 const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
-function tooltipHtml(title: string, body: string): string {
-  return '<div style="padding:6px 10px;font-size:12px;">'
-    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-    + `<div>${body}</div>`
-    + '</div>'
-}
-
 const series = computed(() => {
   const d = props.statusDistribution || {}
   return [
@@ -71,12 +64,6 @@ const chartOptions = computed((): ApexOptions => {
     // highlight avoids the crash; the legend itself still shows/toggles
     // series on click.
     legend: { show: true, position: 'bottom', labels: { colors: palette.legendText }, onItemHover: { highlightDataSeries: false } },
-    tooltip: {
-      custom: ({ series: s, seriesIndex, w }) => {
-        const label = w.globals.labels[seriesIndex] ?? ''
-        return tooltipHtml(String(label), String(s[seriesIndex] ?? 0))
-      },
-    },
   }
 })
 </script>

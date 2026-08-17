@@ -357,13 +357,6 @@ watch(probe, (p) => emit('loaded', p), { immediate: true })
 // most-recent of this section's and SslDetailSection's own lastUpdatedAt.
 defineExpose({ lastUpdatedAt })
 
-function tooltipHtml(title: string, body: string): string {
-  return '<div style="padding:6px 10px;font-size:12px;">'
-    + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-    + `<div>${body}</div>`
-    + '</div>'
-}
-
 // Built once (on first data arrival) rather than as a `computed` over
 // `chartData`: vue3-apexcharts clones the whole `:options` prop via
 // JSON.parse(JSON.stringify(...)) on every *reactive* update after mount —
@@ -399,12 +392,7 @@ function buildChartOptions(categories: string[]): ApexOptions {
     },
     yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${Math.round(v)} ms` } },
     tooltip: {
-      custom: ({ series, seriesIndex, dataPointIndex }) => {
-        const y = series[seriesIndex]?.[dataPointIndex]
-        const title = categories[dataPointIndex] ?? ''
-        const body = y != null ? `${Number(y)} ms` : '—'
-        return tooltipHtml(String(title), body)
-      },
+      y: { formatter: (v: number) => (v != null ? `${Number(v)} ms` : '—') },
     },
   }
 }

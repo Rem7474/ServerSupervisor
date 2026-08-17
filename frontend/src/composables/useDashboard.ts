@@ -256,13 +256,6 @@ export function useDashboard() {
 
   const chartPalette = useReactiveApexChartPalette()
 
-  function tooltipHtml(title: string, body: string): string {
-    return '<div style="padding:6px 10px;font-size:12px;">'
-      + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
-      + body
-      + '</div>'
-  }
-
   const summaryChartOptions = computed((): ApexOptions => {
     const colors = chartPalette.value
     const allPoints = (summaryChartSeries.value ?? []).flatMap((s) => s.data)
@@ -287,16 +280,8 @@ export function useDashboard() {
       yaxis: { min: 0, max: 100, labels: { style: { colors: colors.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
       tooltip: {
         shared: true,
-        custom: ({ series: s, seriesIndex, dataPointIndex, w }) => {
-          const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
-          const rows = w.globals.seriesNames
-            .map((name: string, idx: number) => {
-              const y = s[idx]?.[dataPointIndex]
-              return `<div>${name}: ${y != null ? Number(y).toFixed(1) : '—'}%</div>`
-            })
-            .join('')
-          return tooltipHtml(formatSummaryChartTime(Number(ts)), rows)
-        },
+        x: { formatter: (v: number) => formatSummaryChartTime(v) },
+        y: { formatter: (v: number) => (v != null ? `${Number(v).toFixed(1)}%` : '—') },
       },
     }
   })
