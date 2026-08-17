@@ -140,6 +140,7 @@ function formatAxisTime(value: string): string {
 function baseChartOptions(palette: ReturnType<typeof getApexChartPalette>): ApexOptions {
   return {
     chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    theme: { mode: 'dark' },
     fill: { type: 'solid', opacity: 0.1 },
     stroke: { curve: 'smooth', width: 2 },
     markers: { size: 0, hover: { size: 4 } },
@@ -156,8 +157,8 @@ function baseChartOptions(palette: ReturnType<typeof getApexChartPalette>): Apex
   }
 }
 
-function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
-  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+function tooltipHtml(title: string, body: string): string {
+  return '<div style="padding:6px 10px;font-size:12px;">'
     + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
     + `<div>${body}</div>`
     + '</div>'
@@ -173,7 +174,7 @@ const pctOptions = computed((): ApexOptions => {
         const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
         const y = series[seriesIndex]?.[dataPointIndex]
         const body = y != null ? `${Number(y).toFixed(1)}%` : '—'
-        return tooltipHtml(palette, formatAxisTime(String(ts)), body)
+        return tooltipHtml(formatAxisTime(String(ts)), body)
       },
     },
   }
@@ -193,7 +194,7 @@ const netOptions = computed((): ApexOptions => {
         const rows = w.globals.seriesNames
           .map((name: string, idx: number) => `<div>${name}: ${formatBytesPerSec(series[idx]?.[dataPointIndex])}</div>`)
           .join('')
-        return tooltipHtml(palette, formatAxisTime(String(ts)), rows)
+        return tooltipHtml(formatAxisTime(String(ts)), rows)
       },
     },
   }
@@ -209,7 +210,7 @@ const tempOptions = computed((): ApexOptions => {
         const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
         const y = series[seriesIndex]?.[dataPointIndex]
         const body = y != null ? `${Number(y).toFixed(1)}°C` : '—'
-        return tooltipHtml(palette, formatAxisTime(String(ts)), body)
+        return tooltipHtml(formatAxisTime(String(ts)), body)
       },
     },
   }
@@ -225,7 +226,7 @@ const fanOptions = computed((): ApexOptions => {
         const ts = w.globals.seriesX[seriesIndex]?.[dataPointIndex]
         const y = series[seriesIndex]?.[dataPointIndex]
         const body = y != null ? `${Math.round(Number(y))} RPM` : '—'
-        return tooltipHtml(palette, formatAxisTime(String(ts)), body)
+        return tooltipHtml(formatAxisTime(String(ts)), body)
       },
     },
   }

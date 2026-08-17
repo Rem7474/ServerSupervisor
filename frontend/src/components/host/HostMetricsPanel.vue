@@ -241,8 +241,12 @@ const timeRangeOptions = [
   { hours: 8760, label: '1y' },
 ]
 
-function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
-  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+// No background/border/color here: ApexCharts' own theme-dark tooltip
+// chrome (`theme: { mode: 'dark' }` below) already paints the box —
+// styling it again here just double-boxed the previously-mismatched
+// (default theme-light) wrapper around this dark inner content.
+function tooltipHtml(title: string, body: string): string {
+  return '<div style="padding:6px 10px;font-size:12px;">'
     + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
     + `<div>${body}</div>`
     + '</div>'
@@ -264,6 +268,7 @@ function buildCpuChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
     chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    theme: { mode: 'dark' },
     colors: [palette.cpu],
     fill: { type: 'solid', opacity: 0.1 },
     stroke: { curve: 'smooth', width: 2 },
@@ -285,7 +290,7 @@ function buildCpuChartOptions(): ApexOptions {
       custom: ({ dataPointIndex }) => {
         const p = cpuPoints.value[dataPointIndex]
         if (!p) return ''
-        return tooltipHtml(palette, formatChartTime(p.x), `${p.y.toFixed(1)}%`)
+        return tooltipHtml(formatChartTime(p.x), `${p.y.toFixed(1)}%`)
       },
     },
   }
@@ -295,6 +300,7 @@ function buildMemChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
     chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    theme: { mode: 'dark' },
     colors: [palette.ram],
     fill: { type: 'solid', opacity: 0.1 },
     stroke: { curve: 'smooth', width: 2 },
@@ -320,7 +326,7 @@ function buildMemChartOptions(): ApexOptions {
         const body = p.memory_used && p.memory_total
           ? `${pct}%  (${formatBytes(p.memory_used)} / ${formatBytes(p.memory_total)})`
           : `${pct}%`
-        return tooltipHtml(palette, formatChartTime(p.x), body)
+        return tooltipHtml(formatChartTime(p.x), body)
       },
     },
   }

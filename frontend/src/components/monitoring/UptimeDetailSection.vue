@@ -357,8 +357,8 @@ watch(probe, (p) => emit('loaded', p), { immediate: true })
 // most-recent of this section's and SslDetailSection's own lastUpdatedAt.
 defineExpose({ lastUpdatedAt })
 
-function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: string, body: string): string {
-  return `<div style="background:${palette.tooltipBackground};color:${palette.tooltipText};border:1px solid ${palette.tooltipBorder};border-radius:4px;padding:8px 10px;font-size:12px;">`
+function tooltipHtml(title: string, body: string): string {
+  return '<div style="padding:6px 10px;font-size:12px;">'
     + `<div style="font-weight:600;margin-bottom:2px;">${title}</div>`
     + `<div>${body}</div>`
     + '</div>'
@@ -382,6 +382,7 @@ function buildChartOptions(categories: string[]): ApexOptions {
   const palette = getApexChartPalette()
   return {
     chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    theme: { mode: 'dark' },
     fill: { type: 'solid', opacity: 0.15 },
     stroke: { curve: 'smooth', width: 2 },
     markers: { size: 0, hover: { size: 4 } },
@@ -402,7 +403,7 @@ function buildChartOptions(categories: string[]): ApexOptions {
         const y = series[seriesIndex]?.[dataPointIndex]
         const title = categories[dataPointIndex] ?? ''
         const body = y != null ? `${Number(y)} ms` : '—'
-        return tooltipHtml(palette, String(title), body)
+        return tooltipHtml(String(title), body)
       },
     },
   }
