@@ -302,7 +302,8 @@
             variant="chart"
           />
           <ApexChart
-            v-else-if="series"
+            v-else-if="series && chartOptions"
+            ref="chartRef"
             type="area"
             height="100%"
             :options="chartOptions"
@@ -330,12 +331,13 @@ import EmptyState from '../components/EmptyState.vue'
 import GuestExposureCard from '../components/proxmox/GuestExposureCard.vue'
 import GuestLinkCell from '../components/proxmox/GuestLinkCell.vue'
 import { useAuthStore } from '../stores/auth'
-import { useProxmoxGuest } from '../composables/useProxmoxGuest'
+import { useProxmoxGuest, type ApexChartInstance } from '../composables/useProxmoxGuest'
 import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses'
 import { getMetricColorClass } from '../utils/metricColor'
 
 const router = useRouter()
 const auth = useAuthStore()
+const chartRef = ref<ApexChartInstance | null>(null)
 
 const {
   guest,
@@ -359,7 +361,7 @@ const {
   linkMsgOk,
   confirmLink,
   ignoreLink,
-} = useProxmoxGuest()
+} = useProxmoxGuest(chartRef)
 
 const showNetworkDetail = ref(false)
 

@@ -179,7 +179,8 @@
           style="height: 220px;"
         >
           <ApexChart
-            v-if="chartData"
+            v-if="chartData && chartOptions"
+            ref="chartRef"
             type="area"
             height="100%"
             :options="chartOptions"
@@ -272,7 +273,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, shallowRef, watch } from 'vue'
 import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
@@ -321,7 +322,15 @@ function bucketTitle(b: UptimeHistoryBucket): string {
   return `${when} — ${outcome}${latency}`
 }
 
+// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
+// export it under a name that resolves cleanly through defineAsyncComponent's
+// template-ref typing — restated locally for the one method actually needed).
+interface ApexChartInstance {
+  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
+}
+
 const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
+const chartRef = ref<ApexChartInstance | null>(null)
 
 const {
   probe,
@@ -355,9 +364,22 @@ function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: str
     + '</div>'
 }
 
-const chartOptions = computed((): ApexOptions => {
+// Built once (on first data arrival) rather than as a `computed` over
+// `chartData`: vue3-apexcharts clones the whole `:options` prop via
+// JSON.parse(JSON.stringify(...)) on every *reactive* update after mount —
+// which silently drops every function (yaxis.labels.formatter,
+// tooltip.custom) since JSON can't represent them. Keeping this object's
+// identity stable after the initial build means later data refreshes (this
+// probe polls on a timer, see PROBE_REFRESH_SEC) flow through the
+// (function-free, always-safe) `:series` prop only; the category labels
+// (the one other thing that legitimately changes per refresh, since this
+// is a category- not datetime-axis chart) are pushed via the exposed
+// updateOptions() method directly in the watcher below (bypasses the
+// wrapper's buggy reactive watcher).
+const chartOptions = shallowRef<ApexOptions | null>(null)
+
+function buildChartOptions(categories: string[]): ApexOptions {
   const palette = getApexChartPalette()
-  const categories = chartData.value?.categories ?? []
   return {
     chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
     fill: { type: 'solid', opacity: 0.15 },
@@ -384,5 +406,14 @@ const chartOptions = computed((): ApexOptions => {
       },
     },
   }
-})
+}
+
+watch(() => chartData.value?.categories, (categories) => {
+  if (!categories) return
+  if (!chartOptions.value) {
+    chartOptions.value = buildChartOptions(categories)
+  } else {
+    chartRef.value?.updateOptions({ xaxis: { categories } }, false, false)
+  }
+}, { immediate: true })
 </script>
