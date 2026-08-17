@@ -55,7 +55,8 @@
       style="height: 13rem;"
     >
       <ApexChart
-        v-if="series"
+        v-if="series && chartOptions"
+        ref="chartRef"
         type="area"
         height="100%"
         :options="chartOptions"
@@ -92,6 +93,13 @@ interface ChartPoint {
   size_gb?: number
 }
 
+// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
+// export it under a name that resolves cleanly through defineAsyncComponent's
+// template-ref typing — restated locally for the one method actually needed).
+interface ApexChartInstance {
+  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
+}
+
 const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 const props = withDefaults(defineProps<{
@@ -107,6 +115,8 @@ const chartHours = ref(24)
 const selectedMount = ref<string>(props.mounts[0] ?? '')
 const points = ref<ChartPoint[]>([])
 const series = shallowRef<{ data: ChartPoint[] }[] | null>(null)
+const chartOptions = shallowRef<ApexOptions | null>(null)
+const chartRef = ref<ApexChartInstance | null>(null)
 const loading = ref(false)
 // Unlike `loading` (only true before the very first chart renders, so
 // periodic WS-tick refreshes don't blank + re-animate an already-visible
@@ -155,7 +165,16 @@ function formatChartTime(timestamp: number | string | undefined): string {
   return d.format('DD/MM')
 }
 
-const chartOptions = computed((): ApexOptions => {
+// Built once (on first data load) rather than as a `computed` over `points`:
+// vue3-apexcharts clones the whole `:options` prop via
+// JSON.parse(JSON.stringify(...)) on every *reactive* update after mount —
+// which silently drops every function (labels.formatter, tooltip.custom)
+// since JSON can't represent them. Keeping this object's identity stable
+// after the initial build means later data refreshes flow through the
+// (function-free, always-safe) `:series` prop only; the time-range window
+// (xaxis.min/max) is pushed via the exposed updateOptions() method directly
+// in loadHistory() instead (bypasses the wrapper's buggy watcher).
+function buildChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
     chart: {
@@ -207,7 +226,7 @@ const chartOptions = computed((): ApexOptions => {
       },
     },
   }
-})
+}
 
 async function loadHistory(hours: number): Promise<void> {
   if (!selectedMount.value) return
@@ -230,6 +249,14 @@ async function loadHistory(hours: number): Promise<void> {
     if (!points.value.length) { series.value = null; return }
 
     series.value = [{ data: points.value }]
+    if (!chartOptions.value) {
+      chartOptions.value = buildChartOptions()
+    } else {
+      chartRef.value?.updateOptions(
+        { xaxis: { min: getMinPointTimestamp(points.value), max: getMaxPointTimestamp(points.value) } },
+        false, false,
+      )
+    }
   } catch (e: unknown) {
     console.error('Failed to load disk history:', getApiErrorMessage(e))
     series.value = null

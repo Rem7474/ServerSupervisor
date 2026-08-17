@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { ref } from 'vue'
 
 const {
   getProxmoxGuests, getProxmoxGuestLink, getProxmoxGuestMetrics,
@@ -50,7 +51,7 @@ function mountUseProxmoxGuest() {
   let api!: ReturnType<typeof useProxmoxGuest>
   const wrapper = mount({
     setup() {
-      api = useProxmoxGuest()
+      api = useProxmoxGuest(ref(null))
       return () => null
     },
   })

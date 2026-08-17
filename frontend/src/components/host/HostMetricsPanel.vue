@@ -120,7 +120,8 @@
           style="height: 12rem;"
         >
           <ApexChart
-            v-if="cpuSeries"
+            v-if="cpuSeries && cpuChartOptions"
+            ref="cpuChartRef"
             type="area"
             height="100%"
             :options="cpuChartOptions"
@@ -147,7 +148,8 @@
           style="height: 12rem;"
         >
           <ApexChart
-            v-if="memSeries"
+            v-if="memSeries && memChartOptions"
+            ref="memChartRef"
             type="area"
             height="100%"
             :options="memChartOptions"
@@ -193,6 +195,13 @@ type HistoryPoint = MetricsHistoryPoint
 interface ChartPoint { x: number; y: number }
 interface MemChartPoint extends ChartPoint { memory_used?: number; memory_total?: number }
 
+// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
+// export it under a name that resolves cleanly through defineAsyncComponent's
+// template-ref typing — restated locally for the one method actually needed).
+interface ApexChartInstance {
+  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
+}
+
 const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 const props = withDefaults(defineProps<{
@@ -215,6 +224,10 @@ const cpuPoints = ref<ChartPoint[]>([])
 const memPoints = ref<MemChartPoint[]>([])
 const cpuSeries = shallowRef<{ data: ChartPoint[] }[] | null>(null)
 const memSeries = shallowRef<{ data: MemChartPoint[] }[] | null>(null)
+const cpuChartOptions = shallowRef<ApexOptions | null>(null)
+const memChartOptions = shallowRef<ApexOptions | null>(null)
+const cpuChartRef = ref<ApexChartInstance | null>(null)
+const memChartRef = ref<ApexChartInstance | null>(null)
 
 const hasCpuTemp = computed(() => Number(props.metrics?.cpu_temperature) > 0)
 
@@ -235,7 +248,19 @@ function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: str
     + '</div>'
 }
 
-const cpuChartOptions = computed((): ApexOptions => {
+// Built once (on first data load) rather than as a `computed` over
+// cpuPoints/memPoints: vue3-apexcharts clones the whole `:options` prop via
+// JSON.parse(JSON.stringify(...)) on every *reactive* update after mount
+// (see its scheduleUpdate/copyData) — which silently drops every function
+// (labels.formatter, tooltip.custom) since JSON can't represent them. That
+// path is only exercised when the `options` object's *identity* changes;
+// keeping it stable after the initial build means later data refreshes flow
+// through the (function-free, always-safe) `:series` prop only. The
+// time-range window (xaxis.min/max) still needs to move as new data arrives
+// — pushed via the exposed updateOptions() method directly (bypasses the
+// wrapper's buggy watcher entirely, since we call the real ApexCharts
+// instance ourselves with a plain partial-update object).
+function buildCpuChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
     chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
@@ -264,9 +289,9 @@ const cpuChartOptions = computed((): ApexOptions => {
       },
     },
   }
-})
+}
 
-const memChartOptions = computed((): ApexOptions => {
+function buildMemChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   return {
     chart: { type: 'area', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
@@ -299,7 +324,7 @@ const memChartOptions = computed((): ApexOptions => {
       },
     },
   }
-})
+}
 
 function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
@@ -395,6 +420,24 @@ function buildCharts(): void {
 
   cpuSeries.value = [{ data: cpuPoints.value }]
   memSeries.value = [{ data: memPoints.value }]
+
+  if (!cpuChartOptions.value) {
+    cpuChartOptions.value = buildCpuChartOptions()
+  } else {
+    cpuChartRef.value?.updateOptions(
+      { xaxis: { min: getMinPointTimestamp(cpuPoints.value), max: getMaxPointTimestamp(cpuPoints.value) } },
+      false, false,
+    )
+  }
+
+  if (!memChartOptions.value) {
+    memChartOptions.value = buildMemChartOptions()
+  } else {
+    memChartRef.value?.updateOptions(
+      { xaxis: { min: getMinPointTimestamp(memPoints.value), max: getMaxPointTimestamp(memPoints.value) } },
+      false, false,
+    )
+  }
 }
 
 // Reload chart when the metrics source changes (e.g. user switches agent ↔ proxmox).

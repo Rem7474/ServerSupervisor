@@ -16,7 +16,8 @@
       :style="{ height: mode === 'summary' ? '13rem' : '10rem' }"
     >
       <ApexChart
-        v-if="series"
+        v-if="series && chartOptions"
+        ref="chartRef"
         type="area"
         height="100%"
         :options="chartOptions"
@@ -52,6 +53,13 @@ import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../.
 interface ChartPoint {
   x: number
   y: number
+}
+
+// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
+// export it under a name that resolves cleanly through defineAsyncComponent's
+// template-ref typing — restated locally for the one method actually needed).
+interface ApexChartInstance {
+  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
 }
 
 const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
@@ -110,8 +118,18 @@ function tooltipHtml(palette: ReturnType<typeof getApexChartPalette>, title: str
     + '</div>'
 }
 
-const chartOptions = ref<ApexOptions>()
+const chartOptions = shallowRef<ApexOptions | null>(null)
+const chartRef = ref<ApexChartInstance | null>(null)
 
+// Built once (on first data load), not reassigned on every loadHistory()
+// call: vue3-apexcharts clones the whole `:options` prop via
+// JSON.parse(JSON.stringify(...)) on every *reactive* update after mount —
+// which silently drops every function (labels.formatter, tooltip.custom)
+// since JSON can't represent them. Keeping this object's identity stable
+// after the initial build means later data refreshes flow through the
+// (function-free, always-safe) `:series` prop only; the time-range window
+// (xaxis.min/max) is pushed via the exposed updateOptions() method directly
+// in loadHistory() instead (bypasses the wrapper's buggy watcher).
 function buildChartOptions(): ApexOptions {
   const palette = getApexChartPalette()
   const allPoints = [...rxPoints.value, ...txPoints.value]
@@ -174,7 +192,15 @@ async function loadHistory(): Promise<void> {
       { name: 'Entrant (Rx)', data: rxPoints.value, color: palette.networkRx },
       { name: 'Sortant (Tx)', data: txPoints.value, color: palette.networkTx },
     ]
-    chartOptions.value = buildChartOptions()
+    if (!chartOptions.value) {
+      chartOptions.value = buildChartOptions()
+    } else {
+      const allPoints = [...rxPoints.value, ...txPoints.value]
+      chartRef.value?.updateOptions(
+        { xaxis: { min: getMinPointTimestamp(allPoints), max: getMaxPointTimestamp(allPoints) } },
+        false, false,
+      )
+    }
   } catch (e: unknown) {
     console.error('Failed to load network flows history:', getApiErrorMessage(e))
     series.value = null

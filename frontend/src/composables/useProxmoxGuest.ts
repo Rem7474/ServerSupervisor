@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, onMounted, onUnmounted } from 'vue'
+import { computed, ref, shallowRef, onMounted, onUnmounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import type { ApexOptions } from 'apexcharts'
 import dayjs from '../utils/dayjs'
@@ -37,7 +37,21 @@ interface ProxmoxGuest {
 
 interface GuestNetworkIface { name: string; ips: string[] }
 
-export function useProxmoxGuest() {
+// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
+// export it under a name that resolves cleanly through defineAsyncComponent's
+// template-ref typing — restated locally for the one method actually needed).
+export interface ApexChartInstance {
+  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
+}
+
+// chartRef is owned by the view (bound via `ref="chartRef"` on its
+// <ApexChart>) and passed in here rather than being created and returned by
+// this composable, so the view's own script actually reads the binding
+// (passing it as an argument counts) instead of only handing it to the
+// template — vue-tsc's noUnusedLocals doesn't trace string `ref="x"`
+// template bindings as a "read" of `x`, so a destructure-and-template-only
+// version of this trips a false "declared but never read".
+export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
   const route = useRoute()
   const signal = useAbortSignal()
   const guestActions = useProxmoxGuestActions()
@@ -194,7 +208,20 @@ export function useProxmoxGuest() {
       + '</div>'
   }
 
-  const chartOptions = computed((): ApexOptions => {
+  // Built once (on first data load) rather than as a `computed` over
+  // `series`: vue3-apexcharts clones the whole `:options` prop via
+  // JSON.parse(JSON.stringify(...)) on every *reactive* update after mount
+  // — which silently drops every function (labels.formatter, tooltip.custom)
+  // since JSON can't represent them. Keeping this object's identity stable
+  // after the initial build means later data refreshes (this guest polls
+  // every GUEST_REFRESH_SEC, plus manual changeRange() calls) flow through
+  // the (function-free, always-safe) `:series` prop only; the time-range
+  // window (xaxis.min/max) is pushed via the exposed updateOptions() method
+  // directly in loadGuestSummary() instead (bypasses the wrapper's buggy
+  // reactive watcher).
+  const chartOptions = shallowRef<ApexOptions | null>(null)
+
+  function buildChartOptions(): ApexOptions {
     const palette = getApexChartPalette()
     const allPoints = (series.value ?? []).flatMap((s) => s.data)
     return {
@@ -229,7 +256,7 @@ export function useProxmoxGuest() {
         },
       },
     }
-  })
+  }
 
   async function loadGuestSummary(): Promise<void> {
     if (!guest.value) return
@@ -255,6 +282,15 @@ export function useProxmoxGuest() {
           color: palette.ram,
         },
       ]
+      if (!chartOptions.value) {
+        chartOptions.value = buildChartOptions()
+      } else {
+        const allPoints = series.value.flatMap((s) => s.data)
+        chartRef.value?.updateOptions(
+          { xaxis: { min: getMinPointTimestamp(allPoints), max: getMaxPointTimestamp(allPoints) } },
+          false, false,
+        )
+      }
     } catch {
       series.value = null
     } finally {
