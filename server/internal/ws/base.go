@@ -21,6 +21,7 @@ import (
 	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/safego"
+	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
 )
 
 // snapshotChanged returns true (and updates *lastHash) when payload differs from the
@@ -70,6 +71,7 @@ type WSHandler struct {
 	agentHub           *AgentHub
 	events             *events.Bus
 	latestAgentVersion func() string
+	proxmoxSvc         *proxmoxsvc.Service
 	ipConns            map[string]int
 	ipConnsMu          sync.Mutex
 
@@ -86,7 +88,7 @@ type wsAuthMessage struct {
 	Token string `json:"token"`
 }
 
-func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub, bus *events.Bus, latestAgentVersion func() string) *WSHandler {
+func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub, bus *events.Bus, latestAgentVersion func() string, proxmoxSvc *proxmoxsvc.Service) *WSHandler {
 	h := &WSHandler{
 		db:                 db,
 		cfg:                cfg,
@@ -95,6 +97,7 @@ func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub
 		agentHub:           NewAgentHub(),
 		events:             bus,
 		latestAgentVersion: latestAgentVersion,
+		proxmoxSvc:         proxmoxSvc,
 		ipConns:            make(map[string]int),
 	}
 	h.agentHub.SetOnDisconnect(h.handleAgentDisconnect)
