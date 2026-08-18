@@ -89,6 +89,34 @@
             <span class="form-check-label">Activé</span>
           </label>
         </div>
+        <div class="col-12">
+          <label class="form-label">
+            Identifiants console PVE (optionnel)
+          </label>
+          <div class="form-hint mb-2">
+            Nécessaires uniquement pour ouvrir une console interactive sur un conteneur LXC — l'API PVE
+            n'accepte pas le token pour cette fonctionnalité, un utilisateur PVE avec le rôle
+            <code>VM.Console</code> est requis (ex. <code>root@pam</code>).
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Utilisateur PVE</label>
+          <input
+            v-model="form.pve_username"
+            type="text"
+            class="form-control"
+            placeholder="root@pam"
+          >
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Mot de passe PVE {{ editingId ? '(vide = inchangé)' : '' }}</label>
+          <input
+            v-model="form.pve_password"
+            type="password"
+            class="form-control"
+            autocomplete="new-password"
+          >
+        </div>
       </div>
       <div class="mt-3 d-flex align-items-center gap-2">
         <button
@@ -129,6 +157,7 @@
             <th>Nom</th>
             <th>URL API</th>
             <th>Token ID</th>
+            <th>Console</th>
             <th>Nœuds</th>
             <th>Guests</th>
             <th>Statut</th>
@@ -138,12 +167,12 @@
         </thead>
         <tbody>
           <tr v-if="loading && !instances.length">
-            <td colspan="8">
+            <td colspan="9">
               <LoadingSkeleton variant="table" />
             </td>
           </tr>
           <tr v-else-if="instances.length === 0">
-            <td colspan="8">
+            <td colspan="9">
               <EmptyState title="Aucune connexion Proxmox configurée." />
             </td>
           </tr>
@@ -159,6 +188,16 @@
             </td>
             <td class="text-muted small">
               {{ inst.token_id }}
+            </td>
+            <td>
+              <span
+                v-if="inst.console_configured"
+                class="badge bg-success-lt text-success"
+              >Configurée</span>
+              <span
+                v-else
+                class="badge bg-secondary-lt text-secondary"
+              >Non configurée</span>
             </td>
             <td>{{ inst.node_count }}</td>
             <td>{{ inst.guest_count }}</td>
@@ -273,6 +312,8 @@ interface ProxmoxForm {
   insecure_skip_verify: boolean
   enabled: boolean
   poll_interval_sec: number
+  pve_username: string
+  pve_password: string
 }
 
 withDefaults(defineProps<{
@@ -300,6 +341,8 @@ const emptyForm = (): ProxmoxForm => ({
   insecure_skip_verify: false,
   enabled: true,
   poll_interval_sec: 60,
+  pve_username: '',
+  pve_password: '',
 })
 
 const form = ref<ProxmoxForm>(emptyForm())
@@ -333,6 +376,8 @@ function openEditForm(inst: ProxmoxInstance): void {
     insecure_skip_verify: inst.insecure_skip_verify ?? false,
     enabled: inst.enabled ?? true,
     poll_interval_sec: inst.poll_interval_sec ?? 60,
+    pve_username: inst.pve_username ?? '',
+    pve_password: '',
   }
   formMsg.value = ''
   showForm.value = true

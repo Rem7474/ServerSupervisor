@@ -77,6 +77,19 @@
           class="d-flex gap-2"
         >
           <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            :disabled="guest.guest_type !== 'lxc'"
+            :title="guest.guest_type === 'lxc' ? 'Ouvrir une console interactive' : 'VM QEMU : bientôt disponible'"
+            @click="showConsole = true"
+          >
+            <IconTerminal2
+              :size="16"
+              class="icon me-1"
+            />
+            Console
+          </button>
+          <button
             v-if="guest.status === 'stopped'"
             type="button"
             class="btn btn-sm btn-outline-success"
@@ -317,6 +330,14 @@
           </div>
         </div>
       </div>
+
+      <ProxmoxConsoleLazy
+        v-if="showConsole"
+        :guest-id="guest.id"
+        :guest-name="guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}`"
+        :show="showConsole"
+        @close="showConsole = false"
+      />
     </div>
   </div>
 </template>
@@ -324,7 +345,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
+import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -364,6 +385,10 @@ const {
 } = useProxmoxGuest(chartRef)
 
 const showNetworkDetail = ref(false)
+const showConsole = ref(false)
+// Lazy: only fetched once the user actually opens a console, not on every
+// guest page visit — xterm.js is otherwise dead weight for the common case.
+const ProxmoxConsoleLazy = defineAsyncComponent(() => import('../components/proxmox/ProxmoxConsole.vue'))
 
 // Guests linked to a ServerSupervisor host already get their domain/IP
 // correlation for free from that host's own Exposition tab (same IP, same
