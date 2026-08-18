@@ -1425,6 +1425,21 @@ export interface ProxmoxConnection {
   created_at: string;
   updated_at: string;
   /**
+   * PVEUsername identifies which PVE user account the console feature logs
+   * in as (e.g. "root@pam") — not itself secret, shown like TokenID. The
+   * password never leaves the database; see ProxmoxConnectionRequest and
+   * database.GetProxmoxConsoleCredentials. Console (LXC termproxy) needs a
+   * real user ticket, not the API token used for everything else — PVE's
+   * vncwebsocket upgrade endpoint doesn't accept token auth.
+   */
+  pve_username?: string;
+  /**
+   * ConsoleConfigured reports whether console credentials are set, without
+   * ever exposing them — computed by the DB layer (pve_username <> '' AND
+   * pve_password <> '').
+   */
+  console_configured: boolean;
+  /**
    * Computed stats (joined, not stored)
    */
   node_count?: number /* int */;
@@ -1579,6 +1594,15 @@ export interface ProxmoxConnectionRequest {
   insecure_skip_verify: boolean;
   enabled: boolean;
   poll_interval_sec: number /* int */;
+  /**
+   * PVEUsername/PVEPassword are optional PVE user credentials (e.g.
+   * "root@pam") used only to open an interactive LXC console — PVE
+   * requires a real user ticket for that endpoint, not an API token. Empty
+   * PVEPassword on update means "keep existing", same semantics as
+   * TokenSecret.
+   */
+  pve_username: string;
+  pve_password: string;
 }
 /**
  * ProxmoxSummary is returned by GET /proxmox/summary.
@@ -2567,6 +2591,30 @@ export interface WSCommandStatusUpdate {
   command_id: string;
   status: string;
   output?: string;
+}
+/**
+ * ===== Proxmox console (GET /api/v1/ws/proxmox/console/:guest_id) =====
+ * Unlike CommandStream, this endpoint is bidirectional: raw text frames sent
+ * by the browser are keystrokes/paste data, forwarded byte-for-byte to the
+ * PVE shell. WSConsoleResize is the one exception — a JSON control message
+ * distinguished from keystroke data by unmarshaling successfully with
+ * type=="resize" (an ordinary shell input essentially never does). PVE's own
+ * termproxy wire framing ("0:LEN:DATA" / "1:COLS:ROWS:" / "2") is entirely an
+ * implementation detail of proxmoxclient.TermSession — this endpoint never
+ * speaks it to the browser.
+ */
+export interface WSConsoleResize {
+  type: string; // "resize"
+  cols: number /* int */;
+  rows: number /* int */;
+}
+/**
+ * WSConsoleError is sent once, right before the connection is closed, when
+ * the console session couldn't be opened (bad guest/permission/PVE error).
+ */
+export interface WSConsoleError {
+  type: string; // "console_error"
+  error: string;
 }
 /**
  * WSAlertIncidentNotification is the nested payload of a "new_alert" message.

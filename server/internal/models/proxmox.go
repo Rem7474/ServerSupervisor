@@ -17,6 +17,17 @@ type ProxmoxConnection struct {
 	LastSuccessAt      *time.Time `json:"last_success_at,omitempty"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
+	// PVEUsername identifies which PVE user account the console feature logs
+	// in as (e.g. "root@pam") — not itself secret, shown like TokenID. The
+	// password never leaves the database; see ProxmoxConnectionRequest and
+	// database.GetProxmoxConsoleCredentials. Console (LXC termproxy) needs a
+	// real user ticket, not the API token used for everything else — PVE's
+	// vncwebsocket upgrade endpoint doesn't accept token auth.
+	PVEUsername string `json:"pve_username,omitempty"`
+	// ConsoleConfigured reports whether console credentials are set, without
+	// ever exposing them — computed by the DB layer (pve_username <> '' AND
+	// pve_password <> '').
+	ConsoleConfigured bool `json:"console_configured"`
 	// Computed stats (joined, not stored)
 	NodeCount  int `json:"node_count,omitempty"`
 	GuestCount int `json:"guest_count,omitempty"`
@@ -160,6 +171,13 @@ type ProxmoxConnectionRequest struct {
 	InsecureSkipVerify bool   `json:"insecure_skip_verify"`
 	Enabled            bool   `json:"enabled"`
 	PollIntervalSec    int    `json:"poll_interval_sec"`
+	// PVEUsername/PVEPassword are optional PVE user credentials (e.g.
+	// "root@pam") used only to open an interactive LXC console — PVE
+	// requires a real user ticket for that endpoint, not an API token. Empty
+	// PVEPassword on update means "keep existing", same semantics as
+	// TokenSecret.
+	PVEUsername string `json:"pve_username"`
+	PVEPassword string `json:"pve_password"`
 }
 
 // ProxmoxSummary is returned by GET /proxmox/summary.

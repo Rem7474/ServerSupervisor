@@ -32,7 +32,7 @@ func seedProxmox(ctx context.Context, db *database.DB) error {
 		// poller gate in main.go is ever removed (defense in depth).
 		connID, err = db.CreateProxmoxConnection(ctx, demoProxmoxConnName,
 			"https://pve-demo.example.com:8006", "demo@pve!seed", "demo-token-secret-not-real",
-			true, false, 60)
+			true, false, 60, "", "")
 		if err != nil {
 			return err
 		}

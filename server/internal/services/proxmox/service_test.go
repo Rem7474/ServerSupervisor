@@ -23,12 +23,14 @@ type fakeRepo struct {
 	enabledConns []database.ProxmoxConnectionFull
 	connByID     map[string]*models.ProxmoxConnection
 	guestsByNode map[string][]models.ProxmoxGuest
+	guestByID    map[string]*models.ProxmoxGuest
+	consoleCreds map[string][2]string // connID -> [username, password]
 }
 
 func (f *fakeRepo) ListProxmoxConnections(context.Context) ([]models.ProxmoxConnection, error) {
 	return nil, nil
 }
-func (f *fakeRepo) CreateProxmoxConnection(context.Context, string, string, string, string, bool, bool, int) (string, error) {
+func (f *fakeRepo) CreateProxmoxConnection(context.Context, string, string, string, string, bool, bool, int, string, string) (string, error) {
 	f.created = true
 	return "id", nil
 }
@@ -38,7 +40,7 @@ func (f *fakeRepo) GetProxmoxConnectionByID(_ context.Context, id string) (*mode
 	}
 	return nil, nil
 }
-func (f *fakeRepo) UpdateProxmoxConnection(context.Context, string, string, string, string, string, bool, bool, int) error {
+func (f *fakeRepo) UpdateProxmoxConnection(context.Context, string, string, string, string, string, bool, bool, int, string, string) error {
 	return nil
 }
 func (f *fakeRepo) DeleteProxmoxConnection(context.Context, string) error { return nil }
@@ -46,6 +48,12 @@ func (f *fakeRepo) GetEnabledProxmoxConnections(context.Context) ([]database.Pro
 	return f.enabledConns, nil
 }
 func (f *fakeRepo) GetProxmoxTokenSecret(context.Context, string) (string, error) { return "", nil }
+func (f *fakeRepo) GetProxmoxConsoleCredentials(_ context.Context, id string) (string, string, error) {
+	if creds, ok := f.consoleCreds[id]; ok {
+		return creds[0], creds[1], nil
+	}
+	return "", "", nil
+}
 func (f *fakeRepo) GetProxmoxSummary(context.Context) (models.ProxmoxSummary, error) {
 	return models.ProxmoxSummary{}, nil
 }
@@ -58,7 +66,10 @@ func (f *fakeRepo) ListProxmoxGuestsByNode(_ context.Context, connectionID, node
 	}
 	return nil, nil
 }
-func (f *fakeRepo) GetProxmoxGuestByID(context.Context, string) (*models.ProxmoxGuest, error) {
+func (f *fakeRepo) GetProxmoxGuestByID(_ context.Context, id string) (*models.ProxmoxGuest, error) {
+	if g, ok := f.guestByID[id]; ok {
+		return g, nil
+	}
 	return nil, errors.New("not found")
 }
 func (f *fakeRepo) GetProxmoxGuestMetricsSummary(context.Context, string, int, int) ([]models.ProxmoxNodeMetricsSummary, error) {
@@ -220,3 +231,41 @@ func TestGuestAction_GuestNotFound(t *testing.T) {
 
 func mustConnErr(_ *models.ProxmoxConnection, err error) error { return err }
 func mustLinkErr(_ *models.ProxmoxGuestLink, err error) error  { return err }
+
+func TestOpenGuestConsole_GuestNotFound(t *testing.T) {
+	// GetProxmoxGuestByID's fakeRepo stub always errors -> not found.
+	_, _, err := newSvc(&fakeRepo{}).OpenGuestConsole(context.Background(), "missing")
+	if status(err) != 404 {
+		t.Fatalf("missing guest should be 404, got %v", err)
+	}
+}
+
+func TestOpenGuestConsole_RejectsQemu(t *testing.T) {
+	repo := &fakeRepo{guestByID: map[string]*models.ProxmoxGuest{
+		"g1": {ID: "g1", GuestType: "vm", ConnectionID: "c1", NodeName: "pve1", VMID: 100},
+	}}
+	_, _, err := newSvc(repo).OpenGuestConsole(context.Background(), "g1")
+	if status(err) != 400 {
+		t.Fatalf("qemu guest console should be 400 (V1 is LXC-only), got %v", err)
+	}
+}
+
+func TestOpenGuestConsole_MissingCredentials(t *testing.T) {
+	repo := &fakeRepo{
+		guestByID: map[string]*models.ProxmoxGuest{
+			"g1": {ID: "g1", GuestType: "lxc", ConnectionID: "c1", NodeName: "pve1", VMID: 101},
+		},
+		enabledConns: []database.ProxmoxConnectionFull{{
+			ProxmoxConnection: models.ProxmoxConnection{ID: "c1"},
+			TokenSecret:       "secret",
+		}},
+		connByID: map[string]*models.ProxmoxConnection{
+			"c1": {ID: "c1", APIURL: "https://pve.invalid:8006", TokenID: "user@pve!token"},
+		},
+		// consoleCreds intentionally left empty for c1.
+	}
+	_, _, err := newSvc(repo).OpenGuestConsole(context.Background(), "g1")
+	if status(err) != 400 {
+		t.Fatalf("missing console credentials should be 400, got %v", err)
+	}
+}

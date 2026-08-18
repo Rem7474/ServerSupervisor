@@ -21,12 +21,13 @@ import (
 // which is why the database type appears here).
 type Repository interface {
 	ListProxmoxConnections(ctx context.Context) ([]models.ProxmoxConnection, error)
-	CreateProxmoxConnection(ctx context.Context, name, apiURL, tokenID, tokenSecret string, insecureSkipVerify, enabled bool, pollIntervalSec int) (string, error)
+	CreateProxmoxConnection(ctx context.Context, name, apiURL, tokenID, tokenSecret string, insecureSkipVerify, enabled bool, pollIntervalSec int, pveUsername, pvePassword string) (string, error)
 	GetProxmoxConnectionByID(ctx context.Context, id string) (*models.ProxmoxConnection, error)
-	UpdateProxmoxConnection(ctx context.Context, id, name, apiURL, tokenID, tokenSecret string, insecureSkipVerify, enabled bool, pollIntervalSec int) error
+	UpdateProxmoxConnection(ctx context.Context, id, name, apiURL, tokenID, tokenSecret string, insecureSkipVerify, enabled bool, pollIntervalSec int, pveUsername, pvePassword string) error
 	DeleteProxmoxConnection(ctx context.Context, id string) error
 	GetEnabledProxmoxConnections(ctx context.Context) ([]database.ProxmoxConnectionFull, error)
 	GetProxmoxTokenSecret(ctx context.Context, id string) (string, error)
+	GetProxmoxConsoleCredentials(ctx context.Context, id string) (username, password string, err error)
 	GetProxmoxSummary(ctx context.Context) (models.ProxmoxSummary, error)
 
 	ListProxmoxGuests(ctx context.Context, connectionID, guestType, status string) ([]models.ProxmoxGuest, error)
@@ -115,7 +116,7 @@ func (s *Service) CreateConnection(ctx context.Context, req models.ProxmoxConnec
 	if req.TokenSecret == "" {
 		return nil, apperr.Validation("token_secret is required when creating a connection")
 	}
-	id, err := s.repo.CreateProxmoxConnection(ctx, req.Name, req.APIURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify, req.Enabled, req.PollIntervalSec)
+	id, err := s.repo.CreateProxmoxConnection(ctx, req.Name, req.APIURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify, req.Enabled, req.PollIntervalSec, req.PVEUsername, req.PVEPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +139,7 @@ func (s *Service) UpdateConnection(ctx context.Context, id string, req models.Pr
 	if _, err := s.GetConnection(ctx, id); err != nil {
 		return nil, err
 	}
-	if err := s.repo.UpdateProxmoxConnection(ctx, id, req.Name, req.APIURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify, req.Enabled, req.PollIntervalSec); err != nil {
+	if err := s.repo.UpdateProxmoxConnection(ctx, id, req.Name, req.APIURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify, req.Enabled, req.PollIntervalSec, req.PVEUsername, req.PVEPassword); err != nil {
 		return nil, err
 	}
 	conn, _ := s.repo.GetProxmoxConnectionByID(ctx, id)
@@ -784,6 +785,43 @@ func (s *Service) GuestAction(ctx context.Context, guestID, action string) (stri
 		return "", apperr.BadGateway(err.Error())
 	}
 	return upid, nil
+}
+
+// OpenGuestConsole resolves a guest to its Proxmox connection/node and opens
+// a live termproxy console session on it. LXC only in V1 — QEMU needs a VNC
+// (RFB) proxy instead of termproxy, a materially different wire protocol
+// (see ROADMAP.md's Proxmox console V2 section).
+//
+// Unlike GuestAction, this needs the connection's console-only PVE user
+// credentials in addition to its API token: PVE's vncwebsocket upgrade
+// endpoint doesn't accept token auth (see proxmoxclient.Client.login). The
+// resolved guest is also returned so the caller (the WS handler) can log an
+// audit entry with node/vmid without a second lookup.
+func (s *Service) OpenGuestConsole(ctx context.Context, guestID string) (*models.ProxmoxGuest, *proxmoxclient.TermSession, error) {
+	guest, err := s.repo.GetProxmoxGuestByID(ctx, guestID)
+	if err != nil {
+		return nil, nil, apperr.NotFound("guest not found")
+	}
+	if guest.GuestType != "lxc" {
+		return guest, nil, apperr.Validation("console non disponible pour les VM QEMU — V2 à venir")
+	}
+	secret, conn, err := s.resolveSecret(ctx, guest.ConnectionID)
+	if err != nil {
+		return guest, nil, err
+	}
+	pveUsername, pvePassword, err := s.repo.GetProxmoxConsoleCredentials(ctx, guest.ConnectionID)
+	if err != nil {
+		return guest, nil, err
+	}
+	if pveUsername == "" || pvePassword == "" {
+		return guest, nil, apperr.Validation("console PVE non configurée pour cette connexion : identifiants requis")
+	}
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	session, err := client.OpenLXCConsole(ctx, guest.NodeName, guest.VMID, pveUsername, pvePassword)
+	if err != nil {
+		return guest, nil, apperr.BadGateway(err.Error())
+	}
+	return guest, session, nil
 }
 
 // MigrateGuest migrates a guest to target; guestType defaults to "vm".
