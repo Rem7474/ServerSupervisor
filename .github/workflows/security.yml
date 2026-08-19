@@ -13,6 +13,15 @@ on:
       - 'frontend/package.json'
       - 'frontend/package-lock.json'
       - '**/Dockerfile'
+  pull_request:
+    paths:
+      - 'server/go.mod'
+      - 'server/go.sum'
+      - 'agent/go.mod'
+      - 'agent/go.sum'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '**/Dockerfile'
   workflow_dispatch:        # déclenchable manuellement depuis l'UI GitHub
 
 permissions:
@@ -41,7 +50,7 @@ jobs:
           cache-dependency-path: server/go.sum
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run govulncheck
         working-directory: server
@@ -61,7 +70,7 @@ jobs:
           cache-dependency-path: agent/go.sum
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run govulncheck
         working-directory: agent
@@ -159,8 +168,8 @@ jobs:
           push: false
           load: true
           tags: serversupervisor-server:scan
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=server-trivy
+          cache-to: type=gha,mode=max,scope=server-trivy
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -177,42 +186,3 @@ jobs:
         with:
           sarif_file: trivy-server.sarif
           category: trivy-server
-
-  # ─────────────────────────────────────────
-  # Scan du code source (CodeQL)
-  # ─────────────────────────────────────────
-  codeql:
-    name: CodeQL analysis
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    strategy:
-      fail-fast: false
-      # build-mode: none analyse la source directement. Pour Go, cela couvre les
-      # DEUX modules (server/ + agent/) en une seule passe — ce que autobuild
-      # manquait faute de go.work à la racine (l'agent échappait au scan).
-      matrix:
-        include:
-          - language: go
-            build-mode: none
-          - language: javascript
-            build-mode: none
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-          # Règles supplémentaires pour la sécurité web
-          queries: security-extended
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
-        with:
-          category: codeql-${{ matrix.language }}

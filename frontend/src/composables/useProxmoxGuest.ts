@@ -1,11 +1,13 @@
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, shallowRef, onMounted, onUnmounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
+import type { ApexOptions } from 'apexcharts'
 import dayjs from '../utils/dayjs'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
-import type { ChartData } from 'chart.js'
+import { getApexChartPalette } from '../utils/apexChartTheme'
+import { getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
 import type { ProxmoxGuestLink } from '../types/generated'
 
 export type { GuestPowerAction }
@@ -13,6 +15,8 @@ export type { GuestPowerAction }
 const GUEST_REFRESH_SEC = 30
 
 interface GuestMetricPoint { timestamp: string; cpu_avg?: number; memory_avg?: number; [key: string]: unknown }
+interface ChartPoint { x: number; y: number }
+type GuestChartSeries = { name: string; data: ChartPoint[]; color: string }[]
 
 interface ProxmoxGuest {
   id: string
@@ -33,7 +37,21 @@ interface ProxmoxGuest {
 
 interface GuestNetworkIface { name: string; ips: string[] }
 
-export function useProxmoxGuest() {
+// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
+// export it under a name that resolves cleanly through defineAsyncComponent's
+// template-ref typing — restated locally for the one method actually needed).
+export interface ApexChartInstance {
+  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
+}
+
+// chartRef is owned by the view (bound via `ref="chartRef"` on its
+// <ApexChart>) and passed in here rather than being created and returned by
+// this composable, so the view's own script actually reads the binding
+// (passing it as an argument counts) instead of only handing it to the
+// template — vue-tsc's noUnusedLocals doesn't trace string `ref="x"`
+// template bindings as a "read" of `x`, so a destructure-and-template-only
+// version of this trips a false "declared but never read".
+export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
   const route = useRoute()
   const signal = useAbortSignal()
   const guestActions = useProxmoxGuestActions()
@@ -43,7 +61,7 @@ export function useProxmoxGuest() {
   const summaryLoading = ref(false)
   const error = ref('')
   const hours = ref(24)
-  const chartData = ref<ChartData<'line'> | null>(null)
+  const series = shallowRef<GuestChartSeries | null>(null)
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
   const actionLoading = computed(() => guestActions.isLoading(guest.value?.id))
@@ -177,8 +195,53 @@ export function useProxmoxGuest() {
     }
   }
 
-  function cssVar(name: string): string {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  function formatChartTime(timestampMs: number): string {
+    const d = dayjs(timestampMs)
+    if (!d.isValid()) return ''
+    return hours.value >= 24 ? d.format('DD/MM HH:mm') : d.format('HH:mm')
+  }
+
+  // Built once (on first data load) rather than as a `computed` over
+  // `series`: vue3-apexcharts clones the whole `:options` prop via
+  // JSON.parse(JSON.stringify(...)) on every *reactive* update after mount
+  // — which silently drops every function (labels.formatter, tooltip.custom)
+  // since JSON can't represent them. Keeping this object's identity stable
+  // after the initial build means later data refreshes (this guest polls
+  // every GUEST_REFRESH_SEC, plus manual changeRange() calls) flow through
+  // the (function-free, always-safe) `:series` prop only; the time-range
+  // window (xaxis.min/max) is pushed via the exposed updateOptions() method
+  // directly in loadGuestSummary() instead (bypasses the wrapper's buggy
+  // reactive watcher).
+  const chartOptions = shallowRef<ApexOptions | null>(null)
+
+  function buildChartOptions(): ApexOptions {
+    const palette = getApexChartPalette()
+    const allPoints = (series.value ?? []).flatMap((s) => s.data)
+    return {
+      chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+      theme: { mode: 'dark' },
+      fill: { type: 'solid', opacity: 0.1 },
+      stroke: { curve: 'smooth', width: 2 },
+      markers: { size: 0, hover: { size: 5 } },
+      dataLabels: { enabled: false },
+      legend: { show: true, position: 'top', labels: { colors: palette.legendText }, markers: { size: 5 } },
+      grid: { borderColor: palette.grid },
+      xaxis: {
+        type: 'datetime',
+        min: getMinPointTimestamp(allPoints),
+        max: getMaxPointTimestamp(allPoints),
+        labels: { style: { colors: palette.tickText }, formatter: (v: string) => formatChartTime(Number(v)) },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        tooltip: { enabled: false },
+      },
+      yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
+      tooltip: {
+        shared: true,
+        x: { formatter: (v: number) => formatChartTime(v) },
+        y: { formatter: (v: number) => (v != null ? `${Number(v).toFixed(1)}%` : '—') },
+      },
+    }
   }
 
   async function loadGuestSummary(): Promise<void> {
@@ -189,33 +252,33 @@ export function useProxmoxGuest() {
       const res = await api.getProxmoxGuestMetrics(guest.value.id, hours.value, bucketMinutes, signal)
       const points = Array.isArray(res.data) ? res.data : []
       if (!points.length) {
-        chartData.value = null
+        series.value = null
         return
       }
-      const labels = points.map((p: GuestMetricPoint) =>
-        hours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
-      )
-      chartData.value = {
-        labels,
-        datasets: [
-          {
-            label: 'CPU %',
-            data: points.map((p: GuestMetricPoint) => Number(p.cpu_avg ?? 0)),
-            borderColor: cssVar('--tblr-blue'),
-            backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.10)`,
-            fill: true,
-          },
-          {
-            label: 'RAM %',
-            data: points.map((p: GuestMetricPoint) => Number(p.memory_avg ?? 0)),
-            borderColor: cssVar('--tblr-green'),
-            backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.10)`,
-            fill: true,
-          },
-        ],
+      const palette = getApexChartPalette()
+      series.value = [
+        {
+          name: 'CPU %',
+          data: points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.cpu_avg ?? 0) })),
+          color: palette.cpu,
+        },
+        {
+          name: 'RAM %',
+          data: points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.memory_avg ?? 0) })),
+          color: palette.ram,
+        },
+      ]
+      if (!chartOptions.value) {
+        chartOptions.value = buildChartOptions()
+      } else {
+        const allPoints = series.value.flatMap((s) => s.data)
+        chartRef.value?.updateOptions(
+          { xaxis: { min: getMinPointTimestamp(allPoints), max: getMaxPointTimestamp(allPoints) } },
+          false, false,
+        )
       }
     } catch {
-      chartData.value = null
+      series.value = null
     } finally {
       summaryLoading.value = false
     }
@@ -251,7 +314,8 @@ export function useProxmoxGuest() {
     summaryLoading,
     error,
     hours,
-    chartData,
+    series,
+    chartOptions,
     autoRefresh,
     lastUpdatedAt,
     GUEST_REFRESH_SEC,

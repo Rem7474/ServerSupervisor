@@ -186,7 +186,7 @@
               <td>
                 <div
                   v-if="row.probe && probeHistory[row.probe.id]?.length"
-                  class="d-flex align-items-end gap-1"
+                  class="tracking"
                   style="height: 20px; min-width: 110px;"
                 >
                   <div

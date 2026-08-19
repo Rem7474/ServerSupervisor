@@ -27,7 +27,7 @@ Four stores, each with a `stores/*.spec.ts` — update the matching spec when yo
 ## Tests
 
 - `npm run test` (Vitest, happy-dom) — unit/component tests, `*.spec.ts` co-located, runs in CI, covers all 4 stores.
-- `npm run test:browser` (Vitest + Playwright/Chromium, `*.browser.test.ts`) — for anything asserting on actual Chart.js/D3 rendering (canvas/SVG), which happy-dom can't do. **Does not run in CI** (an upstream Vite 8/rolldown + Vitest 4 browser-mode bug breaks the dep optimizer — see `vitest.browser.config.ts`). Run it locally before merging a change that touches chart or map rendering: `npx playwright install --with-deps chromium && npm run test:browser`.
+- `npm run test:browser` (Vitest + Playwright/Chromium, `*.browser.test.ts`) — for anything asserting on actual ApexCharts/D3 rendering (SVG), which happy-dom can't do. **Does not run in CI** (an upstream Vite 8/rolldown + Vitest 4 browser-mode bug breaks the dep optimizer — see `vitest.browser.config.ts`). Run it locally before merging a change that touches chart or map rendering: `npx playwright install --with-deps chromium && npm run test:browser`.
 
 ## Don't
 

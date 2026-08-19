@@ -664,12 +664,17 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* This app is dark-only (data-bs-theme="dark" fixed in index.html), so a
+   single un-scoped rule set is the actual styling — no [data-bs-theme='dark']
+   selector needed (a prior light/dark split here left the two states out of
+   sync: the "light" values below were dead, always shadowed by a
+   higher-specificity dark override with different colors). */
 .step-chip {
   align-items: center;
-  background: var(--tblr-bg-surface);
-  border: 1px solid var(--tblr-border-color);
+  background: var(--ss-chip-idle-bg);
+  border: 1px solid var(--ss-chip-idle-border);
   border-radius: 0.6rem;
-  color: var(--tblr-body-color);
+  color: var(--ss-chip-idle-text);
   display: flex;
   font-weight: 600;
   gap: 0.5rem;
@@ -678,21 +683,25 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
   padding: 0.4rem 0.6rem;
 }
 
+/* No --ss-* token matches this stepper's stronger-contrast highlight
+   (deliberately higher opacity than --ss-accent-blue-bg, which is tuned for
+   a subtler badge background) — a one-off exception rather than
+   introducing a new token for a single use site. */
 .step-chip.active {
-  background: var(--ss-accent-blue-bg);
+  background: rgba(33, 118, 210, 0.28);
   border-color: var(--ss-accent-blue);
   color: var(--ss-accent-blue-text);
 }
 
+/* Same rationale as .step-chip.active above, vs. --ss-success-bg. */
 .step-chip.done {
-  background: var(--ss-success-bg);
+  background: rgba(56, 142, 99, 0.24);
   border-color: var(--ss-success-border);
   color: var(--ss-success-text);
 }
 
 .step-chip-index {
-  background: rgba(255, 255, 255, 0.75);
-  color: var(--tblr-dark);
+  background: rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   display: inline-flex;
   font-size: 0.85rem;
@@ -700,29 +709,6 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
   height: 24px;
   justify-content: center;
   width: 24px;
-}
-
-
-[data-bs-theme='dark'] .step-chip {
-  background: var(--ss-chip-idle-bg);
-  border-color: var(--ss-chip-idle-border);
-  color: var(--ss-chip-idle-text);
-}
-
-[data-bs-theme='dark'] .step-chip.active {
-  background: rgba(33, 118, 210, 0.28);
-  border-color: var(--ss-accent-blue);
-  color: var(--ss-accent-blue-text);
-}
-
-[data-bs-theme='dark'] .step-chip.done {
-  background: rgba(56, 142, 99, 0.24);
-  border-color: var(--ss-success-border);
-  color: var(--ss-success-text);
-}
-
-[data-bs-theme='dark'] .step-chip-index {
-  background: rgba(255, 255, 255, 0.16);
   /* stylelint-disable-next-line color-no-hex -- no existing --ss-* token
      matches this pale-blue index-badge text; a one-off exception rather
      than introducing a new token for a single use site. */

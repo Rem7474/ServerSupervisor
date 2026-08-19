@@ -1,7 +1,7 @@
 <template>
   <div
     ref="bellRef"
-    class="position-relative"
+    class="dropdown"
   >
     <!-- Bell button -->
     <button
@@ -23,7 +23,7 @@
     <!-- Dropdown panel -->
     <div
       v-if="isOpen"
-      class="notification-dropdown"
+      class="dropdown-menu dropdown-menu-end show notification-dropdown"
     >
       <!-- Header -->
       <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
@@ -222,17 +222,18 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/*
+ * .dropdown-menu already supplies background/border/border-radius/box-shadow/
+ * z-index via Tabler's tokens. Its top/right auto-positioning is gated behind
+ * a [data-bs-popper] attribute that only Bootstrap's JS sets — this app never
+ * loads that JS (see useModalChrome.ts's own hand-rolled positioning for the
+ * same reason), so top/right/width still need to be set explicitly here.
+ */
 .notification-dropdown {
-  position: absolute;
   top: calc(100% + 8px);
   right: 0;
   width: 380px;
   max-width: calc(100vw - 1rem);
-  z-index: 2100;
-  background: var(--tblr-bg-surface);
-  border: 1px solid var(--tblr-border-color);
-  border-radius: 8px;
-  box-shadow: var(--ss-shadow-dropdown);
 }
 
 .notification-bell-btn {
@@ -302,7 +303,6 @@ onUnmounted(() => {
     left: 0.5rem;
     width: auto;
     max-width: none;
-    z-index: 2100;
   }
 }
 
