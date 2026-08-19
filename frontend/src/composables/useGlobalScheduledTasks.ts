@@ -372,6 +372,7 @@ export function useGlobalScheduledTasks() {
       addToast(`${task.name} déclenchée — commande ${data.command_id}`, 'success')
       await loadTasks()
       await pendingCommand.track(data.command_id)
+      await loadTasks()
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, 'Erreur')
     } finally {
