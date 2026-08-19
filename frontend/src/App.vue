@@ -187,7 +187,7 @@
       <!-- Offline / server-unreachable banner -->
       <div
         v-if="!isOnline || serverUnreachable"
-        class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 border-bottom app-network-alert"
+        class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 border-bottom sticky-top app-network-alert"
         role="alert"
       >
         <div class="container-xl d-flex align-items-center gap-2">
@@ -202,7 +202,7 @@
 
       <div
         v-if="httpError"
-        class="alert alert-danger alert-dismissible mb-0 rounded-0 border-0 border-bottom app-http-alert"
+        class="alert alert-danger alert-dismissible mb-0 rounded-0 border-0 border-bottom sticky-top app-http-alert"
         role="alert"
       >
         <div class="container-xl d-flex align-items-center justify-content-between gap-3">
@@ -443,10 +443,10 @@ onUnmounted(() => {
   top: 0;
 }
 
+/* position: relative already comes from Tabler's own .navbar rule — only
+   the stacking level (not a Tabler default) needs setting here. */
 .navbar {
-  position: relative;
   z-index: 1030;
-  overflow: visible;
 }
 
 /* Row 2 (the 6 intent-section links) — Tabler ships no .navbar-light in this
@@ -470,9 +470,10 @@ onUnmounted(() => {
   z-index: 1020;
 }
 
+/* background/border already come from Tabler's own .nav-link rule (this
+   button also carries that class) — only the button-vs-<a> defaults
+   (block width, left-aligned text) need resetting here. */
 .nav-dropdown-toggle {
-  background: transparent;
-  border: 0;
   width: 100%;
   text-align: left;
 }
@@ -514,20 +515,15 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* position: sticky; top: 0 now come from Tabler's own .sticky-top utility
+   (applied in the template) — only the stacking level (above .navbar/
+   .navbar-secondary, below .modal) needs overriding here. */
 .app-network-alert {
-  position: sticky;
-  top: 0;
   z-index: 1040;
 }
 
 .app-http-alert {
-  position: sticky;
-  top: 0;
   z-index: 1039;
-}
-
-#navbar-menu {
-  overflow: visible;
 }
 
 .user-menu {
@@ -544,21 +540,28 @@ onUnmounted(() => {
   color: var(--tblr-secondary-fg) !important;
 }
 
+/* position: absolute already comes from Tabler's own .dropdown-menu rule.
+   top/left are still needed: this app toggles dropdowns via a plain Vue
+   :class binding, not Bootstrap's JS/Popper dropdown, so there's no
+   Popper-computed placement to rely on. min-width/z-index are deliberate
+   overrides of Tabler's own --tblr-dropdown-min-width (11rem) and
+   --tblr-dropdown-zindex (1000). */
 .nav-item.dropdown .dropdown-menu {
-  position: absolute;
   top: calc(100% + 4px);
   left: 0;
   min-width: 200px;
   z-index: 1050;
 }
 
+/* This element also carries .dropdown-menu, whose Tabler rule already sets
+   position: absolute — only the placement/decoration overrides below are
+   this component's own. */
 .user-dropdown {
   min-width: 240px;
   padding: 8px 0;
   border-radius: 12px;
   border: 1px solid var(--ss-overlay-light);
   box-shadow: var(--ss-shadow-floating);
-  position: absolute;
   top: calc(100% + 10px);
   right: 0;
   margin: 0;
