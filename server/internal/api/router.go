@@ -392,6 +392,7 @@ func registerTaskRoutes(g *gin.RouterGroup, h *handlers.ScheduledTaskHandler) {
 	g.GET("/hosts/:id/scheduled-tasks", h.ListScheduledTasks)
 	g.POST("/hosts/:id/scheduled-tasks", h.CreateScheduledTask)
 	g.GET("/hosts/:id/custom-tasks", h.GetCustomTasks)
+	g.POST("/hosts/:id/custom-tasks/:taskId/run", h.RunCustomTask)
 	g.GET("/hosts/:id/tasks-yaml", h.GetTasksConfigYAML)
 	g.PUT("/scheduled-tasks/:id", h.UpdateScheduledTask)
 	g.DELETE("/scheduled-tasks/:id", h.DeleteScheduledTask)

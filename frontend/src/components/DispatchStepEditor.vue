@@ -37,7 +37,10 @@
         </option>
       </select>
     </div>
-    <div class="col-md-3">
+    <div
+      v-if="module !== 'custom'"
+      class="col-md-3"
+    >
       <label class="form-label form-label-sm">Action</label>
       <select
         v-if="actionOptions.length"

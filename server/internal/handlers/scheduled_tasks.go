@@ -149,6 +149,26 @@ func (h *ScheduledTaskHandler) GetScheduledTaskExecutions(c *gin.Context) {
 	c.JSON(http.StatusOK, cmds)
 }
 
+// RunCustomTask triggers one of a host's agent-declared custom tasks
+// (tasks.yaml) immediately, without requiring a persisted ScheduledTask row —
+// the ad-hoc equivalent of RunScheduledTask for the one module (custom) that
+// otherwise had no dedicated ad-hoc endpoint (unlike docker/apt/systemd).
+func (h *ScheduledTaskHandler) RunCustomTask(c *gin.Context) {
+	if !requireHostAccess(c, h.db, c.Param("id"), "operator") {
+		return
+	}
+	username := c.GetString("username")
+	if username == "" {
+		username = "unknown"
+	}
+	commandID, err := h.svc.RunCustomTask(c.Request.Context(), c.Param("id"), c.Param("taskId"), username)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"command_id": commandID, "status": "pending"})
+}
+
 // RunScheduledTask triggers a scheduled task immediately (manual execution).
 func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 	username := c.GetString("username")

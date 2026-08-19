@@ -2042,6 +2042,11 @@ export interface ScheduledTaskWithHost {
 export interface ScheduledTaskRequest {
   name: string;
   module: string;
+  /**
+   * Not binding:"required" — the "custom" module ignores Action entirely
+   * (the agent only looks up Target in tasks.yaml), so it's validated
+   * conditionally in scheduledtask.validate() instead of unconditionally here.
+   */
   action: string;
   target: string;
   payload: string;
