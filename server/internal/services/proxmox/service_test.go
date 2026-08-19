@@ -3,6 +3,8 @@ package proxmox
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -267,5 +269,112 @@ func TestOpenGuestConsole_MissingCredentials(t *testing.T) {
 	_, _, err := newSvc(repo).OpenGuestConsole(context.Background(), "g1")
 	if status(err) != 400 {
 		t.Fatalf("missing console credentials should be 400, got %v", err)
+	}
+}
+
+// fakePVEServer answers the two REST calls TestConnection can make: the
+// plain API reachability check (GET /nodes) and, when console credentials
+// are supplied, the login used to validate them (POST /access/ticket).
+func fakePVEServer(t *testing.T, loginOK bool) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/nodes", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
+		if !loginOK {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"data":null}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:X=="}}`))
+	})
+	return httptest.NewServer(mux)
+}
+
+func TestTestConnection_NoConsoleCredentials(t *testing.T) {
+	srv := fakePVEServer(t, true)
+	defer srv.Close()
+
+	result := newSvc(&fakeRepo{}).TestConnection(srv.URL, "user@pve!token", "secret", false, "", "")
+	if !result.Success {
+		t.Fatalf("expected API test to succeed, got error %q", result.Error)
+	}
+	if result.ConsoleConfigured {
+		t.Error("ConsoleConfigured should be false with no pve_username/pve_password")
+	}
+	if result.ConsoleOK {
+		t.Error("ConsoleOK should be false when console isn't configured")
+	}
+}
+
+func TestTestConnection_ConsoleCredentialsValid(t *testing.T) {
+	srv := fakePVEServer(t, true)
+	defer srv.Close()
+
+	result := newSvc(&fakeRepo{}).TestConnection(srv.URL, "user@pve!token", "secret", false, "root@pam", "hunter2")
+	if !result.Success {
+		t.Fatalf("expected API test to succeed, got error %q", result.Error)
+	}
+	if !result.ConsoleConfigured || !result.ConsoleOK {
+		t.Errorf("expected console configured+ok, got %+v", result)
+	}
+	if result.ConsoleError != "" {
+		t.Errorf("ConsoleError should be empty on success, got %q", result.ConsoleError)
+	}
+}
+
+func TestTestConnection_ConsoleCredentialsInvalid(t *testing.T) {
+	srv := fakePVEServer(t, false)
+	defer srv.Close()
+
+	result := newSvc(&fakeRepo{}).TestConnection(srv.URL, "user@pve!token", "secret", false, "root@pam", "wrong")
+	if !result.Success {
+		t.Fatalf("expected API test to succeed (token auth unaffected by console login), got error %q", result.Error)
+	}
+	if !result.ConsoleConfigured {
+		t.Error("ConsoleConfigured should be true when credentials are supplied")
+	}
+	if result.ConsoleOK {
+		t.Error("ConsoleOK should be false when PVE login fails")
+	}
+	if result.ConsoleError == "" {
+		t.Error("expected a ConsoleError message when PVE login fails")
+	}
+}
+
+func TestTestConnection_APIFailure(t *testing.T) {
+	result := newSvc(&fakeRepo{}).TestConnection("http://127.0.0.1:1", "user@pve!token", "secret", false, "", "")
+	if result.Success {
+		t.Error("expected API test to fail against an unreachable host")
+	}
+	if result.Error == "" {
+		t.Error("expected an Error message on API failure")
+	}
+}
+
+func TestTestConnectionByID_NotFound(t *testing.T) {
+	_, err := newSvc(&fakeRepo{}).TestConnectionByID(context.Background(), "missing")
+	if status(err) != 404 {
+		t.Fatalf("missing connection should be 404, got %v", err)
+	}
+}
+
+func TestTestConnectionByID_UsesStoredCredentials(t *testing.T) {
+	srv := fakePVEServer(t, true)
+	defer srv.Close()
+
+	repo := &fakeRepo{
+		connByID: map[string]*models.ProxmoxConnection{
+			"c1": {ID: "c1", APIURL: srv.URL, TokenID: "user@pve!token"},
+		},
+		consoleCreds: map[string][2]string{"c1": {"root@pam", "hunter2"}},
+	}
+	result, err := newSvc(repo).TestConnectionByID(context.Background(), "c1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Success || !result.ConsoleConfigured || !result.ConsoleOK {
+		t.Errorf("expected a fully successful test, got %+v", result)
 	}
 }

@@ -72,6 +72,15 @@ func (c *Client) login(username, password string) (ticket string, err error) {
 	return envelope.Data.Ticket, nil
 }
 
+// TestLogin verifies PVE user credentials by performing the same login used
+// to open a console (see login's doc comment), without opening a session.
+// Used to validate console credentials from the connection settings UI,
+// where no specific guest is available to open a real console against.
+func (c *Client) TestLogin(username, password string) error {
+	_, err := c.login(username, password)
+	return err
+}
+
 // createTermproxy calls POST /nodes/{node}/lxc/{vmid}/termproxy, which asks
 // PVE to spawn a shell and open a local TCP proxy for it. Requires the
 // VM.Console privilege on the API token.

@@ -1605,6 +1605,21 @@ export interface ProxmoxConnectionRequest {
   pve_password: string;
 }
 /**
+ * ProxmoxTestResult is returned by the connection test endpoints
+ * (POST /proxmox/instances/test and /proxmox/instances/:id/test). Console
+ * fields are only meaningful when ConsoleConfigured is true — PVE login
+ * success only proves the credentials are valid, not that the account has
+ * the VM.Console privilege needed on a specific guest (that can only be
+ * checked by actually opening a console).
+ */
+export interface ProxmoxTestResult {
+  success: boolean;
+  error?: string;
+  console_configured: boolean;
+  console_ok?: boolean;
+  console_error?: string;
+}
+/**
  * ProxmoxSummary is returned by GET /proxmox/summary.
  */
 export interface ProxmoxSummary {

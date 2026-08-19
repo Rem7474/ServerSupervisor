@@ -153,29 +153,46 @@ func (s *Service) DeleteConnection(ctx context.Context, id string) error {
 	return s.repo.DeleteProxmoxConnection(ctx, id)
 }
 
-// TestConnection tests ad-hoc credentials (no persistence). The bool/string pair
-// mirrors the original 200 {success,error} response.
-func (s *Service) TestConnection(apiURL, tokenID, secret string, insecure bool) (bool, string) {
-	if err := proxmoxclient.New(apiURL, tokenID, secret, insecure).TestConnection(); err != nil {
-		return false, err.Error()
+// TestConnection tests ad-hoc credentials (no persistence). When
+// pveUsername/pvePassword are both set, it additionally verifies the PVE
+// login used to open a console (see proxmoxclient.Client.login) — this only
+// proves the credentials are valid, not that the account has the VM.Console
+// privilege on a given guest, which can only be checked by actually opening
+// a console.
+func (s *Service) TestConnection(apiURL, tokenID, secret string, insecure bool, pveUsername, pvePassword string) models.ProxmoxTestResult {
+	result := models.ProxmoxTestResult{ConsoleConfigured: pveUsername != "" && pvePassword != ""}
+	client := proxmoxclient.New(apiURL, tokenID, secret, insecure)
+	if err := client.TestConnection(); err != nil {
+		result.Error = err.Error()
+		return result
 	}
-	return true, ""
+	result.Success = true
+	if result.ConsoleConfigured {
+		if err := client.TestLogin(pveUsername, pvePassword); err != nil {
+			result.ConsoleError = err.Error()
+		} else {
+			result.ConsoleOK = true
+		}
+	}
+	return result
 }
 
-// TestConnectionByID tests a stored connection using its stored secret.
-func (s *Service) TestConnectionByID(ctx context.Context, id string) (bool, string, error) {
+// TestConnectionByID tests a stored connection using its stored secret and
+// console credentials (if configured).
+func (s *Service) TestConnectionByID(ctx context.Context, id string) (models.ProxmoxTestResult, error) {
 	conn, err := s.repo.GetProxmoxConnectionByID(ctx, id)
 	if err != nil || conn == nil {
-		return false, "", apperr.NotFound("connection not found")
+		return models.ProxmoxTestResult{}, apperr.NotFound("connection not found")
 	}
 	secret, err := s.repo.GetProxmoxTokenSecret(ctx, id)
 	if err != nil {
-		return false, "", err
+		return models.ProxmoxTestResult{}, err
 	}
-	if err := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify).TestConnection(); err != nil {
-		return false, err.Error(), nil
+	pveUsername, pvePassword, err := s.repo.GetProxmoxConsoleCredentials(ctx, id)
+	if err != nil {
+		return models.ProxmoxTestResult{}, err
 	}
-	return true, "", nil
+	return s.TestConnection(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify, pveUsername, pvePassword), nil
 }
 
 // ===== summary / guests =====

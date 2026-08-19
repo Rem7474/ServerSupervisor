@@ -180,6 +180,20 @@ type ProxmoxConnectionRequest struct {
 	PVEPassword string `json:"pve_password"`
 }
 
+// ProxmoxTestResult is returned by the connection test endpoints
+// (POST /proxmox/instances/test and /proxmox/instances/:id/test). Console
+// fields are only meaningful when ConsoleConfigured is true — PVE login
+// success only proves the credentials are valid, not that the account has
+// the VM.Console privilege needed on a specific guest (that can only be
+// checked by actually opening a console).
+type ProxmoxTestResult struct {
+	Success           bool   `json:"success"`
+	Error             string `json:"error,omitempty"`
+	ConsoleConfigured bool   `json:"console_configured"`
+	ConsoleOK         bool   `json:"console_ok,omitempty"`
+	ConsoleError      string `json:"console_error,omitempty"`
+}
+
 // ProxmoxSummary is returned by GET /proxmox/summary.
 type ProxmoxSummary struct {
 	ConnectionCount int   `json:"connection_count"`
