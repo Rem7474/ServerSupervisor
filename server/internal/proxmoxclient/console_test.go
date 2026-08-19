@@ -26,12 +26,15 @@ func TestLogin(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL, "user@pve!token", "secret-token", false)
-	ticket, err := c.login("root@pam", "secret")
+	auth, err := c.login("root@pam", "secret")
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
-	if ticket != "PVE:root@pam:XYZ==" {
-		t.Errorf("ticket = %q", ticket)
+	if auth.Ticket != "PVE:root@pam:XYZ==" {
+		t.Errorf("ticket = %q", auth.Ticket)
+	}
+	if auth.CSRFText != "abc" {
+		t.Errorf("CSRFText = %q", auth.CSRFText)
 	}
 }
 
@@ -49,19 +52,30 @@ func TestLoginError(t *testing.T) {
 }
 
 func TestCreateTermproxy(t *testing.T) {
+	auth := pveLogin{Ticket: "PVE:root@pam:AUTH==", CSRFText: "csrf-tok"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/nodes/pve1/lxc/101/termproxy" || r.Method != http.MethodPost {
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
-		if got := r.Header.Get("Authorization"); got != "PVEAPIToken=user@pve!token=secret-token" {
-			t.Errorf("Authorization = %q", got)
+		// Must authenticate as the same cookie identity that will present the
+		// resulting vncticket to vncwebsocket — an API token here produces a
+		// termproxy ticket for the token's user, not pveUsername, and PVE
+		// rejects the mismatch as "invalid PVEVNC ticket".
+		if cookie := r.Header.Get("Cookie"); !strings.Contains(cookie, "PVEAuthCookie=PVE:root@pam:AUTH==") {
+			t.Errorf("missing/incorrect PVEAuthCookie: %q", cookie)
+		}
+		if got := r.Header.Get("CSRFPreventionToken"); got != "csrf-tok" {
+			t.Errorf("CSRFPreventionToken = %q", got)
+		}
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Errorf("termproxy must not use API token auth, got Authorization = %q", got)
 		}
 		_, _ = w.Write([]byte(`{"data":{"ticket":"PVEVNC:XYZ==","port":"31000","user":"root@pam","upid":"UPID:..."}}`))
 	}))
 	defer srv.Close()
 
 	c := New(srv.URL, "user@pve!token", "secret-token", false)
-	ticket, port, user, err := c.createTermproxy("pve1", 101)
+	ticket, port, user, err := c.createTermproxy("pve1", 101, auth)
 	if err != nil {
 		t.Fatalf("createTermproxy: %v", err)
 	}
@@ -78,7 +92,7 @@ func TestCreateTermproxyError(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL, "user@pve!token", "secret-token", false)
-	if _, _, _, err := c.createTermproxy("pve1", 101); err == nil {
+	if _, _, _, err := c.createTermproxy("pve1", 101, pveLogin{Ticket: "x", CSRFText: "y"}); err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
@@ -93,9 +107,15 @@ func fakeTermproxyServer(t *testing.T) *httptest.Server {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH=="}}`))
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH==","CSRFPreventionToken":"csrf-tok"}}`))
 	})
 	mux.HandleFunc("/nodes/pve1/lxc/101/termproxy", func(w http.ResponseWriter, r *http.Request) {
+		if cookie := r.Header.Get("Cookie"); !strings.Contains(cookie, "PVEAuthCookie=PVE:root@pam:AUTH==") {
+			t.Errorf("termproxy missing/incorrect PVEAuthCookie: %q", cookie)
+		}
+		if got := r.Header.Get("CSRFPreventionToken"); got != "csrf-tok" {
+			t.Errorf("termproxy CSRFPreventionToken = %q", got)
+		}
 		_, _ = w.Write([]byte(`{"data":{"ticket":"PVEVNC:TERM==","port":31000,"user":"root@pam","upid":"UPID:.."}}`))
 	})
 	mux.HandleFunc("/nodes/pve1/lxc/101/vncwebsocket", func(w http.ResponseWriter, r *http.Request) {

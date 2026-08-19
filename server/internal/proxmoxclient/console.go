@@ -18,58 +18,75 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// login performs a PVE ticket login (POST /access/ticket) and returns the
-// PVEAuthCookie ticket value.
+// pveLogin is the result of a PVE ticket login: the PVEAuthCookie value plus
+// the CSRF prevention token PVE requires on any cookie-authenticated
+// POST/PUT/DELETE.
+type pveLogin struct {
+	Ticket   string
+	CSRFText string
+}
+
+// login performs a PVE ticket login (POST /access/ticket).
 //
 // This is a separate auth mechanism from the PVEAPIToken header every other
 // Client method uses: PVE's vncwebsocket upgrade endpoint (shared by the
 // term console and VNC) does not accept API-token auth — confirmed by a
 // Proxmox staff reply on the community forum, reproduced by multiple users
 // hitting "does not look like a valid user name" with a token. It requires a
-// real user ticket in a PVEAuthCookie cookie instead. Credentials are used
-// once per call and never cached: a console session logs in fresh each time
-// it's opened, which is well inside a PVE ticket's ~2h lifetime for a
-// human-initiated, short-lived interactive session.
-func (c *Client) login(username, password string) (ticket string, err error) {
+// real user ticket in a PVEAuthCookie cookie instead.
+//
+// Critically, PVE also requires the *entire* console-opening sequence to run
+// as one consistent identity: the vncticket returned by termproxy is only
+// accepted by vncwebsocket if it was generated for the same user as the
+// PVEAuthCookie presented alongside it ("permission denied - invalid
+// PVEVNC ticket" otherwise — confirmed by a Proxmox staff reply on the
+// community forum, reproduced against a real cluster). So termproxy must
+// also be called via this cookie/CSRF pair, not the API token — see
+// createTermproxy. Credentials are used once per call and never cached: a
+// console session logs in fresh each time it's opened, which is well inside
+// a PVE ticket's ~2h lifetime for a human-initiated, short-lived
+// interactive session.
+func (c *Client) login(username, password string) (pveLogin, error) {
 	form := url.Values{"username": {username}, "password": {password}}
 	reqURL := c.baseURL + "/access/ticket"
 	req, err := http.NewRequest(http.MethodPost, reqURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
+		return pveLogin{}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("request: %w", err)
+		return pveLogin{}, fmt.Errorf("request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
+		return pveLogin{}, fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		snippet := string(body)
 		if len(snippet) > 300 {
 			snippet = snippet[:300]
 		}
-		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
+		return pveLogin{}, fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
 	}
 
 	var envelope struct {
 		Data struct {
-			Ticket string `json:"ticket"`
+			Ticket              string `json:"ticket"`
+			CSRFPreventionToken string `json:"CSRFPreventionToken"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
-		return "", fmt.Errorf("parse response: %w", err)
+		return pveLogin{}, fmt.Errorf("parse response: %w", err)
 	}
 	if envelope.Data.Ticket == "" {
-		return "", fmt.Errorf("login succeeded but no ticket returned")
+		return pveLogin{}, fmt.Errorf("login succeeded but no ticket returned")
 	}
-	return envelope.Data.Ticket, nil
+	return pveLogin{Ticket: envelope.Data.Ticket, CSRFText: envelope.Data.CSRFPreventionToken}, nil
 }
 
 // TestLogin verifies PVE user credentials by performing the same login used
@@ -82,15 +99,18 @@ func (c *Client) TestLogin(username, password string) error {
 }
 
 // createTermproxy calls POST /nodes/{node}/lxc/{vmid}/termproxy, which asks
-// PVE to spawn a shell and open a local TCP proxy for it. Requires the
-// VM.Console privilege on the API token.
-func (c *Client) createTermproxy(node string, vmid int) (ticket string, port int, user string, err error) {
+// PVE to spawn a shell and open a local TCP proxy for it, authenticated as
+// the same cookie identity that will later present the resulting vncticket
+// to vncwebsocket (see login's doc comment for why this can't be the API
+// token). Requires the VM.Console privilege on that PVE user.
+func (c *Client) createTermproxy(node string, vmid int, auth pveLogin) (ticket string, port int, user string, err error) {
 	reqURL := c.baseURL + fmt.Sprintf("/nodes/%s/lxc/%d/termproxy", node, vmid)
 	req, err := http.NewRequest(http.MethodPost, reqURL, nil)
 	if err != nil {
 		return "", 0, "", fmt.Errorf("build request: %w", err)
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
+	req.Header.Set("Cookie", "PVEAuthCookie="+auth.Ticket)
+	req.Header.Set("CSRFPreventionToken", auth.CSRFText)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
@@ -153,12 +173,12 @@ type TermSession struct {
 // performs the undocumented termproxy login handshake. The returned session
 // is immediately ready for interactive use.
 func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveUsername, pvePassword string) (*TermSession, error) {
-	authTicket, err := c.login(pveUsername, pvePassword)
+	auth, err := c.login(pveUsername, pvePassword)
 	if err != nil {
 		return nil, fmt.Errorf("pve login: %w", err)
 	}
 
-	termTicket, port, user, err := c.createTermproxy(node, vmid)
+	termTicket, port, user, err := c.createTermproxy(node, vmid, auth)
 	if err != nil {
 		return nil, fmt.Errorf("create termproxy: %w", err)
 	}
@@ -173,7 +193,7 @@ func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveU
 		dialer.TLSClientConfig = transport.TLSClientConfig
 	}
 	header := http.Header{}
-	header.Set("Cookie", "PVEAuthCookie="+authTicket)
+	header.Set("Cookie", "PVEAuthCookie="+auth.Ticket)
 
 	conn, resp, err := dialer.DialContext(ctx, wsURL, header)
 	if err != nil {
