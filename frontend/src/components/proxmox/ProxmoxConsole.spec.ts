@@ -104,7 +104,8 @@ describe('ProxmoxConsole', () => {
     wrapper.unmount()
   })
 
-  it('does NOT close the socket or dispose the terminal when hidden — the session stays alive in the background', async () => {
+  it('a plain show-prop toggle (not the close button) does not close the socket', async () => {
+    statusRef.value = 'connected'
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
     await flushPromises()
 
@@ -114,10 +115,12 @@ describe('ProxmoxConsole', () => {
     expect(termDisposeMock).not.toHaveBeenCalled()
   })
 
-  it('re-fits without recreating the terminal when shown again after being hidden', async () => {
+  it('re-fits without recreating or reconnecting the terminal when re-shown while still connected', async () => {
+    statusRef.value = 'connected'
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
     await flushPromises()
     fitMock.mockClear()
+    openMock.mockClear()
 
     await wrapper.setProps({ show: false })
     await wrapper.setProps({ show: true })
@@ -125,6 +128,19 @@ describe('ProxmoxConsole', () => {
 
     expect(termOpenMock).toHaveBeenCalledTimes(1) // still only constructed once
     expect(fitMock).toHaveBeenCalled()
+    expect(openMock).not.toHaveBeenCalled() // already connected, no redundant reconnect
+  })
+
+  it('reconnects automatically when re-shown while idle/disconnected', async () => {
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+    openMock.mockClear()
+
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect(openMock).toHaveBeenCalledTimes(1)
   })
 
   it('disposes the terminal and closes the socket on unmount', async () => {
@@ -137,15 +153,14 @@ describe('ProxmoxConsole', () => {
     expect(termDisposeMock).toHaveBeenCalledTimes(1)
   })
 
-  it('emits close when the panel close button is clicked', async () => {
+  it('closing (X) ends the remote shell, not just hides the panel', async () => {
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
     await flushPromises()
 
     await wrapper.find('button[title="Fermer"]').trigger('click')
 
     expect(wrapper.emitted('close')).toBeTruthy()
-    // Closing (hiding) must not tear down the session.
-    expect(closeMock).not.toHaveBeenCalled()
+    expect(closeMock).toHaveBeenCalled()
   })
 
   it('shows a "Rouvrir" button and reconnects when the session is disconnected', async () => {

@@ -4,7 +4,7 @@
     :show="show"
     :title="`Console — ${guestName || guestId}`"
     wrapper-class="side-panel"
-    @close="$emit('close')"
+    @close="handleClose"
     @open="$emit('open')"
   >
     <template #title-suffix>
@@ -15,7 +15,7 @@
     </template>
     <template #header-actions>
       <button
-        v-if="status === 'disconnected' || status === 'error'"
+        v-if="status !== 'connecting' && status !== 'connected'"
         type="button"
         class="btn btn-sm btn-outline-secondary"
         @click="connect"
@@ -57,7 +57,7 @@ const props = withDefaults(defineProps<{
   show: false,
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void
   (e: 'open'): void
 }>()
@@ -94,6 +94,16 @@ function connect(): void {
   open(props.guestId, term)
 }
 
+// The close (X) button ends the remote shell — a live PTY session left
+// running server-side after the user thinks they've closed it would be
+// surprising (unlike CommandLogPanel's other uses, where "close" only ever
+// hides a static log). Reopening (the "Rouvrir" button, or the parent
+// re-showing the panel) starts a fresh session via connect().
+function handleClose(): void {
+  closeSocket()
+  emit('close')
+}
+
 // Deferred to the next frame instead of running straight inside the
 // ResizeObserver callback: fitAddon.fit() itself changes the terminal's
 // internal canvas layout, which can trigger another observation in the same
@@ -115,10 +125,10 @@ function scheduleFit(): void {
 // Mounting xterm.js into a hidden (display:none) container yields a
 // zero-size canvas, so the Terminal is only ever constructed once `show`
 // actually flips true the first time and the container has real layout.
-// CommandLogPanel hides with v-show afterwards (not v-if), so a later
-// close/reopen just toggles visibility — the session stays connected in the
-// background exactly like every other console panel in the app, instead of
-// being torn down and losing the shell on every close.
+// The xterm.js instance itself (scrollback, etc.) is kept alive across a
+// close/reopen — CommandLogPanel hides with v-show, not v-if — but the PVE
+// session is not (see handleClose): reopening shows the same screen buffer
+// with a fresh shell connected underneath, same as PVE's own web console.
 async function mountTerminal(): Promise<void> {
   await nextTick()
   if (!containerEl.value || term) return
@@ -150,8 +160,16 @@ function teardownTerminal(): void {
 }
 
 watch(() => props.show, (visible) => {
-  if (visible && !term) void mountTerminal()
-  else if (visible) scheduleFit() // re-fit: the container may have been resized while hidden
+  if (!visible) return
+  if (!term) {
+    void mountTerminal()
+    return
+  }
+  scheduleFit() // re-fit: the container may have been resized while hidden
+  // Reopening (e.g. via the guest page's "Console" button) after an explicit
+  // close reconnects automatically — one click, not "open panel" then
+  // "Rouvrir" as two separate steps.
+  if (status.value !== 'connecting' && status.value !== 'connected') connect()
 }, { immediate: true })
 
 onBeforeUnmount(() => {
