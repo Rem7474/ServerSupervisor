@@ -144,7 +144,7 @@
         </button>
         <span
           v-if="formMsg"
-          :class="['ms-auto small', formOk ? 'text-success' : 'text-danger']"
+          :class="['ms-auto small', formWarn ? 'text-warning' : formOk ? 'text-success' : 'text-danger']"
         >{{ formMsg }}</span>
       </div>
     </div>
@@ -284,7 +284,7 @@
       v-if="listMsg"
       class="card-footer"
     >
-      <span :class="['small', listOk ? 'text-success' : 'text-danger']">{{ listMsg }}</span>
+      <span :class="['small', listWarn ? 'text-warning' : listOk ? 'text-success' : 'text-danger']">{{ listMsg }}</span>
     </div>
   </div>
 </template>
@@ -293,7 +293,7 @@
 import { ref, onMounted } from 'vue'
 import { IconClock, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
-import type { ProxmoxConnection } from '../../types/proxmox'
+import type { ProxmoxConnection, ProxmoxTestResult } from '../../types/proxmox'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
@@ -330,8 +330,13 @@ const saving = ref(false)
 const testing = ref(false)
 const formMsg = ref('')
 const formOk = ref(false)
+// Set alongside formOk only by test-result paths (formatTestResult's
+// 'warning' tone: API reachable but console misconfigured/unreachable) —
+// every other message path (save/create/delete/poll) leaves this false.
+const formWarn = ref(false)
 const listMsg = ref('')
 const listOk = ref(false)
+const listWarn = ref(false)
 
 const emptyForm = (): ProxmoxForm => ({
   name: '',
@@ -363,6 +368,7 @@ function openAddForm(): void {
   editingId.value = null
   form.value = emptyForm()
   formMsg.value = ''
+  formWarn.value = false
   showForm.value = true
 }
 
@@ -380,12 +386,14 @@ function openEditForm(inst: ProxmoxInstance): void {
     pve_password: '',
   }
   formMsg.value = ''
+  formWarn.value = false
   showForm.value = true
 }
 
 function cancelForm(): void {
   showForm.value = false
   formMsg.value = ''
+  formWarn.value = false
   editingId.value = null
 }
 
@@ -397,6 +405,7 @@ async function save(): Promise<void> {
   }
   saving.value = true
   formMsg.value = ''
+  formWarn.value = false
   try {
     if (editingId.value) {
       await api.updateProxmoxInstance(editingId.value, form.value)
@@ -422,28 +431,59 @@ async function save(): Promise<void> {
   }
 }
 
-async function testForm(): Promise<void> {
-  if (!form.value.api_url || !form.value.token_id || !form.value.token_secret) {
-    formMsg.value = 'Renseignez l\'URL, le token ID et le secret pour tester.'
-    formOk.value = false
-    return
+// Shared by testForm/testById: turns a ProxmoxTestResult into a single
+// human message plus its ok/warning/error tone. Console fields are only
+// meaningful when console_configured is true; console_ok only proves the
+// PVE login itself succeeded — it can't confirm the VM.Console privilege
+// without a specific guest to open a console against (see the backend's
+// TestConnection doc comment), so that caveat is spelled out rather than
+// implied by a green badge.
+function formatTestResult(result: ProxmoxTestResult): { message: string, tone: 'success' | 'warning' | 'danger' } {
+  if (!result.success) {
+    return { message: result.error || 'Échec de connexion.', tone: 'danger' }
   }
+  if (!result.console_configured) {
+    return { message: 'Connexion API réussie. Console non configurée (identifiants PVE absents).', tone: 'warning' }
+  }
+  if (result.console_ok) {
+    return { message: 'Connexion API réussie, identifiants console valides. Le rôle VM.Console sera vérifié à l\'ouverture d\'une console sur un conteneur.', tone: 'success' }
+  }
+  return { message: `Connexion API réussie, mais échec de connexion console : ${result.console_error || 'erreur inconnue'}`, tone: 'warning' }
+}
+
+async function testForm(): Promise<void> {
   testing.value = true
   formMsg.value = ''
+  formWarn.value = false
   try {
+    // Editing: test the connection as actually stored server-side, so
+    // fields left blank on purpose ("vide = inchangé") are honored instead
+    // of being sent empty and failing the test.
+    if (editingId.value) {
+      const res = await api.testProxmoxInstanceById(editingId.value)
+      const { message, tone } = formatTestResult(res.data)
+      formMsg.value = message
+      formOk.value = tone !== 'danger'
+      formWarn.value = tone === 'warning'
+      return
+    }
+    if (!form.value.api_url || !form.value.token_id || !form.value.token_secret) {
+      formMsg.value = 'Renseignez l\'URL, le token ID et le secret pour tester.'
+      formOk.value = false
+      return
+    }
     const res = await api.testProxmoxConnection({
       api_url: form.value.api_url,
       token_id: form.value.token_id,
       token_secret: form.value.token_secret,
       insecure_skip_verify: form.value.insecure_skip_verify,
+      pve_username: form.value.pve_username,
+      pve_password: form.value.pve_password,
     })
-    if (res.data.success) {
-      formMsg.value = 'Connexion réussie !'
-      formOk.value = true
-    } else {
-      formMsg.value = res.data.error || 'Échec de connexion.'
-      formOk.value = false
-    }
+    const { message, tone } = formatTestResult(res.data)
+    formMsg.value = message
+    formOk.value = tone !== 'danger'
+    formWarn.value = tone === 'warning'
   } catch (e: unknown) {
     formMsg.value = getApiErrorMessage(e, 'Erreur réseau.')
     formOk.value = false
@@ -454,15 +494,13 @@ async function testForm(): Promise<void> {
 
 async function testById(inst: ProxmoxInstance): Promise<void> {
   listMsg.value = ''
+  listWarn.value = false
   try {
     const res = await api.testProxmoxInstanceById(inst.id)
-    if (res.data.success) {
-      listMsg.value = `[${inst.name}] Connexion OK.`
-      listOk.value = true
-    } else {
-      listMsg.value = `[${inst.name}] ${res.data.error}`
-      listOk.value = false
-    }
+    const { message, tone } = formatTestResult(res.data)
+    listMsg.value = `[${inst.name}] ${message}`
+    listOk.value = tone !== 'danger'
+    listWarn.value = tone === 'warning'
   } catch (e: unknown) {
     listMsg.value = getApiErrorMessage(e, 'Erreur réseau.')
     listOk.value = false
@@ -470,6 +508,7 @@ async function testById(inst: ProxmoxInstance): Promise<void> {
 }
 
 async function pollNow(inst: ProxmoxInstance): Promise<void> {
+  listWarn.value = false
   try {
     await api.pollProxmoxNow(inst.id)
     listMsg.value = `[${inst.name}] Collecte déclenchée.`
@@ -488,6 +527,7 @@ async function remove(inst: ProxmoxInstance): Promise<void> {
     variant: 'danger',
   })
   if (!confirmed) return
+  listWarn.value = false
   try {
     await api.deleteProxmoxInstance(inst.id)
     await load()
