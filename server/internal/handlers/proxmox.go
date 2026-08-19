@@ -113,29 +113,24 @@ func (h *ProxmoxHandler) TestConnection(c *gin.Context) {
 		TokenID            string `json:"token_id" binding:"required"`
 		TokenSecret        string `json:"token_secret" binding:"required"`
 		InsecureSkipVerify bool   `json:"insecure_skip_verify"`
+		PVEUsername        string `json:"pve_username"`
+		PVEPassword        string `json:"pve_password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	if ok, errMsg := h.svc.TestConnection(req.APIURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify); !ok {
-		c.JSON(http.StatusOK, gin.H{"success": false, "error": errMsg})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	result := h.svc.TestConnection(req.APIURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify, req.PVEUsername, req.PVEPassword)
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *ProxmoxHandler) TestConnectionByID(c *gin.Context) {
-	ok, errMsg, err := h.svc.TestConnectionByID(c.Request.Context(), c.Param("id"))
+	result, err := h.svc.TestConnectionByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	if !ok {
-		c.JSON(http.StatusOK, gin.H{"success": false, "error": errMsg})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"success": true})
+	c.JSON(http.StatusOK, result)
 }
 
 // PollNow triggers an immediate poll for one connection.

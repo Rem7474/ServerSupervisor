@@ -67,9 +67,10 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}, bus))
+	proxmoxService := proxmoxsvc.NewService(db, cfg, bus)
 	wsH := ws.NewWSHandler(db, cfg, notifHub, bus, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
-	})
+	}, proxmoxService)
 	dispatcher.SetAgentPusher(wsH.GetAgentHub())
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub, bus)
 	aptH := handlers.NewAptHandler(aptsvc.NewService(db, dispatcher), db)
@@ -117,7 +118,6 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentH.AddCompletionListener(runbookH)
 	agentH.AddCompletionListener(backupH)
 
-	proxmoxService := proxmoxsvc.NewService(db, cfg, bus)
 	proxmoxH := handlers.NewProxmoxHandler(proxmoxService)
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
@@ -205,6 +205,7 @@ func registerWSRoutes(r *gin.Engine, h *ws.WSHandler, cfg *config.Config) {
 	g.GET("/network", h.Network)
 	g.GET("/apt", h.Apt)
 	g.GET("/commands/stream/:command_id", h.CommandStream)
+	g.GET("/proxmox/console/:guest_id", h.ProxmoxConsole)
 	g.GET("/notifications", h.NotificationStream)
 }
 

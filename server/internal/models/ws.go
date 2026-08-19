@@ -106,6 +106,28 @@ type WSCommandStatusUpdate struct {
 	Output    string `json:"output,omitempty"`
 }
 
+// ===== Proxmox console (GET /api/v1/ws/proxmox/console/:guest_id) =====
+// Unlike CommandStream, this endpoint is bidirectional: raw text frames sent
+// by the browser are keystrokes/paste data, forwarded byte-for-byte to the
+// PVE shell. WSConsoleResize is the one exception — a JSON control message
+// distinguished from keystroke data by unmarshaling successfully with
+// type=="resize" (an ordinary shell input essentially never does). PVE's own
+// termproxy wire framing ("0:LEN:DATA" / "1:COLS:ROWS:" / "2") is entirely an
+// implementation detail of proxmoxclient.TermSession — this endpoint never
+// speaks it to the browser.
+type WSConsoleResize struct {
+	Type string `json:"type"` // "resize"
+	Cols int    `json:"cols"`
+	Rows int    `json:"rows"`
+}
+
+// WSConsoleError is sent once, right before the connection is closed, when
+// the console session couldn't be opened (bad guest/permission/PVE error).
+type WSConsoleError struct {
+	Type  string `json:"type"` // "console_error"
+	Error string `json:"error"`
+}
+
 // ===== Browser notifications (GET /api/v1/ws/notifications) =====
 // Each push is one of the message structs below. They replace the previous
 // untyped map[string]interface{} payloads; the frontend switches on `type`.

@@ -44,7 +44,7 @@ func TestBuildIPInventory(t *testing.T) {
 		t.Fatalf("register host: %v", err)
 	}
 
-	connID, err := db.CreateProxmoxConnection(ctx, "main", "https://pve.local:8006", "user@pve!token", "secret", false, true, 30)
+	connID, err := db.CreateProxmoxConnection(ctx, "main", "https://pve.local:8006", "user@pve!token", "secret", false, true, 30, "", "")
 	if err != nil {
 		t.Fatalf("create proxmox connection: %v", err)
 	}
