@@ -105,6 +105,9 @@ func fakeTermproxyServer(t *testing.T) *httptest.Server {
 		if r.URL.Query().Get("vncticket") != "PVEVNC:TERM==" {
 			t.Errorf("vncticket = %q", r.URL.Query().Get("vncticket"))
 		}
+		if proto := r.Header.Get("Sec-WebSocket-Protocol"); proto != "binary" {
+			t.Errorf("Sec-WebSocket-Protocol = %q, want %q (PVE rejects the upgrade without it)", proto, "binary")
+		}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			t.Errorf("upgrade: %v", err)
@@ -177,5 +180,35 @@ func TestOpenLXCConsoleLoginFailure(t *testing.T) {
 	c := New(srv.URL, "user@pve!token", "secret-token", false)
 	if _, err := c.OpenLXCConsole(context.Background(), "pve1", 101, "root@pam", "wrong"); err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+// TestOpenLXCConsoleBadHandshake covers a PVE-side rejection of the
+// vncwebsocket upgrade itself (e.g. the ticket was rejected, or a required
+// header/subprotocol is missing) — this must surface the HTTP status and
+// body PVE actually returned, not just gorilla's generic "bad handshake",
+// so a misconfiguration is diagnosable from the error message alone.
+func TestOpenLXCConsoleBadHandshake(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH=="}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/termproxy", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVEVNC:TERM==","port":31000,"user":"root@pam","upid":"UPID:.."}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/vncwebsocket", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("401 Permission denied - invalid ticket"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := New(srv.URL, "user@pve!token", "secret-token", false)
+	_, err := c.OpenLXCConsole(context.Background(), "pve1", 101, "root@pam", "hunter2")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "HTTP 401") || !strings.Contains(err.Error(), "Permission denied") {
+		t.Errorf("error should surface PVE's actual status/body, got: %v", err)
 	}
 }

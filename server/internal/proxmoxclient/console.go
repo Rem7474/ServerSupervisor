@@ -166,7 +166,9 @@ func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveU
 	wsURL := fmt.Sprintf("%s/nodes/%s/lxc/%d/vncwebsocket?port=%d&vncticket=%s",
 		c.wsBaseURL(), node, vmid, port, url.QueryEscape(termTicket))
 
-	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
+	// Subprotocol "binary" mirrors what PVE's own web UI negotiates for this
+	// endpoint; PVE rejects the upgrade (bad handshake) without it.
+	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second, Subprotocols: []string{"binary"}}
 	if transport, ok := c.httpClient.Transport.(*http.Transport); ok && transport != nil {
 		dialer.TLSClientConfig = transport.TLSClientConfig
 	}
@@ -174,11 +176,16 @@ func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveU
 	header.Set("Cookie", "PVEAuthCookie="+authTicket)
 
 	conn, resp, err := dialer.DialContext(ctx, wsURL, header)
+	if err != nil {
+		if resp != nil {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("dial console websocket: %w (HTTP %d: %s)", err, resp.StatusCode, string(body))
+		}
+		return nil, fmt.Errorf("dial console websocket: %w", err)
+	}
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
-	}
-	if err != nil {
-		return nil, fmt.Errorf("dial console websocket: %w", err)
 	}
 
 	// Undocumented termproxy login handshake: "<user>:<ticket>\n" as the
