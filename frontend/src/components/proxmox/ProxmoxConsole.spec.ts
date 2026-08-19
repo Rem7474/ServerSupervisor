@@ -71,6 +71,20 @@ describe('ProxmoxConsole', () => {
     statusRef.value = 'idle'
     errorRef.value = ''
     vi.stubGlobal('ResizeObserver', FakeResizeObserver)
+    // fit() is deferred to requestAnimationFrame so a ResizeObserver
+    // notification never does layout work synchronously inside its own
+    // callback (the fix for the "ResizeObserver loop completed with
+    // undelivered notifications" crash) — run it synchronously in tests.
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback): number => {
+      cb(0)
+      return 0
+    })
+    // happy-dom does no real layout (offsetWidth/offsetHeight are always 0),
+    // but the component intentionally skips fit() on a zero-size container
+    // (fitting a hidden panel produces meaningless cols/rows) — stub a
+    // real-looking size so that guard doesn't mask fit() being called.
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 800 })
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 400 })
   })
 
   it('does not construct a Terminal while hidden', () => {
@@ -90,17 +104,30 @@ describe('ProxmoxConsole', () => {
     wrapper.unmount()
   })
 
-  it('disposes the terminal and closes the socket when hidden again', async () => {
+  it('does NOT close the socket or dispose the terminal when hidden — the session stays alive in the background', async () => {
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
     await flushPromises()
 
     await wrapper.setProps({ show: false })
 
-    expect(closeMock).toHaveBeenCalled()
-    expect(termDisposeMock).toHaveBeenCalledTimes(1)
+    expect(closeMock).not.toHaveBeenCalled()
+    expect(termDisposeMock).not.toHaveBeenCalled()
   })
 
-  it('disposes the terminal on unmount while still shown', async () => {
+  it('re-fits without recreating the terminal when shown again after being hidden', async () => {
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+    fitMock.mockClear()
+
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect(termOpenMock).toHaveBeenCalledTimes(1) // still only constructed once
+    expect(fitMock).toHaveBeenCalled()
+  })
+
+  it('disposes the terminal and closes the socket on unmount', async () => {
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
     await flushPromises()
 
@@ -110,13 +137,15 @@ describe('ProxmoxConsole', () => {
     expect(termDisposeMock).toHaveBeenCalledTimes(1)
   })
 
-  it('emits close when the close button is clicked', async () => {
+  it('emits close when the panel close button is clicked', async () => {
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
     await flushPromises()
 
-    await wrapper.find('.btn-close').trigger('click')
+    await wrapper.find('button[title="Fermer"]').trigger('click')
 
     expect(wrapper.emitted('close')).toBeTruthy()
+    // Closing (hiding) must not tear down the session.
+    expect(closeMock).not.toHaveBeenCalled()
   })
 
   it('shows a "Rouvrir" button and reconnects when the session is disconnected', async () => {

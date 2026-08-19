@@ -1,68 +1,51 @@
 <template>
-  <div v-if="show">
-    <div
-      ref="modalRef"
-      class="modal modal-blur fade show"
-      style="display: block"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="modal-dialog modal-dialog-centered modal-fullscreen">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title d-flex align-items-center gap-2 mb-0">
-              <IconTerminal2
-                :size="20"
-                class="icon"
-              />
-              Console — {{ guestName || guestId }}
-              <span :class="statusBadgeClass">{{ statusLabel }}</span>
-            </h5>
-            <div class="d-flex align-items-center gap-2">
-              <button
-                v-if="status === 'disconnected' || status === 'error'"
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                @click="connect"
-              >
-                Rouvrir
-              </button>
-              <button
-                type="button"
-                class="btn-close"
-                aria-label="Fermer"
-                @click="$emit('close')"
-              />
-            </div>
-          </div>
-          <div class="modal-body p-0 d-flex flex-column flex-fill console-term-body">
-            <div
-              v-if="status === 'error' && errorMessage"
-              class="alert alert-danger m-3 mb-0"
-            >
-              {{ errorMessage }}
-            </div>
-            <div
-              ref="containerEl"
-              class="flex-fill console-term-container"
-            />
-          </div>
-        </div>
+  <CommandLogPanel
+    mode="custom"
+    :show="show"
+    :title="`Console — ${guestName || guestId}`"
+    wrapper-class="side-panel"
+    @close="$emit('close')"
+    @open="$emit('open')"
+  >
+    <template #title-suffix>
+      <span
+        :class="statusBadgeClass"
+        class="ms-2"
+      >{{ statusLabel }}</span>
+    </template>
+    <template #header-actions>
+      <button
+        v-if="status === 'disconnected' || status === 'error'"
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        @click="connect"
+      >
+        Rouvrir
+      </button>
+    </template>
+
+    <div class="d-flex flex-column flex-fill console-term-body">
+      <div
+        v-if="status === 'error' && errorMessage"
+        class="alert alert-danger m-3 mb-0"
+      >
+        {{ errorMessage }}
       </div>
+      <div
+        ref="containerEl"
+        class="flex-fill console-term-container"
+      />
     </div>
-    <div class="modal-backdrop fade show" />
-  </div>
+  </CommandLogPanel>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { IconTerminal2 } from '@tabler/icons-vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
+import CommandLogPanel from '../host/CommandLogPanel.vue'
 import { useProxmoxConsole } from '../../composables/useProxmoxConsole'
-import { useModalChrome } from '../../composables/useModalChrome'
 import { useStatusBadge } from '../../composables/useStatusBadge'
 
 const props = withDefaults(defineProps<{
@@ -74,12 +57,10 @@ const props = withDefaults(defineProps<{
   show: false,
 })
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'close'): void
+  (e: 'open'): void
 }>()
-
-const modalRef = ref<HTMLElement | null>(null)
-useModalChrome(modalRef, () => props.show, { onClose: () => emit('close') })
 
 const containerEl = ref<HTMLElement | null>(null)
 const { status, errorMessage, open, resize, close: closeSocket } = useProxmoxConsole()
@@ -113,9 +94,31 @@ function connect(): void {
   open(props.guestId, term)
 }
 
-// Mounting xterm.js into a hidden (display:none via v-if) container yields a
+// Deferred to the next frame instead of running straight inside the
+// ResizeObserver callback: fitAddon.fit() itself changes the terminal's
+// internal canvas layout, which can trigger another observation in the same
+// synchronous pass — the classic cause of the (otherwise harmless, but this
+// app's global window 'error' handler treats ANY uncaught error as fatal —
+// see main.ts) "ResizeObserver loop completed with undelivered
+// notifications" error. Also skips entirely while the container has no
+// layout (panel hidden via CommandLogPanel's v-show — see below), since
+// fitting a zero-size box produces meaningless cols/rows.
+function scheduleFit(): void {
+  window.requestAnimationFrame(() => {
+    if (!fitAddon || !term || !containerEl.value) return
+    if (containerEl.value.offsetWidth === 0 || containerEl.value.offsetHeight === 0) return
+    fitAddon.fit()
+    resize(term.cols, term.rows)
+  })
+}
+
+// Mounting xterm.js into a hidden (display:none) container yields a
 // zero-size canvas, so the Terminal is only ever constructed once `show`
-// actually flips true and the container has real layout.
+// actually flips true the first time and the container has real layout.
+// CommandLogPanel hides with v-show afterwards (not v-if), so a later
+// close/reopen just toggles visibility — the session stays connected in the
+// background exactly like every other console panel in the app, instead of
+// being torn down and losing the shell on every close.
 async function mountTerminal(): Promise<void> {
   await nextTick()
   if (!containerEl.value || term) return
@@ -129,15 +132,11 @@ async function mountTerminal(): Promise<void> {
   fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
   term.open(containerEl.value)
-  fitAddon.fit()
+  scheduleFit()
 
   connect()
 
-  resizeObserver = new ResizeObserver(() => {
-    if (!fitAddon || !term) return
-    fitAddon.fit()
-    resize(term.cols, term.rows)
-  })
+  resizeObserver = new ResizeObserver(scheduleFit)
   resizeObserver.observe(containerEl.value)
 }
 
@@ -151,11 +150,8 @@ function teardownTerminal(): void {
 }
 
 watch(() => props.show, (visible) => {
-  if (visible) {
-    void mountTerminal()
-  } else {
-    teardownTerminal()
-  }
+  if (visible && !term) void mountTerminal()
+  else if (visible) scheduleFit() // re-fit: the container may have been resized while hidden
 }, { immediate: true })
 
 onBeforeUnmount(() => {
@@ -166,12 +162,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .console-term-body {
   min-height: 0;
+  height: 100%;
 }
 
 .console-term-container {
   min-height: 0;
   padding: 0.5rem;
   background: var(--ss-panel-solid-darker);
+  border-radius: 0 0 0.5rem 0.5rem;
 }
 
 .console-term-container :deep(.xterm) {
