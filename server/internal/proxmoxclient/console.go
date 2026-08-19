@@ -56,6 +56,13 @@ func (c *Client) login(username, password string) (pveLogin, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
+	// reqURL is built from c.baseURL, the admin-configured Proxmox
+	// connection URL (proxmox_connections.api_url) — not attacker-controlled
+	// request data. Every other Client method in this package (see
+	// client.go) makes the same trust-boundary call against this identical
+	// baseURL and carries the same accepted, still-open alert (#130); this
+	// mirrors that existing posture rather than introducing a new one.
+	// codeql[go/request-forgery]: baseURL is admin-configured, not attacker input — see client.go's identical, already-accepted pattern
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return pveLogin{}, fmt.Errorf("request: %w", err)
