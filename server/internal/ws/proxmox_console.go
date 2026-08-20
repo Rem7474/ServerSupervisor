@@ -93,7 +93,15 @@ func (h *WSHandler) ProxmoxConsole(c *gin.Context) {
 		})
 	}
 
-	// PVE -> browser: raw PTY output, passed straight through as text frames.
+	// PVE -> browser: raw PTY output, passed straight through as binary
+	// frames. This must not be a text frame: PTY output is arbitrary bytes,
+	// not guaranteed valid UTF-8 (binary command output, or a multi-byte
+	// UTF-8 character split across two reads), and a browser is required by
+	// the WebSocket spec to fail the connection on an invalid-UTF-8 text
+	// frame — xterm.js's own guidance is binary frames for exactly this
+	// reason. The frontend writes these bytes straight into xterm.js as a
+	// Uint8Array, which has its own incremental UTF-8 decoder that handles a
+	// split character correctly across writes (see useProxmoxConsole.ts).
 	safego.Go(ctx, "ws.proxmoxConsole.pveToBrowser", func() {
 		defer closeAll()
 		for {
@@ -101,7 +109,7 @@ func (h *WSHandler) ProxmoxConsole(c *gin.Context) {
 			if err != nil {
 				return
 			}
-			if err := safeWriteMessage(conn, websocket.TextMessage, out); err != nil {
+			if err := safeWriteMessage(conn, websocket.BinaryMessage, out); err != nil {
 				return
 			}
 		}

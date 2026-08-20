@@ -4,13 +4,14 @@ import { ref } from 'vue'
 
 const {
   getProxmoxGuests, getProxmoxGuestLink, getProxmoxGuestMetrics,
-  getProxmoxNodes, getProxmoxNodeGuestNetworks,
+  getProxmoxNodes, getProxmoxNodeGuestNetworks, getProxmoxInstance,
 } = vi.hoisted(() => ({
   getProxmoxGuests: vi.fn(),
   getProxmoxGuestLink: vi.fn(),
   getProxmoxGuestMetrics: vi.fn(),
   getProxmoxNodes: vi.fn(),
   getProxmoxNodeGuestNetworks: vi.fn(),
+  getProxmoxInstance: vi.fn(),
 }))
 
 let routeQuery: Record<string, string> = {}
@@ -22,7 +23,7 @@ vi.mock('vue-router', () => ({
 vi.mock('../api', () => ({
   default: {
     getProxmoxGuests, getProxmoxGuestLink, getProxmoxGuestMetrics,
-    getProxmoxNodes, getProxmoxNodeGuestNetworks,
+    getProxmoxNodes, getProxmoxNodeGuestNetworks, getProxmoxInstance,
   },
   getApiErrorMessage: (e: unknown) => String(e),
   isApiAbort: () => false,
@@ -65,6 +66,7 @@ beforeEach(() => {
   getProxmoxGuestLink.mockResolvedValue({ data: null })
   getProxmoxGuestMetrics.mockResolvedValue({ data: [] })
   getProxmoxNodeGuestNetworks.mockResolvedValue({ data: { 101: [{ name: 'eth0', ips: ['10.0.0.5'] }] } })
+  getProxmoxInstance.mockResolvedValue({ data: { console_configured: true } })
 })
 
 describe('useProxmoxGuest — guest network IPs without a ?nodeId= query param', () => {
@@ -107,5 +109,28 @@ describe('useProxmoxGuest — guest network IPs without a ?nodeId= query param',
     expect(getProxmoxNodeGuestNetworks).not.toHaveBeenCalled()
     expect(api.guestNetworks.value).toEqual([])
     expect(api.nodeId.value).toBe('')
+  })
+})
+
+describe('useProxmoxGuest — console configuration check', () => {
+  it('looks up console_configured on the guest\'s own connection once loaded', async () => {
+    getProxmoxInstance.mockResolvedValue({ data: { console_configured: false } })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(getProxmoxInstance).toHaveBeenCalledWith('conn-1')
+    expect(api.consoleConfigured.value).toBe(false)
+    expect(api.consoleButtonTitle.value).toContain('non configurée')
+  })
+
+  it('fails open (null) when the console check itself errors, without blocking the button', async () => {
+    getProxmoxInstance.mockRejectedValue(new Error('network error'))
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(api.consoleConfigured.value).toBeNull()
+    expect(api.consoleButtonTitle.value).toBe('Ouvrir une console interactive')
   })
 })

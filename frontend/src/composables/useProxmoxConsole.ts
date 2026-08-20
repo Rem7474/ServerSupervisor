@@ -68,6 +68,12 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     errorMessage.value = ''
 
     const socket = new WebSocket(createConsoleUrl(guestId))
+    // PTY output arrives as binary frames (see ws.ProxmoxConsole's doc
+    // comment) — arraybuffer lets us hand xterm.js a Uint8Array directly,
+    // whose own parser correctly buffers a multi-byte UTF-8 character split
+    // across two frames instead of corrupting it the way per-message
+    // string decoding would.
+    socket.binaryType = 'arraybuffer'
     ws = socket
 
     dataDisposable = term.onData((data: string) => {
@@ -81,22 +87,29 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
 
     socket.onmessage = (event: MessageEvent): void => {
       if (ws !== socket) return
+
+      // Raw PTY output — the server always sends this as a binary frame
+      // (see ws.ProxmoxConsole). xterm.js's Uint8Array overload of write()
+      // decodes UTF-8 incrementally across calls, unlike treating each
+      // message as an independent JS string.
+      if (event.data instanceof ArrayBuffer) {
+        term.write(new Uint8Array(event.data))
+        return
+      }
       if (typeof event.data !== 'string') return
 
-      // A console_error is only ever sent once, immediately before the
-      // server closes the connection (see ws.ProxmoxConsole) — real shell
-      // output essentially never happens to parse as this exact shape.
+      // Anything else is a text control frame — currently only
+      // console_error, sent once immediately before the server closes the
+      // connection.
       try {
         const parsed: unknown = JSON.parse(event.data)
         if (isConsoleError(parsed)) {
           status.value = 'error'
           errorMessage.value = parsed.error
-          return
         }
       } catch {
-        // Not JSON: ordinary PTY output, fall through to write it.
+        // Not a recognized control message: ignore.
       }
-      term.write(event.data)
     }
 
     socket.onerror = (): void => {

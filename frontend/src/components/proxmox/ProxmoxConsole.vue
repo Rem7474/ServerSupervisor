@@ -17,7 +17,7 @@
       <button
         v-if="status !== 'connecting' && status !== 'connected'"
         type="button"
-        class="btn btn-sm btn-outline-secondary"
+        class="btn btn-sm btn-ghost-secondary"
         @click="connect"
       >
         Rouvrir

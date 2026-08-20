@@ -357,7 +357,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { IconAlertTriangle, IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
@@ -369,7 +369,6 @@ import { useAuthStore } from '../stores/auth'
 import { useProxmoxGuest, type ApexChartInstance } from '../composables/useProxmoxGuest'
 import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses'
 import { getMetricColorClass } from '../utils/metricColor'
-import api from '../api'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -397,6 +396,8 @@ const {
   linkMsgOk,
   confirmLink,
   ignoreLink,
+  consoleConfigured,
+  consoleButtonTitle,
 } = useProxmoxGuest(chartRef)
 
 const showNetworkDetail = ref(false)
@@ -414,27 +415,6 @@ function openConsole(): void {
   hasOpenedConsole.value = true
   showConsole.value = true
 }
-
-// null = not checked yet (or the check itself failed — fail open, don't
-// block the button on a fetch error). Only meaningful for lxc guests; PVE
-// console credentials live on the guest's Proxmox connection, not the guest
-// itself, so this needs a separate lookup — see the "Console" button's
-// warning icon and title.
-const consoleConfigured = ref<boolean | null>(null)
-
-watch(guest, (g) => {
-  consoleConfigured.value = null
-  if (!g || g.guest_type !== 'lxc') return
-  api.getProxmoxInstance(g.connection_id)
-    .then((res) => { consoleConfigured.value = res.data.console_configured })
-    .catch(() => { consoleConfigured.value = null })
-}, { immediate: true })
-
-const consoleButtonTitle = computed(() => {
-  if (!guest.value || guest.value.guest_type !== 'lxc') return 'VM QEMU : bientôt disponible'
-  if (consoleConfigured.value === false) return 'Console PVE non configurée pour cette connexion (Paramètres → Proxmox VE)'
-  return 'Ouvrir une console interactive'
-})
 
 // Guests linked to a ServerSupervisor host already get their domain/IP
 // correlation for free from that host's own Exposition tab (same IP, same

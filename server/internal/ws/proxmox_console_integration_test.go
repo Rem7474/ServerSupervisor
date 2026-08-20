@@ -146,12 +146,18 @@ func TestProxmoxConsole_RelaysBytesAndResize(t *testing.T) {
 		t.Fatalf("write keystrokes: %v", err)
 	}
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	_, out, err := conn.ReadMessage()
+	msgType, out, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("read echo: %v", err)
 	}
 	if string(out) != "echo:ls\n" {
 		t.Errorf("echoed output = %q, want %q", out, "echo:ls\n")
+	}
+	// PVE output must relay as a binary frame, not text: PTY bytes aren't
+	// guaranteed valid UTF-8, and a real browser fails the connection on an
+	// invalid-UTF-8 text frame (see ws.ProxmoxConsole's doc comment).
+	if msgType != websocket.BinaryMessage {
+		t.Errorf("echoed message type = %d, want BinaryMessage (%d)", msgType, websocket.BinaryMessage)
 	}
 
 	resize, _ := json.Marshal(models.WSConsoleResize{Type: "resize", Cols: 120, Rows: 40})
@@ -159,12 +165,15 @@ func TestProxmoxConsole_RelaysBytesAndResize(t *testing.T) {
 		t.Fatalf("write resize: %v", err)
 	}
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	_, out, err = conn.ReadMessage()
+	msgType, out, err = conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("read resize ack: %v", err)
 	}
 	if string(out) != "resized:120:40:" {
 		t.Errorf("resize forwarded = %q, want %q", out, "resized:120:40:")
+	}
+	if msgType != websocket.BinaryMessage {
+		t.Errorf("resize-ack message type = %d, want BinaryMessage (%d)", msgType, websocket.BinaryMessage)
 	}
 
 	logs, err := h.db.GetAuditLogs(context.Background(), 10, 0, database.AuditLogFilter{})
