@@ -8,7 +8,8 @@ import (
 )
 
 // CreateProxmoxConnection inserts a new connection and returns its ID.
-func (db *DB) CreateProxmoxConnection(ctx context.Context, name, apiURL, tokenID, tokenSecret string, insecureSkipVerify, enabled bool, pollIntervalSec int, pveUsername, pvePassword string) (string, error) {
+func (db *DB) CreateProxmoxConnection(ctx context.Context, req models.ProxmoxConnectionRequest) (string, error) {
+	pollIntervalSec := req.PollIntervalSec
 	if pollIntervalSec <= 0 {
 		pollIntervalSec = 60
 	}
@@ -17,7 +18,7 @@ func (db *DB) CreateProxmoxConnection(ctx context.Context, name, apiURL, tokenID
 		INSERT INTO proxmox_connections (name, api_url, token_id, token_secret, insecure_skip_verify, enabled, poll_interval_sec, pve_username, pve_password)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id`,
-		name, apiURL, tokenID, tokenSecret, insecureSkipVerify, enabled, pollIntervalSec, pveUsername, pvePassword,
+		req.Name, req.APIURL, req.TokenID, req.TokenSecret, req.InsecureSkipVerify, req.Enabled, pollIntervalSec, req.PVEUsername, req.PVEPassword,
 	).Scan(&id)
 	return id, err
 }
@@ -151,14 +152,18 @@ func (db *DB) GetEnabledProxmoxConnections(ctx context.Context) ([]ProxmoxConnec
 }
 
 // UpdateProxmoxConnection updates mutable fields.
-// If tokenSecret is empty the existing token secret is preserved; same for
-// pvePassword and the console credentials.
-func (db *DB) UpdateProxmoxConnection(ctx context.Context, id, name, apiURL, tokenID, tokenSecret string, insecureSkipVerify, enabled bool, pollIntervalSec int, pveUsername, pvePassword string) error {
+// If req.TokenSecret is empty the existing token secret is preserved; same
+// for req.PVEPassword and the console credentials.
+func (db *DB) UpdateProxmoxConnection(ctx context.Context, id string, req models.ProxmoxConnectionRequest) error {
+	pollIntervalSec := req.PollIntervalSec
 	if pollIntervalSec <= 0 {
 		pollIntervalSec = 60
 	}
-	if pvePassword == "" {
-		if tokenSecret == "" {
+	name, apiURL, tokenID := req.Name, req.APIURL, req.TokenID
+	insecureSkipVerify, enabled := req.InsecureSkipVerify, req.Enabled
+	pveUsername := req.PVEUsername
+	if req.PVEPassword == "" {
+		if req.TokenSecret == "" {
 			_, err := db.conn.ExecContext(ctx, `
 				UPDATE proxmox_connections
 				SET name=$2, api_url=$3, token_id=$4,
@@ -172,16 +177,16 @@ func (db *DB) UpdateProxmoxConnection(ctx context.Context, id, name, apiURL, tok
 			SET name=$2, api_url=$3, token_id=$4, token_secret=$5,
 			    insecure_skip_verify=$6, enabled=$7, poll_interval_sec=$8, pve_username=$9, updated_at=NOW()
 			WHERE id=$1`,
-			id, name, apiURL, tokenID, tokenSecret, insecureSkipVerify, enabled, pollIntervalSec, pveUsername)
+			id, name, apiURL, tokenID, req.TokenSecret, insecureSkipVerify, enabled, pollIntervalSec, pveUsername)
 		return err
 	}
-	if tokenSecret == "" {
+	if req.TokenSecret == "" {
 		_, err := db.conn.ExecContext(ctx, `
 			UPDATE proxmox_connections
 			SET name=$2, api_url=$3, token_id=$4,
 			    insecure_skip_verify=$5, enabled=$6, poll_interval_sec=$7, pve_username=$8, pve_password=$9, updated_at=NOW()
 			WHERE id=$1`,
-			id, name, apiURL, tokenID, insecureSkipVerify, enabled, pollIntervalSec, pveUsername, pvePassword)
+			id, name, apiURL, tokenID, insecureSkipVerify, enabled, pollIntervalSec, pveUsername, req.PVEPassword)
 		return err
 	}
 	_, err := db.conn.ExecContext(ctx, `
@@ -189,7 +194,7 @@ func (db *DB) UpdateProxmoxConnection(ctx context.Context, id, name, apiURL, tok
 		SET name=$2, api_url=$3, token_id=$4, token_secret=$5,
 		    insecure_skip_verify=$6, enabled=$7, poll_interval_sec=$8, pve_username=$9, pve_password=$10, updated_at=NOW()
 		WHERE id=$1`,
-		id, name, apiURL, tokenID, tokenSecret, insecureSkipVerify, enabled, pollIntervalSec, pveUsername, pvePassword)
+		id, name, apiURL, tokenID, req.TokenSecret, insecureSkipVerify, enabled, pollIntervalSec, pveUsername, req.PVEPassword)
 	return err
 }
 

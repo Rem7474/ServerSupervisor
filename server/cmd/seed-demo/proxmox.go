@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/models"
 )
 
 const demoProxmoxConnName = "Demo - Cluster PVE"
@@ -30,9 +31,11 @@ func seedProxmox(ctx context.Context, db *database.DB) error {
 	if connID == "" {
 		// enabled=false: dummy connection, never polled even if the DEMO_MODE
 		// poller gate in main.go is ever removed (defense in depth).
-		connID, err = db.CreateProxmoxConnection(ctx, demoProxmoxConnName,
-			"https://pve-demo.example.com:8006", "demo@pve!seed", "demo-token-secret-not-real",
-			true, false, 60, "", "")
+		connID, err = db.CreateProxmoxConnection(ctx, models.ProxmoxConnectionRequest{
+			Name: demoProxmoxConnName, APIURL: "https://pve-demo.example.com:8006",
+			TokenID: "demo@pve!seed", TokenSecret: "demo-token-secret-not-real",
+			InsecureSkipVerify: true, Enabled: false, PollIntervalSec: 60,
+		})
 		if err != nil {
 			return err
 		}

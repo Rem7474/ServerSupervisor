@@ -90,8 +90,11 @@ func setupConsoleTestHandler(t *testing.T) (h *WSHandler, guestID string) {
 	t.Cleanup(pve.Close)
 
 	ctx := context.Background()
-	connID, err := db.CreateProxmoxConnection(ctx, "test", pve.URL, "user@pve!token", "secret",
-		false, true, 60, "root@pam", "hunter2")
+	connID, err := db.CreateProxmoxConnection(ctx, models.ProxmoxConnectionRequest{
+		Name: "test", APIURL: pve.URL, TokenID: "user@pve!token", TokenSecret: "secret",
+		InsecureSkipVerify: false, Enabled: true, PollIntervalSec: 60,
+		PVEUsername: "root@pam", PVEPassword: "hunter2",
+	})
 	if err != nil {
 		t.Fatalf("create connection: %v", err)
 	}
