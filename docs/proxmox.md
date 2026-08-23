@@ -6,6 +6,10 @@ via son API REST — **sans agent installé sur l'hyperviseur**. La collecte
 (nœuds, VMs, LXC, stockage, disques, tâches, sauvegardes) se fait entièrement
 par polling HTTP authentifié par token API.
 
+Une seule fonctionnalité échappe à ce modèle : la **console interactive LXC**
+([§8](#8-console-interactive-lxc)), pour laquelle l'API Proxmox n'accepte pas
+l'authentification par token et exige un vrai compte utilisateur PVE.
+
 ---
 
 ## 1. Prérequis côté Proxmox : créer un token API
@@ -33,6 +37,29 @@ Copiez le `token ID` affiché (ex : `supervision@pve!monitoring`) et le
 > ```
 > C'est la cause la plus fréquente d'un token qui s'authentifie mais dont
 > tous les appels renvoient une erreur de permission.
+
+### Identifiants console PVE (optionnel, pour la console LXC)
+
+Le token API ne suffit **pas** pour ouvrir une console interactive sur un
+conteneur : l'endpoint d'upgrade WebSocket de Proxmox (`vncwebsocket`,
+partagé par termproxy et VNC) refuse l'authentification `PVEAPIToken` et
+n'accepte qu'un ticket utilisateur. Si vous voulez la console
+([§8](#8-console-interactive-lxc)), il faut donc fournir en plus un couple
+**utilisateur PVE + mot de passe** ayant le privilège `VM.Console` :
+
+```bash
+# Option 1 : réutiliser le compte de supervision créé plus haut
+pveum role modify SSAuditor -privs "Datastore.Audit Sys.Audit VM.Audit VM.Console"
+pveum passwd supervision@pve      # le compte doit avoir un mot de passe utilisable
+```
+
+Le privilège s'assigne ici à **l'utilisateur**, pas au token — c'est
+l'utilisateur qui ouvre la session console. Un compte `root@pam` fonctionne
+aussi, mais lui donne évidemment bien plus que `VM.Console`.
+
+Ces identifiants sont facultatifs : sans eux, toute la collecte et toutes les
+autres actions fonctionnent normalement, seul le bouton **Console** reste
+indisponible.
 
 ### Étendre les droits pour les actions en écriture (optionnel)
 
@@ -64,6 +91,15 @@ Dans **Réglages** → carte **Proxmox VE** → **Ajouter une connexion** :
 | Intervalle de collecte (s) | Défaut `60`, minimum `10` |
 | Ignorer TLS (self-signed) | À cocher uniquement si le certificat de l'API Proxmox est auto-signé |
 | Activé | Décoché = connexion conservée en base mais jamais pollée |
+| Utilisateur PVE | *Optionnel* — uniquement pour la console LXC (ex : `supervision@pve`, `root@pam`). Voir [§1](#identifiants-console-pve-optionnel-pour-la-console-lxc) |
+| Mot de passe PVE | *Optionnel* — idem (masqué après création — laisser vide en édition = inchangé, même règle que le token secret) |
+
+La colonne **Console** de la liste des connexions indique si ces identifiants
+sont renseignés. **Tester la connexion** vérifie les deux couches séparément et
+le dit explicitement : « Console non configurée », « identifiants console
+valides », ou l'erreur de login PVE rencontrée. Le test ne peut pas confirmer
+le privilège `VM.Console` lui-même — il n'est vérifiable qu'à l'ouverture
+d'une console sur un conteneur précis.
 
 Cliquez **Tester la connexion** (utilise directement les champs du
 formulaire, sans rien sauvegarder) avant de cliquer **Créer**. Chaque
@@ -126,8 +162,10 @@ renvoie une erreur de permission que ServerSupervisor remonte telle quelle.
 
 ## 6. Actions en écriture : posture de permissions
 
-Toutes les actions ci-dessous nécessitent `Sys.Modify` **sur le token PVE**.
-Ce qui diffère, c'est le contrôle **côté ServerSupervisor** :
+Les quatre premières actions ci-dessous nécessitent `Sys.Modify` **sur le
+token PVE** ; la console est le cas à part (pas de token du tout, un compte
+utilisateur PVE avec `VM.Console` — voir [§8](#8-console-interactive-lxc)).
+Ce qui diffère ensuite, c'est le contrôle **côté ServerSupervisor** :
 
 | Action | Endpoint | Qui peut l'utiliser côté ServerSupervisor |
 |---|---|---|
@@ -135,23 +173,81 @@ Ce qui diffère, c'est le contrôle **côté ServerSupervisor** :
 | Migrer un guest | `POST /proxmox/nodes/:id/guests/:vmid/migrate` | N'importe quel utilisateur authentifié — idem |
 | Service systemd du nœud (start/stop/restart/reload) | `POST /proxmox/nodes/:id/services/:service/:action` | N'importe quel utilisateur authentifié — idem |
 | Démarrer / arrêter (ACPI) / redémarrer un guest | `POST /proxmox/guests/:id/action` | **Admin uniquement**, en plus du token — cette action peut couper une VM en cours d'exécution directement, un blast radius jugé suffisant pour justifier un deuxième verrou applicatif |
+| Ouvrir une console LXC | `GET /ws/proxmox/console/:guest_id` (WebSocket) | **Admin uniquement** — même posture que l'action guest ci-dessus, un shell interactif ayant au moins le même blast radius. Ne dépend pas de `Sys.Modify` mais du privilège `VM.Console` du compte PVE |
 
 C'est un choix délibéré, pas un oubli : les trois premières actions
 supposent que si vous avez donné `Sys.Modify` à ce token, vous acceptez que
 tout compte authentifié de l'app puisse s'en servir. L'arrêt/redémarrage de
-guest est le seul cas où ServerSupervisor ajoute son propre contrôle
-d'accès par-dessus celui de Proxmox. Notez aussi que l'arrêt "dur"
-(power-off immédiat, sans ACPI) est volontairement absent des actions
-proposées — seuls `start` / `shutdown` (ACPI) / `reboot` le sont.
+guest et l'ouverture de console sont les deux seuls cas où ServerSupervisor
+ajoute son propre contrôle d'accès par-dessus celui de Proxmox. Notez aussi
+que l'arrêt "dur" (power-off immédiat, sans ACPI) est volontairement absent
+des actions proposées — seuls `start` / `shutdown` (ACPI) / `reboot` le sont.
+
+L'ouverture d'une console est par ailleurs la **seule** action Proxmox qui
+écrit une ligne dans `audit_logs` (action `proxmox_console_open`, avec
+l'utilisateur, l'IP et le guest visé). Les autres actions en écriture
+(`GuestAction` / migration / service de nœud / `apt-refresh`) ne sont pas
+auditées à ce jour — ne le déduisez pas de la présence de cette ligne.
 
 ## 7. Sécurité
 
 - `token_secret` est stocké en base et **jamais renvoyé au frontend**, y
   compris pour un admin qui rouvre le formulaire d'édition (le champ reste
   vide ; laisser vide = ne pas changer le secret existant)
+- `pve_password` (identifiant console, [§1](#identifiants-console-pve-optionnel-pour-la-console-lxc))
+  suit la même règle : jamais renvoyé au frontend, qui ne reçoit qu'un
+  booléen « console configurée ». Il est en revanche stocké **en clair** en
+  base, comme `token_secret` — ServerSupervisor n'a pas de coffre applicatif,
+  la protection repose entièrement sur l'accès à PostgreSQL. Donnez à ce
+  compte le strict `VM.Console` plutôt que de réutiliser `root@pam` si votre
+  posture le demande
 - `insecure_skip_verify` (ignorer les erreurs TLS) est **désactivé par
   défaut** — à n'activer que pour un certificat auto-signé connu, jamais en
   routine
+- Aucune session console n'est persistée : le relais est un simple tuyau
+  bidirectionnel, fermer le panneau termine le shell distant côté PVE
+
+## 8. Console interactive LXC
+
+Un shell interactif dans un conteneur LXC, directement depuis la fiche guest
+(`/proxmox/guests/:id`, bouton **Console**), sans passer par l'interface web
+de Proxmox ni par SSH.
+
+### Portée
+
+- **Conteneurs LXC uniquement.** Le bouton est grisé sur une VM QEMU
+  (« VM QEMU : bientôt disponible ») : QEMU expose du VNC/RFB, un protocole
+  entièrement différent de `termproxy`, non couvert par cette V1.
+- **Admin uniquement**, et uniquement si les identifiants console PVE sont
+  renseignés sur la connexion ([§1](#identifiants-console-pve-optionnel-pour-la-console-lxc)).
+  Un triangle d'avertissement s'affiche à côté du bouton quand ils manquent.
+
+### Fonctionnement
+
+Le navigateur ouvre un WebSocket vers ServerSupervisor
+(`GET /api/v1/ws/proxmox/console/:guest_id`), qui relaie vers `termproxy` sur
+le nœud PVE. **Aucun ticket PVE n'est jamais exposé au navigateur** : le
+serveur obtient lui-même un `PVEAuthCookie` via `POST /access/ticket` juste
+avant d'ouvrir la socket, avec les identifiants de la connexion.
+
+- Pas de reconnexion automatique : une session interrompue ne se rebranche
+  jamais toute seule (un shell qui se rebranche silencieusement au milieu
+  d'une commande serait pire que l'inverse). Un bouton **Rouvrir** ouvre une
+  session neuve.
+- Fermer le panneau (**✕**) termine réellement le shell distant, il ne se
+  contente pas de masquer l'affichage. Le tampon d'écran reste visible à la
+  réouverture, mais avec un nouveau shell dessous — même comportement que la
+  console web de Proxmox.
+- Le redimensionnement de la fenêtre est propagé au PTY distant.
+- L'ouverture est tracée dans `audit_logs` (`proxmox_console_open`).
+
+### Sur mobile
+
+Le panneau passe en plein écran et une barre de touches apparaît sous le
+terminal (`Ctrl`, `^C`, `Échap`, `Tab`, flèches) : un clavier virtuel ne
+produit aucune de ces touches, sans quoi il serait impossible d'interrompre
+une commande ou d'utiliser la complétion. `Ctrl` est un modificateur collant,
+appliqué au caractère tapé juste après.
 
 ## Dépannage
 
@@ -164,6 +260,10 @@ proposées — seuls `start` / `shutdown` (ACPI) / `reboot` le sont.
 | Démarrer/arrêter/redémarrer une VM ou un LXC renvoie 403 alors que le token a `Sys.Modify` | Cette action est admin-only côté ServerSupervisor en plus du token (voir [§6](#6-actions-en-écriture--posture-de-permissions)) — vérifiez le rôle du compte connecté, pas seulement le token PVE |
 | Pas de courbe Température CPU / RPM Ventilateurs sur un nœud | Aucune source capteurs configurée (voir [§4](#source-capteurs-nœud-température--ventilateurs)) — l'API Proxmox seule n'expose pas ces valeurs de façon fiable |
 | Disques physiques ou usure SSD absents d'un nœud | Le rôle du token n'inclut pas `Sys.Audit`, ou le nœud n'expose pas encore de données S.M.A.R.T. au moment du poll |
+| Bouton **Console** grisé sur une VM | Normal : la V1 ne couvre que les conteneurs LXC (voir [§8](#8-console-interactive-lxc)) |
+| Bouton **Console** actif mais triangle d'avertissement à côté | Identifiants console PVE absents sur cette connexion — Paramètres → Proxmox VE (voir [§1](#identifiants-console-pve-optionnel-pour-la-console-lxc)) |
+| La console renvoie « admin only » | L'ouverture de console est admin-only côté ServerSupervisor, indépendamment des droits PVE (voir [§6](#6-actions-en-écriture--posture-de-permissions)) |
+| La console se connecte puis se ferme immédiatement | Le compte PVE s'authentifie mais n'a pas `VM.Console` sur ce conteneur — **Tester la connexion** ne peut pas le détecter, il ne valide que le login |
 | Sauvegardes : "Dernier résultat par VM" vide alors que des vzdump tournent | Aucune tâche vzdump n'a encore été vue par un cycle de poll depuis la création de la connexion — le résultat est dérivé des tâches PVE, pas d'une lecture directe du planning de sauvegarde |
 
 ## Pour aller plus loin

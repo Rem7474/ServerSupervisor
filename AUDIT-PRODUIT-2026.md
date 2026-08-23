@@ -36,7 +36,7 @@ C'est le choix structurant à trancher avant d'investir davantage : rester un ou
 (bien plus de valeur long terme, bien plus de complexité).
 
 Les manques les plus limitants pour un usage NOC/ops sérieux au quotidien : pas de canal
-Slack/Teams/Discord/webhook générique, pas de tagging d'hôtes. Quatre items listés ici à
+Slack/Teams/Discord/webhook générique, pas de groupes d'hôtes dérivés des tags. Quatre items listés ici à
 l'origine sont depuis **corrigés** : la faille RBAC sur la création/modification de tâches
 planifiées (voir [ROADMAP.md](ROADMAP.md) item #1 et
 [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)),
@@ -50,7 +50,7 @@ ouvert de ce même hôte et n'envoie pas sa propre notification tant que celui-c
 coup — pas un moteur de corrélation général entre alertes par ailleurs indépendantes).
 
 **Recommandation directrice** : ne pas refondre. Fermer d'abord les trous d'exploitabilité
-restants (tagging, canal webhook générique) avant d'élargir encore la couverture de
+restants (groupes d'hôtes, canal webhook générique) avant d'élargir encore la couverture de
 check (SNMP, plugins — ICMP est fait, item #8). Trancher
 explicitement l'ambition « moteur de check extensible » avant de la communiquer — c'est la
 seule décision qui change l'ordre de grandeur de l'effort à venir.
@@ -63,7 +63,7 @@ seule décision qui change l'ordre de grandeur de l'effort à venir.
 |---|---|---|---|---|---|
 | **Supervision système** | Agent Go : CPU/RAM/disque/réseau/uptime, Docker, APT+CVE, S.M.A.R.T., température, systemd, journal, processus. Protocole agent↔serveur verrouillé par test contractuel golden-fixture (`protocol/`). | Forte — cœur du produit | Élevée | Pas de checks custom pluggables (seulement exécution de scripts allowlistés via `tasks.yaml`, pas de métriques/seuils arbitraires) ; agent Linux uniquement (hypothèse — aucune mention Windows/macOS trouvée dans le code) | Rien de majeur, module le plus mûr |
 | **Supervision réseau** | Topologie Docker (liens réseau, overrides manuels), sondes HTTP/TCP/ICMP (ROADMAP.md item #8) | Topologie Docker = différenciant réel | Moyenne | Pas de SNMP, pas de cartographie réseau physique L2/L3 | — |
-| **Inventaire / découverte** | Ajout d'hôte manuel (wizard), auto-import Proxmox (guests) et NPM (proxy hosts), scan de sous-réseau IPv4 par ping ICMP (`/24` à `/30`, ROADMAP.md item #12) avec ajout en masse des adresses trouvées | Onboarding correct à petite/moyenne échelle | Moyenne | Découverte limitée à un ping-sweep (pas d'ARP, pas de scan de ports, pas de fingerprinting) ; pas de tagging d'hôtes trouvé dans le modèle de données | Devient un frein au-delà de ~50 hôtes sans tagging/groupes |
+| **Inventaire / découverte** | Ajout d'hôte manuel (wizard), auto-import Proxmox (guests) et NPM (proxy hosts), scan de sous-réseau IPv4 par ping ICMP (`/24` à `/30`, ROADMAP.md item #12) avec ajout en masse des adresses trouvées | Onboarding correct à petite/moyenne échelle | Moyenne | Découverte limitée à un ping-sweep (pas d'ARP, pas de scan de ports, pas de fingerprinting) ; `hosts.tags` existe et sert au filtrage, mais rien ne dérive de groupe à partir d'un tag | Devient un frein au-delà de ~50 hôtes sans groupes dynamiques |
 | **Alertes / notifications** | Moteur avec hystérésis warn/crit + seuils de clear, cooldown, 3 sources (`agent`/`proxmox`/`synthetic`), déclenchement de commande (`command_trigger`), fenêtres de maintenance (`internal/services/maintenance`), acquittement + escalade d'incident (`AcknowledgeIncident`, `AlertActions.EscalateAfterMinutes`), corrélation host-down → cascade Docker/Proxmox (`alert_incidents.correlated_with`). Canaux : SMTP, ntfy, push navigateur, in-app. | Cœur différenciant, anti-flapping déjà pensé | Élevée sur le moteur, faible sur l'écosystème de canaux | Pas de Slack/Teams/Discord/webhook générique | Clarifier la vraie liste de canaux (le « webhook » évoqué en prose README recouvre en fait ntfy) |
 | **Dashboards** | Dashboard fleet temps réel (KPIs, statuts, drift versions Docker, résumé Proxmox), WS-driven | Bon point d'entrée quotidien | Élevée | Pas de dashboard personnalisable, pas de vue « santé globale » agrégée type SLA | — |
 | **Logs / événements** | Journalctl streamé par hôte, historique de commandes, web logs (trafic + menaces) avec corrélation CrowdSec | Bon niveau debug ad hoc, web logs très travaillés | Moyenne-élevée sur le web, faible sur logs applicatifs génériques | Pas de recherche full-text cross-host sur les logs système | — |
@@ -112,7 +112,7 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 | Planification / scheduler | Deux mécanismes cohérents : `poller.Every` (pollers génériques) + `scheduler.TaskScheduler` (cron) | Réutilisable tel quel pour de futurs checks actifs | Ne pas fusionner artificiellement les deux |
 | Stockage des états | Postgres/TimescaleDB, pas de cache | — | Pas de Redis prématuré |
 | Historisation | Bonne (politiques de rétention) | Manque exports/rapports | — |
-| Gestion des règles | Moteur d'alertes correct (hystérésis, cooldown), templates réutilisables cross-host (`alert_rule_templates`, ROADMAP.md item #9) | Pas encore de règles par tag (dépend du tagging d'hôtes, item #7, non démarré) | — |
+| Gestion des règles | Moteur d'alertes correct (hystérésis, cooldown), templates réutilisables cross-host (`alert_rule_templates`, ROADMAP.md item #9) | Pas encore de règles par tag : les tags existent (`hosts.tags`, utilisables pour filtrer les hôtes à l'application d'un modèle) mais aucune règle ne cible un tag — item #7 | — |
 | API | REST bien organisée par domaine | Aucun — le RBAC sur le CRUD des tâches planifiées, manquant à l'origine, est corrigé (ROADMAP.md item #1) | — |
 | Extension / plugins | Absent — plus gros écart structurel avec Checkmk | Élargir encore le nombre de types de check « en dur » (SNMP basique — ICMP fait, item #8) avant tout runtime de plugin | Ne pas construire de plugin engine sans demande prouvée |
 | Sécurité | Bon niveau (JWT, MFA, rate limiting, audit, secrets jamais renvoyés au frontend) | Pas de secret scanning ni signature d'image en CI, Trivy non bloquant — dette silencieuse, effort faible | — |
@@ -194,7 +194,7 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 
 Ne pas refondre — la base (couches, sécurité, moteur d'alertes, temps réel, design system) est
 saine et déjà auto-critiquée par l'équipe elle-même. Fermer d'abord les trous d'exploitabilité
-connus et documentés (tagging, canal webhook générique — RBAC tâches planifiées, dédup,
+connus et documentés (groupes d'hôtes, canal webhook générique — RBAC tâches planifiées, dédup,
 maintenance windows et escalade/ack sont déjà corrigés) : effort limité, impact immédiat sur la
 confiance en production.
 Trancher ensuite, explicitement et avant toute communication publique, le pari « moteur de
