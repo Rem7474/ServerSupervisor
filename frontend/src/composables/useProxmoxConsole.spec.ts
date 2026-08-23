@@ -104,6 +104,41 @@ describe('useProxmoxConsole', () => {
     expect(socket.sent).toEqual(['ls -la\n'])
   })
 
+  it('applies the input transform (sticky Ctrl) to keystrokes before sending them', () => {
+    const { open } = useProxmoxConsole()
+    const term = new FakeTerminal()
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal, {
+      transformInput: (data) => (data === 'c' ? '\u0003' : data),
+    })
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+
+    term.type('c')
+    term.type('x')
+
+    expect(socket.sent).toEqual(['\u0003', 'x'])
+  })
+
+  it('sendInput puts touch-bar keys on the wire without echoing them locally', () => {
+    const { open, sendInput } = useProxmoxConsole()
+    const term = new FakeTerminal()
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+
+    sendInput('\u0003')
+
+    expect(socket.sent).toEqual(['\u0003'])
+    expect(term.written).toEqual([]) // the remote PTY decides what it echoes
+  })
+
+  it('sendInput is a no-op with no open session', () => {
+    const { sendInput } = useProxmoxConsole()
+
+    expect(() => sendInput('\u0003')).not.toThrow()
+    expect(FakeWebSocket.instances).toHaveLength(0)
+  })
+
   it('writes raw binary server output straight to the terminal as bytes', () => {
     const { open } = useProxmoxConsole()
     const term = new FakeTerminal()

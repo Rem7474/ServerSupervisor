@@ -3,10 +3,21 @@ import type { Terminal } from '@xterm/xterm'
 
 export type ConsoleStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error'
 
+interface OpenConsoleOptions {
+  // Applied to every keystroke the terminal emits, just before it goes on
+  // the wire. Backs ProxmoxConsole.vue's sticky "Ctrl" touch key: a soft
+  // keyboard has no Ctrl, so the character typed right after tapping it has
+  // to be rewritten into its control code here — xterm.js's
+  // attachCustomKeyEventHandler only ever sees physical key events, never
+  // soft-keyboard input, which arrives as plain onData text.
+  transformInput?: (data: string) => string
+}
+
 interface UseProxmoxConsoleApi {
   status: Ref<ConsoleStatus>
   errorMessage: Ref<string>
-  open: (guestId: string, term: Terminal) => void
+  open: (guestId: string, term: Terminal, options?: OpenConsoleOptions) => void
+  sendInput: (data: string) => void
   resize: (cols: number, rows: number) => void
   close: () => void
 }
@@ -61,7 +72,7 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     ws = null
   }
 
-  function open(guestId: string, term: Terminal): void {
+  function open(guestId: string, term: Terminal, options?: OpenConsoleOptions): void {
     close()
     manualClose = false
     status.value = 'connecting'
@@ -77,7 +88,8 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     ws = socket
 
     dataDisposable = term.onData((data: string) => {
-      if (ws === socket && socket.readyState === WebSocket.OPEN) socket.send(data)
+      if (ws !== socket || socket.readyState !== WebSocket.OPEN) return
+      socket.send(options?.transformInput ? options.transformInput(data) : data)
     })
 
     socket.onopen = (): void => {
@@ -125,6 +137,15 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     }
   }
 
+  // Raw keystroke bytes that did NOT come from the terminal itself — the
+  // touch bar's Esc/Tab/^C/arrow keys, which a soft keyboard can't produce.
+  // Deliberately not routed through term.write(): that would echo them
+  // locally instead of letting the remote PTY decide what they mean.
+  function sendInput(data: string): void {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    ws.send(data)
+  }
+
   function resize(cols: number, rows: number): void {
     if (!ws || ws.readyState !== WebSocket.OPEN) return
     ws.send(JSON.stringify({ type: 'resize', cols, rows }))
@@ -136,5 +157,5 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     })
   }
 
-  return { status, errorMessage, open, resize, close }
+  return { status, errorMessage, open, sendInput, resize, close }
 }
