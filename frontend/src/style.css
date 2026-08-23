@@ -53,6 +53,27 @@ html {
   }
 }
 
+/* A live terminal (ProxmoxConsole.vue) is the one side panel that can't take
+   the content-driven `height: auto` treatment above: xterm.js derives its
+   row count from the container, so an unbounded container grows one row per
+   line of output — the panel gets taller forever and the page scroll never
+   settles. On a phone it also has no room to spare, so instead of a box in
+   the flow it becomes a full-screen overlay, which is what every mobile
+   console (PVE's own included) does. dvh, not vh: with vh the last rows sit
+   under the soft keyboard once it opens. */
+@media (max-width: 991px) {
+  .side-panel.side-panel-terminal {
+    position: fixed !important;
+    inset: 0;
+    width: 100%;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: none;
+    overflow: hidden !important;
+    z-index: var(--z-index-modal);
+  }
+}
+
 body {
   min-height: 100vh;
   margin: 0;

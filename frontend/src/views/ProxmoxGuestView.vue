@@ -76,6 +76,29 @@
           v-if="auth.isAdmin"
           class="d-flex gap-2"
         >
+          <span
+            v-if="guest.guest_type === 'lxc' && consoleConfigured === false"
+            class="d-inline-flex align-items-center"
+            title="Identifiants console PVE non configurés pour cette connexion — Paramètres → Proxmox VE"
+          >
+            <IconAlertTriangle
+              :size="16"
+              class="icon text-warning"
+            />
+          </span>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            :disabled="guest.guest_type !== 'lxc'"
+            :title="consoleButtonTitle"
+            @click="openConsole"
+          >
+            <IconTerminal2
+              :size="16"
+              class="icon me-1"
+            />
+            Console
+          </button>
           <button
             v-if="guest.status === 'stopped'"
             type="button"
@@ -133,190 +156,202 @@
         </div>
       </div>
 
-      <div class="row row-cards mb-4">
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">
-                CPU
+      <div class="side-layout">
+        <div class="side-main">
+          <div class="row row-cards mb-4">
+            <div class="col-6 col-lg-3">
+              <div class="card card-sm h-100">
+                <div class="card-body">
+                  <div class="subheader">
+                    CPU
+                  </div>
+                  <div
+                    class="h2 mt-2 mb-0"
+                    :class="getMetricColorClass(guest.cpu_usage * 100)"
+                  >
+                    {{ (guest.cpu_usage * 100).toFixed(1) }}%
+                  </div>
+                  <div class="text-secondary small">
+                    {{ guest.cpu_alloc }} vCPU alloués
+                  </div>
+                </div>
               </div>
-              <div
-                class="h2 mt-2 mb-0"
-                :class="getMetricColorClass(guest.cpu_usage * 100)"
-              >
-                {{ (guest.cpu_usage * 100).toFixed(1) }}%
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card card-sm h-100">
+                <div class="card-body">
+                  <div class="subheader">
+                    RAM
+                  </div>
+                  <div
+                    class="h2 mt-2 mb-0"
+                    :class="ramPct != null ? getMetricColorClass(ramPct) : 'text-secondary'"
+                  >
+                    {{ ramPct != null ? ramPct.toFixed(1) + '%' : '—' }}
+                  </div>
+                  <div class="text-secondary small">
+                    {{ formatBytes(guest.mem_usage) }} / {{ formatBytes(guest.mem_alloc) }}
+                  </div>
+                </div>
               </div>
-              <div class="text-secondary small">
-                {{ guest.cpu_alloc }} vCPU alloués
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card card-sm h-100">
+                <div class="card-body">
+                  <div class="subheader">
+                    Disque
+                  </div>
+                  <div
+                    class="h2 mt-2 mb-0"
+                    :class="diskPct != null ? getMetricColorClass(diskPct) : 'text-secondary'"
+                  >
+                    {{ diskPct != null ? diskPct.toFixed(1) + '%' : '—' }}
+                  </div>
+                  <div class="text-secondary small">
+                    {{ formatBytes(guest.disk_usage) }} / {{ formatBytes(guest.disk_alloc) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card card-sm h-100">
+                <div class="card-body">
+                  <div class="subheader">
+                    IP
+                  </div>
+                  <div class="h2 mt-2 mb-0">
+                    {{ guestPrimaryIp || '—' }}
+                  </div>
+                  <a
+                    href="#"
+                    class="text-decoration-none small"
+                    @click.prevent="showNetworkDetail = !showNetworkDetail"
+                  >{{ showNetworkDetail ? 'Masquer le détail réseau' : 'Voir le détail réseau' }}</a>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">
-                RAM
-              </div>
-              <div
-                class="h2 mt-2 mb-0"
-                :class="ramPct != null ? getMetricColorClass(ramPct) : 'text-secondary'"
-              >
-                {{ ramPct != null ? ramPct.toFixed(1) + '%' : '—' }}
-              </div>
-              <div class="text-secondary small">
-                {{ formatBytes(guest.mem_usage) }} / {{ formatBytes(guest.mem_alloc) }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">
-                Disque
-              </div>
-              <div
-                class="h2 mt-2 mb-0"
-                :class="diskPct != null ? getMetricColorClass(diskPct) : 'text-secondary'"
-              >
-                {{ diskPct != null ? diskPct.toFixed(1) + '%' : '—' }}
-              </div>
-              <div class="text-secondary small">
-                {{ formatBytes(guest.disk_usage) }} / {{ formatBytes(guest.disk_alloc) }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">
-                IP
-              </div>
-              <div class="h2 mt-2 mb-0">
-                {{ guestPrimaryIp || '—' }}
-              </div>
-              <a
-                href="#"
-                class="text-decoration-none small"
-                @click.prevent="showNetworkDetail = !showNetworkDetail"
-              >{{ showNetworkDetail ? 'Masquer le détail réseau' : 'Voir le détail réseau' }}</a>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div
-        v-if="showNetworkDetail"
-        class="card mb-4"
-      >
-        <div class="card-header">
-          <h3 class="card-title mb-0">
-            Interfaces réseau
-          </h3>
-        </div>
-        <div class="card-body">
-          <span
-            v-if="guestNetworksLoading"
-            class="text-muted small"
-          >Chargement…</span>
-          <EmptyState
-            v-else-if="guestNetworks.length === 0"
-            title="Aucune interface réseau détectée pour ce guest."
-          />
           <div
-            v-else
-            class="d-flex flex-column gap-2"
+            v-if="showNetworkDetail"
+            class="card mb-4"
           >
-            <div
-              v-for="iface in guestNetworks"
-              :key="iface.name"
-              class="d-flex align-items-center gap-2"
-            >
-              <span class="badge bg-secondary-lt text-secondary">{{ iface.name }}</span>
+            <div class="card-header">
+              <h3 class="card-title mb-0">
+                Interfaces réseau
+              </h3>
+            </div>
+            <div class="card-body">
               <span
-                v-for="ip in iface.ips"
-                :key="ip"
-                class="small font-monospace"
-              >{{ ip }}</span>
+                v-if="guestNetworksLoading"
+                class="text-muted small"
+              >Chargement…</span>
+              <EmptyState
+                v-else-if="guestNetworks.length === 0"
+                title="Aucune interface réseau détectée pour ce guest."
+              />
+              <div
+                v-else
+                class="d-flex flex-column gap-2"
+              >
+                <div
+                  v-for="iface in guestNetworks"
+                  :key="iface.name"
+                  class="d-flex align-items-center gap-2"
+                >
+                  <span class="badge bg-secondary-lt text-secondary">{{ iface.name }}</span>
+                  <span
+                    v-for="ip in iface.ips"
+                    :key="ip"
+                    class="small font-monospace"
+                  >{{ ip }}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div
-        v-if="guestLink?.status === 'confirmed' && guestLink?.host_id"
-        class="card mb-4"
-      >
-        <div class="card-body d-flex align-items-center justify-content-between gap-2 flex-wrap">
-          <div>
-            <div class="fw-medium">
-              Domaines &amp; exposition
-            </div>
-            <div class="text-secondary small">
-              Ce guest est lié à l'hôte {{ guestLink.host_hostname || guestLink.host_name }} — la corrélation domaine/IP se lit sur son onglet Exposition.
+          <div
+            v-if="guestLink?.status === 'confirmed' && guestLink?.host_id"
+            class="card mb-4"
+          >
+            <div class="card-body d-flex align-items-center justify-content-between gap-2 flex-wrap">
+              <div>
+                <div class="fw-medium">
+                  Domaines &amp; exposition
+                </div>
+                <div class="text-secondary small">
+                  Ce guest est lié à l'hôte {{ guestLink.host_hostname || guestLink.host_name }} — la corrélation domaine/IP se lit sur son onglet Exposition.
+                </div>
+              </div>
+              <router-link
+                :to="`/hosts/${guestLink.host_id}?tab=exposition`"
+                class="btn btn-sm btn-outline-primary"
+              >
+                Voir la corrélation domaine/IP
+              </router-link>
             </div>
           </div>
-          <router-link
-            :to="`/hosts/${guestLink.host_id}?tab=exposition`"
-            class="btn btn-sm btn-outline-primary"
-          >
-            Voir la corrélation domaine/IP
-          </router-link>
-        </div>
-      </div>
-      <GuestExposureCard
-        v-else
-        :guest-id="guest.id"
-        class="mb-4"
-      />
-
-      <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-          <h3 class="card-title mb-0">
-            Historique CPU / RAM
-          </h3>
-          <div
-            class="btn-group btn-group-sm guest-range-group"
-            role="group"
-            aria-label="Plage temporelle"
-          >
-            <button
-              v-for="h in [1, 6, 24, 168, 720]"
-              :key="h"
-              type="button"
-              :class="hours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-              @click="changeRange(h)"
-            >
-              {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
-            </button>
-          </div>
-        </div>
-        <div
-          class="card-body"
-          style="height: 14rem;"
-        >
-          <LoadingSkeleton
-            v-if="summaryLoading"
-            variant="chart"
-          />
-          <ApexChart
-            v-else-if="series && chartOptions"
-            ref="chartRef"
-            type="area"
-            height="100%"
-            :options="chartOptions"
-            :series="series"
-          />
-          <div
+          <GuestExposureCard
             v-else
-            class="h-100 d-flex align-items-center justify-content-center text-secondary"
-          >
-            Aucune donnée
+            :guest-id="guest.id"
+            class="mb-4"
+          />
+
+          <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+              <h3 class="card-title mb-0">
+                Historique CPU / RAM
+              </h3>
+              <div
+                class="btn-group btn-group-sm guest-range-group"
+                role="group"
+                aria-label="Plage temporelle"
+              >
+                <button
+                  v-for="h in [1, 6, 24, 168, 720]"
+                  :key="h"
+                  type="button"
+                  :class="hours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+                  @click="changeRange(h)"
+                >
+                  {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
+                </button>
+              </div>
+            </div>
+            <div
+              class="card-body"
+              style="height: 14rem;"
+            >
+              <LoadingSkeleton
+                v-if="summaryLoading"
+                variant="chart"
+              />
+              <ApexChart
+                v-else-if="series && chartOptions"
+                ref="chartRef"
+                type="area"
+                height="100%"
+                :options="chartOptions"
+                :series="series"
+              />
+              <div
+                v-else
+                class="h-100 d-flex align-items-center justify-content-center text-secondary"
+              >
+                Aucune donnée
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </div> <!-- /side-main -->
+        <ProxmoxConsoleLazy
+          v-if="hasOpenedConsole"
+          :guest-id="guest.id"
+          :guest-name="guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}`"
+          :show="showConsole"
+          @close="showConsole = false"
+          @open="showConsole = true"
+        />
+      </div> <!-- /side-layout -->
     </div>
   </div>
 </template>
@@ -324,7 +359,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -361,9 +396,25 @@ const {
   linkMsgOk,
   confirmLink,
   ignoreLink,
+  consoleConfigured,
+  consoleButtonTitle,
 } = useProxmoxGuest(chartRef)
 
 const showNetworkDetail = ref(false)
+const showConsole = ref(false)
+// Mounted once the user first opens a console (see openConsole), then stays
+// mounted so ProxmoxConsole.vue's own v-show-based hide/reopen keeps the
+// session alive in the background instead of tearing it down on every
+// close — same pattern CommandLogPanel already uses elsewhere.
+const hasOpenedConsole = ref(false)
+// Lazy: only fetched once the user actually opens a console, not on every
+// guest page visit — xterm.js is otherwise dead weight for the common case.
+const ProxmoxConsoleLazy = defineAsyncComponent(() => import('../components/proxmox/ProxmoxConsole.vue'))
+
+function openConsole(): void {
+  hasOpenedConsole.value = true
+  showConsole.value = true
+}
 
 // Guests linked to a ServerSupervisor host already get their domain/IP
 // correlation for free from that host's own Exposition tab (same IP, same

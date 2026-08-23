@@ -11,6 +11,7 @@ import type {
   ProxmoxBackupRun,
   ProxmoxGuestLinkRequest,
   ProxmoxGuestLinkUpdate,
+  ProxmoxTestResult,
 } from '../types/proxmox'
 import type { HostExposure } from '../types/host'
 
@@ -28,8 +29,8 @@ export const proxmoxApi = {
     api.put(`/v1/proxmox/instances/${id}`, payload),
   deleteProxmoxInstance: (id: string) => api.delete(`/v1/proxmox/instances/${id}`),
   testProxmoxConnection: (payload: Partial<ProxmoxConnectionRequest>) =>
-    api.post('/v1/proxmox/instances/test', payload),
-  testProxmoxInstanceById: (id: string) => api.post(`/v1/proxmox/instances/${id}/test`),
+    api.post<ProxmoxTestResult>('/v1/proxmox/instances/test', payload),
+  testProxmoxInstanceById: (id: string) => api.post<ProxmoxTestResult>(`/v1/proxmox/instances/${id}/test`),
   pollProxmoxNow: (id: string) => api.post(`/v1/proxmox/instances/${id}/poll-now`),
   getProxmoxNodes: (connectionId?: string, signal?: AbortSignal) =>
     api.get<ProxmoxNode[]>('/v1/proxmox/nodes', { params: connectionId ? { connection_id: connectionId } : {}, signal }),
