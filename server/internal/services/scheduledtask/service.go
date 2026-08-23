@@ -70,6 +70,12 @@ func validate(req *models.ScheduledTaskRequest) error {
 	if !validModules[req.Module] {
 		return apperr.Validation("invalid module: " + req.Module)
 	}
+	// "custom" ignores Action entirely (the agent only looks up Target in
+	// tasks.yaml, see agent/internal/dispatcher/handler_custom.go) — every
+	// other module needs it to know what to do.
+	if req.Module != "custom" && req.Action == "" {
+		return apperr.Validation("action requise")
+	}
 	if req.CronExpression != "" {
 		if _, err := cron.ParseStandard(req.CronExpression); err != nil {
 			return apperr.Validation("expression cron invalide : " + err.Error())
@@ -238,6 +244,25 @@ func (s *Service) Run(ctx context.Context, task models.ScheduledTask, username s
 			slog.String("command_id", result.Command.ID), slog.String("task_id", task.ID), slog.Any("err", err))
 	}
 	_ = s.repo.UpdateScheduledTaskStatus(ctx, task.ID, "pending")
+	return result.Command.ID, nil
+}
+
+// RunCustomTask dispatches one of a host's agent-declared custom tasks
+// (tasks.yaml) immediately, without requiring a persisted ScheduledTask row —
+// mirrors how gitwebhook/releasetracker already trigger module=custom
+// directly. Host authorization is the caller's (HTTP) responsibility.
+func (s *Service) RunCustomTask(ctx context.Context, hostID, taskID, username string) (string, error) {
+	result, err := s.dispatcher.Create(ctx, dispatch.Request{
+		HostID:      hostID,
+		Module:      "custom",
+		Action:      "run",
+		Target:      taskID,
+		Payload:     "{}",
+		TriggeredBy: username,
+	})
+	if err != nil {
+		return "", err
+	}
 	return result.Command.ID, nil
 }
 

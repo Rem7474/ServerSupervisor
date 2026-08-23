@@ -344,6 +344,7 @@ import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useToast } from '../../composables/useToast'
 import { useModalChrome } from '../../composables/useModalChrome'
+import { usePendingCommand } from '../../composables/usePendingCommand'
 import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
 import { getExecutionStateClass } from '../../utils/statusClasses'
@@ -396,6 +397,7 @@ const props = withDefaults(defineProps<{
 })
 
 const dialog = useConfirmDialog()
+const pendingCommand = usePendingCommand()
 const { formatExactDate: formatTaskDate } = useDateFormatter()
 const tasks = ref<Task[]>([])
 type TaskSortKey = 'name' | 'next_run_at'
@@ -515,7 +517,7 @@ function closeTaskModal(): void {
 }
 
 async function saveTask(): Promise<void> {
-  if (!taskForm.value.name || !taskForm.value.action) {
+  if (!taskForm.value.name || (!taskForm.value.action && taskForm.value.module !== 'custom')) {
     taskModalError.value = 'Nom et action sont obligatoires.'
     return
   }
@@ -564,6 +566,8 @@ async function runTaskNow(task: Task): Promise<void> {
       output: '',
     })
     emit('history-changed')
+    await loadTasks()
+    await pendingCommand.track(data.command_id)
     await loadTasks()
   } catch (e: unknown) {
     tasksError.value = getApiErrorMessage(e, 'Erreur')

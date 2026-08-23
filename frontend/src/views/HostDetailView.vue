@@ -564,6 +564,17 @@
             />
           </template>
 
+          <template #taches-personnalisees>
+            <HostCustomTasksTab
+              :host-id="hostId"
+              :can-run-apt="canRunApt"
+              :active="activeTab === 'taches-personnalisees'"
+              @open-command="openCommand"
+              @tasks-count="customTasksCount = $event"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
+
           <template #planifiees>
             <HostTasksTab
               :host-id="hostId"
@@ -789,6 +800,7 @@ import HostEditForm from '../components/host/HostEditForm.vue'
 import HostExposureTab from '../components/host/HostExposureTab.vue'
 import HostSystemTab from '../components/host/HostSystemTab.vue'
 import HostTasksTab from '../components/host/HostTasksTab.vue'
+import HostCustomTasksTab from '../components/host/HostCustomTasksTab.vue'
 import HostTimelineTab from '../components/host/HostTimelineTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
@@ -804,6 +816,7 @@ const {
   activeTab,
   isEditing,
   tasksCount,
+  customTasksCount,
   aptCmdLoading,
   host,
   containers,
@@ -992,6 +1005,11 @@ const hostTabs = computed<EntityTab[]>(() => {
   // ProxmoxNodeView's "Journaux sécurité" tab — same word, unrelated content
   // (per-host RBAC here vs. PVE syslog auth-failure search there).
   tabs.push({ key: 'securite', label: 'Permissions' })
+  tabs.push({
+    key: 'taches-personnalisees',
+    label: 'Tâches personnalisées',
+    badges: customTasksCount.value ? [{ value: customTasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
+  })
   tabs.push({
     key: 'planifiees',
     label: 'Tâches planifiées',

@@ -14,6 +14,8 @@ export const tasksApi = {
   getScheduledTaskExecutions: (id: string, limit?: number) =>
     api.get<ScheduledTaskExecution[]>(`/v1/scheduled-tasks/${id}/executions`, { params: { limit: limit ?? 20 } }),
   getHostCustomTasks: (hostId: string) => api.get<CustomTaskSummary[]>(`/v1/hosts/${hostId}/custom-tasks`),
+  runCustomTask: (hostId: string, taskId: string) =>
+    api.post<{ command_id: string }>(`/v1/hosts/${hostId}/custom-tasks/${taskId}/run`),
   getHostTasksYaml: (hostId: string) => api.get<{ yaml: string }>(`/v1/hosts/${hostId}/tasks-yaml`),
   getHostComposeProjects: (hostId: string) => api.get<ComposeProject[]>(`/v1/hosts/${hostId}/compose-projects`),
 }
