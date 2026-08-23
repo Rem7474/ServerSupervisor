@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
-const { openMock, closeMock, resizeMock } = vi.hoisted(() => ({
+const { openMock, closeMock, resizeMock, sendInputMock } = vi.hoisted(() => ({
   openMock: vi.fn(),
   closeMock: vi.fn(),
   resizeMock: vi.fn(),
+  sendInputMock: vi.fn(),
 }))
 
 // status/errorMessage must be real Vue refs (not plain { value } objects)
@@ -24,6 +25,7 @@ vi.mock('../../composables/useProxmoxConsole', async () => {
       status,
       errorMessage,
       open: openMock,
+      sendInput: sendInputMock,
       resize: resizeMock,
       close: closeMock,
     }),
@@ -34,9 +36,10 @@ import { useProxmoxConsole } from '../../composables/useProxmoxConsole'
 
 const { status: statusRef, errorMessage: errorRef } = useProxmoxConsole()
 
-const { termOpenMock, termDisposeMock, fitMock } = vi.hoisted(() => ({
+const { termOpenMock, termDisposeMock, termFocusMock, fitMock } = vi.hoisted(() => ({
   termOpenMock: vi.fn(),
   termDisposeMock: vi.fn(),
+  termFocusMock: vi.fn(),
   fitMock: vi.fn(),
 }))
 
@@ -45,6 +48,7 @@ vi.mock('@xterm/xterm', () => ({
     return {
       open: termOpenMock,
       dispose: termDisposeMock,
+      focus: termFocusMock,
       loadAddon: vi.fn(),
       cols: 80,
       rows: 24,
@@ -173,6 +177,64 @@ describe('ProxmoxConsole', () => {
     await reopen!.trigger('click')
 
     expect(openMock).toHaveBeenCalledTimes(2) // once on mount, once on reopen
+  })
+
+  // --- Mobile touch bar: a soft keyboard has no Ctrl/Esc/Tab/arrows ---
+
+  it('sends the raw control byte for ^C without going through the terminal', async () => {
+    statusRef.value = 'connected'
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+
+    await wrapper.find('button[title="Interrompre (Ctrl+C)"]').trigger('click')
+
+    expect(sendInputMock).toHaveBeenCalledWith('\u0003')
+    // Refocused so the soft keyboard doesn't close after every tap.
+    expect(termFocusMock).toHaveBeenCalled()
+  })
+
+  it('sends the escape sequences for Échap / Tab / arrows', async () => {
+    statusRef.value = 'connected'
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+
+    await wrapper.find('button[title="Échap"]').trigger('click')
+    await wrapper.find('button[title="Tabulation (complétion)"]').trigger('click')
+    await wrapper.find('button[title="Haut (historique)"]').trigger('click')
+    await wrapper.find('button[title="Droite"]').trigger('click')
+
+    expect(sendInputMock.mock.calls.map((c) => c[0])).toEqual(['\u001b', '\t', '\u001b[A', '\u001b[C'])
+  })
+
+  it('the sticky Ctrl key rewrites the next typed character into its control code', async () => {
+    statusRef.value = 'connected'
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+
+    const transformInput = openMock.mock.calls[0][2].transformInput as (data: string) => string
+    expect(transformInput('c')).toBe('c') // not armed yet
+
+    await wrapper.find('button[title^="Touche Ctrl"]').trigger('click')
+
+    expect(transformInput('c')).toBe('\u0003')
+    expect(transformInput('c')).toBe('c') // sticky for exactly one keystroke
+  })
+
+  it('leaves input with no control form untouched while Ctrl is armed', async () => {
+    statusRef.value = 'connected'
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+    const transformInput = openMock.mock.calls[0][2].transformInput as (data: string) => string
+
+    await wrapper.find('button[title^="Touche Ctrl"]').trigger('click')
+    expect(transformInput('ls -la\n')).toBe('ls -la\n') // a paste, not a single key
+  })
+
+  it('disables the touch keys while the session is not connected', async () => {
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+
+    expect(wrapper.find('button[title="Interrompre (Ctrl+C)"]').attributes('disabled')).toBeDefined()
   })
 
   it('surfaces the error message from the composable', async () => {

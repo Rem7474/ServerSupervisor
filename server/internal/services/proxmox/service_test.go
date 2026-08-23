@@ -32,7 +32,7 @@ type fakeRepo struct {
 func (f *fakeRepo) ListProxmoxConnections(context.Context) ([]models.ProxmoxConnection, error) {
 	return nil, nil
 }
-func (f *fakeRepo) CreateProxmoxConnection(context.Context, string, string, string, string, bool, bool, int, string, string) (string, error) {
+func (f *fakeRepo) CreateProxmoxConnection(context.Context, models.ProxmoxConnectionRequest) (string, error) {
 	f.created = true
 	return "id", nil
 }
@@ -42,7 +42,7 @@ func (f *fakeRepo) GetProxmoxConnectionByID(_ context.Context, id string) (*mode
 	}
 	return nil, nil
 }
-func (f *fakeRepo) UpdateProxmoxConnection(context.Context, string, string, string, string, string, bool, bool, int, string, string) error {
+func (f *fakeRepo) UpdateProxmoxConnection(context.Context, string, models.ProxmoxConnectionRequest) error {
 	return nil
 }
 func (f *fakeRepo) DeleteProxmoxConnection(context.Context, string) error { return nil }

@@ -3,10 +3,21 @@ import type { Terminal } from '@xterm/xterm'
 
 export type ConsoleStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error'
 
+interface OpenConsoleOptions {
+  // Applied to every keystroke the terminal emits, just before it goes on
+  // the wire. Backs ProxmoxConsole.vue's sticky "Ctrl" touch key: a soft
+  // keyboard has no Ctrl, so the character typed right after tapping it has
+  // to be rewritten into its control code here — xterm.js's
+  // attachCustomKeyEventHandler only ever sees physical key events, never
+  // soft-keyboard input, which arrives as plain onData text.
+  transformInput?: (data: string) => string
+}
+
 interface UseProxmoxConsoleApi {
   status: Ref<ConsoleStatus>
   errorMessage: Ref<string>
-  open: (guestId: string, term: Terminal) => void
+  open: (guestId: string, term: Terminal, options?: OpenConsoleOptions) => void
+  sendInput: (data: string) => void
   resize: (cols: number, rows: number) => void
   close: () => void
 }
@@ -61,17 +72,24 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     ws = null
   }
 
-  function open(guestId: string, term: Terminal): void {
+  function open(guestId: string, term: Terminal, options?: OpenConsoleOptions): void {
     close()
     manualClose = false
     status.value = 'connecting'
     errorMessage.value = ''
 
     const socket = new WebSocket(createConsoleUrl(guestId))
+    // PTY output arrives as binary frames (see ws.ProxmoxConsole's doc
+    // comment) — arraybuffer lets us hand xterm.js a Uint8Array directly,
+    // whose own parser correctly buffers a multi-byte UTF-8 character split
+    // across two frames instead of corrupting it the way per-message
+    // string decoding would.
+    socket.binaryType = 'arraybuffer'
     ws = socket
 
     dataDisposable = term.onData((data: string) => {
-      if (ws === socket && socket.readyState === WebSocket.OPEN) socket.send(data)
+      if (ws !== socket || socket.readyState !== WebSocket.OPEN) return
+      socket.send(options?.transformInput ? options.transformInput(data) : data)
     })
 
     socket.onopen = (): void => {
@@ -81,22 +99,29 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
 
     socket.onmessage = (event: MessageEvent): void => {
       if (ws !== socket) return
+
+      // Raw PTY output — the server always sends this as a binary frame
+      // (see ws.ProxmoxConsole). xterm.js's Uint8Array overload of write()
+      // decodes UTF-8 incrementally across calls, unlike treating each
+      // message as an independent JS string.
+      if (event.data instanceof ArrayBuffer) {
+        term.write(new Uint8Array(event.data))
+        return
+      }
       if (typeof event.data !== 'string') return
 
-      // A console_error is only ever sent once, immediately before the
-      // server closes the connection (see ws.ProxmoxConsole) — real shell
-      // output essentially never happens to parse as this exact shape.
+      // Anything else is a text control frame — currently only
+      // console_error, sent once immediately before the server closes the
+      // connection.
       try {
         const parsed: unknown = JSON.parse(event.data)
         if (isConsoleError(parsed)) {
           status.value = 'error'
           errorMessage.value = parsed.error
-          return
         }
       } catch {
-        // Not JSON: ordinary PTY output, fall through to write it.
+        // Not a recognized control message: ignore.
       }
-      term.write(event.data)
     }
 
     socket.onerror = (): void => {
@@ -112,6 +137,15 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     }
   }
 
+  // Raw keystroke bytes that did NOT come from the terminal itself — the
+  // touch bar's Esc/Tab/^C/arrow keys, which a soft keyboard can't produce.
+  // Deliberately not routed through term.write(): that would echo them
+  // locally instead of letting the remote PTY decide what they mean.
+  function sendInput(data: string): void {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    ws.send(data)
+  }
+
   function resize(cols: number, rows: number): void {
     if (!ws || ws.readyState !== WebSocket.OPEN) return
     ws.send(JSON.stringify({ type: 'resize', cols, rows }))
@@ -123,5 +157,5 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     })
   }
 
-  return { status, errorMessage, open, resize, close }
+  return { status, errorMessage, open, sendInput, resize, close }
 }

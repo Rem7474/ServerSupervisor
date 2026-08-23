@@ -14,6 +14,7 @@ class FakeWebSocket {
   onclose: ((event: CloseEvent) => void) | null = null
   sent: string[] = []
   closeCalls = 0
+  binaryType = 'blob'
 
   constructor(url: string) {
     this.url = url
@@ -32,8 +33,14 @@ class FakeWebSocket {
     this.onopen?.()
   }
 
+  // Text control frames (console_error).
   message(data: string): void {
     this.onmessage?.({ data } as MessageEvent)
+  }
+
+  // Binary PTY output frames — see useProxmoxConsole.ts's onmessage.
+  binaryMessage(bytes: Uint8Array): void {
+    this.onmessage?.({ data: bytes.buffer } as MessageEvent)
   }
 
   simulateClose(code = 1006): void {
@@ -44,7 +51,7 @@ class FakeWebSocket {
 // Minimal fake standing in for an xterm.js Terminal — just enough surface
 // (onData/write) for the composable to bind to.
 class FakeTerminal {
-  written: string[] = []
+  written: (string | Uint8Array)[] = []
   private handler: ((data: string) => void) | null = null
 
   onData(handler: (data: string) => void): { dispose: () => void } {
@@ -52,7 +59,7 @@ class FakeTerminal {
     return { dispose: () => { this.handler = null } }
   }
 
-  write(data: string): void {
+  write(data: string | Uint8Array): void {
     this.written.push(data)
   }
 
@@ -80,6 +87,7 @@ describe('useProxmoxConsole', () => {
 
     const socket = FakeWebSocket.instances[0]
     expect(socket.url).toContain('/api/v1/ws/proxmox/console/guest-123')
+    expect(socket.binaryType).toBe('arraybuffer')
     socket.open()
     expect(status.value).toBe('connected')
   })
@@ -96,16 +104,64 @@ describe('useProxmoxConsole', () => {
     expect(socket.sent).toEqual(['ls -la\n'])
   })
 
-  it('writes raw server output straight to the terminal', () => {
+  it('applies the input transform (sticky Ctrl) to keystrokes before sending them', () => {
+    const { open } = useProxmoxConsole()
+    const term = new FakeTerminal()
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal, {
+      transformInput: (data) => (data === 'c' ? '\u0003' : data),
+    })
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+
+    term.type('c')
+    term.type('x')
+
+    expect(socket.sent).toEqual(['\u0003', 'x'])
+  })
+
+  it('sendInput puts touch-bar keys on the wire without echoing them locally', () => {
+    const { open, sendInput } = useProxmoxConsole()
+    const term = new FakeTerminal()
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+
+    sendInput('\u0003')
+
+    expect(socket.sent).toEqual(['\u0003'])
+    expect(term.written).toEqual([]) // the remote PTY decides what it echoes
+  })
+
+  it('sendInput is a no-op with no open session', () => {
+    const { sendInput } = useProxmoxConsole()
+
+    expect(() => sendInput('\u0003')).not.toThrow()
+    expect(FakeWebSocket.instances).toHaveLength(0)
+  })
+
+  it('writes raw binary server output straight to the terminal as bytes', () => {
     const { open } = useProxmoxConsole()
     const term = new FakeTerminal()
     open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
     const socket = FakeWebSocket.instances[0]
     socket.open()
 
-    socket.message('total 12\r\ndrwxr-xr-x ...\r\n')
+    const bytes = new TextEncoder().encode('total 12\r\ndrwxr-xr-x ...\r\n')
+    socket.binaryMessage(bytes)
 
-    expect(term.written).toEqual(['total 12\r\ndrwxr-xr-x ...\r\n'])
+    expect(term.written).toEqual([bytes])
+  })
+
+  it('ignores a text frame that is not a recognized control message', () => {
+    const { open } = useProxmoxConsole()
+    const term = new FakeTerminal()
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+
+    socket.message('not json')
+
+    expect(term.written).toEqual([])
   })
 
   it('sends a resize control message as JSON, not raw text', () => {

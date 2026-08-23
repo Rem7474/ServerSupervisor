@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, onMounted, onUnmounted, type Ref } from 'vue'
+import { computed, ref, shallowRef, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import type { ApexOptions } from 'apexcharts'
 import dayjs from '../utils/dayjs'
@@ -294,6 +294,26 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
     await guestActions.performGuestAction(guest.value, action, loadGuest)
   }
 
+  // null = not checked yet (or the check itself failed — fail open, don't
+  // block the console button on a fetch error). Only meaningful for lxc
+  // guests; PVE console credentials live on the guest's Proxmox connection,
+  // not the guest itself, so this needs a separate lookup.
+  const consoleConfigured = ref<boolean | null>(null)
+
+  watch(guest, (g) => {
+    consoleConfigured.value = null
+    if (!g || g.guest_type !== 'lxc') return
+    api.getProxmoxInstance(g.connection_id)
+      .then((res) => { consoleConfigured.value = res.data.console_configured })
+      .catch(() => { consoleConfigured.value = null })
+  }, { immediate: true })
+
+  const consoleButtonTitle = computed(() => {
+    if (!guest.value || guest.value.guest_type !== 'lxc') return 'VM QEMU : bientôt disponible'
+    if (consoleConfigured.value === false) return 'Console PVE non configurée pour cette connexion (Paramètres → Proxmox VE)'
+    return 'Ouvrir une console interactive'
+  })
+
   let refreshTimer: ReturnType<typeof setInterval> | undefined
   onMounted(async () => {
     await loadGuest()
@@ -330,5 +350,7 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
     linkMsgOk,
     confirmLink,
     ignoreLink,
+    consoleConfigured,
+    consoleButtonTitle,
   }
 }

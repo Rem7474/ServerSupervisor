@@ -3,7 +3,7 @@
     mode="custom"
     :show="show"
     :title="`Console — ${guestName || guestId}`"
-    wrapper-class="side-panel"
+    wrapper-class="side-panel side-panel-terminal"
     @close="handleClose"
     @open="$emit('open')"
   >
@@ -17,7 +17,7 @@
       <button
         v-if="status !== 'connecting' && status !== 'connected'"
         type="button"
-        class="btn btn-sm btn-outline-secondary"
+        class="btn btn-sm btn-ghost-secondary"
         @click="connect"
       >
         Rouvrir
@@ -35,12 +35,106 @@
         ref="containerEl"
         class="flex-fill console-term-container"
       />
+
+      <!-- mousedown.prevent on the bar (not click) keeps the focus — and so
+           the soft keyboard — on xterm's hidden textarea: a button that
+           takes focus dismisses the keyboard on every tap. -->
+      <div
+        class="console-touch-bar"
+        @mousedown.prevent
+      >
+        <button
+          type="button"
+          :class="ctrlArmed ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost-secondary'"
+          :disabled="!inputEnabled"
+          title="Touche Ctrl — s'applique au caractère suivant"
+          @click="toggleCtrl"
+        >
+          Ctrl
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-ghost-secondary"
+          :disabled="!inputEnabled"
+          title="Interrompre (Ctrl+C)"
+          @click="sendKey('\u0003')"
+        >
+          ^C
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-ghost-secondary"
+          :disabled="!inputEnabled"
+          title="Échap"
+          @click="sendKey('\u001b')"
+        >
+          Échap
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-ghost-secondary"
+          :disabled="!inputEnabled"
+          title="Tabulation (complétion)"
+          @click="sendKey('\t')"
+        >
+          Tab
+        </button>
+        <button
+          type="button"
+          class="btn btn-icon btn-sm btn-ghost-secondary"
+          :disabled="!inputEnabled"
+          title="Haut (historique)"
+          @click="sendKey('\u001b[A')"
+        >
+          <IconArrowUp
+            :size="14"
+            class="icon"
+          />
+        </button>
+        <button
+          type="button"
+          class="btn btn-icon btn-sm btn-ghost-secondary"
+          :disabled="!inputEnabled"
+          title="Bas (historique)"
+          @click="sendKey('\u001b[B')"
+        >
+          <IconArrowDown
+            :size="14"
+            class="icon"
+          />
+        </button>
+        <button
+          type="button"
+          class="btn btn-icon btn-sm btn-ghost-secondary"
+          :disabled="!inputEnabled"
+          title="Gauche"
+          @click="sendKey('\u001b[D')"
+        >
+          <IconArrowLeft
+            :size="14"
+            class="icon"
+          />
+        </button>
+        <button
+          type="button"
+          class="btn btn-icon btn-sm btn-ghost-secondary"
+          :disabled="!inputEnabled"
+          title="Droite"
+          @click="sendKey('\u001b[C')"
+        >
+          <IconArrowRight
+            :size="14"
+            class="icon"
+          />
+        </button>
+      </div>
     </div>
   </CommandLogPanel>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp } from '@tabler/icons-vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -63,7 +157,7 @@ const emit = defineEmits<{
 }>()
 
 const containerEl = ref<HTMLElement | null>(null)
-const { status, errorMessage, open, resize, close: closeSocket } = useProxmoxConsole()
+const { status, errorMessage, open, sendInput, resize, close: closeSocket } = useProxmoxConsole()
 
 const { getStatusBadgeClass } = useStatusBadge({
   map: {
@@ -89,9 +183,50 @@ let term: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let resizeObserver: ResizeObserver | null = null
 
+// A phone/tablet soft keyboard has no Ctrl, Esc, Tab or arrow keys, which
+// makes a terminal close to useless there — no way to interrupt a running
+// command, complete a path, or recall the previous one. The touch bar sends
+// those bytes itself; "Ctrl" is a sticky modifier applied to the next
+// character the user types (same interaction as Termux/PVE's own mobile
+// console) rather than a chord nothing on the device can produce.
+const ctrlArmed = ref(false)
+const inputEnabled = computed(() => status.value === 'connected')
+
+// Ctrl+<key> is just the ASCII control code: @ A-Z [ \ ] ^ _ (0x40-0x5F)
+// map to 0x00-0x1F, and Ctrl+? is DEL. Anything else (a digit, an accented
+// letter, a multi-char paste) has no control form — send it unchanged
+// rather than mangling it.
+function toControlChar(data: string): string {
+  if (data.length !== 1) return data
+  const code = data.toUpperCase().charCodeAt(0)
+  if (code >= 0x40 && code <= 0x5f) return String.fromCharCode(code - 0x40)
+  if (code === 0x3f) return '\u007f'
+  return data
+}
+
+function transformInput(data: string): string {
+  if (!ctrlArmed.value) return data
+  ctrlArmed.value = false
+  return toControlChar(data)
+}
+
+function toggleCtrl(): void {
+  ctrlArmed.value = !ctrlArmed.value
+  term?.focus()
+}
+
+// Refocus after every touch key so the soft keyboard stays up and the next
+// keystroke still lands in the terminal.
+function sendKey(sequence: string): void {
+  sendInput(sequence)
+  ctrlArmed.value = false
+  term?.focus()
+}
+
 function connect(): void {
   if (!term) return
-  open(props.guestId, term)
+  ctrlArmed.value = false
+  open(props.guestId, term, { transformInput })
 }
 
 // The close (X) button ends the remote shell — a live PTY session left
@@ -192,5 +327,24 @@ onBeforeUnmount(() => {
 
 .console-term-container :deep(.xterm) {
   height: 100%;
+}
+
+.console-touch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  background: var(--ss-panel-solid);
+  border-top: 1px solid var(--tblr-border-color);
+}
+
+/* Only worth the vertical space where the keys are actually missing: a
+   desktop pointer means a physical keyboard with real Ctrl/Esc/Tab/arrows.
+   Width alone isn't the test — a tablet in landscape is wide and still has
+   no Ctrl key. */
+@media (min-width: 992px) and (pointer: fine) {
+  .console-touch-bar {
+    display: none;
+  }
 }
 </style>
