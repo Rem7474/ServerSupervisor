@@ -7,7 +7,7 @@ import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
 import { getApexChartPalette } from '../utils/apexChartTheme'
-import { getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
+import { breakLargeGaps } from '../utils/chartTimeAxis'
 import type { ProxmoxGuestLink } from '../types/generated'
 
 export type { GuestPowerAction }
@@ -15,7 +15,7 @@ export type { GuestPowerAction }
 const GUEST_REFRESH_SEC = 30
 
 interface GuestMetricPoint { timestamp: string; cpu_avg?: number; memory_avg?: number; [key: string]: unknown }
-interface ChartPoint { x: number; y: number }
+interface ChartPoint { x: number; y: number | null }
 type GuestChartSeries = { name: string; data: ChartPoint[]; color: string }[]
 
 interface ProxmoxGuest {
@@ -91,6 +91,17 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
     if (inputHours <= 24) return 5
     if (inputHours <= 168) return 15
     return 60
+  }
+
+  // The requested window, not the min/max of whatever points came back —
+  // sparse data (e.g. the guest was off for most of the range) used to
+  // shrink/shift the visible axis to just the span of real samples, which
+  // for 1h/6h (1-minute buckets, so a single stale or missing sample swings
+  // the axis a lot) made the chart look broken rather than just showing a
+  // gap in an otherwise correctly-scaled 1h/6h/24h/... window.
+  function chartWindow(): { min: number; max: number } {
+    const max = Date.now()
+    return { min: max - hours.value * 60 * 60 * 1000, max }
   }
 
   async function loadGuest(): Promise<void> {
@@ -216,7 +227,7 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
 
   function buildChartOptions(): ApexOptions {
     const palette = getApexChartPalette()
-    const allPoints = (series.value ?? []).flatMap((s) => s.data)
+    const { min, max } = chartWindow()
     return {
       chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
       theme: { mode: 'dark' },
@@ -228,8 +239,8 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
       grid: { borderColor: palette.grid },
       xaxis: {
         type: 'datetime',
-        min: getMinPointTimestamp(allPoints),
-        max: getMaxPointTimestamp(allPoints),
+        min,
+        max,
         labels: { style: { colors: palette.tickText }, formatter: (v: string) => formatChartTime(Number(v)) },
         axisBorder: { show: false },
         axisTicks: { show: false },
@@ -256,26 +267,27 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
         return
       }
       const palette = getApexChartPalette()
+      // A gap wider than a few sampling intervals is a real hole in the
+      // data (guest was off, polling stalled, ...) — break the line there
+      // instead of letting ApexCharts draw a straight/smooth interpolation
+      // across it, which visually reads as fabricated low/flat activity.
+      const maxGapMs = bucketMinutes * 60 * 1000 * 3
       series.value = [
         {
           name: 'CPU %',
-          data: points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.cpu_avg ?? 0) })),
+          data: breakLargeGaps(points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.cpu_avg ?? 0) })), maxGapMs),
           color: palette.cpu,
         },
         {
           name: 'RAM %',
-          data: points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.memory_avg ?? 0) })),
+          data: breakLargeGaps(points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.memory_avg ?? 0) })), maxGapMs),
           color: palette.ram,
         },
       ]
       if (!chartOptions.value) {
         chartOptions.value = buildChartOptions()
       } else {
-        const allPoints = series.value.flatMap((s) => s.data)
-        chartRef.value?.updateOptions(
-          { xaxis: { min: getMinPointTimestamp(allPoints), max: getMaxPointTimestamp(allPoints) } },
-          false, false,
-        )
+        chartRef.value?.updateOptions({ xaxis: chartWindow() }, false, false)
       }
     } catch {
       series.value = null

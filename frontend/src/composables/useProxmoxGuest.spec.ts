@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
@@ -67,6 +67,49 @@ beforeEach(() => {
   getProxmoxGuestMetrics.mockResolvedValue({ data: [] })
   getProxmoxNodeGuestNetworks.mockResolvedValue({ data: { 101: [{ name: 'eth0', ips: ['10.0.0.5'] }] } })
   getProxmoxInstance.mockResolvedValue({ data: { console_configured: true } })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+describe('useProxmoxGuest — CPU/RAM chart time axis', () => {
+  it('pins xaxis to the requested window rather than the span of returned points', async () => {
+    const now = new Date('2026-08-24T12:00:00.000Z').getTime()
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    // Sparse data covering only the last 5 minutes — before the fix, xaxis
+    // used to shrink to this span instead of the full default 24h range.
+    getProxmoxGuestMetrics.mockResolvedValue({
+      data: [
+        { timestamp: new Date(now - 5 * 60 * 1000).toISOString(), cpu_avg: 10, memory_avg: 20 },
+        { timestamp: new Date(now - 1 * 60 * 1000).toISOString(), cpu_avg: 12, memory_avg: 22 },
+      ],
+    })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(api.chartOptions.value?.xaxis?.min).toBe(now - 24 * 60 * 60 * 1000)
+    expect(api.chartOptions.value?.xaxis?.max).toBe(now)
+  })
+
+  it('breaks the CPU/RAM line across a real gap instead of interpolating across it', async () => {
+    const now = Date.now()
+    // Default range is 24h (5-minute buckets) — a ~59-minute gap between
+    // samples is well past the 3-bucket tolerance and must break the line.
+    getProxmoxGuestMetrics.mockResolvedValue({
+      data: [
+        { timestamp: new Date(now - 60 * 60 * 1000).toISOString(), cpu_avg: 0, memory_avg: 0 },
+        { timestamp: new Date(now - 1 * 60 * 1000).toISOString(), cpu_avg: 50, memory_avg: 60 },
+      ],
+    })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    const cpuSeries = api.series.value?.find((s) => s.name === 'CPU %')
+    expect(cpuSeries?.data.some((p) => p.y === null)).toBe(true)
+  })
 })
 
 describe('useProxmoxGuest — guest network IPs without a ?nodeId= query param', () => {
