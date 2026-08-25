@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, onMounted, onUnmounted, watch, type Ref } from 'vue'
+import { computed, ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { ApexOptions } from 'apexcharts'
 import dayjs from '../utils/dayjs'
@@ -37,21 +37,7 @@ interface ProxmoxGuest {
 
 interface GuestNetworkIface { name: string; ips: string[] }
 
-// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
-// export it under a name that resolves cleanly through defineAsyncComponent's
-// template-ref typing — restated locally for the one method actually needed).
-export interface ApexChartInstance {
-  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
-}
-
-// chartRef is owned by the view (bound via `ref="chartRef"` on its
-// <ApexChart>) and passed in here rather than being created and returned by
-// this composable, so the view's own script actually reads the binding
-// (passing it as an argument counts) instead of only handing it to the
-// template — vue-tsc's noUnusedLocals doesn't trace string `ref="x"`
-// template bindings as a "read" of `x`, so a destructure-and-template-only
-// version of this trips a false "declared but never read".
-export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
+export function useProxmoxGuest() {
   const route = useRoute()
   const signal = useAbortSignal()
   const guestActions = useProxmoxGuestActions()
@@ -212,17 +198,20 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
     return hours.value >= 24 ? d.format('DD/MM HH:mm') : d.format('HH:mm')
   }
 
-  // Built once (on first data load) rather than as a `computed` over
-  // `series`: vue3-apexcharts clones the whole `:options` prop via
-  // JSON.parse(JSON.stringify(...)) on every *reactive* update after mount
-  // — which silently drops every function (labels.formatter, tooltip.custom)
-  // since JSON can't represent them. Keeping this object's identity stable
-  // after the initial build means later data refreshes (this guest polls
-  // every GUEST_REFRESH_SEC, plus manual changeRange() calls) flow through
-  // the (function-free, always-safe) `:series` prop only; the time-range
-  // window (xaxis.min/max) is pushed via the exposed updateOptions() method
-  // directly in loadGuestSummary() instead (bypasses the wrapper's buggy
-  // reactive watcher).
+  // Rebuilt on every load (not a `computed` over `series`, just a plain
+  // shallowRef reassigned in loadGuestSummary): the view only ever renders
+  // <ApexChart> while `!summaryLoading`, and loadGuestSummary sets
+  // summaryLoading true for its whole duration — so the chart component is
+  // fully unmounted before this is reassigned and remounts fresh afterwards,
+  // reading the new object as its initial `:options` prop. That sidesteps
+  // vue3-apexcharts' real footgun (it clones `:options` via
+  // JSON.parse(JSON.stringify(...)) on every *reactive* update to an
+  // *already-mounted* instance, silently dropping functions like
+  // labels.formatter/tooltip.custom) without needing a second, imperative
+  // update path — a prior version pushed xaxis.min/max via the chart
+  // instance's exposed updateOptions() method instead, but that instance is
+  // unmounted (ref already null) by the time loadGuestSummary reaches it, so
+  // range changes silently never reached the chart.
   const chartOptions = shallowRef<ApexOptions | null>(null)
 
   function buildChartOptions(): ApexOptions {
@@ -284,11 +273,7 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
           color: palette.ram,
         },
       ]
-      if (!chartOptions.value) {
-        chartOptions.value = buildChartOptions()
-      } else {
-        chartRef.value?.updateOptions({ xaxis: chartWindow() }, false, false)
-      }
+      chartOptions.value = buildChartOptions()
     } catch {
       series.value = null
     } finally {
