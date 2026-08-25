@@ -21,8 +21,8 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 | 3 | Escalade d'alertes (relance après N minutes si non acquittée) | Aucune existante — un incident critique non vu reste silencieux | Fait |
 | 4 | Acquittement (ack) d'incident + statut « en cours de traitement » | Prérequis technique de l'escalade (#3) et du dédup (#5) | Fait |
 | 5 | Déduplication / groupement d'alertes corrélées | Un hôte down peut aujourd'hui déclencher une cascade d'alertes filles indépendantes | Fait |
-| 6 | Canal Slack / Teams / Discord / webhook générique | Seuls SMTP et ntfy existent réellement (le « webhook » du README recouvre ntfy) | Non démarré |
-| 7 | Tagging des hôtes + groupes dynamiques | Aucun tagging trouvé dans le modèle de données — bloque le filtrage à l'échelle et les règles par groupe | Non démarré |
+| 6 | Canal Slack / Teams / Discord / webhook générique | Canaux réels : SMTP, ntfy, navigateur (in-app + Web Push), plus un canal `notify` **déprécié** qui POSTe du JSON brut vers `NOTIFY_URL` — c'est lui, et non ntfy, que la prose « webhook » recouvrait | Non démarré |
+| 7 | Groupes dynamiques d'hôtes + règles par groupe | Le tagging brut **existe** (`hosts.tags`, éditable, filtrable sur le dashboard et à l'application d'un modèle de règle) — ce qui manque est la couche au-dessus : groupes dérivés d'un tag, et règles/permissions ciblant un groupe plutôt qu'un hôte | En cours |
 
 ### Should have — élargit la couverture sans agent
 
@@ -46,6 +46,16 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 | 18 | Dashboard personnalisable (widgets réordonnables) | Non démarré |
 | 19 | Endpoint `/metrics` Prometheus (scrape externe) | Non démarré |
 | 20 | Séparation légère multi-équipes (sans plein multi-tenant) | Non démarré |
+
+### Hors audit initial — livré ou engagé depuis
+
+Items qui ne figuraient pas dans `AUDIT-PRODUIT-2026.md` (donc hors de la
+numérotation #1-#26) mais qui font partie du même plan d'exécution.
+
+| # | Fonctionnalité | Pourquoi | Statut |
+|---|---|---|---|
+| 27 | Console interactive LXC (xterm.js ↔ PVE `termproxy`) | Ouvrir un shell sur un conteneur obligeait à sortir de ServerSupervisor (UI Proxmox ou SSH) | Fait |
+| 28 | Console QEMU/VM (VNC/RFB) | La V1 de #27 ne couvre que les LXC : QEMU n'expose pas `termproxy` mais du VNC/RFB, un protocole de fil entièrement différent. Le bouton Console est grisé sur une VM en attendant | Non démarré |
 
 ### Later / optional — ne pas engager sans demande prouvée
 
@@ -128,12 +138,12 @@ jamais pièce par pièce (voir `CLAUDE.md`, section serveur).
 3. ~~Escalade + ack d'incidents~~ — fait
 4. ~~Déduplication / groupement d'alertes~~ — fait
 5. Canal webhook générique (Slack/Teams/Discord)
-6. Tagging des hôtes
+6. Groupes dynamiques d'hôtes (le tagging brut existe déjà)
 7. Secret scanning + Trivy bloquant en CI
 8. Finir les assets PWA réels (icônes, captures — actuellement des placeholders SVG)
-9. Mettre à jour les captures d'écran (`screenshot/` ne couvre que APT/Audit/Dashboard/
-   Docker/HostDetail ; Proxmox, Network, Traffic/Threats, Monitoring, Runbooks n'en ont
-   aucune alors que ce sont des fonctionnalités substantielles)
+9. Compléter les captures d'écran (`screenshot/` couvre APT/Audit/Dashboard/Docker/
+   HostDetail/Monitoring/Proxmox ; Network, Traffic/Threats et Runbooks n'en ont
+   toujours aucune alors que ce sont des fonctionnalités substantielles)
 10. Décision explicite et documentée sur le scope i18n (rester FR-only assumé, ou prévoir
     l'anglais)
 
