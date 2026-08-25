@@ -60,7 +60,17 @@ html {
    settles. On a phone it also has no room to spare, so instead of a box in
    the flow it becomes a full-screen overlay, which is what every mobile
    console (PVE's own included) does. dvh, not vh: with vh the last rows sit
-   under the soft keyboard once it opens. */
+   under the soft keyboard once it opens.
+
+   --console-vh (set by ProxmoxConsole.vue from window.visualViewport, see
+   its comment) is a third, more reliable rung on top of vh/dvh: some mobile
+   browsers report a `dvh` that doesn't track the *currently* visible area
+   as the address bar shows/hides (dvh support/behavior is inconsistent
+   across mobile browser versions, unlike visualViewport which reflects the
+   real visible viewport directly) — when a stale/wrong dvh is taller than
+   what's actually on screen, the touch bar at the bottom of the panel ends
+   up pushed past the visible fold. Falls back to 100dvh until the JS listener
+   has run once. */
 @media (max-width: 991px) {
   .side-panel.side-panel-terminal {
     position: fixed !important;
@@ -68,6 +78,7 @@ html {
     width: 100%;
     height: 100vh !important;
     height: 100dvh !important;
+    height: var(--console-vh, 100dvh) !important;
     max-height: none;
     overflow: hidden !important;
     z-index: var(--z-index-modal);

@@ -199,6 +199,26 @@ useModalChrome(ref(null), () => props.show && isMobileViewport.value, {
   lockScroll: true,
 })
 
+// Feeds style.css's --console-vh: some mobile browsers report a `100dvh`
+// that doesn't track the actually-visible area as the address bar
+// shows/hides (dvh browser support/behavior is inconsistent, unlike
+// visualViewport which reflects the real visible viewport directly) — a
+// stale/too-tall dvh pushes the touch bar at the bottom of the full-screen
+// console past the visible fold. window.visualViewport is undefined only on
+// very old browsers, where the CSS var stays unset and style.css's
+// `var(--console-vh, 100dvh)` falls back to the previous dvh-only behavior.
+function updateConsoleVh(): void {
+  const h = window.visualViewport?.height ?? window.innerHeight
+  document.documentElement.style.setProperty('--console-vh', `${h}px`)
+}
+updateConsoleVh()
+window.visualViewport?.addEventListener('resize', updateConsoleVh)
+window.addEventListener('resize', updateConsoleVh)
+onBeforeUnmount(() => {
+  window.visualViewport?.removeEventListener('resize', updateConsoleVh)
+  window.removeEventListener('resize', updateConsoleVh)
+})
+
 let term: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let resizeObserver: ResizeObserver | null = null
