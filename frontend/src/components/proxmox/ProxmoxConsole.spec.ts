@@ -206,6 +206,26 @@ describe('ProxmoxConsole', () => {
     expect(sendInputMock.mock.calls.map((c) => c[0])).toEqual(['\u001b', '\t', '\u001b[A', '\u001b[C'])
   })
 
+  it('does not refocus the terminal on an arrow tap, unlike Ctrl/^C/Esc/Tab', async () => {
+    // Regression test: an arrow is a complete, one-shot action with nothing
+    // to follow it. Unlike Ctrl/^C/Esc/Tab (which need the soft keyboard to
+    // stay open for the next keystroke), calling term.focus() here used to
+    // pop the mobile keyboard up over the touch bar on a phone where it
+    // wasn't already open (e.g. right after opening the console), burying
+    // the very arrow buttons just tapped.
+    statusRef.value = 'connected'
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+    termFocusMock.mockClear()
+
+    await wrapper.find('button[title="Haut (historique)"]').trigger('click')
+    await wrapper.find('button[title="Bas (historique)"]').trigger('click')
+    await wrapper.find('button[title="Gauche"]').trigger('click')
+    await wrapper.find('button[title="Droite"]').trigger('click')
+
+    expect(termFocusMock).not.toHaveBeenCalled()
+  })
+
   it('the sticky Ctrl key rewrites the next typed character into its control code', async () => {
     statusRef.value = 'connected'
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })

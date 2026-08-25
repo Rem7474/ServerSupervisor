@@ -84,7 +84,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           title="Haut (historique)"
-          @click="sendKey('\u001b[A')"
+          @click="sendArrow('\u001b[A')"
         >
           <IconArrowUp
             :size="14"
@@ -96,7 +96,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           title="Bas (historique)"
-          @click="sendKey('\u001b[B')"
+          @click="sendArrow('\u001b[B')"
         >
           <IconArrowDown
             :size="14"
@@ -108,7 +108,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           title="Gauche"
-          @click="sendKey('\u001b[D')"
+          @click="sendArrow('\u001b[D')"
         >
           <IconArrowLeft
             :size="14"
@@ -120,7 +120,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           title="Droite"
-          @click="sendKey('\u001b[C')"
+          @click="sendArrow('\u001b[C')"
         >
           <IconArrowRight
             :size="14"
@@ -141,6 +141,7 @@ import '@xterm/xterm/css/xterm.css'
 import CommandLogPanel from '../host/CommandLogPanel.vue'
 import { useProxmoxConsole } from '../../composables/useProxmoxConsole'
 import { useStatusBadge } from '../../composables/useStatusBadge'
+import { useModalChrome } from '../../composables/useModalChrome'
 
 const props = withDefaults(defineProps<{
   guestId: string
@@ -179,6 +180,25 @@ const statusLabels: Record<string, string> = {
 }
 const statusLabel = computed(() => statusLabels[status.value] ?? status.value)
 
+// Below 991px (style.css's .side-panel-terminal breakpoint) the panel
+// becomes a `position: fixed` full-viewport overlay instead of the desktop
+// sticky sidebar — without a real body scroll lock, iOS Safari can still
+// rubber-band/reveal the page behind it. Desktop's sidebar sits in the
+// normal page flow, so it must NOT lock scroll. ESC/Tab are real terminal
+// keys here (not modal-dismiss/focus-trap gestures), so only the lock is
+// wired in — closeOnEsc/trapFocus stay off, and the DOM ref they'd need is
+// therefore unused.
+const mobileQuery = window.matchMedia('(max-width: 991px)')
+const isMobileViewport = ref(mobileQuery.matches)
+const onMobileQueryChange = (e: MediaQueryListEvent) => { isMobileViewport.value = e.matches }
+mobileQuery.addEventListener('change', onMobileQueryChange)
+onBeforeUnmount(() => mobileQuery.removeEventListener('change', onMobileQueryChange))
+useModalChrome(ref(null), () => props.show && isMobileViewport.value, {
+  closeOnEsc: false,
+  trapFocus: false,
+  lockScroll: true,
+})
+
 let term: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let resizeObserver: ResizeObserver | null = null
@@ -216,11 +236,21 @@ function toggleCtrl(): void {
 }
 
 // Refocus after every touch key so the soft keyboard stays up and the next
-// keystroke still lands in the terminal.
+// keystroke still lands in the terminal. Only for keys the user is meant to
+// keep typing after (Ctrl/^C/Esc/Tab) — an arrow tap is a complete, one-shot
+// action with nothing to follow it, so it must NOT call this: on a phone
+// with the keyboard not already open (e.g. browsing history via the arrows
+// right after opening the console), term.focus() pops the soft keyboard up
+// over the touch bar itself, burying the very buttons just tapped.
 function sendKey(sequence: string): void {
   sendInput(sequence)
   ctrlArmed.value = false
   term?.focus()
+}
+
+function sendArrow(sequence: string): void {
+  sendInput(sequence)
+  ctrlArmed.value = false
 }
 
 function connect(): void {
