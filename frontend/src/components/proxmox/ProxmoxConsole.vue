@@ -199,14 +199,19 @@ useModalChrome(ref(null), () => props.show && isMobileViewport.value, {
   lockScroll: true,
 })
 
-// Feeds style.css's --console-vh: some mobile browsers report a `100dvh`
-// that doesn't track the actually-visible area as the address bar
-// shows/hides (dvh browser support/behavior is inconsistent, unlike
-// visualViewport which reflects the real visible viewport directly) — a
-// stale/too-tall dvh pushes the touch bar at the bottom of the full-screen
-// console past the visible fold. window.visualViewport is undefined only on
-// very old browsers, where the CSS var stays unset and style.css's
-// `var(--console-vh, 100dvh)` falls back to the previous dvh-only behavior.
+// Feeds style.css's --console-vh, consumed by two separate rules there:
+// - mobile (<991px, full-screen overlay): some mobile browsers report a
+//   `100dvh` that doesn't track the actually-visible area as the address
+//   bar shows/hides (dvh support/behavior is inconsistent, unlike
+//   visualViewport which reflects the real visible viewport directly) — a
+//   stale/too-tall dvh pushes the touch bar past the visible fold.
+// - desktop (≥992px, sticky sidebar): the shared `.side-panel` convention's
+//   hardcoded `calc(100vh - 160px)` sticky height has, on some setups, left
+//   too little margin, which — once the panel is actually stuck — cannot be
+//   recovered by scrolling (reported: touch bar unreachable "even scrolling").
+// window.visualViewport is undefined only on very old browsers, where the
+// CSS var stays unset and style.css's `var(--console-vh, 100dvh|100vh)`
+// falls back to the previous vh/dvh-only behavior on each rule respectively.
 function updateConsoleVh(): void {
   const h = window.visualViewport?.height ?? window.innerHeight
   document.documentElement.style.setProperty('--console-vh', `${h}px`)

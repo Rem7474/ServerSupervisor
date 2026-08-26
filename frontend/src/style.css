@@ -85,6 +85,27 @@ html {
   }
 }
 
+/* The shared `.side-panel` rule above (unconditional, not media-scoped)
+   hardcodes `height: calc(100vh - 160px)` as the sticky sidebar's height —
+   an assumed margin that has room to spare on some desktop setups but not
+   others (browser zoom, OS display scaling, extension toolbars — reported
+   case: the terminal's touch bar unreachable, "invisible even scrolling").
+   Once a `position: sticky` element is fully stuck, scrolling the page
+   can't reveal anything past its own bottom edge — its own box has to
+   actually fit the viewport, that's not just a nice-to-have margin. Reuses
+   the same --console-vh measured value as the mobile rule above (accurate
+   on desktop too — no dvh-vs-visible-viewport mismatch to begin with there),
+   sized to leave only the 1rem `top` offset plus a matching 1rem margin at
+   the bottom — measured, not guessed. Scoped to the terminal variant only:
+   the other `.side-panel` consumers (disk/host/network history charts)
+   haven't been reported broken, and changing their sizing isn't this fix's
+   job. */
+@media (min-width: 992px) {
+  .side-panel.side-panel-terminal {
+    height: calc(var(--console-vh, 100vh) - 2rem);
+  }
+}
+
 body {
   min-height: 100vh;
   margin: 0;
