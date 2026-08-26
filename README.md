@@ -1318,4 +1318,4 @@ ServerSupervisor/
 
 ## Licence
 
-MIT
+[GNU AGPLv3](LICENSE)
