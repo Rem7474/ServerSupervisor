@@ -14,8 +14,16 @@
 - [Restic-Example-Nextcloud-AIO](Restic-Example-Nextcloud-AIO.md)
 - [Restic-Example-Immich](Restic-Example-Immich.md)
 
-**Alertes**
+**Alertes & Monitoring**
 - [Alerting](Alerting.md)
+- [Monitoring](Monitoring.md)
+- [Notifications](Notifications.md)
+
+**Compte & Sécurité**
+- [Two-Factor-Authentication](Two-Factor-Authentication.md)
+
+**Hôtes**
+- [Host-Discovery](Host-Discovery.md)
 
 ---
 [README](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md)

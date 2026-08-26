@@ -98,11 +98,13 @@ plus ancien au plus récent.
 |---|---|---|
 | `smtp` | Email | `SMTP_HOST`/`SMTP_FROM` globaux + `actions.smtp_to` sur la règle |
 | `ntfy` | Push ntfy | `NOTIFY_URL` global fournit le serveur (schéma + hôte) ; `actions.ntfy_topic` surcharge le topic par règle |
-| `browser` | Notification in-app (WebSocket) **et** Web Push si le navigateur est abonné | Clés VAPID configurées pour le Web Push |
+| `browser` | Notification in-app (WebSocket) **et** Web Push si le navigateur est abonné | Aucune — les clés VAPID sont générées et persistées automatiquement au premier envoi (voir [Notifications](Notifications.md)) |
 | `notify` | **Déprécié.** POST JSON brut vers `NOTIFY_URL` | `NOTIFY_URL` |
 
 Un canal dont la destination n'est pas configurée est **journalisé et ignoré**,
-il ne fait pas échouer les autres canaux de la même notification.
+il ne fait pas échouer les autres canaux de la même notification. Le Web Push ne délivre
+qu'aux comptes **admin** abonnés, quel que soit le rôle ciblé par la règle — voir
+[Notifications](Notifications.md#3-portée--qui-reçoit-quoi).
 
 > Le canal `notify` est la seule forme de « webhook générique » existante, et
 > il est marqué déprécié dans le code. Un vrai canal
@@ -217,4 +219,4 @@ Le filtrage du sélecteur d'hôtes accepte le nom **ou** un tag d'hôte.
 - [Runbooks-and-Scheduled-Tasks.md](Runbooks-and-Scheduled-Tasks.md) : le
   vocabulaire module/action/cible partagé par `command_trigger`
 - [ROADMAP.md](https://github.com/Rem7474/ServerSupervisor/blob/main/ROADMAP.md) : canaux de notification supplémentaires (#6),
-  tagging d'hôtes et règles par groupe (#7)
+  groupes dynamiques d'hôtes et règles par groupe (#7)

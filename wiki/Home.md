@@ -21,6 +21,10 @@ et la référence API, voir le
 | [Restic-Backups](Restic-Backups.md) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
 | [Restic-Example-Nextcloud-AIO](Restic-Example-Nextcloud-AIO.md) / [Restic-Example-Immich](Restic-Example-Immich.md) | Recettes resticprofile complètes pour deux apps auto-hébergées courantes |
 | [Alerting](Alerting.md) | Moteur d'alertes : seuils, hystérésis, incidents, ack/escalade, corrélation, maintenance, modèles |
+| [Monitoring](Monitoring.md) | Sondes uptime HTTP/TCP/ICMP et certificats SSL/TLS |
+| [Notifications](Notifications.md) | Centre de notifications in-app et Web Push (VAPID) |
+| [Two-Factor-Authentication](Two-Factor-Authentication.md) | TOTP et clés de sécurité/passkeys (WebAuthn) |
+| [Host-Discovery](Host-Discovery.md) | Scan de sous-réseau et ajout en masse |
 | [Custom-Tasks-Examples](Custom-Tasks-Examples.md) | Exemples de `tasks.yaml` prêts à copier |
 
 ## Autres ressources
