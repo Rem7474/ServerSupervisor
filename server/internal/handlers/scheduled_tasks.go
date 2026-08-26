@@ -46,7 +46,7 @@ func (h *ScheduledTaskHandler) ListScheduledTasks(c *gin.Context) {
 
 // CreateScheduledTask creates a new scheduled task for a host. Requires
 // Operator+ on that host — mirrors RunScheduledTask's check (see
-// docs/runbooks-scheduled-tasks.md §3, previously an undocumented gap: only
+// wiki/Runbooks-and-Scheduled-Tasks.md §3, previously an undocumented gap: only
 // manual run was role-checked, create/update/delete were not).
 func (h *ScheduledTaskHandler) CreateScheduledTask(c *gin.Context) {
 	if !requireHostAccess(c, h.db, c.Param("id"), "operator") {

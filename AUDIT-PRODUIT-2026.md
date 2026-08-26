@@ -39,7 +39,7 @@ Les manques les plus limitants pour un usage NOC/ops sérieux au quotidien : pas
 Slack/Teams/Discord/webhook générique, pas de groupes d'hôtes dérivés des tags. Quatre items listés ici à
 l'origine sont depuis **corrigés** : la faille RBAC sur la création/modification de tâches
 planifiées (voir [ROADMAP.md](ROADMAP.md) item #1 et
-[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)),
+[Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks#3-lasymétrie-en-un-coup-dœil)),
 l'absence de fenêtres de maintenance (item #2, `internal/services/maintenance`), l'absence
 d'escalade/acquittement d'incident (items #3/#4, `AlertActions.EscalateAfterMinutes` +
 `AcknowledgeIncident`) et l'absence de déduplication (item #5, `alert_incidents.correlated_with`

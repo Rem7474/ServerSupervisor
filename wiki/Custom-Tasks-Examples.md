@@ -5,7 +5,7 @@ l'agent, par défaut `/etc/serversupervisor/tasks.yaml`.
 
 La référence des champs (`id`, `name`, `command`, `timeout`), les variables
 `SS_*` injectées par un webhook Git et les trois façons de déclencher une
-tâche sont dans le [README](../README.md#tâches-custom-tasksyaml). Ce fichier
+tâche sont dans le [README](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md#tâches-custom-tasksyaml). Ce fichier
 ne contient que des exemples.
 
 > **Rappel sur le shell.** L'agent exécute `command` comme un argv, sans
@@ -43,7 +43,7 @@ tasks:
 une connexion lente ; le maximum accepté est 3600 secondes.
 
 > Pour des conteneurs gérés par Compose, le [suivi de
-> releases](git-webhooks-releases.md) fait déjà `compose pull` + `up -d`
+> releases](Git-Webhooks-and-Releases.md) fait déjà `compose pull` + `up -d`
 > automatiquement à la détection d'une nouvelle image. Ces tâches restent
 > utiles pour un déclenchement manuel, un hôte sans tracker, ou un
 > enchaînement qui dépasse la simple mise à jour.

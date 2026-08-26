@@ -54,7 +54,7 @@ describe('HostDiagnosticsBanner', () => {
     const wrapper = mount(HostDiagnosticsBanner, { props: { diagnostics } })
     const links = wrapper.findAll('a')
     expect(links.length).toBe(1)
-    expect(links[0].attributes('href')).toContain('backup-restic.md')
+    expect(links[0].attributes('href')).toContain('wiki/Restic-Backups')
   })
 
   const oneIssue: DiagnosticIssue[] = [{ collector: 'restic', severity: 'error', message: 'resticconf introuvable' }]

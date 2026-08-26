@@ -65,6 +65,6 @@ immich-db:
 
 Points à noter :
 - `/UPLOAD_LOCATION` est le point de montage que vous avez défini dans le `.env` d'Immich — adaptez le chemin réel.
-- Pour déclencher les quatre profils en une fois (backup manuel ou tâche planifiée), utilisez le nom du groupe `full-immich-backup` comme cible — voir la section 4 du [guide principal](../backup-restic.md#4-resticprofileyaml--définir-vos-profils-de-sauvegarde) pour la syntaxe `groups:`.
+- Pour déclencher les quatre profils en une fois (backup manuel ou tâche planifiée), utilisez le nom du groupe `full-immich-backup` comme cible — voir la section 4 du [guide principal](Restic-Backups.md#4-resticprofileyaml--définir-vos-profils-de-sauvegarde) pour la syntaxe `groups:`.
 
-Voir aussi le [guide principal Restic](../backup-restic.md) pour l'installation, l'activation côté agent et le déclenchement depuis ServerSupervisor.
+Voir aussi le [guide principal Restic](Restic-Backups.md) pour l'installation, l'activation côté agent et le déclenchement depuis ServerSupervisor.

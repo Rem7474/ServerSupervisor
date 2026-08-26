@@ -114,8 +114,8 @@ Expert).
 
 Pour aligner l'exécution sur votre propre fuseau, définissez la variable
 d'environnement `TZ` du service `server` (ex : `TZ=Europe/Paris` dans
-`.env`, voir [`docker-compose.yml`](../docker-compose.yml) et
-[`.env.example`](../.env.example)) — Go/tzdata la respecte nativement (le
+`.env`, voir [`docker-compose.yml`](https://github.com/Rem7474/ServerSupervisor/blob/main/docker-compose.yml) et
+[`.env.example`](https://github.com/Rem7474/ServerSupervisor/blob/main/.env.example)) — Go/tzdata la respecte nativement (le
 paquet `tzdata` est déjà installé dans l'image finale), aucun rebuild n'est
 nécessaire, un simple `docker compose up -d --force-recreate server`
 suffit. Le champ "Prochaine exécution" affiché dans l'UI est, lui, toujours
@@ -140,7 +140,7 @@ admin-only + whitelist stricte. Une tâche planifiée reste bornée à un seul
 hôte à la fois.
 
 > **Historique** : jusqu'à la correction de cette faille (voir
-> [ROADMAP.md](../ROADMAP.md), item #1), la création/modification/
+> [ROADMAP.md](https://github.com/Rem7474/ServerSupervisor/blob/main/ROADMAP.md), item #1), la création/modification/
 > suppression n'étaient vérifiées par aucun rôle côté API — un `viewer`
 > capable d'appeler l'API directement (pas via le dashboard, qui masquait
 > déjà ces actions) pouvait créer une tâche planifiée sur n'importe quel
@@ -163,8 +163,8 @@ hôte à la fois.
 
 ## Pour aller plus loin
 
-Voir aussi [Webhooks Git et suivi de releases](git-webhooks-releases.md) pour
-l'autre famille de déclencheurs, [Sauvegardes Restic](backup-restic.md) pour
+Voir aussi [Webhooks Git et suivi de releases](Git-Webhooks-and-Releases.md) pour
+l'autre famille de déclencheurs, [Sauvegardes Restic](Restic-Backups.md) pour
 le détail du module `restic` utilisable en tâche planifiée, et la section
-[Runbooks & Tâches planifiées](../README.md#runbooks--tâches-planifiées) du
+[Runbooks & Tâches planifiées](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md#runbooks--tâches-planifiées) du
 README pour le tableau complet des routes API.

@@ -162,7 +162,7 @@ func newScheduledTasksRouterAsOperator(t *testing.T) (*gin.Engine, *database.DB)
 }
 
 // TestScheduledTaskCreateRequiresOperatorHostAccess is the regression test for
-// the RBAC gap documented in docs/runbooks-scheduled-tasks.md §3: create was
+// the RBAC gap documented in wiki/Runbooks-and-Scheduled-Tasks.md §3: create was
 // previously reachable by any authenticated caller regardless of per-host
 // permissions, unlike RunScheduledTask which was already Operator+-gated.
 func TestScheduledTaskCreateRequiresOperatorHostAccess(t *testing.T) {

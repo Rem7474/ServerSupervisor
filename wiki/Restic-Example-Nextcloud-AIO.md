@@ -36,6 +36,6 @@ nextcloud-db:
 
 Points à noter :
 - `run-after-fail` désactive le mode maintenance même si le backup échoue — sans ça, un backup en erreur laisse l'instance bloquée en maintenance.
-- Les deux profils sont indépendants : déclenchez-les séparément (backup manuel ou tâche planifiée par profil), ou groupez-les sous une entrée `groups:` si vous voulez les deux dans un seul appel — voir la section 4 du [guide principal](../backup-restic.md#4-resticprofileyaml--définir-vos-profils-de-sauvegarde).
+- Les deux profils sont indépendants : déclenchez-les séparément (backup manuel ou tâche planifiée par profil), ou groupez-les sous une entrée `groups:` si vous voulez les deux dans un seul appel — voir la section 4 du [guide principal](Restic-Backups.md#4-resticprofileyaml--définir-vos-profils-de-sauvegarde).
 
-Voir aussi le [guide principal Restic](../backup-restic.md) pour l'installation, l'activation côté agent et le déclenchement depuis ServerSupervisor.
+Voir aussi le [guide principal Restic](Restic-Backups.md) pour l'installation, l'activation côté agent et le déclenchement depuis ServerSupervisor.
