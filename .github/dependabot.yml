@@ -4,6 +4,7 @@ updates:
   # ── Actions GitHub ────────────────────────────────────────
   - package-ecosystem: github-actions
     directory: /
+    target-branch: dev
     schedule:
       interval: weekly
       day: monday
@@ -22,6 +23,7 @@ updates:
   # ── Go - Serveur ──────────────────────────────────────────
   - package-ecosystem: gomod
     directory: /server
+    target-branch: dev
     schedule:
       interval: weekly
       day: monday
@@ -49,6 +51,7 @@ updates:
   # ── Go - Agent ────────────────────────────────────────────
   - package-ecosystem: gomod
     directory: /agent
+    target-branch: dev
     schedule:
       interval: weekly
       day: monday
@@ -73,6 +76,7 @@ updates:
   # ── npm - Frontend ────────────────────────────────────────
   - package-ecosystem: npm
     directory: /frontend
+    target-branch: dev
     schedule:
       interval: weekly
       day: tuesday    # décalé pour éviter trop de PRs le même jour
@@ -111,6 +115,7 @@ updates:
   # ── Docker - images de base ───────────────────────────────────
   - package-ecosystem: docker
     directory: /server
+    target-branch: dev
     schedule:
       interval: weekly
       day: wednesday
