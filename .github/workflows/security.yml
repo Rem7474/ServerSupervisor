@@ -83,6 +83,12 @@ jobs:
     name: nancy (server)
     runs-on: ubuntu-latest
     environment: Action
+    # GitHub withholds repo/environment secrets from Dependabot's own
+    # pull_request events (same restriction that made SonarQube Scan fail on
+    # #304 — see #306) — OSS_INDEX_USER/TOKEN resolve empty and nancy fails
+    # every time with a 401 that carries no real signal. Skip rather than
+    # fail; the weekly schedule run and non-Dependabot PRs still cover this.
+    if: github.actor != 'dependabot[bot]'
 
     steps:
       - uses: actions/checkout@v7
@@ -104,6 +110,8 @@ jobs:
     name: nancy (agent)
     runs-on: ubuntu-latest
     environment: Action
+    # See nancy-server above.
+    if: github.actor != 'dependabot[bot]'
 
     steps:
       - uses: actions/checkout@v7
