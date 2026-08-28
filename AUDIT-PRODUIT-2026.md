@@ -115,7 +115,7 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
 | Gestion des règles | Moteur d'alertes correct (hystérésis, cooldown), templates réutilisables cross-host (`alert_rule_templates`, ROADMAP.md item #9) | Pas encore de règles par tag : les tags existent (`hosts.tags`, utilisables pour filtrer les hôtes à l'application d'un modèle) mais aucune règle ne cible un tag — item #7 | — |
 | API | REST bien organisée par domaine | Aucun — le RBAC sur le CRUD des tâches planifiées, manquant à l'origine, est corrigé (ROADMAP.md item #1) | — |
 | Extension / plugins | Absent — plus gros écart structurel avec Checkmk | Élargir encore le nombre de types de check « en dur » (SNMP basique — ICMP fait, item #8) avant tout runtime de plugin | Ne pas construire de plugin engine sans demande prouvée |
-| Sécurité | Bon niveau (JWT, MFA, rate limiting, audit, secrets jamais renvoyés au frontend) | Pas de secret scanning ni signature d'image en CI, Trivy non bloquant — dette silencieuse, effort faible | — |
+| Sécurité | Bon niveau (JWT, MFA, rate limiting, audit, secrets jamais renvoyés au frontend). Secret scanning (TruffleHog, `secret-scan.yml`) et Trivy bloquant (`security.yml`) en CI depuis ROADMAP.md item #7 ; signature d'image déjà couverte côté release (cosign, `release.yml`) | — | — |
 | Scalabilité | Assumée single-instance par design (WS hubs, event bus, rate limiter, store WebAuthn) — cohérent avec `docker-compose.yml` actuel | Anticiper explicitement avant toute promesse de HA/clustering | Ne pas scaler une seule brique isolément |
 
 ## 4. Lecture architecture — frontend
@@ -157,9 +157,11 @@ release/push Git) directement liée à la supervision. C'est l'angle à assumer 
   `pg_dump`/`pg_restore` testée bout-en-bout (voir README), mais dépend de la discipline
   humaine (snapshot avant upgrade) — automatiser le snapshot pré-migration réduirait le
   risque.
-- 🟡 **CI incomplète** : Trivy non bloquant, pas de secret scanning, pas de gate de
-  couverture, tests navigateur désactivés (bug amont Vite/Vitest) — dette silencieuse qui
-  grossit si non traitée.
+- ✅ **Trivy bloquant + secret scanning** : corrigé (voir ROADMAP.md item #7) — Trivy
+  échoue désormais la CI sur CRITICAL/HIGH (`security.yml`), TruffleHog scanne chaque
+  push/PR (`secret-scan.yml`).
+- 🟡 **CI incomplète (résiduel)** : pas de gate de couverture, tests navigateur désactivés
+  (bug amont Vite/Vitest) — dette silencieuse qui grossit si non traitée.
 - 🟢 **Absence d'auto-observabilité du serveur** (pas de `/metrics`, pas d'OTel) — ironique
   pour un outil de supervision, gênant pour diagnostiquer l'outil lui-même à plus grande
   échelle.

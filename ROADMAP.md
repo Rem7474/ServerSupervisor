@@ -139,7 +139,7 @@ jamais pièce par pièce (voir `CLAUDE.md`, section serveur).
 4. ~~Déduplication / groupement d'alertes~~ — fait
 5. Canal webhook générique (Slack/Teams/Discord)
 6. Groupes dynamiques d'hôtes (le tagging brut existe déjà)
-7. Secret scanning + Trivy bloquant en CI
+7. ~~Secret scanning + Trivy bloquant en CI~~ — fait
 8. Finir les assets PWA réels (icônes, captures — actuellement des placeholders SVG)
 9. Compléter les captures d'écran (`screenshot/` couvre APT/Audit/Dashboard/Docker/
    HostDetail/Monitoring/Proxmox ; Network, Traffic/Threats et Runbooks n'en ont
