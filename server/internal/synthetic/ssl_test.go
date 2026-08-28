@@ -120,6 +120,53 @@ func selfSignedCert(t *testing.T, notAfter time.Time) tls.Certificate {
 	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
 }
 
+// certChain generates a self-signed root CA and a leaf certificate for
+// 127.0.0.1 signed by it, so a test can exercise the intermediates pool
+// checkCertificate builds from state.PeerCertificates[1:] — a lone
+// self-signed leaf (selfSignedCert above) never has a second certificate to
+// put in that pool.
+func certChain(t *testing.T) tls.Certificate {
+	t.Helper()
+	rootKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate root key: %v", err)
+	}
+	rootTmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "test root CA"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(24 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	rootDER, err := x509.CreateCertificate(rand.Reader, rootTmpl, rootTmpl, &rootKey.PublicKey, rootKey)
+	if err != nil {
+		t.Fatalf("create root certificate: %v", err)
+	}
+	rootCert, err := x509.ParseCertificate(rootDER)
+	if err != nil {
+		t.Fatalf("parse root certificate: %v", err)
+	}
+
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate leaf key: %v", err)
+	}
+	leafTmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject:      pkix.Name{CommonName: "127.0.0.1"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	leafDER, err := x509.CreateCertificate(rand.Reader, leafTmpl, rootCert, &leafKey.PublicKey, rootKey)
+	if err != nil {
+		t.Fatalf("create leaf certificate: %v", err)
+	}
+	return tls.Certificate{Certificate: [][]byte{leafDER, rootDER}, PrivateKey: leafKey}
+}
+
 // listenTLS starts a TLS listener serving cert on 127.0.0.1 and accepts
 // (and discards) connections in the background until the test ends.
 func listenTLS(t *testing.T, cert tls.Certificate) int {
@@ -191,6 +238,25 @@ func TestCheckCertificate_ExpiredSelfSignedReportsExpiry(t *testing.T) {
 
 	if !strings.Contains(result.LastError, "certificate expired on") {
 		t.Fatalf("expected last_error to mention expiry, got %q", result.LastError)
+	}
+}
+
+func TestCheckCertificate_ChainWithIntermediateIsRead(t *testing.T) {
+	port := listenTLS(t, certChain(t))
+
+	result := checkCertificate(context.Background(), models.SSLCertificate{
+		ID:   "cert-4",
+		Host: "127.0.0.1",
+		Port: port,
+	})
+
+	if result.SerialNumber == "" {
+		t.Fatal("expected the leaf certificate to be read despite the extra intermediate in the chain")
+	}
+	// Still untrusted (the root above is never added to any trust store) —
+	// last_error must say so rather than come back empty.
+	if result.LastError == "" {
+		t.Fatal("expected last_error to report the untrusted root")
 	}
 }
 
