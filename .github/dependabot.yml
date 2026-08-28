@@ -14,7 +14,7 @@ updates:
       prefix: "ci"
     labels:
       - dependencies
-      - github-actions
+      - ci
     groups:
       github-actions:
         patterns:
@@ -33,7 +33,6 @@ updates:
       prefix: "chore(server)"
     labels:
       - dependencies
-      - go
       - server
     # Grouper les mises à jour mineures/patch ensemble
     groups:
@@ -61,7 +60,6 @@ updates:
       prefix: "chore(agent)"
     labels:
       - dependencies
-      - go
       - agent
     groups:
       agent-minor-patch:
@@ -86,7 +84,6 @@ updates:
       prefix: "chore(frontend)"
     labels:
       - dependencies
-      - javascript
       - frontend
     # Grouper toutes les devDependencies ensemble
     groups:
