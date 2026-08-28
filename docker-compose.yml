@@ -24,9 +24,11 @@ services:
 
   # ServerSupervisor Server (API + Frontend)
   server:
-    build:
-      context: .
-      dockerfile: server/Dockerfile
+    # Pre-built, multi-arch, cosign-signed image published by .github/workflows/release.yml.
+    # Override SERVERSUPERVISOR_IMAGE/SERVERSUPERVISOR_VERSION in .env to pin a specific
+    # release or point at a private mirror; building from source is only needed for local
+    # development (see CONTRIBUTING.md) or docker-compose.demo.yml.
+    image: ${SERVERSUPERVISOR_IMAGE:-ghcr.io/rem7474/serversupervisor}:${SERVERSUPERVISOR_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "${SERVER_PORT:-8080}:8080"
