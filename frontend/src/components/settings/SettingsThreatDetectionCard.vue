@@ -25,7 +25,7 @@
           >WordPress</label>
           <input
             id="threat-weight-wordpress"
-            v-model.number="form.threatWeightWordpress"
+            v-model.number="weightWordpressModel"
             type="number"
             step="0.1"
             min="0"
@@ -39,7 +39,7 @@
           >Panneau admin</label>
           <input
             id="threat-weight-adminpanel"
-            v-model.number="form.threatWeightAdminpanel"
+            v-model.number="weightAdminpanelModel"
             type="number"
             step="0.1"
             min="0"
@@ -53,7 +53,7 @@
           >Traversée de chemin</label>
           <input
             id="threat-weight-pathtraversal"
-            v-model.number="form.threatWeightPathtraversal"
+            v-model.number="weightPathtraversalModel"
             type="number"
             step="0.1"
             min="0"
@@ -67,7 +67,7 @@
           >Scanner connu</label>
           <input
             id="threat-weight-knownscanner"
-            v-model.number="form.threatWeightKnownscanner"
+            v-model.number="weightKnownscannerModel"
             type="number"
             step="0.1"
             min="0"
@@ -81,7 +81,7 @@
           >Méthode suspecte</label>
           <input
             id="threat-weight-suspiciousmethod"
-            v-model.number="form.threatWeightSuspiciousmethod"
+            v-model.number="weightSuspiciousmethodModel"
             type="number"
             step="0.1"
             min="0"
@@ -101,7 +101,7 @@
           >2xx (succès)</label>
           <input
             id="threat-weight-status-2xx"
-            v-model.number="form.threatWeightStatus2xx"
+            v-model.number="weightStatus2xxModel"
             type="number"
             step="0.05"
             min="0"
@@ -115,7 +115,7 @@
           >3xx (redirection)</label>
           <input
             id="threat-weight-status-3xx"
-            v-model.number="form.threatWeightStatus3xx"
+            v-model.number="weightStatus3xxModel"
             type="number"
             step="0.1"
             min="0"
@@ -129,7 +129,7 @@
           >404</label>
           <input
             id="threat-weight-status-404"
-            v-model.number="form.threatWeightStatus404"
+            v-model.number="weightStatus404Model"
             type="number"
             step="0.1"
             min="0"
@@ -143,7 +143,7 @@
           >4xx (autre)</label>
           <input
             id="threat-weight-status-4xx"
-            v-model.number="form.threatWeightStatus4xx"
+            v-model.number="weightStatus4xxModel"
             type="number"
             step="0.1"
             min="0"
@@ -157,7 +157,7 @@
           >5xx</label>
           <input
             id="threat-weight-status-5xx"
-            v-model.number="form.threatWeightStatus5xx"
+            v-model.number="weightStatus5xxModel"
             type="number"
             step="0.1"
             min="0"
@@ -177,7 +177,7 @@
           >Largeur (chemins distincts)</label>
           <input
             id="threat-weight-breadth"
-            v-model.number="form.threatWeightBreadth"
+            v-model.number="weightBreadthModel"
             type="number"
             step="0.1"
             min="0"
@@ -198,7 +198,7 @@
           >Volume de requêtes</label>
           <input
             id="threat-weight-hits"
-            v-model.number="form.threatWeightHits"
+            v-model.number="weightHitsModel"
             type="number"
             step="0.1"
             min="0"
@@ -225,7 +225,7 @@
           >MEDIUM à partir de</label>
           <input
             id="threat-threshold-medium"
-            v-model.number="form.threatThresholdMedium"
+            v-model.number="thresholdMediumModel"
             type="number"
             step="1"
             min="0"
@@ -239,7 +239,7 @@
           >HIGH à partir de</label>
           <input
             id="threat-threshold-high"
-            v-model.number="form.threatThresholdHigh"
+            v-model.number="thresholdHighModel"
             type="number"
             step="1"
             min="0"
@@ -253,7 +253,7 @@
           >CRITICAL à partir de</label>
           <input
             id="threat-threshold-critical"
-            v-model.number="form.threatThresholdCritical"
+            v-model.number="thresholdCriticalModel"
             type="number"
             step="1"
             min="0"
@@ -322,9 +322,41 @@ const props = withDefaults(defineProps<{
   threatDetectionSaveOk: false,
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'save'): void
+  (e: 'update:form', value: ThreatDetectionForm): void
 }>()
+
+// The `form` prop is owned by the parent (SettingsView, via useSettings) and
+// shared with the other Settings*Card siblings. This component never
+// mutates it in place — every field write emits a whole-object replacement
+// for the parent to apply (bound as `v-model:form` there).
+function updateForm<K extends keyof ThreatDetectionForm>(key: K, value: ThreatDetectionForm[K]): void {
+  emit('update:form', { ...props.form, [key]: value })
+}
+
+function fieldModel<K extends keyof ThreatDetectionForm>(key: K) {
+  return computed<ThreatDetectionForm[K]>({
+    get: () => props.form[key],
+    set: (value) => updateForm(key, value),
+  })
+}
+
+const weightWordpressModel = fieldModel('threatWeightWordpress')
+const weightAdminpanelModel = fieldModel('threatWeightAdminpanel')
+const weightPathtraversalModel = fieldModel('threatWeightPathtraversal')
+const weightKnownscannerModel = fieldModel('threatWeightKnownscanner')
+const weightSuspiciousmethodModel = fieldModel('threatWeightSuspiciousmethod')
+const weightStatus2xxModel = fieldModel('threatWeightStatus2xx')
+const weightStatus3xxModel = fieldModel('threatWeightStatus3xx')
+const weightStatus404Model = fieldModel('threatWeightStatus404')
+const weightStatus4xxModel = fieldModel('threatWeightStatus4xx')
+const weightStatus5xxModel = fieldModel('threatWeightStatus5xx')
+const weightBreadthModel = fieldModel('threatWeightBreadth')
+const weightHitsModel = fieldModel('threatWeightHits')
+const thresholdMediumModel = fieldModel('threatThresholdMedium')
+const thresholdHighModel = fieldModel('threatThresholdHigh')
+const thresholdCriticalModel = fieldModel('threatThresholdCritical')
 
 const thresholdOrderWarning = computed(() => {
   const { threatThresholdMedium: m, threatThresholdHigh: h, threatThresholdCritical: c } = props.form

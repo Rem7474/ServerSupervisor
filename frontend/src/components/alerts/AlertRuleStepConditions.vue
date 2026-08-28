@@ -57,7 +57,7 @@
         >Durée (secondes)</label>
         <input
           id="alert-cond-duration"
-          v-model.number="form.duration"
+          v-model.number="durationModel"
           type="number"
           min="0"
           class="form-control"
@@ -88,7 +88,7 @@
           >Warn si ≥ N service(s) dégradé(s)</label>
           <input
             id="alert-cond-threshold-warn"
-            v-model.number="form.threshold_warn"
+            v-model.number="thresholdWarnModel"
             type="number"
             step="1"
             min="1"
@@ -106,7 +106,7 @@
           >Crit si ≥ N service(s) dégradé(s)</label>
           <input
             id="alert-cond-threshold-crit"
-            v-model.number="form.threshold_crit"
+            v-model.number="thresholdCritModel"
             type="number"
             step="1"
             min="1"
@@ -125,7 +125,7 @@
         >Durée (secondes)</label>
         <input
           id="alert-cond-compose-duration"
-          v-model.number="form.duration"
+          v-model.number="durationModel"
           type="number"
           min="0"
           class="form-control"
@@ -155,7 +155,7 @@
           >Fenêtre de moyenne glissante</label>
           <select
             id="alert-cond-baseline-window"
-            v-model.number="form.baseline_window_seconds"
+            v-model.number="baselineWindowModel"
             class="form-select"
           >
             <option :value="3600">
@@ -181,7 +181,7 @@
           >Seuil d'avertissement (% de la moyenne glissante)</label>
           <input
             id="alert-cond-bandwidth-threshold-warn"
-            v-model.number="form.threshold_warn"
+            v-model.number="thresholdWarnModel"
             type="number"
             step="1"
             min="0"
@@ -197,7 +197,7 @@
           >Seuil critique (% de la moyenne glissante)</label>
           <input
             id="alert-cond-bandwidth-threshold-crit"
-            v-model.number="form.threshold_crit"
+            v-model.number="thresholdCritModel"
             type="number"
             step="1"
             min="0"
@@ -219,7 +219,7 @@
           >Silence maximum (secondes)</label>
           <input
             id="alert-cond-heartbeat-timeout"
-            v-model.number="form.threshold_crit"
+            v-model.number="thresholdCritModel"
             type="number"
             step="60"
             class="form-control"
@@ -246,7 +246,7 @@
           >Opérateur</label>
           <select
             id="alert-cond-operator"
-            v-model="form.operator"
+            v-model="operatorModel"
             class="form-select"
           >
             <option value=">">
@@ -273,7 +273,7 @@
           >Seuil d'avertissement (warn)</label>
           <input
             id="alert-cond-generic-threshold-warn"
-            v-model.number="form.threshold_warn"
+            v-model.number="thresholdWarnModel"
             type="number"
             step="0.1"
             class="form-control"
@@ -288,7 +288,7 @@
           >Seuil critique (crit)</label>
           <input
             id="alert-cond-generic-threshold-crit"
-            v-model.number="form.threshold_crit"
+            v-model.number="thresholdCritModel"
             type="number"
             step="0.1"
             class="form-control"
@@ -306,7 +306,7 @@
           >Seuil de résolution warn (hystérésis)</label>
           <input
             id="alert-cond-threshold-clear-warn"
-            v-model.number="form.threshold_clear_warn"
+            v-model.number="thresholdClearWarnModel"
             type="number"
             step="0.1"
             class="form-control"
@@ -334,7 +334,7 @@
           >Seuil de résolution crit (hystérésis)</label>
           <input
             id="alert-cond-threshold-clear-crit"
-            v-model.number="form.threshold_clear_crit"
+            v-model.number="thresholdClearCritModel"
             type="number"
             step="0.1"
             class="form-control"
@@ -364,7 +364,7 @@
         >Durée (secondes)</label>
         <input
           id="alert-cond-generic-duration"
-          v-model.number="form.duration"
+          v-model.number="durationModel"
           type="number"
           class="form-control"
           placeholder="300"
@@ -499,9 +499,45 @@ const props = defineProps<{
   metricUnit?: string
 }>()
 
-const emit = defineEmits<{ (e: 'download-logs'): void }>()
+const emit = defineEmits<{
+  (e: 'download-logs'): void
+  (e: 'update:form', value: AlertRuleFormData): void
+}>()
 
 type Severity = 'warn' | 'crit'
+
+// ── Shared form-field emit helpers ───────────────────────────────────
+// The `form` prop is owned by the parent (AlertRuleModal, via
+// useAlertRuleForm). This component never mutates it in place — every
+// field write emits a whole-object replacement for the parent to apply
+// (bound as `v-model:form` there), which also keeps sibling reads (e.g.
+// AlertRuleStepSource) consistent.
+
+function updateForm<K extends keyof AlertRuleFormData>(key: K, value: AlertRuleFormData[K]): void {
+  emit('update:form', { ...props.form, [key]: value })
+}
+
+function updateDockerScope<K extends keyof AlertRuleFormData['docker_scope']>(
+  key: K,
+  value: AlertRuleFormData['docker_scope'][K],
+): void {
+  emit('update:form', { ...props.form, docker_scope: { ...props.form.docker_scope, [key]: value } })
+}
+
+function fieldModel<K extends keyof AlertRuleFormData>(key: K) {
+  return computed<AlertRuleFormData[K]>({
+    get: () => props.form[key],
+    set: (value) => updateForm(key, value),
+  })
+}
+
+const durationModel = fieldModel('duration')
+const thresholdWarnModel = fieldModel('threshold_warn')
+const thresholdCritModel = fieldModel('threshold_crit')
+const thresholdClearWarnModel = fieldModel('threshold_clear_warn')
+const thresholdClearCritModel = fieldModel('threshold_clear_crit')
+const baselineWindowModel = fieldModel('baseline_window_seconds')
+const operatorModel = fieldModel('operator')
 
 // ── Docker state helpers ─────────────────────────────────────────────
 
@@ -514,13 +550,12 @@ const dockerStateNoSelection = computed(
 )
 
 function toggleState(level: 'warn' | 'crit', state: string, checked: boolean): void {
-  const arr = level === 'warn' ? props.form.docker_scope.warn_states : props.form.docker_scope.crit_states
-  if (checked) {
-    if (!arr.includes(state)) arr.push(state)
-  } else {
-    const idx = arr.indexOf(state)
-    if (idx >= 0) arr.splice(idx, 1)
-  }
+  const key = level === 'warn' ? 'warn_states' : 'crit_states'
+  const current = props.form.docker_scope[key]
+  const next = checked
+    ? (current.includes(state) ? current : [...current, state])
+    : current.filter((s) => s !== state)
+  updateDockerScope(key, next)
 }
 
 // ── Generic hysteresis helpers (generic form only) ──────────────────

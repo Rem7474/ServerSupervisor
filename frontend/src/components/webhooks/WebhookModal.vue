@@ -124,7 +124,7 @@
             <template v-else>
               <WebhookTrackerFields
                 v-model:container-source-host-id="containerSourceHostId"
-                :form="form"
+                v-model:form="form"
                 :registry-credentials="registryCredentials"
                 :container-hosts="containerHosts"
                 :containers-for-host="containersForHost"

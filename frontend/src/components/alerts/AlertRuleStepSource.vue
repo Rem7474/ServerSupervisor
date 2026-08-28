@@ -7,7 +7,7 @@
       >Nom</label>
       <input
         id="alert-source-name"
-        v-model="form.name"
+        v-model="nameModel"
         type="text"
         class="form-control"
         placeholder="Ex: CPU élevé sur serveur web"
@@ -68,7 +68,7 @@
       >Hôte cible</label>
       <select
         id="alert-source-host-id"
-        v-model="form.host_id"
+        v-model="hostIdModel"
         class="form-select"
         :disabled="!metricSupportsHostFilter"
       >
@@ -148,7 +148,7 @@
         >Scope Proxmox</label>
         <select
           id="alert-source-proxmox-scope-mode"
-          v-model="form.proxmox_scope.scope_mode"
+          v-model="proxmoxScopeModeModel"
           class="form-select"
         >
           <option value="global">
@@ -196,7 +196,7 @@
         >Connexion</label>
         <select
           id="alert-source-proxmox-connection"
-          v-model="form.proxmox_scope.connection_id"
+          v-model="proxmoxConnectionIdModel"
           class="form-select"
         >
           <option value="">
@@ -221,7 +221,7 @@
         >Nœud</label>
         <select
           id="alert-source-proxmox-node"
-          v-model="form.proxmox_scope.node_id"
+          v-model="proxmoxNodeIdModel"
           class="form-select"
         >
           <option value="">
@@ -246,7 +246,7 @@
         >VM/LXC</label>
         <select
           id="alert-source-proxmox-guest"
-          v-model="form.proxmox_scope.guest_id"
+          v-model="proxmoxGuestIdModel"
           class="form-select"
         >
           <option value="">
@@ -271,7 +271,7 @@
         >Stockage</label>
         <select
           id="alert-source-proxmox-storage"
-          v-model="form.proxmox_scope.storage_id"
+          v-model="proxmoxStorageIdModel"
           class="form-select"
         >
           <option value="">
@@ -296,7 +296,7 @@
         >Disque physique</label>
         <select
           id="alert-source-proxmox-disk"
-          v-model="form.proxmox_scope.disk_id"
+          v-model="proxmoxDiskIdModel"
           class="form-select"
         >
           <option value="">
@@ -331,7 +331,7 @@
         >Hôte</label>
         <select
           id="alert-source-docker-host"
-          v-model="form.docker_scope.host_id"
+          :value="form.docker_scope.host_id"
           class="form-select"
           @change="onDockerHostChange"
         >
@@ -364,7 +364,7 @@
         >Scope</label>
         <select
           id="alert-source-docker-scope-mode"
-          v-model="form.docker_scope.scope_mode"
+          :value="form.docker_scope.scope_mode"
           class="form-select"
           @change="onDockerScopeModeChange"
         >
@@ -428,7 +428,7 @@
         >Projet Compose</label>
         <select
           id="alert-source-docker-project"
-          v-model="form.docker_scope.project_name"
+          v-model="dockerProjectNameModel"
           class="form-select"
         >
           <option value="">
@@ -480,7 +480,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
+import type { AlertRuleFormData, DockerScope } from '../../composables/useAlertRuleForm'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 
 interface ScopeOption { id: string; label: string }
@@ -525,7 +525,61 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-metric', value: string): void
   (e: 'set-source-type', value: 'agent' | 'proxmox' | 'synthetic' | 'docker'): void
+  (e: 'update:form', value: AlertRuleFormData): void
 }>()
+
+// ── Shared form-field emit helpers ───────────────────────────────────
+// The `form` prop is owned by the parent (AlertRuleModal, via
+// useAlertRuleForm). This component never mutates it in place — every
+// field write emits a whole-object replacement for the parent to apply
+// (bound as `v-model:form` there), which also keeps sibling reads (e.g.
+// AlertRuleStepConditions) consistent.
+
+function updateForm<K extends keyof AlertRuleFormData>(key: K, value: AlertRuleFormData[K]): void {
+  emit('update:form', { ...props.form, [key]: value })
+}
+
+function updateProxmoxScope<K extends keyof AlertRuleFormData['proxmox_scope']>(
+  key: K,
+  value: AlertRuleFormData['proxmox_scope'][K],
+): void {
+  emit('update:form', { ...props.form, proxmox_scope: { ...props.form.proxmox_scope, [key]: value } })
+}
+
+function updateDockerScope<K extends keyof DockerScope>(key: K, value: DockerScope[K]): void {
+  emit('update:form', { ...props.form, docker_scope: { ...props.form.docker_scope, [key]: value } })
+}
+
+function fieldModel<K extends keyof AlertRuleFormData>(key: K) {
+  return computed<AlertRuleFormData[K]>({
+    get: () => props.form[key],
+    set: (value) => updateForm(key, value),
+  })
+}
+
+function proxmoxScopeModel<K extends keyof AlertRuleFormData['proxmox_scope']>(key: K) {
+  return computed<AlertRuleFormData['proxmox_scope'][K]>({
+    get: () => props.form.proxmox_scope[key],
+    set: (value) => updateProxmoxScope(key, value),
+  })
+}
+
+function dockerScopeModel<K extends keyof DockerScope>(key: K) {
+  return computed<DockerScope[K]>({
+    get: () => props.form.docker_scope[key],
+    set: (value) => updateDockerScope(key, value),
+  })
+}
+
+const nameModel = fieldModel('name')
+const hostIdModel = fieldModel('host_id')
+const proxmoxScopeModeModel = proxmoxScopeModel('scope_mode')
+const proxmoxConnectionIdModel = proxmoxScopeModel('connection_id')
+const proxmoxNodeIdModel = proxmoxScopeModel('node_id')
+const proxmoxGuestIdModel = proxmoxScopeModel('guest_id')
+const proxmoxStorageIdModel = proxmoxScopeModel('storage_id')
+const proxmoxDiskIdModel = proxmoxScopeModel('disk_id')
+const dockerProjectNameModel = dockerScopeModel('project_name')
 
 function isProxmoxMetric(metric: string): boolean {
   return getAlertMetricMeta(metric).category === 'proxmox'
@@ -539,26 +593,45 @@ const selectedDockerHost = computed(() =>
   props.dockerHosts.find(h => h.host_id === props.form.docker_scope?.host_id) ?? null
 )
 
-function onDockerHostChange(): void {
-  props.form.docker_scope.container_id = ''
-  props.form.docker_scope.container_ids = []
-  props.form.docker_scope.project_name = ''
+// Changing the host or the scope mode resets the container/project
+// selection in the same atomic update as the field itself — reading
+// `event.target.value` directly (rather than the prop, which may not have
+// propagated back down yet at this point in the native change handler)
+// keeps the whole docker_scope patch consistent in one emit.
+function onDockerHostChange(event: Event): void {
+  const hostId = (event.target as HTMLSelectElement).value
+  emit('update:form', {
+    ...props.form,
+    docker_scope: {
+      ...props.form.docker_scope,
+      host_id: hostId,
+      container_id: '',
+      container_ids: [],
+      project_name: '',
+    },
+  })
 }
 
-function onDockerScopeModeChange(): void {
-  props.form.docker_scope.container_id = ''
-  props.form.docker_scope.container_ids = []
-  props.form.docker_scope.project_name = ''
+function onDockerScopeModeChange(event: Event): void {
+  const scopeMode = (event.target as HTMLSelectElement).value
+  emit('update:form', {
+    ...props.form,
+    docker_scope: {
+      ...props.form.docker_scope,
+      scope_mode: scopeMode,
+      container_id: '',
+      container_ids: [],
+      project_name: '',
+    },
+  })
 }
 
 function toggleContainer(containerId: string, checked: boolean): void {
-  const ids = props.form.docker_scope.container_ids
-  if (checked) {
-    if (!ids.includes(containerId)) ids.push(containerId)
-  } else {
-    const idx = ids.indexOf(containerId)
-    if (idx >= 0) ids.splice(idx, 1)
-  }
+  const current = props.form.docker_scope.container_ids
+  const next = checked
+    ? (current.includes(containerId) ? current : [...current, containerId])
+    : current.filter((id) => id !== containerId)
+  updateDockerScope('container_ids', next)
 }
 </script>
 
