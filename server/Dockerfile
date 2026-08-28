@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # ==== Stage 3: Final Image ====
 FROM alpine:3.24
-RUN apk add --no-cache ca-certificates tzdata libcap && \
+RUN apk add --no-cache --upgrade ca-certificates tzdata libcap && \
     addgroup -g 1000 supervisor && \
     adduser -D -u 1000 -G supervisor supervisor
 WORKDIR /app
