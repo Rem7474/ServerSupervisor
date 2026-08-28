@@ -29,8 +29,12 @@
 
           <div class="row g-3">
             <div class="col-12">
-              <label class="form-label required">Nom</label>
+              <label
+                for="webhook-name"
+                class="form-label required"
+              >Nom</label>
               <input
+                id="webhook-name"
                 v-model="form.name"
                 type="text"
                 class="form-control"
@@ -41,8 +45,12 @@
             <!-- ===== WEBHOOK FIELDS ===== -->
             <template v-if="mode === 'webhook'">
               <div class="col-md-6">
-                <label class="form-label required">Provider</label>
+                <label
+                  for="webhook-provider"
+                  class="form-label required"
+                >Provider</label>
                 <select
+                  id="webhook-provider"
                   v-model="form.provider"
                   class="form-select"
                 >
@@ -64,8 +72,12 @@
                 </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label">Evenement</label>
+                <label
+                  for="webhook-event-filter"
+                  class="form-label"
+                >Evenement</label>
                 <select
+                  id="webhook-event-filter"
                   v-model="form.event_filter"
                   class="form-select"
                 >
@@ -81,8 +93,12 @@
                 </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label">Filtre repo <span class="text-muted">(optionnel)</span></label>
+                <label
+                  for="webhook-repo-filter"
+                  class="form-label"
+                >Filtre repo <span class="text-muted">(optionnel)</span></label>
                 <input
+                  id="webhook-repo-filter"
                   v-model="form.repo_filter"
                   type="text"
                   class="form-control"
@@ -90,8 +106,12 @@
                 >
               </div>
               <div class="col-md-6">
-                <label class="form-label">Filtre branche <span class="text-muted">(optionnel)</span></label>
+                <label
+                  for="webhook-branch-filter"
+                  class="form-label"
+                >Filtre branche <span class="text-muted">(optionnel)</span></label>
                 <input
+                  id="webhook-branch-filter"
                   v-model="form.branch_filter"
                   type="text"
                   class="form-control"
@@ -141,8 +161,12 @@
               v-if="mode === 'tracker' && form.dispatch_task"
               class="col-md-4"
             >
-              <label class="form-label">Cooldown (heures)</label>
+              <label
+                for="webhook-cooldown-hours"
+                class="form-label"
+              >Cooldown (heures)</label>
               <input
+                id="webhook-cooldown-hours"
                 v-model.number="form.cooldown_hours"
                 type="number"
                 min="0"
@@ -160,7 +184,9 @@
               v-if="mode === 'tracker' && form.dispatch_task && form.tracker_type === 'docker'"
               class="col-12"
             >
-              <label class="form-label">Mode de mise a jour</label>
+              <div class="form-label">
+                Mode de mise a jour
+              </div>
               <div class="row g-2">
                 <div class="col-6">
                   <label
@@ -202,10 +228,12 @@
             <template v-if="mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)">
               <div class="col-md-6">
                 <label
+                  for="webhook-host-id"
                   class="form-label"
                   :class="(mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)) ? 'required' : ''"
                 >VM cible</label>
                 <select
+                  id="webhook-host-id"
                   v-model="form.host_id"
                   class="form-select"
                 >
@@ -225,8 +253,12 @@
               <!-- Compose mode: project + service -->
               <template v-if="isComposeMode">
                 <div class="col-md-6">
-                  <label class="form-label required">Projet compose</label>
+                  <label
+                    for="webhook-compose-project"
+                    class="form-label required"
+                  >Projet compose</label>
                   <input
+                    id="webhook-compose-project"
                     v-model="form.compose_project"
                     type="text"
                     class="form-control"
@@ -241,8 +273,12 @@
                   </div>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Service <span class="text-muted">(optionnel)</span></label>
+                  <label
+                    for="webhook-compose-service"
+                    class="form-label"
+                  >Service <span class="text-muted">(optionnel)</span></label>
                   <input
+                    id="webhook-compose-service"
                     v-model="form.compose_service"
                     type="text"
                     class="form-control"
@@ -250,8 +286,12 @@
                   >
                 </div>
                 <div class="col-md-4">
-                  <label class="form-label">Healthcheck (s)</label>
+                  <label
+                    for="webhook-healthcheck-timeout"
+                    class="form-label"
+                  >Healthcheck (s)</label>
                   <input
+                    id="webhook-healthcheck-timeout"
                     v-model.number="form.healthcheck_timeout_sec"
                     type="number"
                     min="0"
@@ -300,9 +340,13 @@
                   </div>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Hook avant MAJ <span class="text-muted">(optionnel)</span></label>
+                  <label
+                    for="webhook-pre-update-task-id"
+                    class="form-label"
+                  >Hook avant MAJ <span class="text-muted">(optionnel)</span></label>
                   <select
                     v-if="customTasks.length"
+                    id="webhook-pre-update-task-id"
                     v-model="form.pre_update_task_id"
                     class="form-select"
                   >
@@ -319,6 +363,7 @@
                   </select>
                   <input
                     v-else
+                    id="webhook-pre-update-task-id"
                     v-model="form.pre_update_task_id"
                     type="text"
                     class="form-control"
@@ -329,9 +374,13 @@
                   </div>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Hook apres MAJ <span class="text-muted">(optionnel)</span></label>
+                  <label
+                    for="webhook-post-update-task-id"
+                    class="form-label"
+                  >Hook apres MAJ <span class="text-muted">(optionnel)</span></label>
                   <select
                     v-if="customTasks.length"
+                    id="webhook-post-update-task-id"
                     v-model="form.post_update_task_id"
                     class="form-select"
                   >
@@ -348,6 +397,7 @@
                   </select>
                   <input
                     v-else
+                    id="webhook-post-update-task-id"
                     v-model="form.post_update_task_id"
                     type="text"
                     class="form-control"
@@ -362,11 +412,13 @@
                 class="col-md-6"
               >
                 <label
+                  for="webhook-custom-task-id"
                   class="form-label"
                   :class="(mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)) ? 'required' : ''"
                 >Tache (tasks.yaml)</label>
                 <select
                   v-if="customTasks.length"
+                  id="webhook-custom-task-id"
                   v-model="form.custom_task_id"
                   class="form-select"
                 >
@@ -386,6 +438,7 @@
                 </select>
                 <input
                   v-else
+                  id="webhook-custom-task-id"
                   v-model="form.custom_task_id"
                   type="text"
                   class="form-control"
@@ -403,7 +456,9 @@
 
             <!-- Notifications -->
             <div class="col-12">
-              <label class="form-label">Notifications</label>
+              <div class="form-label">
+                Notifications
+              </div>
               <div class="d-flex flex-wrap gap-3 mt-1">
                 <label
                   v-if="mode === 'webhook'"
