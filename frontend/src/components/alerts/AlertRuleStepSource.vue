@@ -1,8 +1,12 @@
 <template>
   <div>
     <div class="mb-3">
-      <label class="form-label required">Nom</label>
+      <label
+        for="alert-source-name"
+        class="form-label required"
+      >Nom</label>
       <input
+        id="alert-source-name"
         v-model="form.name"
         type="text"
         class="form-control"
@@ -11,7 +15,9 @@
     </div>
 
     <div class="mb-3">
-      <label class="form-label required">Source des données</label>
+      <div class="form-label required">
+        Source des données
+      </div>
       <div
         class="btn-group w-100"
         role="group"
@@ -56,8 +62,12 @@
       v-if="form.source_type === 'agent'"
       class="mb-3"
     >
-      <label class="form-label">Hôte cible</label>
+      <label
+        for="alert-source-host-id"
+        class="form-label"
+      >Hôte cible</label>
       <select
+        id="alert-source-host-id"
         v-model="form.host_id"
         class="form-select"
         :disabled="!metricSupportsHostFilter"
@@ -132,8 +142,12 @@
       class="row g-2 mt-2"
     >
       <div class="col-md-4">
-        <label class="form-label">Scope Proxmox</label>
+        <label
+          for="alert-source-proxmox-scope-mode"
+          class="form-label"
+        >Scope Proxmox</label>
         <select
+          id="alert-source-proxmox-scope-mode"
           v-model="form.proxmox_scope.scope_mode"
           class="form-select"
         >
@@ -176,8 +190,12 @@
         v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'connection'"
         class="col-md-8"
       >
-        <label class="form-label">Connexion</label>
+        <label
+          for="alert-source-proxmox-connection"
+          class="form-label"
+        >Connexion</label>
         <select
+          id="alert-source-proxmox-connection"
           v-model="form.proxmox_scope.connection_id"
           class="form-select"
         >
@@ -197,8 +215,12 @@
         v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'node'"
         class="col-md-8"
       >
-        <label class="form-label">Nœud</label>
+        <label
+          for="alert-source-proxmox-node"
+          class="form-label"
+        >Nœud</label>
         <select
+          id="alert-source-proxmox-node"
           v-model="form.proxmox_scope.node_id"
           class="form-select"
         >
@@ -218,8 +240,12 @@
         v-if="metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'guest'"
         class="col-md-8"
       >
-        <label class="form-label">VM/LXC</label>
+        <label
+          for="alert-source-proxmox-guest"
+          class="form-label"
+        >VM/LXC</label>
         <select
+          id="alert-source-proxmox-guest"
           v-model="form.proxmox_scope.guest_id"
           class="form-select"
         >
@@ -239,8 +265,12 @@
         v-if="metricAllowsStorageScope && form.proxmox_scope.scope_mode === 'storage'"
         class="col-md-8"
       >
-        <label class="form-label">Stockage</label>
+        <label
+          for="alert-source-proxmox-storage"
+          class="form-label"
+        >Stockage</label>
         <select
+          id="alert-source-proxmox-storage"
           v-model="form.proxmox_scope.storage_id"
           class="form-select"
         >
@@ -260,8 +290,12 @@
         v-if="metricAllowsDiskScope && form.proxmox_scope.scope_mode === 'disk'"
         class="col-md-8"
       >
-        <label class="form-label">Disque physique</label>
+        <label
+          for="alert-source-proxmox-disk"
+          class="form-label"
+        >Disque physique</label>
         <select
+          id="alert-source-proxmox-disk"
           v-model="form.proxmox_scope.disk_id"
           class="form-select"
         >
@@ -291,8 +325,12 @@
       class="row g-2 mt-2"
     >
       <div class="col-md-4">
-        <label class="form-label required">Hôte</label>
+        <label
+          for="alert-source-docker-host"
+          class="form-label required"
+        >Hôte</label>
         <select
+          id="alert-source-docker-host"
           v-model="form.docker_scope.host_id"
           class="form-select"
           @change="onDockerHostChange"
@@ -320,8 +358,12 @@
         v-if="form.metric !== 'docker_compose_degraded_services'"
         class="col-md-4"
       >
-        <label class="form-label">Scope</label>
+        <label
+          for="alert-source-docker-scope-mode"
+          class="form-label"
+        >Scope</label>
         <select
+          id="alert-source-docker-scope-mode"
           v-model="form.docker_scope.scope_mode"
           class="form-select"
           @change="onDockerScopeModeChange"
@@ -338,7 +380,9 @@
         v-if="form.docker_scope.scope_mode === 'container' && form.docker_scope.host_id"
         class="col-md-8"
       >
-        <label class="form-label required">Container(s)</label>
+        <div class="form-label required">
+          Container(s)
+        </div>
         <div
           v-if="(selectedDockerHost?.containers || []).length === 0"
           class="form-hint"
@@ -378,8 +422,12 @@
         v-if="form.metric === 'docker_compose_degraded_services' && form.docker_scope.host_id"
         class="col-md-4"
       >
-        <label class="form-label required">Projet Compose</label>
+        <label
+          for="alert-source-docker-project"
+          class="form-label required"
+        >Projet Compose</label>
         <select
+          id="alert-source-docker-project"
           v-model="form.docker_scope.project_name"
           class="form-select"
         >

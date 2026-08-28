@@ -3,10 +3,13 @@ package synthetic
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/serversupervisor/server/internal/database"
@@ -134,11 +137,39 @@ func checkCertificate(ctx context.Context, c models.SSLCertificate) models.SSLCe
 		c.DNSNames = []string{}
 	}
 
-	// Surface near-expiry as a non-fatal warning in last_error so the UI can show it.
-	if remaining := time.Until(notAfter); remaining < 0 {
-		c.LastError = fmt.Sprintf("certificate expired on %s", notAfter.Format(time.RFC3339))
+	// The handshake above skipped verification entirely (InsecureSkipVerify)
+	// so we could still read the chain of an expired/invalid endpoint —
+	// otherwise that connection would just fail before we got here. That
+	// means a wrong hostname or an untrusted CA would go completely
+	// unreported. Verify independently now and fold anything beyond plain
+	// expiry into last_error too.
+	intermediates := x509.NewCertPool()
+	for _, cert := range state.PeerCertificates[1:] {
+		intermediates.AddCert(cert)
 	}
+	_, verifyErr := leaf.Verify(x509.VerifyOptions{DNSName: serverName, Intermediates: intermediates})
+	c.LastError = strings.Join(certificateIssues(notAfter, verifyErr), "; ")
 	return c
+}
+
+// certificateIssues turns a certificate's expiry and an independent
+// chain/hostname verification error (nil if it passed) into the list of
+// problems to report in last_error. verifyErr's own "certificate has
+// expired" case is suppressed since the notAfter check already reports that
+// more clearly ("expired on <date>" vs x509's raw error text) — anything
+// else from verifyErr (wrong hostname, untrusted CA, ...) is kept.
+func certificateIssues(notAfter time.Time, verifyErr error) []string {
+	var issues []string
+	if remaining := time.Until(notAfter); remaining < 0 {
+		issues = append(issues, fmt.Sprintf("certificate expired on %s", notAfter.Format(time.RFC3339)))
+	}
+	if verifyErr != nil {
+		var invalidErr x509.CertificateInvalidError
+		if !errors.As(verifyErr, &invalidErr) || invalidErr.Reason != x509.Expired {
+			issues = append(issues, verifyErr.Error())
+		}
+	}
+	return issues
 }
 
 // Compile-time check: database.DB satisfies SSLDB.

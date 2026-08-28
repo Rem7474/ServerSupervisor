@@ -19,8 +19,12 @@
       </h4>
       <div class="row g-2 mb-3">
         <div class="col-6 col-md-4">
-          <label class="form-label">WordPress</label>
+          <label
+            for="threat-weight-wordpress"
+            class="form-label"
+          >WordPress</label>
           <input
+            id="threat-weight-wordpress"
             v-model.number="form.threatWeightWordpress"
             type="number"
             step="0.1"
@@ -29,8 +33,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">Panneau admin</label>
+          <label
+            for="threat-weight-adminpanel"
+            class="form-label"
+          >Panneau admin</label>
           <input
+            id="threat-weight-adminpanel"
             v-model.number="form.threatWeightAdminpanel"
             type="number"
             step="0.1"
@@ -39,8 +47,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">Traversée de chemin</label>
+          <label
+            for="threat-weight-pathtraversal"
+            class="form-label"
+          >Traversée de chemin</label>
           <input
+            id="threat-weight-pathtraversal"
             v-model.number="form.threatWeightPathtraversal"
             type="number"
             step="0.1"
@@ -49,8 +61,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">Scanner connu</label>
+          <label
+            for="threat-weight-knownscanner"
+            class="form-label"
+          >Scanner connu</label>
           <input
+            id="threat-weight-knownscanner"
             v-model.number="form.threatWeightKnownscanner"
             type="number"
             step="0.1"
@@ -59,8 +75,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">Méthode suspecte</label>
+          <label
+            for="threat-weight-suspiciousmethod"
+            class="form-label"
+          >Méthode suspecte</label>
           <input
+            id="threat-weight-suspiciousmethod"
             v-model.number="form.threatWeightSuspiciousmethod"
             type="number"
             step="0.1"
@@ -75,8 +95,12 @@
       </h4>
       <div class="row g-2 mb-3">
         <div class="col-6 col-md-4">
-          <label class="form-label">2xx (succès)</label>
+          <label
+            for="threat-weight-status-2xx"
+            class="form-label"
+          >2xx (succès)</label>
           <input
+            id="threat-weight-status-2xx"
             v-model.number="form.threatWeightStatus2xx"
             type="number"
             step="0.05"
@@ -85,8 +109,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">3xx (redirection)</label>
+          <label
+            for="threat-weight-status-3xx"
+            class="form-label"
+          >3xx (redirection)</label>
           <input
+            id="threat-weight-status-3xx"
             v-model.number="form.threatWeightStatus3xx"
             type="number"
             step="0.1"
@@ -95,8 +123,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">404</label>
+          <label
+            for="threat-weight-status-404"
+            class="form-label"
+          >404</label>
           <input
+            id="threat-weight-status-404"
             v-model.number="form.threatWeightStatus404"
             type="number"
             step="0.1"
@@ -105,8 +137,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">4xx (autre)</label>
+          <label
+            for="threat-weight-status-4xx"
+            class="form-label"
+          >4xx (autre)</label>
           <input
+            id="threat-weight-status-4xx"
             v-model.number="form.threatWeightStatus4xx"
             type="number"
             step="0.1"
@@ -115,8 +151,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">5xx</label>
+          <label
+            for="threat-weight-status-5xx"
+            class="form-label"
+          >5xx</label>
           <input
+            id="threat-weight-status-5xx"
             v-model.number="form.threatWeightStatus5xx"
             type="number"
             step="0.1"
@@ -132,10 +172,11 @@
       <div class="row g-2 mb-3">
         <div class="col-6 col-md-4">
           <label
+            for="threat-weight-breadth"
             class="form-label"
-            aria-describedby="threat-breadth-hint"
           >Largeur (chemins distincts)</label>
           <input
+            id="threat-weight-breadth"
             v-model.number="form.threatWeightBreadth"
             type="number"
             step="0.1"
@@ -152,10 +193,11 @@
         </div>
         <div class="col-6 col-md-4">
           <label
+            for="threat-weight-hits"
             class="form-label"
-            aria-describedby="threat-hits-hint"
           >Volume de requêtes</label>
           <input
+            id="threat-weight-hits"
             v-model.number="form.threatWeightHits"
             type="number"
             step="0.1"
@@ -177,8 +219,12 @@
       </h4>
       <div class="row g-2">
         <div class="col-6 col-md-4">
-          <label class="form-label">MEDIUM à partir de</label>
+          <label
+            for="threat-threshold-medium"
+            class="form-label"
+          >MEDIUM à partir de</label>
           <input
+            id="threat-threshold-medium"
             v-model.number="form.threatThresholdMedium"
             type="number"
             step="1"
@@ -187,8 +233,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">HIGH à partir de</label>
+          <label
+            for="threat-threshold-high"
+            class="form-label"
+          >HIGH à partir de</label>
           <input
+            id="threat-threshold-high"
             v-model.number="form.threatThresholdHigh"
             type="number"
             step="1"
@@ -197,8 +247,12 @@
           >
         </div>
         <div class="col-6 col-md-4">
-          <label class="form-label">CRITICAL à partir de</label>
+          <label
+            for="threat-threshold-critical"
+            class="form-label"
+          >CRITICAL à partir de</label>
           <input
+            id="threat-threshold-critical"
             v-model.number="form.threatThresholdCritical"
             type="number"
             step="1"

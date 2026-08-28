@@ -24,8 +24,12 @@
           <form @submit.prevent="submit">
             <div class="modal-body">
               <div class="mb-3">
-                <label class="form-label required">Nom</label>
+                <label
+                  for="alert-template-name"
+                  class="form-label required"
+                >Nom</label>
                 <input
+                  id="alert-template-name"
                   v-model="form.name"
                   type="text"
                   class="form-control"
@@ -35,8 +39,12 @@
               </div>
               <div class="row g-3">
                 <div class="col-12 col-md-6">
-                  <label class="form-label required">Métrique</label>
+                  <label
+                    for="alert-template-metric"
+                    class="form-label required"
+                  >Métrique</label>
                   <select
+                    id="alert-template-metric"
                     v-model="form.metric"
                     class="form-select"
                     required
@@ -54,8 +62,12 @@
                   </div>
                 </div>
                 <div class="col-12 col-md-6">
-                  <label class="form-label required">Opérateur</label>
+                  <label
+                    for="alert-template-operator"
+                    class="form-label required"
+                  >Opérateur</label>
                   <select
+                    id="alert-template-operator"
                     v-model="form.operator"
                     class="form-select"
                     required
@@ -78,8 +90,12 @@
                   v-if="form.metric === 'bandwidth_vs_rolling_avg'"
                   class="col-12"
                 >
-                  <label class="form-label required">Fenêtre de moyenne glissante</label>
+                  <label
+                    for="alert-template-baseline-window"
+                    class="form-label required"
+                  >Fenêtre de moyenne glissante</label>
                   <select
+                    id="alert-template-baseline-window"
                     v-model.number="form.baseline_window_seconds"
                     class="form-select"
                   >
@@ -95,10 +111,14 @@
                   </select>
                 </div>
                 <div class="col-6 col-md-3">
-                  <label class="form-label required">
+                  <label
+                    for="alert-template-threshold-warn"
+                    class="form-label required"
+                  >
                     {{ form.metric === 'bandwidth_vs_rolling_avg' ? 'Seuil avertissement (% moyenne)' : 'Seuil avertissement' }}
                   </label>
                   <input
+                    id="alert-template-threshold-warn"
                     v-model.number="form.threshold_warn"
                     type="number"
                     step="any"
@@ -107,10 +127,14 @@
                   >
                 </div>
                 <div class="col-6 col-md-3">
-                  <label class="form-label required">
+                  <label
+                    for="alert-template-threshold-crit"
+                    class="form-label required"
+                  >
                     {{ form.metric === 'bandwidth_vs_rolling_avg' ? 'Seuil critique (% moyenne)' : 'Seuil critique' }}
                   </label>
                   <input
+                    id="alert-template-threshold-crit"
                     v-model.number="form.threshold_crit"
                     type="number"
                     step="any"
@@ -122,8 +146,12 @@
                   v-if="form.metric !== 'bandwidth_vs_rolling_avg'"
                   class="col-6 col-md-3"
                 >
-                  <label class="form-label">Durée (secondes)</label>
+                  <label
+                    for="alert-template-duration"
+                    class="form-label"
+                  >Durée (secondes)</label>
                   <input
+                    id="alert-template-duration"
                     v-model.number="form.duration"
                     type="number"
                     min="0"
@@ -131,8 +159,12 @@
                   >
                 </div>
                 <div class="col-6 col-md-3">
-                  <label class="form-label">Silence (secondes)</label>
+                  <label
+                    for="alert-template-cooldown"
+                    class="form-label"
+                  >Silence (secondes)</label>
                   <input
+                    id="alert-template-cooldown"
                     v-model.number="form.actions.cooldown"
                     type="number"
                     min="0"
@@ -140,8 +172,12 @@
                   >
                 </div>
                 <div class="col-12">
-                  <label class="form-label">Escalade si non acquittée (minutes)</label>
+                  <label
+                    for="alert-template-escalate-after-minutes"
+                    class="form-label"
+                  >Escalade si non acquittée (minutes)</label>
                   <input
+                    id="alert-template-escalate-after-minutes"
                     v-model.number="form.actions.escalate_after_minutes"
                     type="number"
                     min="0"
@@ -154,7 +190,9 @@
                 </div>
               </div>
               <div class="mb-0 mt-3">
-                <label class="form-label">Canaux de notification</label>
+                <div class="form-label">
+                  Canaux de notification
+                </div>
                 <div>
                   <label class="form-check form-check-inline">
                     <input
