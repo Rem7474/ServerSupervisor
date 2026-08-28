@@ -57,11 +57,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # server/ and agent/ are independent Go modules that can each bump their
+      # own `go` directive independently (e.g. a Dependabot update running `go
+      # mod tidy` on just one of them) — go-version-file can only point at one
+      # file, so pick whichever module currently requires the higher version
+      # instead of hardcoding server/go.mod and silently breaking the Go build
+      # below whenever agent/ (or vice versa) moves ahead.
+      - name: Determine Go version (max across server/ and agent/ go.mod)
+        if: matrix.language == 'go'
+        id: goversion
+        run: |
+          SERVER_GO=$(grep -m1 '^go ' server/go.mod | awk '{print $2}')
+          AGENT_GO=$(grep -m1 '^go ' agent/go.mod | awk '{print $2}')
+          MAX_GO=$(printf '%s\n%s\n' "$SERVER_GO" "$AGENT_GO" | sort -V | tail -1)
+          echo "version=$MAX_GO" >> "$GITHUB_OUTPUT"
+
       - name: Setup Go
         if: matrix.language == 'go'
         uses: actions/setup-go@v7
         with:
-          go-version-file: server/go.mod
+          go-version: ${{ steps.goversion.outputs.version }}
           cache-dependency-path: |
             server/go.sum
             agent/go.sum
