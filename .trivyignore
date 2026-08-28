@@ -1,0 +1,11 @@
+# GO-2026-5932: govulndb flags golang.org/x/crypto/openpgp as unmaintained
+# and unsafe by design. The server never imports that subpackage — x/crypto
+# is only pulled in for bcrypt/ssh/chacha20 (`go mod why -m golang.org/x/crypto`
+# -> internal/auth -> bcrypt; `go list -deps ./...` has no openpgp entry).
+# The advisory carries no CVSS score (severity UNKNOWN, tag "note") and no
+# fixed version — govulncheck, which does reachability analysis, already
+# passes clean on this repo. Trivy's Go-binary scanner flags the whole
+# x/crypto module regardless of which subpackages actually got linked in,
+# which is why this alone was intermittently failing the blocking
+# CRITICAL/HIGH gate with no code change involved.
+GO-2026-5932
