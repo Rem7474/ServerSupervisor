@@ -1,0 +1,17 @@
+# Overrides docker-compose.yml's server service to build from local source
+# instead of pulling the published GHCR image — for running your own code
+# changes through the real, non-demo container (persisted data, real env
+# vars), as opposed to `go run ./cmd/server` on the host or the separate
+# demo stack (docker-compose.demo.yml, see CONTRIBUTING.md). Not meant for
+# production: keeping this as a second explicit file rather than the
+# Compose-auto-merged docker-compose.override.yml convention means it can
+# never end up silently active on a server that copied the wrong file.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
