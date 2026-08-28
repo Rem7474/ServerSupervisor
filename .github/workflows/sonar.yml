@@ -127,8 +127,13 @@ jobs:
     name: SonarQube Scan
     runs-on: ubuntu-latest
     needs: [server-coverage, agent-coverage, frontend-coverage]
-    # Fork PRs don't receive SONAR_TOKEN — skip the scan rather than fail it.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Fork PRs and Dependabot PRs don't receive SONAR_TOKEN (GitHub withholds
+    # repo secrets from both, even though Dependabot's PRs aren't forks —
+    # head.repo.full_name == github.repository there too) — skip the scan
+    # rather than fail it.
+    if: |
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - uses: actions/checkout@v7
         with:
