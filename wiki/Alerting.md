@@ -98,16 +98,18 @@ plus ancien au plus récent.
 |---|---|---|
 | `smtp` | Email | `SMTP_HOST`/`SMTP_FROM` globaux + `actions.smtp_to` sur la règle |
 | `ntfy` | Push ntfy | `NOTIFY_URL` global fournit le serveur (schéma + hôte) ; `actions.ntfy_topic` surcharge le topic par règle |
-| `browser` | Notification in-app (WebSocket) **et** Web Push si le navigateur est abonné | Clés VAPID configurées pour le Web Push |
+| `browser` | Notification in-app (WebSocket) **et** Web Push si le navigateur est abonné | Aucune — les clés VAPID sont générées et persistées automatiquement au premier envoi (voir [Notifications](Notifications.md)) |
 | `notify` | **Déprécié.** POST JSON brut vers `NOTIFY_URL` | `NOTIFY_URL` |
 
 Un canal dont la destination n'est pas configurée est **journalisé et ignoré**,
-il ne fait pas échouer les autres canaux de la même notification.
+il ne fait pas échouer les autres canaux de la même notification. Le Web Push ne délivre
+qu'aux comptes **admin** abonnés, quel que soit le rôle ciblé par la règle — voir
+[Notifications](Notifications.md#3-portée--qui-reçoit-quoi).
 
 > Le canal `notify` est la seule forme de « webhook générique » existante, et
 > il est marqué déprécié dans le code. Un vrai canal
 > Slack/Teams/Discord/webhook reste un item ouvert de la
-> [roadmap](../ROADMAP.md) (#6) — ne comptez pas dessus pour une intégration
+> [roadmap](https://github.com/Rem7474/ServerSupervisor/blob/main/ROADMAP.md) (#6) — ne comptez pas dessus pour une intégration
 > neuve.
 
 ### Cooldown et escalade
@@ -131,7 +133,7 @@ remédiation en boucle est une action bien plus risquée que répéter un messag
 Une règle peut dispatcher une commande agent quand elle se déclenche. Le
 vocabulaire (module / action / cible) est le même que celui des runbooks et
 est validé côté serveur contre une whitelist — voir
-[docs/runbooks-scheduled-tasks.md](runbooks-scheduled-tasks.md).
+[Runbooks-and-Scheduled-Tasks.md](Runbooks-and-Scheduled-Tasks.md).
 
 ## 5. Corrélation : éviter la cascade « hôte down »
 
@@ -213,8 +215,8 @@ Le filtrage du sélecteur d'hôtes accepte le nom **ou** un tag d'hôte.
 
 ## Pour aller plus loin
 
-- [README — Alertes](../README.md#alertes) : liste des endpoints
-- [docs/runbooks-scheduled-tasks.md](runbooks-scheduled-tasks.md) : le
+- [README — Alertes](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md#alertes) : liste des endpoints
+- [Runbooks-and-Scheduled-Tasks.md](Runbooks-and-Scheduled-Tasks.md) : le
   vocabulaire module/action/cible partagé par `command_trigger`
-- [ROADMAP.md](../ROADMAP.md) : canaux de notification supplémentaires (#6),
-  tagging d'hôtes et règles par groupe (#7)
+- [ROADMAP.md](https://github.com/Rem7474/ServerSupervisor/blob/main/ROADMAP.md) : canaux de notification supplémentaires (#6),
+  groupes dynamiques d'hôtes et règles par groupe (#7)

@@ -268,6 +268,6 @@ appliqué au caractère tapé juste après.
 
 ## Pour aller plus loin
 
-Voir aussi la section [Proxmox VE](../README.md#proxmox-ve-supervision-sans-agent)
+Voir aussi la section [Proxmox VE](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md#proxmox-ve-supervision-sans-agent)
 du README pour la vue d'ensemble des fonctionnalités et le tableau complet
 des routes API.

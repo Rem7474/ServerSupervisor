@@ -1,0 +1,1 @@
+[ServerSupervisor](https://github.com/Rem7474/ServerSupervisor) — [AGPLv3](https://github.com/Rem7474/ServerSupervisor/blob/main/LICENSE) · [Signaler un bug](https://github.com/Rem7474/ServerSupervisor/issues) · [Signaler une vulnérabilité](https://github.com/Rem7474/ServerSupervisor/blob/main/SECURITY.md)

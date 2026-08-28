@@ -7,17 +7,22 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 Ce README couvre l'installation et donne une vue d'ensemble de chaque
 fonctionnalité. Pour une intégration qui demande une vraie procédure de
 configuration côté service tiers, un guide dédié va plus loin (dépannage
-inclus) :
+inclus) — sur le [wiki](https://github.com/Rem7474/ServerSupervisor/wiki),
+généré depuis le dossier [`wiki/`](wiki/) du dépôt :
 
 | Guide | Sujet |
 |---|---|
-| [docs/proxmox.md](docs/proxmox.md) | Connecter un cluster Proxmox VE (token API, permissions, actions en écriture) |
-| [docs/npm.md](docs/npm.md) | Connecter Nginx Proxy Manager (sync, monitoring auto par proxy host) |
-| [docs/git-webhooks-releases.md](docs/git-webhooks-releases.md) | Webhooks Git et suivi de releases GitHub/GitLab/Gitea/Docker |
-| [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md) | Runbooks multi-étapes vs tâches planifiées par hôte |
-| [docs/backup-restic.md](docs/backup-restic.md) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
-| [docs/alerting.md](docs/alerting.md) | Moteur d'alertes (seuils, hystérésis, incidents, ack/escalade, corrélation, maintenance, modèles) |
-| [docs/task.md](docs/task.md) | Exemples de `tasks.yaml` prêts à copier |
+| [Proxmox](https://github.com/Rem7474/ServerSupervisor/wiki/Proxmox) | Connecter un cluster Proxmox VE (token API, permissions, actions en écriture) |
+| [NPM](https://github.com/Rem7474/ServerSupervisor/wiki/NPM) | Connecter Nginx Proxy Manager (sync, monitoring auto par proxy host) |
+| [Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases) | Webhooks Git et suivi de releases GitHub/GitLab/Gitea/Docker |
+| [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks) | Runbooks multi-étapes vs tâches planifiées par hôte |
+| [Restic-Backups](https://github.com/Rem7474/ServerSupervisor/wiki/Restic-Backups) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
+| [Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting) | Moteur d'alertes (seuils, hystérésis, incidents, ack/escalade, corrélation, maintenance, modèles) |
+| [Monitoring](https://github.com/Rem7474/ServerSupervisor/wiki/Monitoring) | Sondes uptime HTTP/TCP/ICMP et certificats SSL/TLS |
+| [Notifications](https://github.com/Rem7474/ServerSupervisor/wiki/Notifications) | Centre de notifications in-app et Web Push (VAPID) |
+| [Two-Factor-Authentication](https://github.com/Rem7474/ServerSupervisor/wiki/Two-Factor-Authentication) | TOTP et clés de sécurité/passkeys (WebAuthn) |
+| [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery) | Scan de sous-réseau et ajout en masse |
+| [Custom-Tasks-Examples](https://github.com/Rem7474/ServerSupervisor/wiki/Custom-Tasks-Examples) | Exemples de `tasks.yaml` prêts à copier |
 
 ## Vision produit & roadmap
 
@@ -83,19 +88,19 @@ inclus) :
 - **APT** : gestion centralisée des mises à jour avec actions groupées et console live streamée
 - **Détail hôte** : exécution à distance de commandes systemd (start/stop/restart/enable/disable), logs journalctl streamés, snapshot des processus — directement depuis la page hôte
 - **Streaming commandes** : affichage en temps réel de la sortie des commandes longues via WebSocket
-- **Versions** : suivi des releases GitHub/GitLab/Gitea et des digests d'images Docker, notification ou déclenchement automatique (script ou `compose pull && up -d`) — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
-- **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
-- **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
-- **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic
+- **Versions** : suivi des releases GitHub/GitLab/Gitea et des digests d'images Docker, notification ou déclenchement automatique (script ou `compose pull && up -d`) — voir [Git Webhooks & Suivi de releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
+- **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
+- **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
+- **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring` — voir [Monitoring](https://github.com/Rem7474/ServerSupervisor/wiki/Monitoring)
+- **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic — voir [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery)
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
-- **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent ; onglet « Modèles » — définir une règle (métrique agent + seuils + notifications) une fois et l'appliquer à plusieurs hôtes en un clic
+- **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
+- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy ou notifications navigateur (in-app + Web Push) — un canal `notify` webhook générique existe aussi mais est déprécié, voir [Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting) ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent ; onglet « Modèles » — définir une règle (métrique agent + seuils + notifications) une fois et l'appliquer à plusieurs hôtes en un clic
 - **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
-- **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
-- **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
+- **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy des alertes — voir [Notifications](https://github.com/Rem7474/ServerSupervisor/wiki/Notifications)
+- **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security` (TOTP et/ou clés de sécurité/passkeys WebAuthn) — voir [Two-Factor-Authentication](https://github.com/Rem7474/ServerSupervisor/wiki/Two-Factor-Authentication)
 - **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, corrélation CrowdSec si activée côté agent), stats trafic web sur `/traffic`, menaces web sur `/threats`
 - **UI cohérente** : barres de recherche/filtres/tri harmonisées sur les vues principales (Docker, APT, Audit)
 - **Proxmox VE** : supervision de l'infrastructure de virtualisation via API Proxmox (sans agent sur l'hyperviseur) — nœuds, VMs QEMU, conteneurs LXC, stockage ; polling configurable par connexion
@@ -122,7 +127,7 @@ cet endpoint.
 
 Guide complet (création du token PVE, identifiants console, permissions en
 écriture, posture admin vs authentifié par action, dépannage) :
-**[docs/proxmox.md](docs/proxmox.md)**.
+**[Proxmox](https://github.com/Rem7474/ServerSupervisor/wiki/Proxmox)**.
 
 ### NPM (Nginx Proxy Manager)
 
@@ -136,7 +141,7 @@ ou si la connexion elle-même est supprimée. Vue `/npm` : gestion des
 connexions (admin) + liste des proxy hosts importés.
 
 Guide complet (authentification, cadence de sync réelle, sémantique des
-interrupteurs de monitoring, dépannage) : **[docs/npm.md](docs/npm.md)**.
+interrupteurs de monitoring, dépannage) : **[NPM](https://github.com/Rem7474/ServerSupervisor/wiki/NPM)**.
 
 ### Git Webhooks & Suivi de releases
 
@@ -151,7 +156,7 @@ sur un hôte, avec le contexte du commit injecté en variables d'environnement.
 
 Guide complet (création d'un tracker, configuration du webhook côté
 plateforme, vérification de signature par provider, dépannage) :
-**[docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)**.
+**[Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)**.
 
 ### Runbooks & Tâches planifiées
 
@@ -166,7 +171,7 @@ hôte (voir le guide).
 
 Guide complet (whitelist par module, tableau comparatif runbook vs tâche
 planifiée, fuseau horaire d'exécution du cron, dépannage) :
-**[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)**.
+**[Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)**.
 
 ### Agent
 - Collecte automatique : CPU, RAM, disques, réseau, uptime
@@ -358,7 +363,7 @@ sudo journalctl -u serversupervisor-agent -f
 
 Pour un webhook déclenché en temps réel par un push (plutôt que ce polling
 15 min), ou pour un tracker Docker en mode Compose avec réconciliation de
-dérive : voir le guide complet **[docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)**.
+dérive : voir le guide complet **[Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)**.
 
 ---
 
@@ -731,7 +736,7 @@ Trois chemins, tous limités à un `id` déjà déclaré côté agent :
 |---|---|
 | **L'interface** | Fiche hôte → onglet **Tâches personnalisées** → **Exécuter**. Exécution unique, sans créer de tâche planifiée (`POST /api/v1/hosts/:id/custom-tasks/:taskId/run`, Operator+ sur l'hôte) |
 | **Une planification** | Créer une tâche planifiée `module=custom`, `target=<id de la tâche>`. Le champ **Action** est masqué pour ce module : l'agent l'ignore, seul l'identifiant compte |
-| **Un webhook Git** | Voir [docs/git-webhooks-releases.md](docs/git-webhooks-releases.md) — les variables `SS_*` ci-dessus sont injectées dans l'environnement du processus |
+| **Un webhook Git** | Voir [Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases) — les variables `SS_*` ci-dessus sont injectées dans l'environnement du processus |
 
 L'onglet **Tâches personnalisées** affiche ce que l'agent voit réellement : la
 liste vient de son `tasks.yaml`, pas de la base. Un fichier absent ou mal
@@ -743,7 +748,7 @@ formé s'y remarque immédiatement.
 
 Supervision optionnelle des sauvegardes [Restic](https://restic.net)/[resticprofile](https://creativeprojects.github.io/resticprofile/) sur les hôtes supervisés. Le toolkit Restic (binaire, `resticconf`, `run_backup.sh`, `resticprofile.yaml`) doit déjà être installé et configuré sur la machine — ServerSupervisor ne l'installe pas et ne stocke **jamais** ses credentials (mot de passe du dépôt, clés Swift/S3/B2, identifiants SMTP) : ils restent dans `resticconf` sur l'hôte, lu localement par l'agent et jamais transmis au serveur.
 
-Guide complet (installation, `resticprofile.yaml`, exemples Nextcloud AIO/Immich, dépannage) : **[docs/backup-restic.md](docs/backup-restic.md)**.
+Guide complet (installation, `resticprofile.yaml`, exemples Nextcloud AIO/Immich, dépannage) : **[Restic-Backups](https://github.com/Rem7474/ServerSupervisor/wiki/Restic-Backups)**.
 
 #### Activer la collecte (`agent.yaml`)
 
@@ -957,7 +962,7 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 
 > Guide complet du moteur d'alertes (hystérésis, cooldown, incidents, ack,
 > escalade, corrélation, fenêtres de maintenance, modèles) :
-> **[docs/alerting.md](docs/alerting.md)**.
+> **[Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting)**.
 
 #### Fenêtres de maintenance
 | Méthode | Endpoint | Description | Rôle |
@@ -1008,7 +1013,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `POST` | `/api/v1/ssl/certificates/:id/check-now` | Vérification immédiate | Admin |
 
 #### NPM (Nginx Proxy Manager)
-> Guide complet : [docs/npm.md](docs/npm.md)
+> Guide complet : [NPM](https://github.com/Rem7474/ServerSupervisor/wiki/NPM)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -1032,7 +1037,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `DELETE` | `/api/v1/users/:id` | Supprimer un utilisateur |
 
 #### Git Webhooks & Suivi de releases
-> Guide complet : [docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)
+> Guide complet : [Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -1054,7 +1059,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `PUT/DELETE` | `/api/v1/registry-credentials/:id` | Modifier / supprimer des identifiants de registre | Admin |
 
 #### Runbooks
-> Guide complet : [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)
+> Guide complet : [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -1065,7 +1070,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `GET` | `/api/v1/runbooks/:id/executions/:execution_id` | Détail d'une exécution | Admin |
 
 #### Tâches planifiées
-> Guide complet : [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)
+> Guide complet : [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -1078,11 +1083,11 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 
 > Création/modification/suppression sont désormais vérifiées au même
 > niveau que `run` (`requireHostAccess(..., "operator")`) — voir
-> [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
+> [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks#3-lasymétrie-en-un-coup-dœil)
 > pour le détail.
 
 #### Proxmox VE
-> Guide complet : [docs/proxmox.md](docs/proxmox.md)
+> Guide complet : [Proxmox](https://github.com/Rem7474/ServerSupervisor/wiki/Proxmox)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -1205,7 +1210,7 @@ Deux domaines restent hors de portée de ce découpage, par construction : une
 cible qui n'est pas un hôte agent (guest Proxmox, conteneur Docker, sonde
 synthétique) ne peut pas être ramenée à une ligne de `hosts`, donc seules les
 fenêtres de maintenance **globales** la couvrent, et les actions Proxmox
-suivent leur propre posture (voir [docs/proxmox.md](docs/proxmox.md#6-actions-en-écriture--posture-de-permissions)).
+suivent leur propre posture (voir [Proxmox](https://github.com/Rem7474/ServerSupervisor/wiki/Proxmox#6-actions-en-écriture--posture-de-permissions)).
 
 ---
 

@@ -126,8 +126,8 @@ groups:
 Deux recettes complètes (profils + groupe + bascule maintenance) pour des
 applications auto-hébergées courantes :
 
-- [Nextcloud AIO](restic-examples/nextcloud-aio.md)
-- [Immich](restic-examples/immich.md)
+- [Nextcloud AIO](Restic-Example-Nextcloud-AIO.md)
+- [Immich](Restic-Example-Immich.md)
 
 ## 5. `run_backup.sh` — le script que l'agent exécute
 
@@ -227,6 +227,6 @@ backup récurrent est une tâche planifiée comme une autre :
 
 ## Pour aller plus loin
 
-Voir aussi la section [Sauvegardes Restic](../README.md#sauvegardes-restic) du
+Voir aussi la section [Sauvegardes Restic](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md#sauvegardes-restic) du
 README pour le résumé des trois modes (passif/actif/planifié) et le tableau
 des routes API associées.
