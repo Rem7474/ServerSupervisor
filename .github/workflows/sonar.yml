@@ -1,0 +1,155 @@
+name: SonarQube
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'server/**'
+      - '!server/**/*.md'
+      - 'agent/**'
+      - '!agent/**/*.md'
+      - 'frontend/**'
+      - '!frontend/**/*.md'
+      - 'sonar-project.properties'
+      - '.github/workflows/sonar.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - '!server/**/*.md'
+      - 'agent/**'
+      - '!agent/**/*.md'
+      - 'frontend/**'
+      - '!frontend/**/*.md'
+      - 'sonar-project.properties'
+      - '.github/workflows/sonar.yml'
+
+permissions:
+  contents: read
+
+# A newer push to the same branch/PR supersedes the running one.
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
+# This workflow generates its own coverage (go test -coverprofile / vitest
+# --coverage) rather than reusing ci-server.yml/ci-agent.yml/ci-frontend.yml's
+# runs: those three are independently triggered by their own path filters, so
+# a change touching only one module would leave the other two coverage files
+# missing for a combined scan. Some duplicated test execution is the
+# trade-off for a scan that's never missing a module's coverage.
+jobs:
+  server-coverage:
+    name: Server coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      # See ci-server.yml for why Ryuk is disabled in this ephemeral CI environment.
+      - name: Run tests
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sonar-server-coverage
+          path: server/coverage.out
+          retention-days: 1
+
+  agent-coverage:
+    name: Agent coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: agent/go.mod
+          cache: true
+          cache-dependency-path: agent/go.sum
+
+      - name: Run tests
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sonar-agent-coverage
+          path: agent/coverage.out
+          retention-days: 1
+
+  frontend-coverage:
+    name: Frontend coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      # lcov paths are relative to the working directory tests ran in
+      # (frontend/, e.g. "SF:src/App.vue"), but sonar.sources declares
+      # "frontend/src" relative to the repo root the scan runs from — rewrite
+      # them so SonarCloud can actually match coverage to source files.
+      - name: Rewrite lcov paths relative to repo root
+        run: sed -i 's|^SF:|SF:frontend/|' coverage/lcov.info
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sonar-frontend-coverage
+          path: frontend/coverage/lcov.info
+          retention-days: 1
+
+  scan:
+    name: SonarQube Scan
+    runs-on: ubuntu-latest
+    needs: [server-coverage, agent-coverage, frontend-coverage]
+    # Fork PRs don't receive SONAR_TOKEN — skip the scan rather than fail it.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history for accurate blame/new-code analysis
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: sonar-server-coverage
+          path: server/
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: sonar-agent-coverage
+          path: agent/
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: sonar-frontend-coverage
+          path: frontend/coverage/
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
