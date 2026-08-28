@@ -139,16 +139,12 @@ déclenchement (surface de casse plus large), d'où le verrouillage
 admin-only + whitelist stricte. Une tâche planifiée reste bornée à un seul
 hôte à la fois.
 
-> **Historique** : jusqu'à la correction de cette faille (voir
-> [ROADMAP.md](https://github.com/Rem7474/ServerSupervisor/blob/main/ROADMAP.md), item #1), la création/modification/
-> suppression n'étaient vérifiées par aucun rôle côté API — un `viewer`
-> capable d'appeler l'API directement (pas via le dashboard, qui masquait
-> déjà ces actions) pouvait créer une tâche planifiée sur n'importe quel
-> hôte. Les trois handlers (`Create`/`Update`/`DeleteScheduledTask`)
-> appellent désormais `requireHostAccess(..., "operator")` sur l'hôte
-> ciblé, exactement comme `run` — `Update`/`Delete` résolvent d'abord la
-> tâche pour retrouver son `host_id` (`:id` dans l'URL est l'id de la
-> tâche, pas de l'hôte).
+Les trois handlers (`Create`/`Update`/`DeleteScheduledTask`) appellent
+`requireHostAccess(..., "operator")` sur l'hôte ciblé, exactement comme
+`run` — un `viewer`, y compris en appelant l'API directement sans passer
+par le dashboard, ne peut pas créer/modifier/supprimer une tâche
+planifiée. `Update`/`Delete` résolvent d'abord la tâche pour retrouver son
+`host_id` (`:id` dans l'URL est l'id de la tâche, pas de l'hôte).
 
 ## Dépannage
 

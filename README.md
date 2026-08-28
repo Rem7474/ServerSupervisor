@@ -723,7 +723,7 @@ Variables d'environnement injectées automatiquement par un Git Webhook :
 > `tasks.yaml` de l'hôte, et l'agent exécute le tableau tel quel via
 > `exec.CommandContext`. Il n'y a donc pas d'injection possible *depuis le
 > serveur*. En revanche, écrire vous-même `["bash", "-c", "…"]` (comme dans
-> l'exemple `git-pull-test` ci-dessus) réintroduit volontairement un shell
+> l'exemple `git-pull-test` ci-dessus) insère volontairement un shell
 > **dans votre propre commande** — c'est légitime et parfois nécessaire, mais
 > les variables que vous y interpolez, `SS_BRANCH` en tête, viennent d'un
 > webhook. Préférez un script dédié dès que la commande devient non triviale.
@@ -1081,7 +1081,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ (vérifié par hôte) |
 | `GET` | `/api/v1/scheduled-tasks/:id/executions` | Historique d'exécution d'une tâche | Authentifié |
 
-> Création/modification/suppression sont désormais vérifiées au même
+> Création/modification/suppression sont vérifiées au même
 > niveau que `run` (`requireHostAccess(..., "operator")`) — voir
 > [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks#3-lasymétrie-en-un-coup-dœil)
 > pour le détail.
