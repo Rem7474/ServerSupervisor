@@ -22,11 +22,11 @@ régénère et diff ce fichier) — voir la note sur les types générés dans
 ## Tester son code via le vrai conteneur (stack racine, données réelles)
 
 `docker-compose.yml` pointe `server` sur l'image publiée (`ghcr.io/rem7474/serversupervisor`)
-plutôt que de builder depuis les sources — nécessaire pour qu'un `docker compose up -d`
+plutôt que de builder depuis les sources, pour qu'un `docker compose up -d`
 frais fonctionne sans cloner le repo (voir le README). Pour tester ses propres
 changements de code à travers le vrai conteneur (pas `go run` sur l'hôte, pas
 le mode démo) avec des données persistées non-démo, `docker-compose.dev.yml`
-réintroduit le `build:` local en overlay :
+définit un `build:` local en overlay :
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
