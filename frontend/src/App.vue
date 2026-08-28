@@ -111,8 +111,17 @@
         </div>
       </header>
 
-      <!-- Row 2: the 6 intent sections (config/navigation.ts) — collapses on mobile -->
-      <header class="navbar navbar-expand-md navbar-light navbar-secondary">
+      <!-- Row 2: the 6 intent sections (config/navigation.ts) — collapses on mobile.
+           navbar-expand-md only switches #navbar-menu's *internal* collapse
+           behavior; it doesn't hide this <header> itself below md, so with
+           navbarOpen false (default) this row used to stay in the flow as
+           an empty second bar (its own Tabler padding/border, no content)
+           until the burger was clicked. Toggle the header's own visibility
+           directly below md instead of relying on .collapse alone. -->
+      <header
+        class="navbar navbar-expand-md navbar-light navbar-secondary"
+        :class="navbarOpen ? 'd-flex' : 'd-none d-md-flex'"
+      >
         <div class="container-xl">
           <div
             id="navbar-menu"

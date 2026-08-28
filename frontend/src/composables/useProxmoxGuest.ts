@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, onMounted, onUnmounted, watch, type Ref } from 'vue'
+import { computed, ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { ApexOptions } from 'apexcharts'
 import dayjs from '../utils/dayjs'
@@ -7,7 +7,7 @@ import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
 import { getApexChartPalette } from '../utils/apexChartTheme'
-import { getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
+import { breakLargeGaps } from '../utils/chartTimeAxis'
 import type { ProxmoxGuestLink } from '../types/generated'
 
 export type { GuestPowerAction }
@@ -15,7 +15,7 @@ export type { GuestPowerAction }
 const GUEST_REFRESH_SEC = 30
 
 interface GuestMetricPoint { timestamp: string; cpu_avg?: number; memory_avg?: number; [key: string]: unknown }
-interface ChartPoint { x: number; y: number }
+interface ChartPoint { x: number; y: number | null }
 type GuestChartSeries = { name: string; data: ChartPoint[]; color: string }[]
 
 interface ProxmoxGuest {
@@ -37,21 +37,7 @@ interface ProxmoxGuest {
 
 interface GuestNetworkIface { name: string; ips: string[] }
 
-// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
-// export it under a name that resolves cleanly through defineAsyncComponent's
-// template-ref typing — restated locally for the one method actually needed).
-export interface ApexChartInstance {
-  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
-}
-
-// chartRef is owned by the view (bound via `ref="chartRef"` on its
-// <ApexChart>) and passed in here rather than being created and returned by
-// this composable, so the view's own script actually reads the binding
-// (passing it as an argument counts) instead of only handing it to the
-// template — vue-tsc's noUnusedLocals doesn't trace string `ref="x"`
-// template bindings as a "read" of `x`, so a destructure-and-template-only
-// version of this trips a false "declared but never read".
-export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
+export function useProxmoxGuest() {
   const route = useRoute()
   const signal = useAbortSignal()
   const guestActions = useProxmoxGuestActions()
@@ -91,6 +77,17 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
     if (inputHours <= 24) return 5
     if (inputHours <= 168) return 15
     return 60
+  }
+
+  // The requested window, not the min/max of whatever points came back —
+  // sparse data (e.g. the guest was off for most of the range) used to
+  // shrink/shift the visible axis to just the span of real samples, which
+  // for 1h/6h (1-minute buckets, so a single stale or missing sample swings
+  // the axis a lot) made the chart look broken rather than just showing a
+  // gap in an otherwise correctly-scaled 1h/6h/24h/... window.
+  function chartWindow(): { min: number; max: number } {
+    const max = Date.now()
+    return { min: max - hours.value * 60 * 60 * 1000, max }
   }
 
   async function loadGuest(): Promise<void> {
@@ -201,22 +198,25 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
     return hours.value >= 24 ? d.format('DD/MM HH:mm') : d.format('HH:mm')
   }
 
-  // Built once (on first data load) rather than as a `computed` over
-  // `series`: vue3-apexcharts clones the whole `:options` prop via
-  // JSON.parse(JSON.stringify(...)) on every *reactive* update after mount
-  // — which silently drops every function (labels.formatter, tooltip.custom)
-  // since JSON can't represent them. Keeping this object's identity stable
-  // after the initial build means later data refreshes (this guest polls
-  // every GUEST_REFRESH_SEC, plus manual changeRange() calls) flow through
-  // the (function-free, always-safe) `:series` prop only; the time-range
-  // window (xaxis.min/max) is pushed via the exposed updateOptions() method
-  // directly in loadGuestSummary() instead (bypasses the wrapper's buggy
-  // reactive watcher).
+  // Rebuilt on every load (not a `computed` over `series`, just a plain
+  // shallowRef reassigned in loadGuestSummary): the view only ever renders
+  // <ApexChart> while `!summaryLoading`, and loadGuestSummary sets
+  // summaryLoading true for its whole duration — so the chart component is
+  // fully unmounted before this is reassigned and remounts fresh afterwards,
+  // reading the new object as its initial `:options` prop. That sidesteps
+  // vue3-apexcharts' real footgun (it clones `:options` via
+  // JSON.parse(JSON.stringify(...)) on every *reactive* update to an
+  // *already-mounted* instance, silently dropping functions like
+  // labels.formatter/tooltip.custom) without needing a second, imperative
+  // update path — a prior version pushed xaxis.min/max via the chart
+  // instance's exposed updateOptions() method instead, but that instance is
+  // unmounted (ref already null) by the time loadGuestSummary reaches it, so
+  // range changes silently never reached the chart.
   const chartOptions = shallowRef<ApexOptions | null>(null)
 
   function buildChartOptions(): ApexOptions {
     const palette = getApexChartPalette()
-    const allPoints = (series.value ?? []).flatMap((s) => s.data)
+    const { min, max } = chartWindow()
     return {
       chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
       theme: { mode: 'dark' },
@@ -228,8 +228,8 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
       grid: { borderColor: palette.grid },
       xaxis: {
         type: 'datetime',
-        min: getMinPointTimestamp(allPoints),
-        max: getMaxPointTimestamp(allPoints),
+        min,
+        max,
         labels: { style: { colors: palette.tickText }, formatter: (v: string) => formatChartTime(Number(v)) },
         axisBorder: { show: false },
         axisTicks: { show: false },
@@ -256,27 +256,24 @@ export function useProxmoxGuest(chartRef: Ref<ApexChartInstance | null>) {
         return
       }
       const palette = getApexChartPalette()
+      // A gap wider than a few sampling intervals is a real hole in the
+      // data (guest was off, polling stalled, ...) — break the line there
+      // instead of letting ApexCharts draw a straight/smooth interpolation
+      // across it, which visually reads as fabricated low/flat activity.
+      const maxGapMs = bucketMinutes * 60 * 1000 * 3
       series.value = [
         {
           name: 'CPU %',
-          data: points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.cpu_avg ?? 0) })),
+          data: breakLargeGaps(points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.cpu_avg ?? 0) })), maxGapMs),
           color: palette.cpu,
         },
         {
           name: 'RAM %',
-          data: points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.memory_avg ?? 0) })),
+          data: breakLargeGaps(points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.memory_avg ?? 0) })), maxGapMs),
           color: palette.ram,
         },
       ]
-      if (!chartOptions.value) {
-        chartOptions.value = buildChartOptions()
-      } else {
-        const allPoints = series.value.flatMap((s) => s.data)
-        chartRef.value?.updateOptions(
-          { xaxis: { min: getMinPointTimestamp(allPoints), max: getMaxPointTimestamp(allPoints) } },
-          false, false,
-        )
-      }
+      chartOptions.value = buildChartOptions()
     } catch {
       series.value = null
     } finally {

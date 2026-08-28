@@ -30,6 +30,24 @@ func parseVMID(s string) int {
 	return v
 }
 
+// mergeTasksByUPID appends extra tasks not already present in base (keyed by
+// UPID, PVE's unique task identifier) — used to fold a type-filtered task
+// fetch (e.g. "vzdump") into the plain top-N task window without duplicating
+// a task both calls happened to return.
+func mergeTasksByUPID(base, extra []proxmoxclient.PVETask) []proxmoxclient.PVETask {
+	seen := make(map[string]bool, len(base))
+	for _, t := range base {
+		seen[t.UPID] = true
+	}
+	for _, t := range extra {
+		if !seen[t.UPID] {
+			base = append(base, t)
+			seen[t.UPID] = true
+		}
+	}
+	return base
+}
+
 // Poller runs the background Proxmox collection loop. It is background sync, so it
 // uses the concrete *database.DB directly (many write paths) rather than a port.
 type Poller struct {
@@ -165,10 +183,24 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 			}
 		}
 
-		tasks, err := client.GetNodeTasks(n.Node, taskLimit)
+		tasks, err := client.GetNodeTasks(n.Node, taskLimit, "")
 		if err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get tasks: %v", conn.Name, n.Node, err))
 		} else {
+			// The plain top-taskLimit window above can silently push an
+			// older vzdump (backup) task out on a node busy with other
+			// activity (replication, service actions, ...) — backups are
+			// operationally the task type users most need visible (and
+			// UpsertProxmoxBackupRun below depends on seeing it), so fetch
+			// them again with PVE's own server-side type filter and merge,
+			// deduped by UPID, rather than trust they survived the general
+			// window.
+			if vzdumpTasks, err := client.GetNodeTasks(n.Node, taskLimit, "vzdump"); err != nil {
+				slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get vzdump tasks: %v", conn.Name, n.Node, err))
+			} else {
+				tasks = mergeTasksByUPID(tasks, vzdumpTasks)
+			}
+
 			for _, t := range tasks {
 				var startTime, endTime *time.Time
 				if t.StartTime > 0 {

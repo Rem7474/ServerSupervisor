@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { ref } from 'vue'
 
 const {
   getProxmoxGuests, getProxmoxGuestLink, getProxmoxGuestMetrics,
@@ -52,7 +51,7 @@ function mountUseProxmoxGuest() {
   let api!: ReturnType<typeof useProxmoxGuest>
   const wrapper = mount({
     setup() {
-      api = useProxmoxGuest(ref(null))
+      api = useProxmoxGuest()
       return () => null
     },
   })
@@ -67,6 +66,75 @@ beforeEach(() => {
   getProxmoxGuestMetrics.mockResolvedValue({ data: [] })
   getProxmoxNodeGuestNetworks.mockResolvedValue({ data: { 101: [{ name: 'eth0', ips: ['10.0.0.5'] }] } })
   getProxmoxInstance.mockResolvedValue({ data: { console_configured: true } })
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+describe('useProxmoxGuest — CPU/RAM chart time axis', () => {
+  it('pins xaxis to the requested window rather than the span of returned points', async () => {
+    const now = new Date('2026-08-24T12:00:00.000Z').getTime()
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    // Sparse data covering only the last 5 minutes — before the fix, xaxis
+    // used to shrink to this span instead of the full default 24h range.
+    getProxmoxGuestMetrics.mockResolvedValue({
+      data: [
+        { timestamp: new Date(now - 5 * 60 * 1000).toISOString(), cpu_avg: 10, memory_avg: 20 },
+        { timestamp: new Date(now - 1 * 60 * 1000).toISOString(), cpu_avg: 12, memory_avg: 22 },
+      ],
+    })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(api.chartOptions.value?.xaxis?.min).toBe(now - 24 * 60 * 60 * 1000)
+    expect(api.chartOptions.value?.xaxis?.max).toBe(now)
+  })
+
+  it('breaks the CPU/RAM line across a real gap instead of interpolating across it', async () => {
+    const now = Date.now()
+    // Default range is 24h (5-minute buckets) — a ~59-minute gap between
+    // samples is well past the 3-bucket tolerance and must break the line.
+    getProxmoxGuestMetrics.mockResolvedValue({
+      data: [
+        { timestamp: new Date(now - 60 * 60 * 1000).toISOString(), cpu_avg: 0, memory_avg: 0 },
+        { timestamp: new Date(now - 1 * 60 * 1000).toISOString(), cpu_avg: 50, memory_avg: 60 },
+      ],
+    })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    const cpuSeries = api.series.value?.find((s) => s.name === 'CPU %')
+    expect(cpuSeries?.data.some((p) => p.y === null)).toBe(true)
+  })
+
+  it('updates xaxis to the new window on changeRange(), not just on the initial load', async () => {
+    // Regression test: loadGuestSummary sets summaryLoading true for its
+    // whole duration, and the view only renders <ApexChart> while
+    // !summaryLoading — so a prior version that pushed xaxis.min/max via
+    // the chart instance's exposed updateOptions() method reached an
+    // already-unmounted (ref already null) instance on every range change,
+    // silently leaving the axis frozen at whatever the very first load
+    // computed it as, regardless of which range button was clicked
+    // afterwards. chartOptions must instead be rebuilt directly.
+    const now = new Date('2026-08-24T12:00:00.000Z').getTime()
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    getProxmoxGuestMetrics.mockResolvedValue({
+      data: [{ timestamp: new Date(now - 1 * 60 * 1000).toISOString(), cpu_avg: 10, memory_avg: 20 }],
+    })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+    expect(api.chartOptions.value?.xaxis?.min).toBe(now - 24 * 60 * 60 * 1000)
+
+    api.changeRange(6)
+    await flushPromises()
+
+    expect(api.chartOptions.value?.xaxis?.min).toBe(now - 6 * 60 * 60 * 1000)
+    expect(api.chartOptions.value?.xaxis?.max).toBe(now)
+  })
 })
 
 describe('useProxmoxGuest — guest network IPs without a ?nodeId= query param', () => {

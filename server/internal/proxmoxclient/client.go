@@ -326,13 +326,21 @@ type PVEBackupJob struct {
 // ─── Extended API methods ─────────────────────────────────────────────────────
 
 // GetNodeTasks returns up to limit recent tasks for the given node.
-// limit ≤ 0 defaults to 50.
-func (c *Client) GetNodeTasks(node string, limit int) ([]PVETask, error) {
+// limit ≤ 0 defaults to 50. typeFilter, when non-empty, restricts the result
+// server-side to PVE tasks of that exact type (PVE's own `typefilter` query
+// param, e.g. "vzdump") — applied before the limit, so that type is never
+// silently pushed out of a plain top-N window by unrelated task volume (a
+// node busy with e.g. replication tasks).
+func (c *Client) GetNodeTasks(node string, limit int, typeFilter string) ([]PVETask, error) {
 	if limit <= 0 {
 		limit = 50
 	}
+	path := fmt.Sprintf("/nodes/%s/tasks?limit=%d", node, limit)
+	if typeFilter != "" {
+		path += "&typefilter=" + url.QueryEscape(typeFilter)
+	}
 	var tasks []PVETask
-	if err := c.get(fmt.Sprintf("/nodes/%s/tasks?limit=%d", node, limit), &tasks); err != nil {
+	if err := c.get(path, &tasks); err != nil {
 		return nil, err
 	}
 	return tasks, nil
