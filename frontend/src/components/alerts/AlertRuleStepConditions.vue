@@ -120,11 +120,11 @@
       </div>
       <div class="mb-3">
         <label
-          for="alert-cond-duration"
+          for="alert-cond-compose-duration"
           class="form-label"
         >Durée (secondes)</label>
         <input
-          id="alert-cond-duration"
+          id="alert-cond-compose-duration"
           v-model.number="form.duration"
           type="number"
           min="0"

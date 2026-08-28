@@ -205,11 +205,11 @@
         <div class="row g-2">
           <div class="col-md-4">
             <label
-              for="webhook-tracker-provider"
+              for="webhook-tracker-linked-provider"
               class="form-label"
             >Provider</label>
             <select
-              id="webhook-tracker-provider"
+              id="webhook-tracker-linked-provider"
               v-model="form.provider"
               class="form-select"
             >
@@ -226,11 +226,11 @@
           </div>
           <div class="col-md-4">
             <label
-              for="webhook-tracker-repo-owner"
+              for="webhook-tracker-linked-repo-owner"
               class="form-label"
             >Owner / Org</label>
             <input
-              id="webhook-tracker-repo-owner"
+              id="webhook-tracker-linked-repo-owner"
               v-model="form.repo_owner"
               type="text"
               class="form-control"
@@ -239,11 +239,11 @@
           </div>
           <div class="col-md-4">
             <label
-              for="webhook-tracker-repo-name"
+              for="webhook-tracker-linked-repo-name"
               class="form-label"
             >Depot</label>
             <input
-              id="webhook-tracker-repo-name"
+              id="webhook-tracker-linked-repo-name"
               v-model="form.repo_name"
               type="text"
               class="form-control"
