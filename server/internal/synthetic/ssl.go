@@ -3,10 +3,13 @@ package synthetic
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/serversupervisor/server/internal/database"
@@ -135,9 +138,28 @@ func checkCertificate(ctx context.Context, c models.SSLCertificate) models.SSLCe
 	}
 
 	// Surface near-expiry as a non-fatal warning in last_error so the UI can show it.
+	var issues []string
 	if remaining := time.Until(notAfter); remaining < 0 {
-		c.LastError = fmt.Sprintf("certificate expired on %s", notAfter.Format(time.RFC3339))
+		issues = append(issues, fmt.Sprintf("certificate expired on %s", notAfter.Format(time.RFC3339)))
 	}
+
+	// The handshake above skipped verification entirely (InsecureSkipVerify)
+	// so we could still read the chain of an expired/invalid endpoint —
+	// otherwise that connection would just fail before we got here. That
+	// means a wrong hostname or an untrusted CA would go completely
+	// unreported. Verify independently now and fold anything beyond plain
+	// expiry (already reported above) into last_error too.
+	intermediates := x509.NewCertPool()
+	for _, cert := range state.PeerCertificates[1:] {
+		intermediates.AddCert(cert)
+	}
+	if _, verifyErr := leaf.Verify(x509.VerifyOptions{DNSName: serverName, Intermediates: intermediates}); verifyErr != nil {
+		var invalidErr x509.CertificateInvalidError
+		if !(errors.As(verifyErr, &invalidErr) && invalidErr.Reason == x509.Expired) {
+			issues = append(issues, verifyErr.Error())
+		}
+	}
+	c.LastError = strings.Join(issues, "; ")
 	return c
 }
 
