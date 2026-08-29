@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/serversupervisor/server/internal/testutil"
@@ -101,5 +102,26 @@ func TestBootstrapAdminAccount_ExistingInstall_NonDefaultPasswordLeavesFlagAlone
 	}
 	if u.MustChangePassword {
 		t.Error("must_change_password should stay false when the configured password is not the literal default")
+	}
+}
+
+func TestBootstrapAdminAccount_PropagatesHasAdminUserError(t *testing.T) {
+	db, cfg := testutil.NewPostgresDBWithConfig(t)
+
+	// A canceled context makes the underlying QueryRowContext fail
+	// deterministically — this is the standard way to force a DB error
+	// without a broken-connection mock, and it exercises the actual
+	// concern the wrapping message promises: the caller (main) must see
+	// a real error, not a nil/false result, when the admin check itself
+	// can't run.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := bootstrapAdminAccount(ctx, db, cfg)
+	if err == nil {
+		t.Fatal("expected an error when the admin-check query can't run")
+	}
+	if !strings.Contains(err.Error(), "failed to check existing admin user") {
+		t.Errorf("error = %q, want it to identify the admin-check step", err.Error())
 	}
 }
