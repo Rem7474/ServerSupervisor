@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -427,6 +428,59 @@ func TestOpenLXCConsoleHandshakeRejected(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "termproxy login rejected") {
 		t.Errorf("error = %v, want it to mention the rejected handshake", err)
+	}
+}
+
+// TestOpenLXCConsoleHandshakeNeverReplies covers a PVE that accepts the
+// vncwebsocket upgrade and reads the login handshake but never replies —
+// a wedged/buggy termproxy, as opposed to the explicit-rejection case above.
+// Without handshakeTimeout's read deadline this would hang the calling
+// goroutine forever; shrinking it here keeps the test itself fast.
+func TestOpenLXCConsoleHandshakeNeverReplies(t *testing.T) {
+	old := handshakeTimeout
+	handshakeTimeout = 200 * time.Millisecond
+	defer func() { handshakeTimeout = old }()
+
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH=="}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/termproxy", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVEVNC:TERM==","port":31000,"user":"root@pam","upid":"UPID:.."}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/vncwebsocket", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+		// Deliberately never reply — simulates a wedged termproxy. Block
+		// until the client gives up and closes, rather than returning and
+		// tearing down the connection ourselves (which would surface as a
+		// "read login response: ... closed" error instead of the deadline
+		// this test is actually verifying).
+		<-r.Context().Done()
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := New(srv.URL, "user@pve!token", "secret-token", false)
+	start := time.Now()
+	_, err := c.OpenLXCConsole(context.Background(), "pve1", 101, "root@pam", "hunter2")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected an error when PVE never replies to the handshake")
+	}
+	if !strings.Contains(err.Error(), "read login response") {
+		t.Errorf("error = %v, want it to identify the handshake read step", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("OpenLXCConsole took %v to fail, want it bounded by handshakeTimeout (%v)", elapsed, handshakeTimeout)
 	}
 }
 
