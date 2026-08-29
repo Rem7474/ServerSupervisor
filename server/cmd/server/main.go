@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -97,66 +96,13 @@ func main() {
 		slog.WarnContext(rootCtx, "failed to cleanup stalled commands", slog.Any("err", err))
 	}
 
-	// First run / Account bootstrap:
-	// If no admin user exists in the database, initialize the admin account.
-	hasAdmin, err := db.HasAdminUser(rootCtx)
-	if err != nil {
-		slog.ErrorContext(rootCtx, "failed to check existing admin user", slog.Any("err", err))
-		log.Fatalf("Failed to check existing admin user: %v", err)
-	}
-
-	if !hasAdmin {
-		adminUser := cfg.AdminUser
-		if adminUser == "" {
-			adminUser = "admin"
-		}
-
-		adminPassword := cfg.AdminPassword
-		mustChangePassword := false
-		isGenerated := false
-
-		if adminPassword == "" {
-			adminPassword = config.GenerateRandomPassword(16)
-			mustChangePassword = true
-			isGenerated = true
-		}
-
-		hash, err := handlers.HashPassword(adminPassword)
-		if err != nil {
-			slog.ErrorContext(rootCtx, "failed to hash admin password", slog.Any("err", err))
-			log.Fatalf("Failed to hash admin password: %v", err)
-		}
-
-		if err := db.CreateUser(rootCtx, adminUser, hash, "admin", mustChangePassword); err != nil {
-			slog.ErrorContext(rootCtx, "failed to create initial admin user", slog.Any("err", err))
-			log.Fatalf("Failed to create initial admin user: %v", err)
-		}
-
-		if isGenerated {
-			fmt.Printf("\n" +
-				"========================================================================\n" +
-				"🚀 SERVERSUPERVISOR — COMPTE ADMINISTRATEUR INITIALISÉ\n" +
-				"========================================================================\n" +
-				"  Identifiant  : %s\n" +
-				"  Mot de passe : %s\n\n" +
-				"  ⚠️  IMPORTANT : Conservez ce mot de passe temporaire !\n" +
-				"  ⚠️  Vous serez invité à le modifier dès votre première connexion.\n" +
-				"========================================================================\n\n",
-				adminUser, adminPassword)
-			slog.InfoContext(rootCtx, "first run: initial admin account created with generated password", slog.String("username", adminUser))
-		} else {
-			slog.InfoContext(rootCtx, "first run: initial admin account created with configured password", slog.String("username", adminUser))
-		}
-	} else {
-		// Existing installation safety net: if configured with default password "admin", enforce must_change_password flag
-		if cfg.AdminPassword == "admin" {
-			if err := db.SetUserMustChangePassword(rootCtx, cfg.AdminUser, true); err != nil {
-				slog.WarnContext(rootCtx, "failed to enforce must_change_password for admin user", slog.Any("err", err), slog.String("username", cfg.AdminUser))
-			} else {
-				slog.WarnContext(rootCtx, "default admin password configured: must_change_password enforced", slog.String("username", cfg.AdminUser))
-			}
-		}
-		slog.InfoContext(rootCtx, "admin account already initialized", slog.String("username", cfg.AdminUser))
+	// First run / Account bootstrap: creates the admin account if none exists
+	// yet, or re-applies the must_change_password safety net on an existing
+	// installation still configured with the default password (see
+	// bootstrapAdminAccount's doc comment).
+	if err := bootstrapAdminAccount(rootCtx, db, cfg); err != nil {
+		slog.ErrorContext(rootCtx, "admin account bootstrap failed", slog.Any("err", err))
+		log.Fatalf("Admin account bootstrap failed: %v", err)
 	}
 
 	dispatcher := dispatch.New(db)
