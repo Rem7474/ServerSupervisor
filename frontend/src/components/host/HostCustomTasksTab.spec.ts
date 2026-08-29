@@ -49,7 +49,8 @@ describe('HostCustomTasksTab', () => {
 
     expect(getHostCustomTasks).toHaveBeenCalledWith('host-1')
     expect(wrapper.text()).toContain('Aucune tâche personnalisée')
-    expect(wrapper.emitted('tasks-count')?.at(-1)).toEqual([0])
+    const tasksCountEvents = wrapper.emitted('tasks-count') ?? []
+    expect(tasksCountEvents[tasksCountEvents.length - 1]).toEqual([0])
   })
 
   it('does not load until the tab becomes active', async () => {
@@ -65,7 +66,8 @@ describe('HostCustomTasksTab', () => {
     await flushPromises()
     expect(getHostCustomTasks).toHaveBeenCalledTimes(1)
     expect(wrapper.text()).toContain('Renew certs')
-    expect(wrapper.emitted('tasks-count')?.at(-1)).toEqual([1])
+    const tasksCountEvents = wrapper.emitted('tasks-count') ?? []
+    expect(tasksCountEvents[tasksCountEvents.length - 1]).toEqual([1])
   })
 
   it('runs a task, shows the toast, tracks it, and emits open-command/history-changed', async () => {
