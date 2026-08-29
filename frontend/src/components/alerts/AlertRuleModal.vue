@@ -67,7 +67,7 @@
 
             <div v-if="step === 1">
               <AlertRuleStepSource
-                :form="form"
+                v-model:form="form"
                 :rule="rule"
                 :hosts="(hosts as any)"
                 :capabilities="(capabilities as any)"
@@ -95,7 +95,7 @@
 
             <div v-if="step === 2">
               <AlertRuleStepConditions
-                :form="form"
+                v-model:form="form"
                 :rule="(rule as any)"
                 :test-results="(testResults as any)"
                 :has-no-data-results="hasNoDataResults"

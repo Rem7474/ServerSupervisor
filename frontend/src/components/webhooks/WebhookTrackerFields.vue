@@ -11,7 +11,7 @@
           :class="form.tracker_type === 'git' ? 'tracker-type-card--active' : 'tracker-type-card--idle'"
         >
           <input
-            v-model="form.tracker_type"
+            v-model="trackerTypeModel"
             class="tracker-type-input"
             type="radio"
             value="git"
@@ -28,7 +28,7 @@
           :class="form.tracker_type === 'docker' ? 'tracker-type-card--active' : 'tracker-type-card--idle'"
         >
           <input
-            v-model="form.tracker_type"
+            v-model="trackerTypeModel"
             class="tracker-type-input"
             type="radio"
             value="docker"
@@ -51,7 +51,7 @@
       >Provider</label>
       <select
         id="webhook-tracker-provider"
-        v-model="form.provider"
+        v-model="providerModel"
         class="form-select"
       >
         <option value="github">
@@ -72,7 +72,7 @@
       >Owner / Org</label>
       <input
         id="webhook-tracker-repo-owner"
-        v-model="form.repo_owner"
+        v-model="repoOwnerModel"
         type="text"
         class="form-control"
         placeholder="ex: home-assistant"
@@ -85,7 +85,7 @@
       >Depot</label>
       <input
         id="webhook-tracker-repo-name"
-        v-model="form.repo_name"
+        v-model="repoNameModel"
         type="text"
         class="form-control"
         placeholder="ex: core"
@@ -173,7 +173,7 @@
       >Registre privé <span class="text-muted">(optionnel)</span></label>
       <select
         id="webhook-tracker-registry-credentials"
-        v-model="form.registry_credentials_id"
+        v-model="registryCredentialsIdModel"
         class="form-select"
       >
         <option value="">
@@ -210,7 +210,7 @@
             >Provider</label>
             <select
               id="webhook-tracker-linked-provider"
-              v-model="form.provider"
+              v-model="providerModel"
               class="form-select"
             >
               <option value="github">
@@ -231,7 +231,7 @@
             >Owner / Org</label>
             <input
               id="webhook-tracker-linked-repo-owner"
-              v-model="form.repo_owner"
+              v-model="repoOwnerModel"
               type="text"
               class="form-control"
               placeholder="ex: home-assistant"
@@ -244,7 +244,7 @@
             >Depot</label>
             <input
               id="webhook-tracker-linked-repo-name"
-              v-model="form.repo_name"
+              v-model="repoNameModel"
               type="text"
               class="form-control"
               placeholder="ex: core"
@@ -257,6 +257,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { WebhookFormData, RegistryCredential, PickableContainer } from '../../composables/useWebhookForm'
 
 const props = defineProps<{
@@ -273,7 +274,31 @@ const props = defineProps<{
 // and is reset on hydrate), so it is bound through as an explicit v-model.
 const containerSourceHostId = defineModel<string>('containerSourceHostId', { default: '' })
 
-const emit = defineEmits<{ (e: 'select-container', key: string): void }>()
+const emit = defineEmits<{
+  (e: 'select-container', key: string): void
+  (e: 'update:form', value: WebhookFormData): void
+}>()
+
+// The `form` prop is owned by the parent (WebhookModal, via
+// useWebhookForm). This component never mutates it in place — every field
+// write emits a whole-object replacement for the parent to apply (bound as
+// `v-model:form` there).
+function updateForm<K extends keyof WebhookFormData>(key: K, value: WebhookFormData[K]): void {
+  emit('update:form', { ...props.form, [key]: value })
+}
+
+function fieldModel<K extends keyof WebhookFormData>(key: K) {
+  return computed<WebhookFormData[K]>({
+    get: () => props.form[key],
+    set: (value) => updateForm(key, value),
+  })
+}
+
+const trackerTypeModel = fieldModel('tracker_type')
+const providerModel = fieldModel('provider')
+const repoOwnerModel = fieldModel('repo_owner')
+const repoNameModel = fieldModel('repo_name')
+const registryCredentialsIdModel = fieldModel('registry_credentials_id')
 
 function onContainerChange(event: Event): void {
   const key = (event.target as HTMLSelectElement).value

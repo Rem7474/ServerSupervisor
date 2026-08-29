@@ -133,7 +133,7 @@
         <!-- Détection de menaces -->
         <div v-show="tab === 'threats'">
           <SettingsThreatDetectionCard
-            :form="form"
+            v-model:form="form"
             :auth-is-admin="auth.isAdmin"
             :saving-threat-detection="savingThreatDetection"
             :threat-detection-save-msg="threatDetectionSaveMsg"

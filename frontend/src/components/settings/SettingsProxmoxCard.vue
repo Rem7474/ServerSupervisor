@@ -100,8 +100,12 @@
           </div>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Utilisateur PVE</label>
+          <label
+            for="proxmox-pve-username"
+            class="form-label"
+          >Utilisateur PVE</label>
           <input
+            id="proxmox-pve-username"
             v-model="form.pve_username"
             type="text"
             class="form-control"
@@ -109,8 +113,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Mot de passe PVE {{ editingId ? '(vide = inchangé)' : '' }}</label>
+          <label
+            for="proxmox-pve-password"
+            class="form-label"
+          >Mot de passe PVE {{ editingId ? '(vide = inchangé)' : '' }}</label>
           <input
+            id="proxmox-pve-password"
             v-model="form.pve_password"
             type="password"
             class="form-control"
