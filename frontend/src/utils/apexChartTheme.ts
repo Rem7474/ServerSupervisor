@@ -19,7 +19,30 @@
 //   composable (not dashboard-specific) so another chart can opt in later
 //   without re-inventing the observer wiring.
 
-import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount, defineAsyncComponent, type Ref } from 'vue'
+import type { ApexOptions } from 'apexcharts'
+
+// vue3-apexcharts ships no usable TypeScript types for the component
+// instance itself; this covers the one method every chart consumer that
+// pushes a data update via the exposed instance (as opposed to remounting
+// on new options) actually calls.
+export interface ApexChartInstance {
+  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
+}
+
+// Every chart component lazy-loads vue3-apexcharts the same way, so the
+// dependency stays out of the main bundle (see vite.config.js's
+// vendor-apexcharts manual chunk) — one shared const instead of each file
+// re-declaring an identical loader.
+export const AsyncApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
+// Vue's <script setup> compiler infers a component's name from its local
+// `const X = ...` declaration for devtools/Vue Test Utils stub-by-name
+// matching — but only for components declared directly inside the SFC, not
+// ones imported from elsewhere (this used to be such a local declaration in
+// every consumer). Naming it explicitly keeps `global.stubs: { ApexChart }`
+// working in every spec that stubs it, regardless of which file imports it.
+;(AsyncApexChart as { name?: string }).name = 'ApexChart'
+;(AsyncApexChart as { name?: string }).name = 'ApexChart'
 
 export interface ApexChartPalette {
   legendText: string

@@ -368,6 +368,7 @@ import { useAuthStore } from '../stores/auth'
 import { useProxmoxGuest } from '../composables/useProxmoxGuest'
 import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses'
 import { getMetricColorClass } from '../utils/metricColor'
+import { AsyncApexChart as ApexChart } from '../utils/apexChartTheme'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -445,7 +446,6 @@ const guestPrimaryIp = computed(() => {
   return ''
 })
 
-const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'

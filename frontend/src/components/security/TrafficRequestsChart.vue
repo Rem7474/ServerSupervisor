@@ -22,23 +22,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, shallowRef, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
-import { getApexChartPalette } from '../../utils/apexChartTheme'
+import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
 
 interface Point {
   timestamp: string
   human?: number | string
   bot?: number | string
   [key: string]: unknown
-}
-
-// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
-// export it under a name that resolves cleanly through defineAsyncComponent's
-// template-ref typing — restated locally for the one method actually needed).
-interface ApexChartInstance {
-  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
 }
 
 const props = defineProps<{
@@ -48,7 +41,6 @@ const props = defineProps<{
   loading: boolean
 }>()
 
-const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 const chartRef = ref<ApexChartInstance | null>(null)
 
 function bucketLabel(ts: string): string {
