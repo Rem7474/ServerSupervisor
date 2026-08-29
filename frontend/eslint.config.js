@@ -7,7 +7,7 @@ import pluginLocal from './eslint-rules/design-system.js'
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '.git/**', 'src/types/generated.ts'],
+    ignores: ['dist/**', 'node_modules/**', '.git/**', 'src/types/generated.ts', 'coverage/**', 'coverage-browser/**'],
   },
   {
     files: ['**/*.{js,mjs,cjs,jsx,ts,tsx,vue}'],

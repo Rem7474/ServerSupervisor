@@ -40,12 +40,11 @@ lint bloquant (`agent/.golangci.yml`).
 ### CI Frontend (`ci-frontend.yml`) — push/PR sur `frontend/**`
 
 - Job `quality` : `npm ci` → lint → typecheck → **tests unitaires/composants
-  (`npm run test`, Vitest)** → build de production
-- Les tests navigateur (`npm run test:browser`, Playwright/Chromium, rendu
-  Chart.js / D3) **ne sont pas exécutés en CI** pour l'instant : bug amont de
-  l'optimiseur de deps Vite 8 (rolldown) en mode browser Vitest 4 (voir
-  `vitest.browser.config.ts`). À lancer en local ; rajouter un job
-  `browser-tests` une fois le correctif amont disponible.
+  (`npm run test`, Vitest, happy-dom)** → build de production
+- Job `browser-tests` : `npm ci` → installation de Playwright/Chromium →
+  **tests navigateur réels (`npm run test:browser`)**, pour tout ce qui
+  dépend d'un rendu effectif (ApexCharts SVG, carte du monde D3) que
+  happy-dom ne peut pas exécuter.
 
 ### Security (`security.yml`) — lundi 6h UTC + push/PR sur les manifests + manuel
 

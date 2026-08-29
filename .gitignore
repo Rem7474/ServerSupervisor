@@ -43,3 +43,4 @@ frontend/eslint-pass2.json
 server/coverage.out
 agent/coverage.out
 frontend/coverage/
+frontend/coverage-browser/

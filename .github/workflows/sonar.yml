@@ -107,20 +107,35 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Run tests with coverage
         run: npm run test:coverage
+
+      # Real-browser component tests (ApexCharts/D3 rendering happy-dom can't
+      # exercise) produce a second, separate lcov report (coverage-browser/,
+      # see vitest.browser.config.ts) — both paths are declared in
+      # sonar-project.properties and SonarCloud merges per-file hit counts
+      # across report paths.
+      - name: Run real-browser tests with coverage
+        run: npm run test:browser:coverage
 
       # lcov paths are relative to the working directory tests ran in
       # (frontend/, e.g. "SF:src/App.vue"), but sonar.sources declares
       # "frontend/src" relative to the repo root the scan runs from — rewrite
       # them so SonarCloud can actually match coverage to source files.
       - name: Rewrite lcov paths relative to repo root
-        run: sed -i 's|^SF:|SF:frontend/|' coverage/lcov.info
+        run: |
+          sed -i 's|^SF:|SF:frontend/|' coverage/lcov.info
+          sed -i 's|^SF:|SF:frontend/|' coverage-browser/lcov.info
 
       - uses: actions/upload-artifact@v7
         with:
           name: sonar-frontend-coverage
-          path: frontend/coverage/lcov.info
+          path: |
+            frontend/coverage/lcov.info
+            frontend/coverage-browser/lcov.info
           retention-days: 1
 
   scan:
@@ -152,7 +167,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: sonar-frontend-coverage
-          path: frontend/coverage/
+          path: frontend/
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1

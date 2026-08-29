@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:browser": "vitest run --config vitest.browser.config.ts"
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:browser:coverage": "vitest run --config vitest.browser.config.ts --coverage"
   },
   "dependencies": {
     "@tabler/core": "^1.0.0",
