@@ -5,9 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
@@ -357,6 +359,132 @@ func TestTestConnectionByID_NotFound(t *testing.T) {
 	_, err := newSvc(&fakeRepo{}).TestConnectionByID(context.Background(), "missing")
 	if status(err) != 404 {
 		t.Fatalf("missing connection should be 404, got %v", err)
+	}
+}
+
+func TestCreateConnection_Success(t *testing.T) {
+	repo := &fakeRepo{connByID: map[string]*models.ProxmoxConnection{
+		"id": {ID: "id", Name: "x"}, // returned by GetProxmoxConnectionByID after the create
+	}}
+	req := models.ProxmoxConnectionRequest{Name: "x", APIURL: "https://pve.invalid:8006", TokenID: "t", TokenSecret: "s"}
+	conn, err := newSvc(repo).CreateConnection(context.Background(), req)
+	if err != nil {
+		t.Fatalf("CreateConnection: %v", err)
+	}
+	if !repo.created {
+		t.Error("expected the repository Create call to have been made")
+	}
+	if conn == nil || conn.ID != "id" {
+		t.Errorf("got conn = %+v, want ID %q (from fakeRepo.CreateProxmoxConnection)", conn, "id")
+	}
+}
+
+func TestUpdateConnection_Success(t *testing.T) {
+	repo := &fakeRepo{connByID: map[string]*models.ProxmoxConnection{
+		"c1": {ID: "c1", Name: "old"},
+	}}
+	_, err := newSvc(repo).UpdateConnection(context.Background(), "c1", models.ProxmoxConnectionRequest{Name: "new"})
+	if err != nil {
+		t.Fatalf("UpdateConnection: %v", err)
+	}
+}
+
+func TestUpdateConnection_NotFound(t *testing.T) {
+	_, err := newSvc(&fakeRepo{}).UpdateConnection(context.Background(), "missing", models.ProxmoxConnectionRequest{})
+	if status(err) != 404 {
+		t.Fatalf("missing connection should be 404, got %v", err)
+	}
+}
+
+func TestDeleteConnection(t *testing.T) {
+	repo := &fakeRepo{connByID: map[string]*models.ProxmoxConnection{"c1": {ID: "c1"}}}
+	if err := newSvc(repo).DeleteConnection(context.Background(), "c1"); err != nil {
+		t.Fatalf("DeleteConnection: %v", err)
+	}
+}
+
+// fakeConsoleServer simulates the three PVE calls OpenGuestConsole's
+// underlying OpenLXCConsole needs (login, termproxy, vncwebsocket) — same
+// fake shape as proxmoxclient/console_test.go and
+// ws/proxmox_console_integration_test.go, reimplemented here since it's a
+// different package and this test cares about the service-layer wiring
+// (guest resolution -> secret/credential lookup -> client), not the client
+// protocol itself.
+func fakeConsoleServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH=="}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/termproxy", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVEVNC:TERM==","port":31000,"user":"root@pam","upid":"UPID:.."}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/vncwebsocket", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if _, msg, err := conn.ReadMessage(); err != nil || string(msg) != "root@pam:PVEVNC:TERM==\n" {
+			return
+		}
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("OK"))
+		<-r.Context().Done()
+	})
+	return httptest.NewServer(mux)
+}
+
+func TestOpenGuestConsole_Success(t *testing.T) {
+	srv := fakeConsoleServer(t)
+	defer srv.Close()
+
+	repo := &fakeRepo{
+		guestByID: map[string]*models.ProxmoxGuest{
+			"g1": {ID: "g1", GuestType: "lxc", ConnectionID: "c1", NodeName: "pve1", VMID: 101},
+		},
+		enabledConns: []database.ProxmoxConnectionFull{{
+			ProxmoxConnection: models.ProxmoxConnection{ID: "c1"},
+			TokenSecret:       "secret",
+		}},
+		connByID: map[string]*models.ProxmoxConnection{
+			"c1": {ID: "c1", APIURL: srv.URL, TokenID: "user@pve!token"},
+		},
+		consoleCreds: map[string][2]string{"c1": {"root@pam", "hunter2"}},
+	}
+	guest, session, err := newSvc(repo).OpenGuestConsole(context.Background(), "g1")
+	if err != nil {
+		t.Fatalf("OpenGuestConsole: %v", err)
+	}
+	if guest == nil || guest.ID != "g1" {
+		t.Errorf("got guest = %+v", guest)
+	}
+	if session == nil {
+		t.Fatal("expected a non-nil session")
+	}
+	_ = session.Close()
+}
+
+func TestOpenGuestConsole_BadGatewayOnPVEFailure(t *testing.T) {
+	repo := &fakeRepo{
+		guestByID: map[string]*models.ProxmoxGuest{
+			"g1": {ID: "g1", GuestType: "lxc", ConnectionID: "c1", NodeName: "pve1", VMID: 101},
+		},
+		enabledConns: []database.ProxmoxConnectionFull{{
+			ProxmoxConnection: models.ProxmoxConnection{ID: "c1"},
+			TokenSecret:       "secret",
+		}},
+		connByID: map[string]*models.ProxmoxConnection{
+			"c1": {ID: "c1", APIURL: "http://127.0.0.1:1", TokenID: "user@pve!token"},
+		},
+		consoleCreds: map[string][2]string{"c1": {"root@pam", "hunter2"}},
+	}
+	_, _, err := newSvc(repo).OpenGuestConsole(context.Background(), "g1")
+	if status(err) != http.StatusBadGateway {
+		t.Fatalf("PVE connection failure should be a 502 BadGateway, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "pve login") {
+		t.Errorf("expected the underlying pve login error to surface, got: %v", err)
 	}
 }
 

@@ -208,6 +208,169 @@ func TestOpenLXCConsoleLoginFailure(t *testing.T) {
 // header/subprotocol is missing) — this must surface the HTTP status and
 // body PVE actually returned, not just gorilla's generic "bad handshake",
 // so a misconfiguration is diagnosable from the error message alone.
+// TestClientTestLogin covers the exported TestLogin wrapper used by
+// Service.TestConnection to validate console credentials from the
+// connection-settings UI (see service.go's TestConnection doc comment).
+func TestClientTestLogin(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		if r.Form.Get("password") != "hunter2" {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"data":null}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:X==","CSRFPreventionToken":"c"}}`))
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, "user@pve!token", "secret-token", false)
+	if err := c.TestLogin("root@pam", "hunter2"); err != nil {
+		t.Fatalf("TestLogin with correct credentials: %v", err)
+	}
+	if err := c.TestLogin("root@pam", "wrong"); err == nil {
+		t.Fatal("TestLogin with wrong credentials: expected error, got nil")
+	}
+}
+
+// TestLoginNoTicketReturned covers a 200 OK response that nonetheless carries
+// no ticket — treated as a login failure rather than a nil-ticket success.
+func TestLoginNoTicketReturned(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":""}}`))
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, "user@pve!token", "secret-token", false)
+	if _, err := c.login("root@pam", "secret"); err == nil {
+		t.Fatal("expected an error when PVE returns no ticket")
+	}
+}
+
+func TestWsBaseURL(t *testing.T) {
+	cases := []struct {
+		name    string
+		baseURL string
+		want    string
+	}{
+		{"https", "https://pve.example.com:8006", "wss://pve.example.com:8006"},
+		{"http", "http://pve.example.com:8006", "ws://pve.example.com:8006"},
+		{"unrecognized scheme returned as-is", "ftp://pve.example.com", "ftp://pve.example.com"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := New(tc.baseURL, "user@pve!token", "secret-token", false)
+			if got := c.wsBaseURL(); got != tc.want {
+				t.Errorf("wsBaseURL() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestTermSessionResizeAndPing covers TermSession.Resize/Ping's wire framing
+// directly against a raw WebSocket server, independent of the
+// login/termproxy handshake exercised by TestOpenLXCConsole.
+func TestTermSessionResizeAndPing(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	received := make(chan string, 2)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		for i := 0; i < 2; i++ {
+			_, msg, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			received <- string(msg)
+		}
+	}))
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	session := &TermSession{conn: conn}
+	defer func() { _ = session.Close() }()
+
+	if err := session.Resize(120, 40); err != nil {
+		t.Fatalf("Resize: %v", err)
+	}
+	if err := session.Ping(); err != nil {
+		t.Fatalf("Ping: %v", err)
+	}
+
+	if got := <-received; got != "1:120:40:" {
+		t.Errorf("Resize frame = %q, want %q", got, "1:120:40:")
+	}
+	if got := <-received; got != "2" {
+		t.Errorf("Ping frame = %q, want %q", got, "2")
+	}
+}
+
+// TestOpenLXCConsoleTermproxyError covers a successful login followed by a
+// PVE-side rejection of the termproxy creation call itself (e.g. missing
+// VM.Console privilege on that node/guest).
+func TestOpenLXCConsoleTermproxyError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH=="}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/termproxy", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"errors":{"perm":"no VM.Console"}}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := New(srv.URL, "user@pve!token", "secret-token", false)
+	if _, err := c.OpenLXCConsole(context.Background(), "pve1", 101, "root@pam", "hunter2"); err == nil {
+		t.Fatal("expected an error when termproxy creation is rejected")
+	}
+}
+
+// TestOpenLXCConsoleHandshakeRejected covers the vncwebsocket upgrade
+// succeeding but the termproxy login handshake itself being rejected (PVE
+// replies with something other than the literal "OK").
+func TestOpenLXCConsoleHandshakeRejected(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH=="}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/termproxy", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVEVNC:TERM==","port":31000,"user":"root@pam","upid":"UPID:.."}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/vncwebsocket", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("FAIL"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := New(srv.URL, "user@pve!token", "secret-token", false)
+	_, err := c.OpenLXCConsole(context.Background(), "pve1", 101, "root@pam", "hunter2")
+	if err == nil {
+		t.Fatal("expected an error when the termproxy login handshake is rejected")
+	}
+	if !strings.Contains(err.Error(), "termproxy login rejected") {
+		t.Errorf("error = %v, want it to mention the rejected handshake", err)
+	}
+}
+
 func TestOpenLXCConsoleBadHandshake(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {

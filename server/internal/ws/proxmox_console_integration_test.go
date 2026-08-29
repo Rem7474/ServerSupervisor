@@ -217,6 +217,94 @@ func TestProxmoxConsole_NonAdminRejected(t *testing.T) {
 	}
 }
 
+// TestProxmoxConsole_TooManyConnections covers the per-IP connection cap
+// (wsMaxConnsPerIP, shared by every WS route — see base.go's acquireConn).
+// Directly pre-filling h.ipConns avoids actually opening wsMaxConnsPerIP real
+// connections just to exercise this one branch.
+func TestProxmoxConsole_TooManyConnections(t *testing.T) {
+	h, guestID := setupConsoleTestHandler(t)
+	srv := newConsoleTestServer(t, h)
+	token := mintTestJWT(t, h.cfg.JWTSecret, "admin1", models.RoleAdmin)
+
+	h.ipConnsMu.Lock()
+	h.ipConns["127.0.0.1"] = wsMaxConnsPerIP
+	h.ipConnsMu.Unlock()
+	t.Cleanup(func() {
+		h.ipConnsMu.Lock()
+		delete(h.ipConns, "127.0.0.1")
+		h.ipConnsMu.Unlock()
+	})
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/console/" + guestID
+	header := http.Header{}
+	header.Set("Cookie", cookies.AccessTokenName+"="+token)
+	_, resp, err := websocket.DefaultDialer.Dial(wsURL, header)
+	if err == nil {
+		t.Fatal("expected the WS upgrade to be rejected once the per-IP cap is hit")
+	}
+	if resp == nil || resp.StatusCode != http.StatusTooManyRequests {
+		status := 0
+		if resp != nil {
+			status = resp.StatusCode
+		}
+		t.Fatalf("status = %d, want 429", status)
+	}
+	if resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+}
+
+// TestProxmoxConsole_UnauthenticatedRejected covers the in-band auth fallback
+// (no session cookie) rejecting a malformed/missing auth message — see
+// authenticateWSClaims's doc comment in base.go.
+func TestProxmoxConsole_UnauthenticatedRejected(t *testing.T) {
+	h, guestID := setupConsoleTestHandler(t)
+	srv := newConsoleTestServer(t, h)
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/console/" + guestID
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+
+	// No cookie was sent, so the handler falls back to the in-band
+	// {"type":"auth"} handshake; sending anything else must be rejected.
+	if err := conn.WriteJSON(map[string]string{"type": "not-auth"}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	var msg map[string]string
+	if err := conn.ReadJSON(&msg); err != nil {
+		t.Fatalf("read rejection: %v", err)
+	}
+	if msg["type"] != "auth_error" {
+		t.Errorf("type = %q, want auth_error", msg["type"])
+	}
+}
+
+// TestProxmoxConsole_GuestNotFound covers OpenGuestConsole returning an
+// error (unknown guest) before any PVE session is opened.
+func TestProxmoxConsole_GuestNotFound(t *testing.T) {
+	h, _ := setupConsoleTestHandler(t)
+	srv := newConsoleTestServer(t, h)
+	token := mintTestJWT(t, h.cfg.JWTSecret, "admin1", models.RoleAdmin)
+
+	conn := dialConsole(t, srv, "00000000-0000-0000-0000-000000000000", token)
+
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	var msg models.WSConsoleError
+	if err := conn.ReadJSON(&msg); err != nil {
+		t.Fatalf("read console_error: %v", err)
+	}
+	if msg.Type != "console_error" || msg.Error == "" {
+		t.Errorf("got %+v, want a non-empty console_error", msg)
+	}
+}
+
 func TestProxmoxConsole_MissingGuestID(t *testing.T) {
 	h, _ := setupConsoleTestHandler(t)
 	gin.SetMode(gin.TestMode)
