@@ -104,7 +104,7 @@ jobs:
 
       - name: Run nancy
         working-directory: server
-        run: go list -json -deps ./... | ../nancy sleuth --quiet --username "${{ secrets.OSS_INDEX_USER }}" --token "${{ secrets.OSS_INDEX_TOKEN }}"
+        run: go list -json -deps ./... | ../nancy sleuth --quiet --exclude-vulnerability-file ../.nancy-ignore --username "${{ secrets.OSS_INDEX_USER }}" --token "${{ secrets.OSS_INDEX_TOKEN }}"
 
   nancy-agent:
     name: nancy (agent)
