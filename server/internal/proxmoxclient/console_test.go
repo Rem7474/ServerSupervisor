@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -312,6 +313,64 @@ func TestTermSessionResizeAndPing(t *testing.T) {
 	if got := <-received; got != "2" {
 		t.Errorf("Ping frame = %q, want %q", got, "2")
 	}
+}
+
+// TestTermSession_ConcurrentWritesDoNotRace exercises Write/Resize/Ping from
+// separate goroutines simultaneously — the exact shape of
+// ws/proxmox_console.go's usage (a browser-to-PVE forwarding goroutine
+// calling Write/Resize while a separate keepalive-ticker goroutine calls
+// Ping). gorilla/websocket only supports one concurrent writer per
+// connection; run with -race to catch a regression if writeMu is ever
+// removed.
+func TestTermSession_ConcurrentWritesDoNotRace(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	const messagesPerGoroutine = 50
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	session := &TermSession{conn: conn}
+	defer func() { _ = session.Close() }()
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < messagesPerGoroutine; i++ {
+			_ = session.Write([]byte("x"))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < messagesPerGoroutine; i++ {
+			_ = session.Resize(80, 24)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < messagesPerGoroutine; i++ {
+			_ = session.Ping()
+		}
+	}()
+	wg.Wait()
 }
 
 // TestOpenLXCConsoleTermproxyError covers a successful login followed by a

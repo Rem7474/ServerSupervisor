@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -171,6 +172,11 @@ func (c *Client) wsBaseURL() string {
 // (ReadMessage).
 type TermSession struct {
 	conn *websocket.Conn
+	// writeMu serializes Write/Resize/Ping: gorilla/websocket requires at
+	// most one concurrent writer per connection, but ws/proxmox_console.go
+	// calls Write/Resize from its browser-to-PVE forwarding goroutine while
+	// a separate keepalive ticker goroutine calls Ping concurrently.
+	writeMu sync.Mutex
 }
 
 // OpenLXCConsole opens a live shell session on an LXC container: logs in
@@ -238,17 +244,23 @@ func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveU
 // Write sends keystroke/paste bytes to the remote shell.
 func (s *TermSession) Write(data []byte) error {
 	frame := append([]byte(fmt.Sprintf("0:%d:", len(data))), data...)
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	return s.conn.WriteMessage(websocket.TextMessage, frame)
 }
 
 // Resize tells PVE to resize the PTY.
 func (s *TermSession) Resize(cols, rows int) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	return s.conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("1:%d:%d:", cols, rows)))
 }
 
 // Ping sends a termproxy keepalive; PVE closes idle console sessions after a
 // few minutes without one.
 func (s *TermSession) Ping() error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	return s.conn.WriteMessage(websocket.TextMessage, []byte("2"))
 }
 
