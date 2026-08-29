@@ -35,31 +35,33 @@ func main() {
 
 	// Structured logging — also bridges the standard log package through slog.
 	logging.Init(cfg.LogLevel, cfg.LogFormat)
-	slog.Info("ServerSupervisor starting", slog.String("log_level", cfg.LogLevel), slog.String("log_format", cfg.LogFormat))
-	log.Printf("Database Config: host=%s port=%s dbname=%s", cfg.DBHost, cfg.DBPort, cfg.DBName)
+	slog.InfoContext(rootCtx, "ServerSupervisor starting", slog.String("log_level", cfg.LogLevel), slog.String("log_format", cfg.LogFormat))
+	slog.InfoContext(rootCtx, "Database Config", slog.String("host", cfg.DBHost), slog.String("port", cfg.DBPort), slog.String("dbname", cfg.DBName))
 
 	// ⚠️  Validate configuration — log all warnings before connecting to the database
 	for _, w := range cfg.Validate() {
-		log.Printf("⚠️  WARNING: %s", w)
+		slog.WarnContext(rootCtx, "configuration warning", slog.String("warning", w))
 	}
 
 	// In production (APP_ENV != "dev"/"development"), refuse to start when
 	// insecure defaults are present (JWT_SECRET, ADMIN_PASSWORD, DB_PASSWORD).
 	if err := cfg.ValidateStrict(); err != nil {
+		slog.ErrorContext(rootCtx, "refusing to start due to insecure configuration", slog.Any("err", err))
 		log.Fatalf("Refusing to start: %v. Set APP_ENV=dev to bypass for local development.", err)
 	}
 	if config.IsDevEnv() {
-		log.Printf("[dev] APP_ENV=%s — strict secret validation disabled. Do NOT use this mode in production.", config.AppEnv())
+		slog.InfoContext(rootCtx, "strict secret validation disabled in dev mode", slog.String("app_env", config.AppEnv()))
 	}
 
 	// Ensure database exists
 	if err := database.EnsureDatabaseExists(cfg); err != nil {
-		log.Printf("Warning: could not ensure database exists: %v (will retry on connection)", err)
+		slog.WarnContext(rootCtx, "could not ensure database exists (will retry on connection)", slog.Any("err", err))
 	}
 
 	// Connect to database
 	db, err := database.New(cfg)
 	if err != nil {
+		slog.ErrorContext(rootCtx, "failed to connect to database", slog.Any("err", err))
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer func() { _ = db.Close() }()
@@ -69,6 +71,17 @@ func main() {
 	// lazily when the settings page was opened). All downstream consumers (pollers,
 	// alert engine, notify, retention jobs) read the resulting config.
 	cfg.OverrideFromDB(db)
+
+	// If JWT_SECRET was not provided in env or DB, generate a strong random secret
+	// and persist it in the settings table so it remains stable across restarts.
+	if cfg.JWTSecret == "" {
+		generatedSecret := config.GenerateRandomSecret()
+		if err := db.SetSetting(rootCtx, "jwt_secret", generatedSecret); err != nil {
+			slog.WarnContext(rootCtx, "failed to persist generated JWT secret to database", slog.Any("err", err))
+		}
+		cfg.JWTSecret = generatedSecret
+		slog.InfoContext(rootCtx, "JWT secret auto-generated and persisted in settings")
+	}
 
 	// Reconcile the TimescaleDB metric retention policy with the effective config
 	// so a retention value set via env or the settings table is honoured without a
@@ -80,23 +93,16 @@ func main() {
 
 	// Cleanup stalled commands at startup (commands older than 10 minutes)
 	if err := db.CleanupStalledCommands(rootCtx, 10); err != nil {
-		log.Printf("Warning: failed to cleanup stalled commands: %v", err)
+		slog.WarnContext(rootCtx, "failed to cleanup stalled commands", slog.Any("err", err))
 	}
 
-	// Create default admin user (sets must_change_password if using default "admin" password)
-	hash, err := handlers.HashPassword(cfg.AdminPassword)
-	if err != nil {
-		log.Fatalf("Failed to hash admin password: %v", err)
-	}
-	mustChangePassword := cfg.AdminPassword == "admin"
-	if err := db.CreateUser(rootCtx, cfg.AdminUser, hash, "admin", mustChangePassword); err != nil {
-		log.Printf("Admin user creation: %v (may already exist)", err)
-	}
-	// For existing installations still using default password, ensure flag is set
-	if mustChangePassword {
-		if err := db.SetUserMustChangePassword(rootCtx, cfg.AdminUser, true); err != nil {
-			log.Printf("Warning: failed to set must_change_password for admin: %v", err)
-		}
+	// First run / Account bootstrap: creates the admin account if none exists
+	// yet, or re-applies the must_change_password safety net on an existing
+	// installation still configured with the default password (see
+	// bootstrapAdminAccount's doc comment).
+	if err := bootstrapAdminAccount(rootCtx, db, cfg); err != nil {
+		slog.ErrorContext(rootCtx, "admin account bootstrap failed", slog.Any("err", err))
+		log.Fatalf("Admin account bootstrap failed: %v", err)
 	}
 
 	dispatcher := dispatch.New(db)

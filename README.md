@@ -225,11 +225,15 @@ pour lancer ce même mode démo en local).
 ```bash
 git clone https://github.com/Rem7474/ServerSupervisor.git && cd ServerSupervisor
 cp .env.example .env
-# Éditer .env avec vos valeurs (JWT_SECRET, ADMIN_PASSWORD, etc.)
 docker compose up -d
 ```
 
-Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin` par défaut).
+- Le dashboard est accessible sur `http://localhost:8080`.
+- **Premier démarrage** : Si `ADMIN_PASSWORD` n'est pas renseigné dans votre fichier `.env`, un mot de passe aléatoire sécurisé est généré automatiquement au premier lancement. Affichez-le via :
+  ```bash
+  docker compose logs server
+  ```
+- Connectez-vous avec le login `admin` et le mot de passe généré (ou celui défini dans `.env`). Une modification du mot de passe vous sera demandée dès la première connexion.
 
 ### 2. Enregistrer un hôte
 
@@ -396,11 +400,11 @@ dérive : voir le guide complet **[Git-Webhooks-and-Releases](https://github.com
 #### Authentification
 | Variable | Description | Défaut |
 |---|---|---|
-| `JWT_SECRET` | Secret JWT **(à changer !)** | `change-me...` |
+| `JWT_SECRET` | Secret JWT (généré automatiquement et persisté en base si omis) | _Auto-généré_ |
 | `JWT_EXPIRATION` | Durée de vie du token JWT | `24h` |
 | `REFRESH_TOKEN_EXPIRATION` | Durée de vie du refresh token | `168h` |
 | `ADMIN_USER` | Nom du compte admin initial | `admin` |
-| `ADMIN_PASSWORD` | Mot de passe admin initial **(à changer !)** | `admin` |
+| `ADMIN_PASSWORD` | Mot de passe admin initial (généré et affiché dans les logs au 1er boot si omis) | _Auto-généré_ |
 
 #### Rate limiting
 | Variable | Description | Défaut |

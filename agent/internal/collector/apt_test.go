@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -29,8 +30,9 @@ func TestCollectAPT_RespectsCancelledContext(t *testing.T) {
 	}
 
 	if err != nil {
-		// apt-get missing entirely is the only expected error path; anything
-		// else means the cancelled ctx wasn't respected the way we expect.
+		if strings.Contains(err.Error(), "apt-get not found in PATH") || strings.Contains(err.Error(), "executable file not found") {
+			t.Skip("apt-get not found on this system")
+		}
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if status == nil {
@@ -57,6 +59,9 @@ func TestCollectAPTFast(t *testing.T) {
 	}
 
 	if err != nil {
+		if strings.Contains(err.Error(), "apt-get not found in PATH") || strings.Contains(err.Error(), "executable file not found") {
+			t.Skip("apt-get not found on this system")
+		}
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if status == nil {

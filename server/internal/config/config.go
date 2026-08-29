@@ -137,18 +137,36 @@ func IsDevEnv() bool {
 	return e == "dev" || e == "development"
 }
 
-// generateRandomSecret returns a 64-character hex string (32 random bytes).
-// Used as a dev-only fallback when JWT_SECRET is unset so local runs work
-// out of the box without ever using the hardcoded default.
-func generateRandomSecret() string {
+// GenerateRandomSecret returns a 64-character hex string (32 random bytes).
+// Used as a fallback when JWT_SECRET is unset so runs work out of the box
+// without ever using a hardcoded default.
+func GenerateRandomSecret() string {
 	var b [32]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		// Extremely unlikely; fall back to the well-known default so the
-		// dev server can still boot. ValidateStrict() will refuse to start
-		// in production anyway.
+		// Extremely unlikely; fall back to the well-known default
 		return DefaultJWTSecret
 	}
 	return hex.EncodeToString(b[:])
+}
+
+// GenerateRandomPassword returns a cryptographically secure random password
+// composed of uppercase, lowercase, digits and symbols.
+func GenerateRandomPassword(length int) string {
+	if length <= 0 {
+		return ""
+	}
+	const charset = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*"
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		for i := range bytes {
+			bytes[i] = charset[(i*7+13)%len(charset)]
+		}
+		return string(bytes)
+	}
+	for i, b := range bytes {
+		bytes[i] = charset[int(b)%len(charset)]
+	}
+	return string(bytes)
 }
 
 // logFormatDefault honours LOG_FORMAT when set, otherwise defaults to
@@ -165,12 +183,8 @@ func logFormatDefault() string {
 
 func Load() *Config {
 	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		if IsDevEnv() {
-			jwtSecret = generateRandomSecret()
-		} else {
-			jwtSecret = DefaultJWTSecret
-		}
+	if jwtSecret == "" && IsDevEnv() {
+		jwtSecret = GenerateRandomSecret()
 	}
 
 	return &Config{
@@ -197,7 +211,7 @@ func Load() *Config {
 		RefreshTokenExpiration: getDurationEnv("REFRESH_TOKEN_EXPIRATION", 7*24*time.Hour),
 		APIKeyHeader:           "X-API-Key",
 		AdminUser:              getEnv("ADMIN_USER", "admin"),
-		AdminPassword:          getEnv("ADMIN_PASSWORD", "admin"),
+		AdminPassword:          getEnv("ADMIN_PASSWORD", ""),
 
 		RateLimitRPS:        getIntEnv("RATE_LIMIT_RPS", 100),
 		RateLimitBurst:      getIntEnv("RATE_LIMIT_BURST", 200),
@@ -312,6 +326,11 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 			c.NetworkFlowsRetentionDays = i
 		}
 	}
+	if c.JWTSecret == "" {
+		if v, ok := settings["jwt_secret"]; ok && v != "" {
+			c.JWTSecret = v
+		}
+	}
 
 	overrideFloat(settings, "threat_weight_wordpress", &c.ThreatWeightWordPress)
 	overrideFloat(settings, "threat_weight_adminpanel", &c.ThreatWeightAdminPanel)
@@ -355,7 +374,7 @@ func (c *Config) Validate() []string {
 		warnings = append(warnings, "ADMIN_PASSWORD is 'admin' — change it immediately")
 	}
 	if c.DBPassword == "supervisor" {
-		warnings = append(warnings, "DB_PASSWORD is using the default value — change it in production")
+		warnings = append(warnings, "DB_PASSWORD is using the default value ('supervisor') — change it in production if postgres is accessible from outside")
 	}
 	if c.MetricsRetentionDays <= 0 {
 		warnings = append(warnings, "METRICS_RETENTION_DAYS must be a positive integer")
@@ -380,17 +399,18 @@ func (c *Config) ValidateStrict() error {
 		return nil
 	}
 	var problems []string
-	if c.JWTSecret == DefaultJWTSecret || c.JWTSecret == "" {
-		problems = append(problems, "JWT_SECRET must be set to a unique random value (>=32 chars)")
-	}
-	if len(c.JWTSecret) < 32 {
+	if c.JWTSecret == DefaultJWTSecret {
+		problems = append(problems, "JWT_SECRET must not use the default insecure value")
+	} else if c.JWTSecret != "" && len(c.JWTSecret) < 32 {
 		problems = append(problems, "JWT_SECRET is too short (minimum 32 characters)")
 	}
 	if c.AdminPassword == "admin" {
 		problems = append(problems, "ADMIN_PASSWORD must not be 'admin'")
+	} else if c.AdminPassword != "" && len(c.AdminPassword) < 8 {
+		problems = append(problems, "ADMIN_PASSWORD must be at least 8 characters if specified")
 	}
 	if c.DBPassword == "supervisor" {
-		problems = append(problems, "DB_PASSWORD must not be the default 'supervisor'")
+		problems = append(problems, "DB_PASSWORD must not be the default 'supervisor' in production")
 	}
 	if len(problems) == 0 {
 		return nil

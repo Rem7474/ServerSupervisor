@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -604,15 +606,69 @@ func registerNPMRoutes(g *gin.RouterGroup, h *handlers.NPMHandler) {
 	admin.PATCH("/npm/proxy-hosts/:id/npm-enabled", h.SetNPMEnabled)
 }
 
+type assetCacheWriter struct {
+	gin.ResponseWriter
+	headerWritten bool
+}
+
+func (w *assetCacheWriter) WriteHeader(code int) {
+	if !w.headerWritten {
+		w.headerWritten = true
+		if code == http.StatusOK || code == http.StatusNotModified {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+		}
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *assetCacheWriter) Write(b []byte) (int, error) {
+	if !w.headerWritten {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(b)
+}
+
 func registerStaticFiles(r *gin.Engine) {
-	r.Static("/assets", "./frontend/dist/assets")
-	r.StaticFile("/", "./frontend/dist/index.html")
-	// Static root-level files must be explicit — the NoRoute SPA fallback would
-	// otherwise serve index.html for them, causing parse errors in the browser.
-	r.StaticFile("/manifest.json", "./frontend/dist/manifest.json")
-	r.StaticFile("/favicon.svg", "./frontend/dist/favicon.svg")
-	r.StaticFile("/service-worker.js", "./frontend/dist/service-worker.js")
+	// Static hashed assets: cached for 1 year immutable ONLY on 200/304 (never on 404)
+	assets := r.Group("/assets")
+	assets.Use(func(c *gin.Context) {
+		w := &assetCacheWriter{ResponseWriter: c.Writer}
+		c.Writer = w
+		c.Next()
+	})
+	assets.Static("", "./frontend/dist/assets")
+
+	// Dynamic entry points (never cache HTML / service worker / manifest across upgrades)
+	// Register both GET and HEAD so HEAD health/cache probes work accurately
+	serveNoCacheFile := func(path string, filepath string) {
+		handler := func(c *gin.Context) {
+			c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+			c.Header("Pragma", "no-cache")
+			c.Header("Expires", "0")
+			c.File(filepath)
+		}
+		r.GET(path, handler)
+		r.HEAD(path, handler)
+	}
+
+	serveNoCacheFile("/", "./frontend/dist/index.html")
+	serveNoCacheFile("/manifest.json", "./frontend/dist/manifest.json")
+	serveNoCacheFile("/favicon.svg", "./frontend/dist/favicon.svg")
+	serveNoCacheFile("/service-worker.js", "./frontend/dist/service-worker.js")
+
 	r.NoRoute(func(c *gin.Context) {
+		// API and WebSocket routes that don't match should return 404 JSON, not HTML
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "endpoint not found", "code": "NOT_FOUND"})
+			return
+		}
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
 		c.File("./frontend/dist/index.html")
 	})
 }
