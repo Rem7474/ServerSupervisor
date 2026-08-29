@@ -20,12 +20,6 @@ type RefreshTokenRecord struct {
 
 // ========== Users ==========
 
-func (db *DB) CountUsers(ctx context.Context) (int, error) {
-	var count int
-	err := db.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&count)
-	return count, err
-}
-
 func (db *DB) HasAdminUser(ctx context.Context) (bool, error) {
 	var exists bool
 	err := db.conn.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE role = 'admin')`).Scan(&exists)

@@ -152,10 +152,16 @@ func GenerateRandomSecret() string {
 // GenerateRandomPassword returns a cryptographically secure random password
 // composed of uppercase, lowercase, digits and symbols.
 func GenerateRandomPassword(length int) string {
+	if length <= 0 {
+		return ""
+	}
 	const charset = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*"
 	bytes := make([]byte, length)
 	if _, err := rand.Read(bytes); err != nil {
-		return GenerateRandomSecret()[:length]
+		for i := range bytes {
+			bytes[i] = charset[(i*7+13)%len(charset)]
+		}
+		return string(bytes)
 	}
 	for i, b := range bytes {
 		bytes[i] = charset[int(b)%len(charset)]
@@ -402,6 +408,9 @@ func (c *Config) ValidateStrict() error {
 		problems = append(problems, "ADMIN_PASSWORD must not be 'admin'")
 	} else if c.AdminPassword != "" && len(c.AdminPassword) < 8 {
 		problems = append(problems, "ADMIN_PASSWORD must be at least 8 characters if specified")
+	}
+	if c.DBPassword == "supervisor" {
+		problems = append(problems, "DB_PASSWORD must not be the default 'supervisor' in production")
 	}
 	if len(problems) == 0 {
 		return nil

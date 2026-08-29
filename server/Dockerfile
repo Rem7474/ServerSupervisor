@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/app/frontend/node_modules/.vite \
 # emulation — only GOARCH needs to change, not the machine executing `go
 # build`. TARGETOS/TARGETARCH are populated automatically by buildx from
 # whatever --platform the image is being built for.
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS server-builder
+FROM --platform=$BUILDPLATFORM golang:1.25.13-alpine AS server-builder
 RUN apk add --no-cache git
 WORKDIR /app
 ARG TARGETOS
