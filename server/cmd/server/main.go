@@ -70,6 +70,17 @@ func main() {
 	// alert engine, notify, retention jobs) read the resulting config.
 	cfg.OverrideFromDB(db)
 
+	// If JWT_SECRET was not provided in env or DB, generate a strong random secret
+	// and persist it in the settings table so it remains stable across restarts.
+	if cfg.JWTSecret == "" {
+		generatedSecret := config.GenerateRandomSecret()
+		if err := db.SetSetting(rootCtx, "jwt_secret", generatedSecret); err != nil {
+			log.Printf("Warning: failed to persist generated JWT secret to database: %v", err)
+		}
+		cfg.JWTSecret = generatedSecret
+		slog.Info("JWT secret auto-generated and persisted in settings")
+	}
+
 	// Reconcile the TimescaleDB metric retention policy with the effective config
 	// so a retention value set via env or the settings table is honoured without a
 	// manual "cleanup metrics" click. Non-fatal: the migration baseline already
@@ -83,20 +94,55 @@ func main() {
 		log.Printf("Warning: failed to cleanup stalled commands: %v", err)
 	}
 
-	// Create default admin user (sets must_change_password if using default "admin" password)
-	hash, err := handlers.HashPassword(cfg.AdminPassword)
+	// First run / Account bootstrap:
+	// If no admin user exists in the database, initialize the admin account.
+	hasAdmin, err := db.HasAdminUser(rootCtx)
 	if err != nil {
-		log.Fatalf("Failed to hash admin password: %v", err)
+		log.Fatalf("Failed to check existing admin user: %v", err)
 	}
-	mustChangePassword := cfg.AdminPassword == "admin"
-	if err := db.CreateUser(rootCtx, cfg.AdminUser, hash, "admin", mustChangePassword); err != nil {
-		log.Printf("Admin user creation: %v (may already exist)", err)
-	}
-	// For existing installations still using default password, ensure flag is set
-	if mustChangePassword {
-		if err := db.SetUserMustChangePassword(rootCtx, cfg.AdminUser, true); err != nil {
-			log.Printf("Warning: failed to set must_change_password for admin: %v", err)
+
+	if !hasAdmin {
+		adminUser := cfg.AdminUser
+		if adminUser == "" {
+			adminUser = "admin"
 		}
+
+		adminPassword := cfg.AdminPassword
+		mustChangePassword := false
+		isGenerated := false
+
+		if adminPassword == "" {
+			adminPassword = config.GenerateRandomPassword(16)
+			mustChangePassword = true
+			isGenerated = true
+		}
+
+		hash, err := handlers.HashPassword(adminPassword)
+		if err != nil {
+			log.Fatalf("Failed to hash admin password: %v", err)
+		}
+
+		if err := db.CreateUser(rootCtx, adminUser, hash, "admin", mustChangePassword); err != nil {
+			log.Fatalf("Failed to create initial admin user: %v", err)
+		}
+
+		if isGenerated {
+			log.Printf("\n" +
+				"========================================================================\n" +
+				"🚀 SERVERSUPERVISOR — COMPTE ADMINISTRATEUR INITIALISÉ\n" +
+				"========================================================================\n" +
+				"  Identifiant  : %s\n" +
+				"  Mot de passe : %s\n\n" +
+				"  ⚠️  IMPORTANT : Conservez ce mot de passe temporaire !\n" +
+				"  ⚠️  Vous serez invité à le modifier dès votre première connexion.\n" +
+				"========================================================================\n",
+				adminUser, adminPassword)
+			slog.Info("First run: initial admin account created with generated password", slog.String("username", adminUser))
+		} else {
+			slog.Info("First run: initial admin account created with configured password", slog.String("username", adminUser))
+		}
+	} else {
+		slog.Info("Admin account already initialized")
 	}
 
 	dispatcher := dispatch.New(db)

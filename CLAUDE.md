@@ -184,7 +184,7 @@ Sharing stops at the shell. The two entities' tab *content* was evaluated pair b
 
 ### Key env vars
 
-`JWT_SECRET`, `ADMIN_PASSWORD`, `DB_PASSWORD` are required for any non-trivial run. See [.env.example](.env.example) for the full list. `APP_ENV=dev` bypasses strict-secret validation for local development. The `settings` table can override most runtime config after first boot.
+`JWT_SECRET`, `ADMIN_PASSWORD`, `DB_PASSWORD` can be customized in [.env.example](.env.example). When `ADMIN_PASSWORD` or `JWT_SECRET` are left empty, they are auto-generated securely at first startup (`JWT_SECRET` is persisted in the `settings` table). `APP_ENV=dev` bypasses strict-secret validation for local development. The `settings` table can override most runtime config after first boot.
 
 ## Conventions & pitfalls
 

@@ -10,7 +10,7 @@
 # JS/CSS/HTML, so building it under QEMU emulation for a second target arch
 # would be pure waste — same output, ~5-10x slower. BuildKit also shares this
 # stage's cached layer across every target platform in the same build.
-FROM --platform=$BUILDPLATFORM node:26-slim AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/app/frontend/node_modules/.vite \
 # emulation — only GOARCH needs to change, not the machine executing `go
 # build`. TARGETOS/TARGETARCH are populated automatically by buildx from
 # whatever --platform the image is being built for.
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS server-builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS server-builder
 RUN apk add --no-cache git
 WORKDIR /app
 ARG TARGETOS
@@ -50,7 +50,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /seed-demo ./cmd/seed-demo
 
 # ==== Stage 3: Final Image ====
-FROM alpine:3.24
+FROM alpine:3.21
 RUN apk add --no-cache --upgrade ca-certificates tzdata libcap && \
     addgroup -g 1000 supervisor && \
     adduser -D -u 1000 -G supervisor supervisor
@@ -73,5 +73,8 @@ RUN chown -R supervisor:supervisor /app && \
 # start.
 USER supervisor
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
 ENTRYPOINT ["./serversupervisor"]

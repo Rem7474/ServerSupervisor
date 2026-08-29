@@ -32,12 +32,12 @@ func parseTimeRange(c *gin.Context, defaultPeriod string) (since, until time.Tim
 			respondError(c, apperr.Validation("from and to must both be provided"))
 			return time.Time{}, time.Time{}, false
 		}
-		from, err := time.Parse(time.RFC3339, fromRaw)
+		from, err := parseRFC3339Query(fromRaw)
 		if err != nil {
 			respondError(c, apperr.Validation("invalid from (expected RFC3339, e.g. 2026-08-08T13:25:00Z)"))
 			return time.Time{}, time.Time{}, false
 		}
-		to, err := time.Parse(time.RFC3339, toRaw)
+		to, err := parseRFC3339Query(toRaw)
 		if err != nil {
 			respondError(c, apperr.Validation("invalid to (expected RFC3339, e.g. 2026-08-08T15:02:00Z)"))
 			return time.Time{}, time.Time{}, false
@@ -67,4 +67,19 @@ func parseTimeRange(c *gin.Context, defaultPeriod string) (since, until time.Tim
 		return time.Time{}, time.Time{}, false
 	}
 	return time.Now().Add(-period), time.Time{}, true
+}
+
+func parseRFC3339Query(raw string) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339, raw)
+	if err == nil {
+		return t, nil
+	}
+	// If query param decoding replaced '+' with ' ' for timezone offset, restore '+'
+	if strings.Contains(raw, " ") {
+		restored := strings.ReplaceAll(raw, " ", "+")
+		if t, err2 := time.Parse(time.RFC3339, restored); err2 == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, err
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -302,6 +303,9 @@ func TestHasAllowedResticEnvPrefix(t *testing.T) {
 }
 
 func TestLoadResticEnv_FiltersToAllowlistAndNeverLeaksOthers(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("skipping shell execution test on non-Unix OS")
+	}
 	dir := t.TempDir()
 	confPath := filepath.Join(dir, "resticconf")
 	content := `export RESTIC_REPOSITORY=/tmp/repo
@@ -359,6 +363,9 @@ func TestRunResticBackupWithProgress_MissingScript(t *testing.T) {
 // and a plain text line containing a fake credential — verifying progress/summary
 // parsing and that the credential-looking line is redacted before being streamed.
 func TestRunResticBackupWithProgress_StreamsAndRedacts(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("skipping shell execution test on non-Unix OS")
+	}
 	dir := t.TempDir()
 
 	confPath := filepath.Join(dir, "resticconf")
@@ -409,6 +416,9 @@ exit 0
 }
 
 func TestRunResticBackupWithProgress_ReportsScriptFailure(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("skipping shell execution test on non-Unix OS")
+	}
 	dir := t.TempDir()
 
 	confPath := filepath.Join(dir, "resticconf")
@@ -443,6 +453,9 @@ func TestRunResticBackupWithProgress_ReportsScriptFailure(t *testing.T) {
 }
 
 func TestResticBackupSummary_DurationIsPopulated(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("skipping shell execution test on non-Unix OS")
+	}
 	dir := t.TempDir()
 	confPath := filepath.Join(dir, "resticconf")
 	if err := os.WriteFile(confPath, []byte("export RESTIC_REPOSITORY=/tmp/repo\n"), 0o644); err != nil {

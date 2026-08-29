@@ -121,14 +121,21 @@ func TestParseTimeRange_InvalidRFC3339Rejected(t *testing.T) {
 }
 
 func TestParseTimeRange_FutureToIsClamped(t *testing.T) {
-	from := time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
-	to := time.Now().Add(24 * time.Hour).Format(time.RFC3339)
+	from := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
+	to := time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339)
 	c := testContextWithQuery("from=" + from + "&to=" + to)
 	_, until, ok := parseTimeRange(c, "24h")
 	if !ok {
 		t.Fatal("expected ok=true, a future `to` is clamped rather than rejected")
 	}
-	if until.After(time.Now()) {
+	if until.After(time.Now().Add(time.Second)) {
 		t.Errorf("expected until to be clamped to now, got %v", until)
+	}
+
+	// Test unencoded offset with spaces (e.g. "+02:00" turning into " 02:00")
+	cWithOffset := testContextWithQuery("from=2026-08-08T13:25:00+02:00&to=2026-08-08T15:25:00+02:00")
+	_, _, okOffset := parseTimeRange(cWithOffset, "24h")
+	if !okOffset {
+		t.Fatal("expected ok=true for RFC3339 query with timezone offset")
 	}
 }

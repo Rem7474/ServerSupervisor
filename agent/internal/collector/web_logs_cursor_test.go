@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -125,6 +126,9 @@ func TestLoadWebLogCursor_MissingOrCorruptFileFailsOpen(t *testing.T) {
 // seek into the new file at a byte offset unrelated to any line boundary
 // and return garbage instead of a clean bootstrap of the new file.
 func TestReadIncrementalLines_FastRotationDetectedEvenWhenSizeGrew(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("skipping inode-based logrotate simulation test on non-Unix OS")
+	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "rotating.log")
 

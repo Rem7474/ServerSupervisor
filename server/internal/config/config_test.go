@@ -49,13 +49,13 @@ func TestValidateStrict_RejectsShortSecret(t *testing.T) {
 	}
 }
 
-func TestValidateStrict_RejectsDefaultAdminAndDBPassword(t *testing.T) {
+func TestValidateStrict_RejectsDefaultAdminPassword(t *testing.T) {
 	t.Setenv("APP_ENV", "")
 	long := strings.Repeat("a", 64)
 
 	cases := map[string]Config{
 		"default admin password": {JWTSecret: long, AdminPassword: "admin", DBPassword: "strong"},
-		"default DB password":    {JWTSecret: long, AdminPassword: "strong", DBPassword: "supervisor"},
+		"short admin password":   {JWTSecret: long, AdminPassword: "short", DBPassword: "strong"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -63,6 +63,18 @@ func TestValidateStrict_RejectsDefaultAdminAndDBPassword(t *testing.T) {
 				t.Fatal("expected ValidateStrict to fail")
 			}
 		})
+	}
+}
+
+func TestValidateStrict_AcceptsEmptyAdminAndJWTSecretForFirstRun(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	c := &Config{
+		JWTSecret:     "",
+		AdminPassword: "",
+		DBPassword:    "supervisor",
+	}
+	if err := c.ValidateStrict(); err != nil {
+		t.Fatalf("expected no error for empty admin/jwt (auto-generated at boot), got %v", err)
 	}
 }
 
@@ -75,6 +87,17 @@ func TestValidateStrict_AcceptsStrongConfig(t *testing.T) {
 	}
 	if err := c.ValidateStrict(); err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+}
+
+func TestGenerateRandomPassword(t *testing.T) {
+	p1 := GenerateRandomPassword(16)
+	p2 := GenerateRandomPassword(16)
+	if len(p1) != 16 || len(p2) != 16 {
+		t.Fatalf("expected password length 16, got %d and %d", len(p1), len(p2))
+	}
+	if p1 == p2 {
+		t.Fatal("consecutive random passwords should not match")
 	}
 }
 
