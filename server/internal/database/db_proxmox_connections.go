@@ -119,7 +119,8 @@ func (db *DB) GetEnabledProxmoxConnections(ctx context.Context) ([]ProxmoxConnec
 	rows, err := db.conn.QueryContext(ctx, `
 		SELECT id, name, api_url, token_id, token_secret,
 		       insecure_skip_verify, enabled, poll_interval_sec,
-		       last_error, last_error_at, last_success_at, created_at, updated_at
+		       last_error, last_error_at, last_success_at, created_at, updated_at,
+		       pve_username, (pve_username <> '' AND pve_password <> '')
 		FROM proxmox_connections WHERE enabled = TRUE ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -135,6 +136,7 @@ func (db *DB) GetEnabledProxmoxConnections(ctx context.Context) ([]ProxmoxConnec
 			&c.InsecureSkipVerify, &c.Enabled, &c.PollIntervalSec,
 			&c.LastError, &lastErrAt, &lastSuccAt,
 			&c.CreatedAt, &c.UpdatedAt,
+			&c.PVEUsername, &c.ConsoleConfigured,
 		); err != nil {
 			return nil, err
 		}

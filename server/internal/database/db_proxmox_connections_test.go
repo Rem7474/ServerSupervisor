@@ -171,6 +171,17 @@ func TestProxmoxConnectionsCRUD(t *testing.T) {
 				if c.TokenSecret != "double-rotated" {
 					t.Errorf("TokenSecret = %q, want double-rotated", c.TokenSecret)
 				}
+				// PVEUsername/ConsoleConfigured were previously missing from
+				// this query's SELECT — the struct fields silently stayed
+				// zero-valued instead of failing to compile, so this would
+				// have passed even with the columns absent were it not for
+				// these explicit assertions.
+				if c.PVEUsername != "root@pam" {
+					t.Errorf("PVEUsername = %q, want root@pam", c.PVEUsername)
+				}
+				if !c.ConsoleConfigured {
+					t.Error("ConsoleConfigured = false, want true (console credentials were set above)")
+				}
 			}
 		}
 		if !found {
