@@ -32,6 +32,7 @@ Never start a bare `go func(){...}()`. Use `internal/safego` (`safego.Go`, `.Rec
 - Unit tests fake the `Repository` port — no database required.
 - Integration tests use a real, ephemeral Postgres via `testcontainers-go` (`internal/testutil/postgres.go`); they skip cleanly with no Docker daemon and run for real in CI.
 - `go test -v -race ./...` from `server/`. `golangci-lint run` (v2.12.2, config in `.golangci.yml`) is a second, separate, blocking CI gate — run it locally too, `go test` passing doesn't mean lint will.
+- When adding a test to close a coverage gap rather than to cover new behavior you just wrote, every assertion still has to earn its place (see root CLAUDE.md's "a coverage percentage is a symptom, not a goal") — a test that only exercises a happy path with no real assertion on the returned error/value doesn't count.
 
 ## Don't
 
