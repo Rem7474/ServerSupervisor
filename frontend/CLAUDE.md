@@ -28,6 +28,7 @@ Four stores, each with a `stores/*.spec.ts` — update the matching spec when yo
 
 - `npm run test` (Vitest, happy-dom) — unit/component tests, `*.spec.ts` co-located, runs in CI, covers all 4 stores.
 - `npm run test:browser` (Vitest + Playwright/Chromium, `*.browser.test.ts`) — for anything asserting on actual ApexCharts/D3 rendering (SVG), which happy-dom can't do. Runs in CI (`ci-frontend.yml`'s `browser-tests` job) and feeds SonarCloud coverage via a separate lcov report (`npm run test:browser:coverage` → `coverage-browser/lcov.info`, declared alongside the happy-dom report in `sonar-project.properties`). Run it locally before merging a change that touches chart or map rendering: `npx playwright install --with-deps chromium && npm run test:browser`.
+- When adding a test to close a coverage gap rather than to cover new behavior you just wrote, every assertion still has to earn its place (see root CLAUDE.md's "a coverage percentage is a symptom, not a goal") — a `mount()` with no meaningful `expect` just to touch a line doesn't count as a test.
 
 ## Don't
 
