@@ -26,6 +26,8 @@ func newProxmoxRouter(t *testing.T) (*gin.Engine, *database.DB) {
 	r.GET("/proxmox/instances/:id", h.GetConnection)
 	r.PUT("/proxmox/instances/:id", h.UpdateConnection)
 	r.DELETE("/proxmox/instances/:id", h.DeleteConnection)
+	r.POST("/proxmox/instances/test", h.TestConnection)
+	r.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
 	return r, db
 }
 

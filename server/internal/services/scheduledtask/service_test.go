@@ -97,6 +97,31 @@ func TestCreate_InvalidModule(t *testing.T) {
 	}
 }
 
+func TestCreate_RequiresAction(t *testing.T) {
+	svc := NewService(&fakeRepo{}, &fakeScheduler{}, &fakeDispatcher{})
+	r := req("apt")
+	r.Action = ""
+	_, err := svc.Create(context.Background(), "h1", "alice", r)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.HTTPStatus != 400 {
+		t.Fatalf("missing action should be apperr 400, got %v", err)
+	}
+}
+
+// "custom" ignores Action entirely — the agent only looks up Target in
+// tasks.yaml (see service.go's validate doc comment) — so it must not
+// require one, unlike every other module.
+func TestCreate_CustomModuleDoesNotRequireAction(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := NewService(repo, &fakeScheduler{}, &fakeDispatcher{})
+	r := req("custom")
+	r.Action = ""
+	r.CronExpression = ""
+	if _, err := svc.Create(context.Background(), "h1", "alice", r); err != nil {
+		t.Fatalf("custom module without an action should be valid, got %v", err)
+	}
+}
+
 func TestCreate_InvalidCron(t *testing.T) {
 	svc := NewService(&fakeRepo{}, &fakeScheduler{}, &fakeDispatcher{})
 	r := req("apt")
@@ -192,4 +217,39 @@ func TestRun_DispatchesLinksAndMarksPending(t *testing.T) {
 	if repo.statusUpdated != "pending" {
 		t.Errorf("Run must mark the task pending, got %q", repo.statusUpdated)
 	}
+}
+
+func TestRunCustomTask_DispatchesCustomModule(t *testing.T) {
+	disp := &fakeDispatcher{result: &dispatch.Result{Command: &models.RemoteCommand{ID: "cmd-42"}}}
+	svc := NewService(&fakeRepo{}, &fakeScheduler{}, disp)
+
+	id, err := svc.RunCustomTask(context.Background(), "h1", "task-yaml-id", "alice")
+	if err != nil {
+		t.Fatalf("RunCustomTask: %v", err)
+	}
+	if id != "cmd-42" {
+		t.Errorf("RunCustomTask should return the dispatched command id, got %q", id)
+	}
+	if disp.gotReq.HostID != "h1" || disp.gotReq.Module != "custom" || disp.gotReq.Action != "run" {
+		t.Errorf("dispatch request not built correctly: %+v", disp.gotReq)
+	}
+	if disp.gotReq.Target != "task-yaml-id" {
+		t.Errorf("Target should be the tasks.yaml task id, got %q", disp.gotReq.Target)
+	}
+	if disp.gotReq.TriggeredBy != "alice" {
+		t.Errorf("TriggeredBy = %q, want alice", disp.gotReq.TriggeredBy)
+	}
+}
+
+func TestRunCustomTask_DispatchError(t *testing.T) {
+	svc := NewService(&fakeRepo{}, &fakeScheduler{}, &erroringDispatcher{err: errors.New("dispatch failed")})
+	if _, err := svc.RunCustomTask(context.Background(), "h1", "task-yaml-id", "alice"); err == nil {
+		t.Fatal("expected the dispatcher error to propagate")
+	}
+}
+
+type erroringDispatcher struct{ err error }
+
+func (e *erroringDispatcher) Create(context.Context, dispatch.Request) (*dispatch.Result, error) {
+	return nil, e.err
 }

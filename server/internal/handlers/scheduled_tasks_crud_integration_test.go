@@ -107,6 +107,67 @@ func TestScheduledTasksCRUD(t *testing.T) {
 	}
 }
 
+// newScheduledTasksRouterWithRunCustomTask adds the RunCustomTask route,
+// which the other router builders above don't register.
+func newScheduledTasksRouterWithRunCustomTask(t *testing.T, role string) (*gin.Engine, *database.DB) {
+	t.Helper()
+	db, _ := testutil.NewPostgresDBWithConfig(t)
+	disp := dispatch.New(db)
+	sched := scheduler.New(db, disp)
+	h := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, disp), db)
+
+	r := gin.New()
+	r.Use(withRole(role))
+	r.POST("/hosts/:id/custom-tasks/:taskId/run", h.RunCustomTask)
+	return r, db
+}
+
+// TestRunCustomTask dispatches an ad-hoc tasks.yaml task (module=custom,
+// action=run, target=the task id) — the ad-hoc equivalent of RunScheduledTask
+// for the one module that otherwise had no dedicated ad-hoc endpoint.
+func TestRunCustomTask(t *testing.T) {
+	r, db := newScheduledTasksRouterWithRunCustomTask(t, "admin")
+	const hostID = "custom-task-host-1"
+	seedHost(t, db, hostID)
+
+	w := doJSON(t, r, http.MethodPost, "/hosts/"+hostID+"/custom-tasks/backup-db/run", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["status"] != "pending" {
+		t.Errorf("status field = %v, want pending", body["status"])
+	}
+	if cmdID, _ := body["command_id"].(string); cmdID == "" {
+		t.Error("expected a non-empty command_id")
+	}
+}
+
+// TestRunCustomTask_RequiresOperatorHostAccess covers the same
+// requireHostAccess("operator") gate every other scheduled-task mutation has.
+func TestRunCustomTask_RequiresOperatorHostAccess(t *testing.T) {
+	r, db := newScheduledTasksRouterWithRunCustomTask(t, "operator")
+	const hostID = "custom-task-host-2"
+	seedHost(t, db, hostID)
+
+	if err := db.SetHostPermission(context.Background(), "tester", hostID, "viewer"); err != nil {
+		t.Fatalf("seed host permission: %v", err)
+	}
+	if w := doJSON(t, r, http.MethodPost, "/hosts/"+hostID+"/custom-tasks/backup-db/run", nil); w.Code != http.StatusForbidden {
+		t.Fatalf("viewer-level access = %d, want 403; body = %s", w.Code, w.Body.String())
+	}
+
+	if err := db.SetHostPermission(context.Background(), "tester", hostID, "operator"); err != nil {
+		t.Fatalf("upgrade host permission: %v", err)
+	}
+	if w := doJSON(t, r, http.MethodPost, "/hosts/"+hostID+"/custom-tasks/backup-db/run", nil); w.Code != http.StatusOK {
+		t.Fatalf("operator-level access = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+}
+
 func TestScheduledTaskCreateValidation(t *testing.T) {
 	r, db := newScheduledTasksRouter(t)
 	const hostID = "sched-host-2"
