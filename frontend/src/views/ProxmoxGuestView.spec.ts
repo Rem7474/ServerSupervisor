@@ -23,11 +23,15 @@ const baseGuest = {
 
 const { getProxmoxInstance } = vi.hoisted(() => ({ getProxmoxInstance: vi.fn() }))
 
+const qemuGuest = { ...baseGuest, id: 'g2', guest_type: 'qemu' }
+
+const { guestsResponse } = vi.hoisted(() => ({ guestsResponse: { data: [] as unknown[] } }))
+
 vi.mock('../api', () => {
   const ok = (data: unknown = {}) => async () => ({ data })
   return {
     default: {
-      getProxmoxGuests: vi.fn(async () => ({ data: [baseGuest] })),
+      getProxmoxGuests: vi.fn(async () => guestsResponse),
       getProxmoxGuestLink: ok(null),
       getProxmoxNodes: ok([{ id: 'node-1', node_name: 'pve1' }]),
       getProxmoxNodeGuestNetworks: ok({}),
@@ -37,8 +41,10 @@ vi.mock('../api', () => {
   }
 })
 
+const { routeParamId } = vi.hoisted(() => ({ routeParamId: { value: 'g1' } }))
+
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { id: 'g1' }, query: {} }),
+  useRoute: () => ({ params: { id: routeParamId.value }, query: {} }),
   useRouter: () => ({ push: vi.fn() }),
 }))
 
@@ -69,6 +75,8 @@ function mountView() {
 describe('ProxmoxGuestView — console entry point', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    routeParamId.value = 'g1'
+    guestsResponse.data = [baseGuest]
   })
 
   it('warns and explains when the lxc guest\'s connection has no console credentials configured', async () => {
@@ -107,5 +115,21 @@ describe('ProxmoxGuestView — console entry point', () => {
     await flushPromises()
 
     expect(wrapper.find('.proxmox-console-stub').exists()).toBe(true)
+  })
+
+  it('disables the Console button and skips the config check entirely for a QEMU guest', async () => {
+    routeParamId.value = 'g2'
+    guestsResponse.data = [qemuGuest]
+
+    const wrapper = mountView()
+    await flushPromises()
+    await flushPromises()
+
+    expect(getProxmoxInstance).not.toHaveBeenCalled()
+    const btn = wrapper.findAll('button').find((b) => b.text().includes('Console'))
+    expect(btn!.attributes('disabled')).toBeDefined()
+    expect(btn!.attributes('title')).toBe('VM QEMU : bientôt disponible')
+    // The "console not configured" warning icon is lxc-only.
+    expect(wrapper.find('[title*="Identifiants console PVE non configurés"]').exists()).toBe(false)
   })
 })

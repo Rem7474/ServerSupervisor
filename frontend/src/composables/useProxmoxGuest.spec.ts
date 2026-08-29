@@ -180,6 +180,58 @@ describe('useProxmoxGuest — guest network IPs without a ?nodeId= query param',
   })
 })
 
+describe('useProxmoxGuest — chart time formatting', () => {
+  it('formats the x-axis/tooltip time as HH:mm for windows under 24h, and DD/MM HH:mm at/above 24h', async () => {
+    const now = new Date('2026-08-24T12:00:00.000Z').getTime()
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    getProxmoxGuestMetrics.mockResolvedValue({
+      data: [{ timestamp: new Date(now - 60_000).toISOString(), cpu_avg: 10, memory_avg: 20 }],
+    })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    // Default range is 24h.
+    const xaxisFormatter = api.chartOptions.value?.xaxis?.labels?.formatter as (v: string) => string
+    expect(xaxisFormatter(String(now))).toMatch(/^\d{2}\/\d{2} \d{2}:\d{2}$/)
+
+    api.changeRange(6)
+    await flushPromises()
+    const shortRangeFormatter = api.chartOptions.value?.xaxis?.labels?.formatter as (v: string) => string
+    expect(shortRangeFormatter(String(now))).toMatch(/^\d{2}:\d{2}$/)
+
+    // Tooltip x/y formatters delegate to the same helper / a plain % format.
+    const tooltip = api.chartOptions.value?.tooltip as { x?: { formatter: (v: number) => string }; y?: { formatter: (v: number | null) => string } }
+    expect(tooltip.x?.formatter(now)).toMatch(/^\d{2}:\d{2}$/)
+    expect(tooltip.y?.formatter(42.567)).toBe('42.6%')
+    expect(tooltip.y?.formatter(null as unknown as number)).toBe('—')
+  })
+
+  it('returns an empty string from the time formatter for an invalid/non-finite timestamp', async () => {
+    getProxmoxGuestMetrics.mockResolvedValue({
+      data: [{ timestamp: new Date().toISOString(), cpu_avg: 10, memory_avg: 20 }],
+    })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    const formatter = api.chartOptions.value?.xaxis?.labels?.formatter as (v: string) => string
+    expect(formatter('not-a-number')).toBe('')
+  })
+})
+
+describe('useProxmoxGuest — summary fetch failure', () => {
+  it('clears the series (not a thrown error) when the metrics fetch rejects', async () => {
+    getProxmoxGuestMetrics.mockRejectedValue(new Error('boom'))
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(api.series.value).toBeNull()
+    expect(api.summaryLoading.value).toBe(false)
+  })
+})
+
 describe('useProxmoxGuest — console configuration check', () => {
   it('looks up console_configured on the guest\'s own connection once loaded', async () => {
     getProxmoxInstance.mockResolvedValue({ data: { console_configured: false } })
@@ -200,5 +252,24 @@ describe('useProxmoxGuest — console configuration check', () => {
 
     expect(api.consoleConfigured.value).toBeNull()
     expect(api.consoleButtonTitle.value).toBe('Ouvrir une console interactive')
+  })
+
+  it('offers the console once configured is confirmed true for an lxc guest', async () => {
+    getProxmoxInstance.mockResolvedValue({ data: { console_configured: true } })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(api.consoleButtonTitle.value).toBe('Ouvrir une console interactive')
+  })
+
+  it('never checks console config for a non-lxc (QEMU) guest and shows the "coming soon" title', async () => {
+    getProxmoxGuests.mockResolvedValue({ data: [{ ...guest, guest_type: 'qemu' }] })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(getProxmoxInstance).not.toHaveBeenCalled()
+    expect(api.consoleButtonTitle.value).toBe('VM QEMU : bientôt disponible')
   })
 })

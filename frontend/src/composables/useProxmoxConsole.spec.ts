@@ -190,6 +190,40 @@ describe('useProxmoxConsole', () => {
     expect(term.written).toEqual([])
   })
 
+  it('reports error status when the socket errors', () => {
+    const { open, status } = useProxmoxConsole()
+    const term = new FakeTerminal()
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
+    const socket = FakeWebSocket.instances[0]
+    socket.open()
+
+    socket.onerror?.()
+
+    expect(status.value).toBe('error')
+  })
+
+  it('ignores late events from a superseded socket after re-opening', () => {
+    const { open, status } = useProxmoxConsole()
+    const term = new FakeTerminal()
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
+    const staleSocket = FakeWebSocket.instances[0]
+    staleSocket.open()
+    expect(status.value).toBe('connected')
+
+    // Re-opening tears down and replaces the socket — the old one is now stale.
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
+    const newSocket = FakeWebSocket.instances[1]
+
+    // A late error/close from the superseded socket must not affect status.
+    staleSocket.onerror?.()
+    expect(status.value).toBe('connecting')
+    staleSocket.simulateClose()
+    expect(status.value).toBe('connecting')
+
+    newSocket.open()
+    expect(status.value).toBe('connected')
+  })
+
   it('does not auto-reconnect after an unexpected close', () => {
     const { open, status } = useProxmoxConsole()
     const term = new FakeTerminal()
