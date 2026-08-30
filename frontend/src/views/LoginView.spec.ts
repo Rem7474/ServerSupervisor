@@ -89,6 +89,37 @@ describe('LoginView', () => {
     expect(wrapper.text()).toContain('Erreur de connexion')
   })
 
+  it('shows a translated error when the login response is missing a role', async () => {
+    login.mockResolvedValueOnce({ data: {} })
+    const wrapper = mount(LoginView)
+
+    await wrapper.find('input[name="username"]').setValue('admin')
+    await wrapper.find('input[name="password"]').setValue('secret')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Réponse de connexion invalide.')
+  })
+
+  it('offers the security-key button when the server supports it, and shows a translated error if verification fails', async () => {
+    login.mockResolvedValueOnce({ data: { require_mfa: true, mfa_methods: { totp: false, webauthn: true } } })
+    beginWebAuthnLogin.mockRejectedValueOnce({ response: { data: {} } })
+    const wrapper = mount(LoginView)
+
+    await wrapper.find('input[name="username"]').setValue('admin')
+    await wrapper.find('input[name="password"]').setValue('secret')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const webauthnButton = wrapper.findAll('button').find((b) => b.text().includes('clé de sécurité'))
+    expect(webauthnButton).toBeTruthy()
+
+    await webauthnButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Échec de la vérification de la clé de sécurité')
+  })
+
   it('renders in English once the UI locale is switched', () => {
     setLocale('en')
     const wrapper = mount(LoginView)
