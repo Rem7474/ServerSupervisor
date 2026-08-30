@@ -558,7 +558,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import ProxmoxClusterCard from '../components/proxmox/ProxmoxClusterCard.vue'
@@ -575,8 +575,7 @@ import { isNeverConnectedHost } from '../utils/hosts'
 import { pluralize } from '../utils/formatters'
 import { useDashboard, type DashboardProxmoxLinkRecord } from '../composables/useDashboard'
 import { useAttentionCenter } from '../composables/useAttentionCenter'
-
-const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
+import { AsyncApexChart as ApexChart } from '../utils/apexChartTheme'
 const {
   hosts,
   versionComparisons,

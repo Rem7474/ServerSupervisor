@@ -168,12 +168,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
+import { computed, ref, shallowRef, onMounted, watch, toRef } from 'vue'
 import type { ApexOptions } from 'apexcharts'
 import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import { fetchMetricsHistory, type MetricsHistoryPoint } from '../../composables/useHostMetricsHistory'
 import dayjs from '../../utils/dayjs'
-import { getApexChartPalette } from '../../utils/apexChartTheme'
+import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
 import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
 
 interface MetricsData {
@@ -194,15 +194,6 @@ type HistoryPoint = MetricsHistoryPoint
 
 interface ChartPoint { x: number; y: number }
 interface MemChartPoint extends ChartPoint { memory_used?: number; memory_total?: number }
-
-// vue3-apexcharts' own exposed instance API (its .d.ts declares this but doesn't
-// export it under a name that resolves cleanly through defineAsyncComponent's
-// template-ref typing — restated locally for the one method actually needed).
-interface ApexChartInstance {
-  updateOptions(options: ApexOptions, redrawPaths?: boolean, animate?: boolean, updateSyncedCharts?: boolean): Promise<void>
-}
-
-const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 const props = withDefaults(defineProps<{
   hostId: string

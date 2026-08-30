@@ -394,6 +394,15 @@ func (c *Config) Validate() []string {
 // ValidateStrict returns ErrInsecureConfig (wrapped with details) when any
 // insecure default is detected and APP_ENV is not a development environment.
 // Server startup should refuse to continue in that case.
+//
+// An empty JWTSecret/AdminPassword deliberately passes: main.go calls this
+// before generating and persisting a random JWT secret (when unset) and
+// before bootstrapAdminAccount generates a random admin password (when
+// unset) — this function only guards against a *known-bad* value being
+// explicitly configured, not against "not yet generated". That ordering is
+// load-bearing: calling ValidateStrict after either generation step, or
+// changing either generator to leave its field empty on success, would
+// silently defeat this check for the value it's supposed to guard.
 func (c *Config) ValidateStrict() error {
 	if IsDevEnv() {
 		return nil

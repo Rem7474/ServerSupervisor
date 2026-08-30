@@ -228,7 +228,30 @@ describe('useProxmoxGuest — summary fetch failure', () => {
     await flushPromises()
 
     expect(api.series.value).toBeNull()
+    // Regression: chartOptions used to stay stale (from a prior successful
+    // load's time window) when a reload failed — the template's
+    // `v-else-if="series && chartOptions"` masked it today, but only by
+    // accident of both being checked together.
+    expect(api.chartOptions.value).toBeNull()
     expect(api.summaryLoading.value).toBe(false)
+  })
+
+  it('clears both series and chartOptions when a reload returns zero points', async () => {
+    const now = Date.now()
+    getProxmoxGuestMetrics.mockResolvedValueOnce({
+      data: [{ timestamp: new Date(now).toISOString(), cpu_avg: 10, memory_avg: 20 }],
+    })
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+    expect(api.series.value).not.toBeNull()
+    expect(api.chartOptions.value).not.toBeNull()
+
+    getProxmoxGuestMetrics.mockResolvedValueOnce({ data: [] })
+    api.changeRange(1)
+    await flushPromises()
+
+    expect(api.series.value).toBeNull()
+    expect(api.chartOptions.value).toBeNull()
   })
 })
 

@@ -642,10 +642,16 @@ function toggleContainer(containerId: string, checked: boolean): void {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* This app is dark-only (data-bs-theme="dark" fixed in index.html), so a
+   single un-scoped rule set is the actual styling — no [data-bs-theme='dark']
+   selector needed (a light/dark split here left the two states out of sync:
+   the "light" values below were dead, always shadowed by a
+   higher-specificity dark override with different colors — same pattern
+   already cleaned up in AlertRuleModal's step chips). */
 .metric-card {
   align-items: center;
-  background: var(--tblr-bg-surface);
-  border: 1px solid var(--tblr-border-color);
+  background: var(--ss-chip-idle-bg);
+  border: 1px solid var(--ss-chip-idle-border);
   border-radius: 0.8rem;
   cursor: pointer;
   display: flex;
@@ -663,7 +669,7 @@ function toggleContainer(containerId: string, checked: boolean): void {
 }
 
 .metric-card.selected {
-  background: linear-gradient(160deg, rgba(45, 140, 255, 0.14) 0%, rgba(45, 140, 255, 0.06) 100%);
+  background: linear-gradient(160deg, rgba(33, 118, 210, 0.34) 0%, rgba(18, 79, 150, 0.2) 100%);
   border-color: var(--ss-accent-blue);
   box-shadow: inset 0 0 0 1px var(--ss-accent-blue);
 }
@@ -682,15 +688,6 @@ function toggleContainer(containerId: string, checked: boolean): void {
   color: var(--tblr-body-color);
   font-size: 0.92rem;
   font-weight: 600;
-}
-
-[data-bs-theme='dark'] .metric-card {
-  background: var(--ss-chip-idle-bg);
-  border-color: var(--ss-chip-idle-border);
-}
-
-[data-bs-theme='dark'] .metric-card.selected {
-  background: linear-gradient(160deg, rgba(33, 118, 210, 0.34) 0%, rgba(18, 79, 150, 0.2) 100%);
 }
 
 @media (max-width: 768px) {

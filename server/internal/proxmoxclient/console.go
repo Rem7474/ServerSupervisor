@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -171,7 +172,18 @@ func (c *Client) wsBaseURL() string {
 // (ReadMessage).
 type TermSession struct {
 	conn *websocket.Conn
+	// writeMu serializes Write/Resize/Ping: gorilla/websocket requires at
+	// most one concurrent writer per connection, but ws/proxmox_console.go
+	// calls Write/Resize from its browser-to-PVE forwarding goroutine while
+	// a separate keepalive ticker goroutine calls Ping concurrently.
+	writeMu sync.Mutex
 }
+
+// handshakeTimeout bounds the termproxy login write/read after the
+// WebSocket dial succeeds — see its use in OpenLXCConsole for why nothing
+// else already covers this specific step. A var, not a const, so tests can
+// shrink it rather than waiting out the real value.
+var handshakeTimeout = 10 * time.Second
 
 // OpenLXCConsole opens a live shell session on an LXC container: logs in
 // with the supplied PVE user credentials (see login's doc comment for why
@@ -216,11 +228,26 @@ func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveU
 	}
 
 	// Undocumented termproxy login handshake: "<user>:<ticket>\n" as the
-	// first message, server replies with the literal bytes "OK".
+	// first message, server replies with the literal bytes "OK". Unlike the
+	// login()/createTermproxy() HTTP calls above (bounded by c.httpClient's
+	// own Timeout) and the dial above (bounded by dialer.HandshakeTimeout),
+	// nothing else bounds this write/read pair — a PVE that accepts the WS
+	// upgrade but never completes the handshake would otherwise hang this
+	// goroutine forever. The deadline is cleared before returning: the
+	// interactive session that follows must not inherit it (TermSession's
+	// own Ping-based keepalive is what keeps that connection alive instead).
+	if err := conn.SetWriteDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("set handshake write deadline: %w", err)
+	}
 	handshake := fmt.Sprintf("%s:%s\n", user, termTicket)
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(handshake)); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("send login handshake: %w", err)
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("set handshake read deadline: %w", err)
 	}
 	_, loginResp, err := conn.ReadMessage()
 	if err != nil {
@@ -231,6 +258,10 @@ func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveU
 		_ = conn.Close()
 		return nil, fmt.Errorf("termproxy login rejected: %s", loginResp)
 	}
+	if err := conn.SetReadDeadline(time.Time{}); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("clear handshake read deadline: %w", err)
+	}
 
 	return &TermSession{conn: conn}, nil
 }
@@ -238,17 +269,23 @@ func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveU
 // Write sends keystroke/paste bytes to the remote shell.
 func (s *TermSession) Write(data []byte) error {
 	frame := append([]byte(fmt.Sprintf("0:%d:", len(data))), data...)
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	return s.conn.WriteMessage(websocket.TextMessage, frame)
 }
 
 // Resize tells PVE to resize the PTY.
 func (s *TermSession) Resize(cols, rows int) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	return s.conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("1:%d:%d:", cols, rows)))
 }
 
 // Ping sends a termproxy keepalive; PVE closes idle console sessions after a
 // few minutes without one.
 func (s *TermSession) Ping() error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
 	return s.conn.WriteMessage(websocket.TextMessage, []byte("2"))
 }
 

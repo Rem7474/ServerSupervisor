@@ -20,10 +20,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed } from 'vue'
 import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
-import { getApexChartPalette } from '../../utils/apexChartTheme'
+import { getApexChartPalette, AsyncApexChart as ApexChart } from '../../utils/apexChartTheme'
 
 type StatusDistribution = Record<string, number>
 
@@ -32,8 +32,6 @@ const props = defineProps<{
   chartReady: boolean
   loading: boolean
 }>()
-
-const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 
 const series = computed(() => {
   const d = props.statusDistribution || {}

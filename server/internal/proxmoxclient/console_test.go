@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -314,6 +316,64 @@ func TestTermSessionResizeAndPing(t *testing.T) {
 	}
 }
 
+// TestTermSession_ConcurrentWritesDoNotRace exercises Write/Resize/Ping from
+// separate goroutines simultaneously — the exact shape of
+// ws/proxmox_console.go's usage (a browser-to-PVE forwarding goroutine
+// calling Write/Resize while a separate keepalive-ticker goroutine calls
+// Ping). gorilla/websocket only supports one concurrent writer per
+// connection; run with -race to catch a regression if writeMu is ever
+// removed.
+func TestTermSession_ConcurrentWritesDoNotRace(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	const messagesPerGoroutine = 50
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}))
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	conn, resp, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	session := &TermSession{conn: conn}
+	defer func() { _ = session.Close() }()
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < messagesPerGoroutine; i++ {
+			_ = session.Write([]byte("x"))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < messagesPerGoroutine; i++ {
+			_ = session.Resize(80, 24)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < messagesPerGoroutine; i++ {
+			_ = session.Ping()
+		}
+	}()
+	wg.Wait()
+}
+
 // TestOpenLXCConsoleTermproxyError covers a successful login followed by a
 // PVE-side rejection of the termproxy creation call itself (e.g. missing
 // VM.Console privilege on that node/guest).
@@ -368,6 +428,59 @@ func TestOpenLXCConsoleHandshakeRejected(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "termproxy login rejected") {
 		t.Errorf("error = %v, want it to mention the rejected handshake", err)
+	}
+}
+
+// TestOpenLXCConsoleHandshakeNeverReplies covers a PVE that accepts the
+// vncwebsocket upgrade and reads the login handshake but never replies —
+// a wedged/buggy termproxy, as opposed to the explicit-rejection case above.
+// Without handshakeTimeout's read deadline this would hang the calling
+// goroutine forever; shrinking it here keeps the test itself fast.
+func TestOpenLXCConsoleHandshakeNeverReplies(t *testing.T) {
+	old := handshakeTimeout
+	handshakeTimeout = 200 * time.Millisecond
+	defer func() { handshakeTimeout = old }()
+
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH=="}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/termproxy", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"PVEVNC:TERM==","port":31000,"user":"root@pam","upid":"UPID:.."}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc/101/vncwebsocket", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+		// Deliberately never reply — simulates a wedged termproxy. Block
+		// until the client gives up and closes, rather than returning and
+		// tearing down the connection ourselves (which would surface as a
+		// "read login response: ... closed" error instead of the deadline
+		// this test is actually verifying).
+		<-r.Context().Done()
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := New(srv.URL, "user@pve!token", "secret-token", false)
+	start := time.Now()
+	_, err := c.OpenLXCConsole(context.Background(), "pve1", 101, "root@pam", "hunter2")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected an error when PVE never replies to the handshake")
+	}
+	if !strings.Contains(err.Error(), "read login response") {
+		t.Errorf("error = %v, want it to identify the handshake read step", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Errorf("OpenLXCConsole took %v to fail, want it bounded by handshakeTimeout (%v)", elapsed, handshakeTimeout)
 	}
 }
 

@@ -24,8 +24,8 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue'
 import type { ApexOptions } from 'apexcharts'
+import { AsyncApexChart as ApexChart } from '../../utils/apexChartTheme'
 
 export type RRDChartSeries = NonNullable<ApexOptions['series']>
 
@@ -39,6 +39,4 @@ withDefaults(defineProps<{
   options: () => ({}),
   emptyText: 'Aucune donnée',
 })
-
-const ApexChart = defineAsyncComponent(() => import('vue3-apexcharts').then((m) => m.default))
 </script>

@@ -253,6 +253,7 @@ export function useProxmoxGuest() {
       const points = Array.isArray(res.data) ? res.data : []
       if (!points.length) {
         series.value = null
+        chartOptions.value = null
         return
       }
       const palette = getApexChartPalette()
@@ -276,6 +277,7 @@ export function useProxmoxGuest() {
       chartOptions.value = buildChartOptions()
     } catch {
       series.value = null
+      chartOptions.value = null
     } finally {
       summaryLoading.value = false
     }

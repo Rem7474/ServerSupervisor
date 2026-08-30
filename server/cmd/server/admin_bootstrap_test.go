@@ -125,3 +125,34 @@ func TestBootstrapAdminAccount_PropagatesHasAdminUserError(t *testing.T) {
 		t.Errorf("error = %q, want it to identify the admin-check step", err.Error())
 	}
 }
+
+func TestBootstrapAdminAccount_ExistingInstall_RenamedAdminUserDoesNotErrorOrTouchOtherAccount(t *testing.T) {
+	db, cfg := testutil.NewPostgresDBWithConfig(t)
+	ctx := context.Background()
+
+	// First boot creates "admin" (cfg's default). Simulate an operator who
+	// then renamed ADMIN_USER without renaming the underlying account —
+	// the real admin is still "admin", but cfg now points at "root".
+	cfg.AdminPassword = "admin"
+	if err := bootstrapAdminAccount(ctx, db, cfg); err != nil {
+		t.Fatalf("initial bootstrap: %v", err)
+	}
+	if err := db.SetUserMustChangePassword(ctx, cfg.AdminUser, false); err != nil {
+		t.Fatalf("clear must_change_password: %v", err)
+	}
+
+	cfg.AdminUser = "root"
+	if err := bootstrapAdminAccount(ctx, db, cfg); err != nil {
+		t.Fatalf("bootstrapAdminAccount with renamed ADMIN_USER: %v", err)
+	}
+
+	// The real admin account, still named "admin", must be left untouched
+	// rather than silently no-op'd or errored on.
+	u, err := db.GetUserByUsername(ctx, "admin")
+	if err != nil {
+		t.Fatalf("GetUserByUsername(admin): %v", err)
+	}
+	if u.MustChangePassword {
+		t.Error("the real admin account's must_change_password should not change when cfg.AdminUser no longer matches it")
+	}
+}
