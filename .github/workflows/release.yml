@@ -242,8 +242,8 @@ jobs:
           labels: ${{ steps.docker-meta.outputs.labels }}
           build-args: |
             VERSION=${{ needs.meta.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=server-release
+          cache-to: type=gha,mode=max,scope=server-release
           # Supply-chain attestations pushed alongside the image to GHCR.
           provenance: mode=max
           sbom: true

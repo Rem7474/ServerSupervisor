@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -113,6 +114,33 @@ func TestOverrideFromDB_KeepsSecretsWhenBlank(t *testing.T) {
 	}
 	if c.GitHubToken != "env-token" {
 		t.Errorf("GitHubToken = %q, want env-token (empty DB value must not override)", c.GitHubToken)
+	}
+}
+
+// TestOverrideFromDB_LoadsPersistedJWTSecretWhenEnvUnset guards the
+// persistent-JWT-secret feature: a secret generated and saved at a prior
+// boot (JWT_SECRET unset in env) must be picked back up on the next boot
+// instead of a fresh one being generated, which would invalidate every
+// existing session/token.
+func TestOverrideFromDB_LoadsPersistedJWTSecretWhenEnvUnset(t *testing.T) {
+	c := &Config{JWTSecret: ""}
+	persisted := strings.Repeat("p", 64)
+
+	c.OverrideFromDB(fakeSettingsLoader{settings: map[string]string{"jwt_secret": persisted}})
+
+	if c.JWTSecret != persisted {
+		t.Fatalf("expected the persisted jwt_secret to be loaded, got %q", c.JWTSecret)
+	}
+}
+
+func TestOverrideFromDB_DoesNotOverwriteAnAlreadySetJWTSecret(t *testing.T) {
+	explicit := strings.Repeat("e", 64)
+	c := &Config{JWTSecret: explicit}
+
+	c.OverrideFromDB(fakeSettingsLoader{settings: map[string]string{"jwt_secret": strings.Repeat("p", 64)}})
+
+	if c.JWTSecret != explicit {
+		t.Fatalf("expected the env-provided secret to take precedence, got %q", c.JWTSecret)
 	}
 }
 

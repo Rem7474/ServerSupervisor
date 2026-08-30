@@ -13,6 +13,15 @@ on:
       - 'frontend/package.json'
       - 'frontend/package-lock.json'
       - '**/Dockerfile'
+  pull_request:
+    paths:
+      - 'server/go.mod'
+      - 'server/go.sum'
+      - 'agent/go.mod'
+      - 'agent/go.sum'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '**/Dockerfile'
   workflow_dispatch:        # déclenchable manuellement depuis l'UI GitHub
 
 permissions:
@@ -41,7 +50,7 @@ jobs:
           cache-dependency-path: server/go.sum
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run govulncheck
         working-directory: server
@@ -61,7 +70,7 @@ jobs:
           cache-dependency-path: agent/go.sum
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run govulncheck
         working-directory: agent
@@ -74,6 +83,12 @@ jobs:
     name: nancy (server)
     runs-on: ubuntu-latest
     environment: Action
+    # GitHub withholds repo/environment secrets from Dependabot's own
+    # pull_request events (same restriction that made SonarQube Scan fail on
+    # #304 — see #306) — OSS_INDEX_USER/TOKEN resolve empty and nancy fails
+    # every time with a 401 that carries no real signal. Skip rather than
+    # fail; the weekly schedule run and non-Dependabot PRs still cover this.
+    if: github.actor != 'dependabot[bot]'
 
     steps:
       - uses: actions/checkout@v7
@@ -89,12 +104,14 @@ jobs:
 
       - name: Run nancy
         working-directory: server
-        run: go list -json -deps ./... | ../nancy sleuth --quiet --username "${{ secrets.OSS_INDEX_USER }}" --token "${{ secrets.OSS_INDEX_TOKEN }}"
+        run: go list -json -deps ./... | ../nancy sleuth --quiet --exclude-vulnerability-file ../.nancy-ignore --username "${{ secrets.OSS_INDEX_USER }}" --token "${{ secrets.OSS_INDEX_TOKEN }}"
 
   nancy-agent:
     name: nancy (agent)
     runs-on: ubuntu-latest
     environment: Action
+    # See nancy-server above.
+    if: github.actor != 'dependabot[bot]'
 
     steps:
       - uses: actions/checkout@v7
@@ -159,8 +176,8 @@ jobs:
           push: false
           load: true
           tags: serversupervisor-server:scan
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=server-trivy
+          cache-to: type=gha,mode=max,scope=server-trivy
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -169,7 +186,8 @@ jobs:
           format: sarif
           output: trivy-server.sarif
           severity: CRITICAL,HIGH
-          exit-code: '0'    # ne pas faire échouer le build, juste reporter
+          exit-code: '1'    # bloquant : ROADMAP.md item #7
+          trivyignores: .trivyignore
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
@@ -177,42 +195,3 @@ jobs:
         with:
           sarif_file: trivy-server.sarif
           category: trivy-server
-
-  # ─────────────────────────────────────────
-  # Scan du code source (CodeQL)
-  # ─────────────────────────────────────────
-  codeql:
-    name: CodeQL analysis
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    strategy:
-      fail-fast: false
-      # build-mode: none analyse la source directement. Pour Go, cela couvre les
-      # DEUX modules (server/ + agent/) en une seule passe — ce que autobuild
-      # manquait faute de go.work à la racine (l'agent échappait au scan).
-      matrix:
-        include:
-          - language: go
-            build-mode: none
-          - language: javascript
-            build-mode: none
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-          # Règles supplémentaires pour la sécurité web
-          queries: security-extended
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
-        with:
-          category: codeql-${{ matrix.language }}

@@ -7,15 +7,22 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 Ce README couvre l'installation et donne une vue d'ensemble de chaque
 fonctionnalité. Pour une intégration qui demande une vraie procédure de
 configuration côté service tiers, un guide dédié va plus loin (dépannage
-inclus) :
+inclus) — sur le [wiki](https://github.com/Rem7474/ServerSupervisor/wiki),
+généré depuis le dossier [`wiki/`](wiki/) du dépôt :
 
 | Guide | Sujet |
 |---|---|
-| [docs/proxmox.md](docs/proxmox.md) | Connecter un cluster Proxmox VE (token API, permissions, actions en écriture) |
-| [docs/npm.md](docs/npm.md) | Connecter Nginx Proxy Manager (sync, monitoring auto par proxy host) |
-| [docs/git-webhooks-releases.md](docs/git-webhooks-releases.md) | Webhooks Git et suivi de releases GitHub/GitLab/Gitea/Docker |
-| [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md) | Runbooks multi-étapes vs tâches planifiées par hôte |
-| [docs/backup-restic.md](docs/backup-restic.md) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
+| [Proxmox](https://github.com/Rem7474/ServerSupervisor/wiki/Proxmox) | Connecter un cluster Proxmox VE (token API, permissions, actions en écriture) |
+| [NPM](https://github.com/Rem7474/ServerSupervisor/wiki/NPM) | Connecter Nginx Proxy Manager (sync, monitoring auto par proxy host) |
+| [Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases) | Webhooks Git et suivi de releases GitHub/GitLab/Gitea/Docker |
+| [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks) | Runbooks multi-étapes vs tâches planifiées par hôte |
+| [Restic-Backups](https://github.com/Rem7474/ServerSupervisor/wiki/Restic-Backups) | Sauvegardes Restic (installation, resticprofile, déclenchement) |
+| [Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting) | Moteur d'alertes (seuils, hystérésis, incidents, ack/escalade, corrélation, maintenance, modèles) |
+| [Monitoring](https://github.com/Rem7474/ServerSupervisor/wiki/Monitoring) | Sondes uptime HTTP/TCP/ICMP et certificats SSL/TLS |
+| [Notifications](https://github.com/Rem7474/ServerSupervisor/wiki/Notifications) | Centre de notifications in-app et Web Push (VAPID) |
+| [Two-Factor-Authentication](https://github.com/Rem7474/ServerSupervisor/wiki/Two-Factor-Authentication) | TOTP et clés de sécurité/passkeys (WebAuthn) |
+| [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery) | Scan de sous-réseau et ajout en masse |
+| [Custom-Tasks-Examples](https://github.com/Rem7474/ServerSupervisor/wiki/Custom-Tasks-Examples) | Exemples de `tasks.yaml` prêts à copier |
 
 ## Vision produit & roadmap
 
@@ -81,19 +88,19 @@ inclus) :
 - **APT** : gestion centralisée des mises à jour avec actions groupées et console live streamée
 - **Détail hôte** : exécution à distance de commandes systemd (start/stop/restart/enable/disable), logs journalctl streamés, snapshot des processus — directement depuis la page hôte
 - **Streaming commandes** : affichage en temps réel de la sortie des commandes longues via WebSocket
-- **Versions** : suivi des releases GitHub/GitLab/Gitea et des digests d'images Docker, notification ou déclenchement automatique (script ou `compose pull && up -d`) — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
-- **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](docs/git-webhooks-releases.md)
-- **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
-- **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic
+- **Versions** : suivi des releases GitHub/GitLab/Gitea et des digests d'images Docker, notification ou déclenchement automatique (script ou `compose pull && up -d`) — voir [Git Webhooks & Suivi de releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
+- **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
+- **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
+- **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring` — voir [Monitoring](https://github.com/Rem7474/ServerSupervisor/wiki/Monitoring)
+- **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic — voir [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery)
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
-- **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](docs/runbooks-scheduled-tasks.md)
-- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent ; onglet « Modèles » — définir une règle (métrique agent + seuils + notifications) une fois et l'appliquer à plusieurs hôtes en un clic
+- **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
+- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy ou notifications navigateur (in-app + Web Push) — un canal `notify` webhook générique existe aussi mais est déprécié, voir [Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting) ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent ; onglet « Modèles » — définir une règle (métrique agent + seuils + notifications) une fois et l'appliquer à plusieurs hôtes en un clic
 - **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
-- **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
-- **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
+- **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy des alertes — voir [Notifications](https://github.com/Rem7474/ServerSupervisor/wiki/Notifications)
+- **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security` (TOTP et/ou clés de sécurité/passkeys WebAuthn) — voir [Two-Factor-Authentication](https://github.com/Rem7474/ServerSupervisor/wiki/Two-Factor-Authentication)
 - **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, corrélation CrowdSec si activée côté agent), stats trafic web sur `/traffic`, menaces web sur `/threats`
 - **UI cohérente** : barres de recherche/filtres/tri harmonisées sur les vues principales (Docker, APT, Audit)
 - **Proxmox VE** : supervision de l'infrastructure de virtualisation via API Proxmox (sans agent sur l'hyperviseur) — nœuds, VMs QEMU, conteneurs LXC, stockage ; polling configurable par connexion
@@ -110,8 +117,17 @@ tâches récentes et résultats de sauvegarde vzdump — avec liaison optionnell
 Sauvegardes / Mises à jour / Services / Journaux sécurité). `token_secret`
 stocké en base, jamais renvoyé au frontend.
 
-Guide complet (création du token PVE, permissions en écriture, posture
-admin vs authentifié par action, dépannage) : **[docs/proxmox.md](docs/proxmox.md)**.
+**Console interactive LXC** : un shell dans un conteneur directement depuis la
+fiche guest, relayé en WebSocket vers `termproxy` sur le nœud PVE — aucun
+ticket PVE n'atteint jamais le navigateur, aucune session n'est persistée.
+Admin uniquement, tracé dans les logs d'audit, et limité aux LXC (QEMU
+demanderait du VNC/RFB, un protocole différent). Demande un compte PVE avec
+`VM.Console` en plus du token API : l'API Proxmox n'accepte pas le token sur
+cet endpoint.
+
+Guide complet (création du token PVE, identifiants console, permissions en
+écriture, posture admin vs authentifié par action, dépannage) :
+**[Proxmox](https://github.com/Rem7474/ServerSupervisor/wiki/Proxmox)**.
 
 ### NPM (Nginx Proxy Manager)
 
@@ -125,7 +141,7 @@ ou si la connexion elle-même est supprimée. Vue `/npm` : gestion des
 connexions (admin) + liste des proxy hosts importés.
 
 Guide complet (authentification, cadence de sync réelle, sémantique des
-interrupteurs de monitoring, dépannage) : **[docs/npm.md](docs/npm.md)**.
+interrupteurs de monitoring, dépannage) : **[NPM](https://github.com/Rem7474/ServerSupervisor/wiki/NPM)**.
 
 ### Git Webhooks & Suivi de releases
 
@@ -140,7 +156,7 @@ sur un hôte, avec le contexte du commit injecté en variables d'environnement.
 
 Guide complet (création d'un tracker, configuration du webhook côté
 plateforme, vérification de signature par provider, dépannage) :
-**[docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)**.
+**[Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)**.
 
 ### Runbooks & Tâches planifiées
 
@@ -155,7 +171,7 @@ hôte (voir le guide).
 
 Guide complet (whitelist par module, tableau comparatif runbook vs tâche
 planifiée, fuseau horaire d'exécution du cron, dépannage) :
-**[docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)**.
+**[Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)**.
 
 ### Agent
 - Collecte automatique : CPU, RAM, disques, réseau, uptime
@@ -209,11 +225,15 @@ pour lancer ce même mode démo en local).
 ```bash
 git clone https://github.com/Rem7474/ServerSupervisor.git && cd ServerSupervisor
 cp .env.example .env
-# Éditer .env avec vos valeurs (JWT_SECRET, ADMIN_PASSWORD, etc.)
 docker compose up -d
 ```
 
-Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin` par défaut).
+- Le dashboard est accessible sur `http://localhost:8080`.
+- **Premier démarrage** : Si `ADMIN_PASSWORD` n'est pas renseigné dans votre fichier `.env`, un mot de passe aléatoire sécurisé est généré automatiquement au premier lancement. Affichez-le via :
+  ```bash
+  docker compose logs server
+  ```
+- Connectez-vous avec le login `admin` et le mot de passe généré (ou celui défini dans `.env`). Une modification du mot de passe vous sera demandée dès la première connexion.
 
 ### 2. Enregistrer un hôte
 
@@ -347,7 +367,7 @@ sudo journalctl -u serversupervisor-agent -f
 
 Pour un webhook déclenché en temps réel par un push (plutôt que ce polling
 15 min), ou pour un tracker Docker en mode Compose avec réconciliation de
-dérive : voir le guide complet **[docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)**.
+dérive : voir le guide complet **[Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)**.
 
 ---
 
@@ -380,23 +400,65 @@ dérive : voir le guide complet **[docs/git-webhooks-releases.md](docs/git-webho
 #### Authentification
 | Variable | Description | Défaut |
 |---|---|---|
-| `JWT_SECRET` | Secret JWT **(à changer !)** | `change-me...` |
+| `JWT_SECRET` | Secret JWT (généré automatiquement et persisté en base si omis) | _Auto-généré_ |
 | `JWT_EXPIRATION` | Durée de vie du token JWT | `24h` |
 | `REFRESH_TOKEN_EXPIRATION` | Durée de vie du refresh token | `168h` |
 | `ADMIN_USER` | Nom du compte admin initial | `admin` |
-| `ADMIN_PASSWORD` | Mot de passe admin initial **(à changer !)** | `admin` |
+| `ADMIN_PASSWORD` | Mot de passe admin initial (généré et affiché dans les logs au 1er boot si omis) | _Auto-généré_ |
 
 #### Rate limiting
 | Variable | Description | Défaut |
 |---|---|---|
 | `RATE_LIMIT_RPS` | Requêtes par seconde max par IP | `100` |
 | `RATE_LIMIT_BURST` | Burst max par IP | `200` |
+| `AGENT_RATE_LIMIT_RPS` | Idem, pour les routes `/api/agent/*` (un agent qui rapporte souvent ne doit pas être limité comme un navigateur) | `20` |
+| `AGENT_RATE_LIMIT_BURST` | Burst max par IP sur `/api/agent/*` | `40` |
+
+> Le limiteur est **en mémoire, par instance** — comme le bus d'événements et
+> les hubs WebSocket. C'est cohérent avec le modèle de déploiement actuel (un
+> seul conteneur `server`), pas un oubli.
 
 #### GitHub
 | Variable | Description | Défaut |
 |---|---|---|
 | `GITHUB_TOKEN` | Token GitHub (augmente rate limit 60→5000/h) | `` |
 | `GITHUB_POLL_INTERVAL` | Intervalle de vérification | `15m` |
+| `DOCKER_IMAGE_POLL_INTERVAL` | Rafraîchissement du cache de versions d'images Docker (balaye toute la flotte, les registres limitent par IP source) | `6h` |
+
+#### Divers
+| Variable | Description | Défaut |
+|---|---|---|
+| `DEMO_MODE` | Mode démonstration (jeu de données figé, actions désactivées) — voir [CONTRIBUTING.md](CONTRIBUTING.md#mode-démo) | `false` |
+| `TLS_ENABLED` | **Ne fait pas servir le HTTPS.** Force uniquement le flag `Secure` sur les cookies de session — à activer quand l'app est exposée en HTTPS derrière un reverse proxy. Le serveur lui-même n'écoute qu'en HTTP | `false` |
+| `ALLOWED_ORIGINS` | Origines WebSocket/CORS additionnelles (séparées par des virgules) | `` |
+| `TRUSTED_PROXIES` | Proxies de confiance pour la résolution d'IP cliente | `` |
+| `WEBAUTHN_RP_ID` | Relying Party ID WebAuthn (déduit de `BASE_URL` si absent) | dérivé |
+| `WEBAUTHN_RP_ORIGINS` | Origines WebAuthn autorisées (déduites de `ALLOWED_ORIGINS` si absent) | dérivé |
+
+#### Détection de menaces (scoring)
+
+Le score de menace d'une IP dans les vues Trafic/Menaces est une somme
+pondérée de signaux, entièrement réglable. Tout est optionnel — les défauts
+sont calibrés pour un usage courant, ne les touchez que si le scoring est
+trop bruyant ou trop laxiste sur votre trafic.
+
+| Variable | Description | Défaut |
+|---|---|---|
+| `THREAT_THRESHOLD_MEDIUM` | Score à partir duquel une IP est classée « moyenne » | `15` |
+| `THREAT_THRESHOLD_HIGH` | Score « élevée » | `50` |
+| `THREAT_THRESHOLD_CRITICAL` | Score « critique » | `150` |
+| `THREAT_WEIGHT_HITS` | Poids du volume de requêtes | `2` |
+| `THREAT_WEIGHT_BREADTH` | Poids du nombre de chemins distincts sondés | `3` |
+| `THREAT_WEIGHT_STATUS_404` | Poids des 404 (signature d'un balayage) | `2` |
+| `THREAT_WEIGHT_STATUS_4XX` | Poids des autres 4xx | `1.5` |
+| `THREAT_WEIGHT_STATUS_5XX` | Poids des 5xx | `3` |
+| `THREAT_WEIGHT_STATUS_3XX` | Poids des 3xx | `1` |
+| `THREAT_WEIGHT_STATUS_2XX` | Poids des 2xx — volontairement quasi nul : du trafic qui réussit est du trafic normal | `0.1` |
+| `THREAT_WEIGHT_ADMIN_PANEL` | Bonus si des chemins d'administration sont visés | `3` |
+| `THREAT_WEIGHT_WORDPRESS` | Bonus sur les chemins WordPress classiques | `2` |
+| `THREAT_WEIGHT_PATH_TRAVERSAL` | Bonus sur les tentatives de traversée de chemin | `5` |
+| `THREAT_WEIGHT_SUSPICIOUS_METHOD` | Bonus sur les méthodes HTTP inhabituelles | `2` |
+| `THREAT_WEIGHT_KNOWN_SCANNER` | Bonus si le User-Agent est un scanner connu | `4` |
 
 #### Alertes & notifications
 | Variable | Description | Défaut |
@@ -407,13 +469,22 @@ dérive : voir le guide complet **[docs/git-webhooks-releases.md](docs/git-webho
 | `SMTP_USER` | Utilisateur SMTP | `` |
 | `SMTP_PASS` | Mot de passe SMTP | `` |
 | `SMTP_FROM` | Email expéditeur | `` |
+| `SMTP_TO` | Destinataire par défaut des alertes email | `` |
 | `SMTP_TLS` | Activer TLS | `true` |
+| `NTFY_AUTH_TOKEN` | Token d'authentification ntfy (topics protégés) | `` |
 
 #### Rétention
 | Variable | Description | Défaut |
 |---|---|---|
 | `METRICS_RETENTION_DAYS` | Rétention des métriques en jours | `30` |
 | `AUDIT_RETENTION_DAYS` | Rétention des logs d'audit en jours | `90` |
+| `WEB_LOGS_RETENTION_DAYS` | Rétention des requêtes de logs web | `30` |
+| `NETWORK_FLOWS_RETENTION_DAYS` | Rétention des flux réseau | `14` |
+
+> `AUDIT_RETENTION_DAYS` peut être affiné **par catégorie** d'événement, mais
+> uniquement depuis Settings (clé `audit_retention_days_by_category`) : une
+> map par catégorie n'entre pas dans le format plat `CLÉ=valeur` d'une
+> variable d'environnement.
 
 > Les paramètres de notifications et de rétention sont également éditables depuis le dashboard (Settings) et persistés en base de données.
 
@@ -648,8 +719,32 @@ Variables d'environnement injectées automatiquement par un Git Webhook :
 |---|---|
 | `id` | Identifiant unique (alphanumérique + `-` + `_`, max 64 chars) |
 | `name` | Nom affiché dans le dashboard |
-| `command` | Argv (tableau) — exécuté directement, **sans shell**, pas d'injection possible |
+| `command` | Argv (tableau) — exécuté directement par l'agent, **sans passer par un shell** |
 | `timeout` | Timeout en secondes (défaut 60, max 3600) |
+
+> **Sur l'argv et le shell.** ServerSupervisor n'assemble jamais de ligne de
+> commande : le serveur ne peut désigner qu'un `id` déjà présent dans le
+> `tasks.yaml` de l'hôte, et l'agent exécute le tableau tel quel via
+> `exec.CommandContext`. Il n'y a donc pas d'injection possible *depuis le
+> serveur*. En revanche, écrire vous-même `["bash", "-c", "…"]` (comme dans
+> l'exemple `git-pull-test` ci-dessus) insère volontairement un shell
+> **dans votre propre commande** — c'est légitime et parfois nécessaire, mais
+> les variables que vous y interpolez, `SS_BRANCH` en tête, viennent d'un
+> webhook. Préférez un script dédié dès que la commande devient non triviale.
+
+#### Déclencher une tâche custom
+
+Trois chemins, tous limités à un `id` déjà déclaré côté agent :
+
+| Depuis | Comment |
+|---|---|
+| **L'interface** | Fiche hôte → onglet **Tâches personnalisées** → **Exécuter**. Exécution unique, sans créer de tâche planifiée (`POST /api/v1/hosts/:id/custom-tasks/:taskId/run`, Operator+ sur l'hôte) |
+| **Une planification** | Créer une tâche planifiée `module=custom`, `target=<id de la tâche>`. Le champ **Action** est masqué pour ce module : l'agent l'ignore, seul l'identifiant compte |
+| **Un webhook Git** | Voir [Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases) — les variables `SS_*` ci-dessus sont injectées dans l'environnement du processus |
+
+L'onglet **Tâches personnalisées** affiche ce que l'agent voit réellement : la
+liste vient de son `tasks.yaml`, pas de la base. Un fichier absent ou mal
+formé s'y remarque immédiatement.
 
 ---
 
@@ -657,7 +752,7 @@ Variables d'environnement injectées automatiquement par un Git Webhook :
 
 Supervision optionnelle des sauvegardes [Restic](https://restic.net)/[resticprofile](https://creativeprojects.github.io/resticprofile/) sur les hôtes supervisés. Le toolkit Restic (binaire, `resticconf`, `run_backup.sh`, `resticprofile.yaml`) doit déjà être installé et configuré sur la machine — ServerSupervisor ne l'installe pas et ne stocke **jamais** ses credentials (mot de passe du dépôt, clés Swift/S3/B2, identifiants SMTP) : ils restent dans `resticconf` sur l'hôte, lu localement par l'agent et jamais transmis au serveur.
 
-Guide complet (installation, `resticprofile.yaml`, exemples Nextcloud AIO/Immich, dépannage) : **[docs/backup-restic.md](docs/backup-restic.md)**.
+Guide complet (installation, `resticprofile.yaml`, exemples Nextcloud AIO/Immich, dépannage) : **[Restic-Backups](https://github.com/Rem7474/ServerSupervisor/wiki/Restic-Backups)**.
 
 #### Activer la collecte (`agent.yaml`)
 
@@ -734,16 +829,33 @@ curl http://localhost:8080/api/v1/hosts \
 | `POST` | `/api/v1/hosts` | Enregistrer un hôte | Admin |
 | `POST` | `/api/v1/hosts/bulk` | Enregistrer plusieurs hôtes en un appel (ex: après un scan réseau) | Admin |
 | `POST` | `/api/v1/hosts/discover` | Scanner un sous-réseau IPv4 par ping ICMP (`/24` à `/30`) | Admin |
-| `GET` | `/api/v1/hosts/:id` | Détails d'un hôte | Authentifié |
-| `PATCH` | `/api/v1/hosts/:id` | Modifier un hôte | Admin |
-| `DELETE` | `/api/v1/hosts/:id` | Supprimer un hôte | Admin |
-| `POST` | `/api/v1/hosts/:id/rotate-key` | Rotation de clé API | Admin |
-| `GET` | `/api/v1/hosts/:id/dashboard` | Dashboard rapide d'un hôte | Authentifié |
-| `GET` | `/api/v1/hosts/:id/metrics/history` | Métriques brutes (≤24h) | Authentifié |
-| `GET` | `/api/v1/hosts/:id/metrics/aggregated` | Métriques agrégées (heure/jour) | Authentifié |
+| `GET` | `/api/v1/hosts/:id` | Détails d'un hôte | Viewer+ (par hôte) |
+| `PATCH` | `/api/v1/hosts/:id` | Modifier un hôte | Operator+ (par hôte) |
+| `DELETE` | `/api/v1/hosts/:id` | Supprimer un hôte | Operator+ (par hôte) |
+| `POST` | `/api/v1/hosts/:id/rotate-key` | Rotation de clé API | Operator+ (par hôte) |
+| `POST` | `/api/v1/hosts/:id/agent/update` | Déclencher la mise à jour de l'agent | Operator+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/dashboard` | Dashboard rapide d'un hôte | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/complete` | Vue complète agrégée d'un hôte | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/metrics/history` | Métriques brutes (≤24h) | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/metrics/aggregated` | Métriques agrégées (heure/jour) | Viewer+ (par hôte) |
 | `GET` | `/api/v1/metrics/summary` | Résumé global (toutes VMs) | Authentifié |
-| `GET` | `/api/v1/hosts/:id/disk/metrics` | Métriques disques | Authentifié |
-| `GET` | `/api/v1/hosts/:id/disk/health` | Santé S.M.A.R.T. | Authentifié |
+| `GET` | `/api/v1/hosts/:id/disk/metrics` | Métriques disques | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/disk/health` | Santé S.M.A.R.T. | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/disk/metrics/history` | Historique brut des métriques disque | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/disk/metrics/aggregated` | Historique agrégé des métriques disque | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/capabilities` | Ce que l'agent de cet hôte sait faire (collecteurs actifs) | Authentifié |
+| `GET` | `/api/v1/hosts/:id/timeline` | Chronologie des événements de l'hôte (onglet Timeline) | Authentifié |
+| `GET` | `/api/v1/hosts/:id/exposure` | Domaines publics NPM routés vers cet hôte + trafic/menaces associés | Viewer+ (par hôte) |
+| `GET` | `/api/v1/dashboard/attention` | Centre d'attention : ce qui nécessite une action, tous domaines confondus | Authentifié |
+
+Permissions par hôte (voir [RBAC](#rbac)) :
+
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/hosts/:id/permissions` | Permissions accordées sur cet hôte | Admin |
+| `PUT` | `/api/v1/hosts/:id/permissions/:username` | Accorder/modifier une permission | Admin |
+| `DELETE` | `/api/v1/hosts/:id/permissions/:username` | Retirer une permission | Admin |
+| `GET` | `/api/v1/auth/host-permissions` | Ses propres permissions par hôte | Authentifié |
 
 #### Docker & Network
 | Méthode | Endpoint | Description | Rôle |
@@ -755,18 +867,31 @@ curl http://localhost:8080/api/v1/hosts \
 | `GET` | `/api/v1/network` | Snapshot réseau | Authentifié |
 | `GET` | `/api/v1/network/topology` | Topologie réseau | Authentifié |
 | `GET/PUT` | `/api/v1/network/config` | Config topologie (overrides) | Authentifié |
+| `GET` | `/api/v1/hosts/:id/compose-projects` | Projets Compose d'un hôte | Authentifié |
+| `GET` | `/api/v1/network/ip-inventory` | Inventaire IP consolidé (hôtes, guests, conteneurs) | Authentifié |
+| `GET` | `/api/v1/hosts/:id/network/flows` | Flux réseau live d'un hôte | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/network/flows/history` | Historique des flux réseau | Viewer+ (par hôte) |
+| `GET` | `/api/v1/hosts/:id/network/flows/summary` | Top talkers / résumé des flux | Viewer+ (par hôte) |
 
 #### APT
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/apt` | Statut APT d'un hôte | Authentifié |
+| `GET` | `/api/v1/apt/summary` | Résumé CVE consolidé toute la flotte | Authentifié |
 | `POST` | `/api/v1/apt/command` | Envoyer une commande APT | Operator+ |
+| `GET` | `/api/v1/hosts/:id/apt/unattended-upgrades` | État de `unattended-upgrades` sur l'hôte | Authentifié |
+| `PUT` | `/api/v1/hosts/:id/apt/unattended-upgrades` | Configurer `unattended-upgrades` | Operator+ |
+| `POST` | `/api/v1/hosts/:id/apt/unattended-upgrades/install` | Installer `unattended-upgrades` | Operator+ |
+| `POST` | `/api/v1/hosts/:id/apt/unattended-upgrades/run-now` | Lancer une passe immédiate | Operator+ |
+| `GET` | `/api/v1/hosts/:id/apt/unattended-upgrades/runs` | Historique des passes automatiques | Authentifié |
 
 #### Sauvegardes Restic
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/backup` | Statut agrégé (dernier run + état passif) | Authentifié |
 | `GET` | `/api/v1/hosts/:id/backup/runs` | Historique des backups d'un hôte | Authentifié |
+| `GET` | `/api/v1/hosts/:id/backup/profiles` | Profils resticprofile détectés sur l'hôte | Authentifié |
+| `GET` | `/api/v1/hosts/:id/backup/groups` | Groupes resticprofile détectés sur l'hôte | Authentifié |
 | `GET` | `/api/v1/backup/runs/:runId` | Détail d'un run | Authentifié |
 | `POST` | `/api/v1/hosts/:id/backup/run` | Déclencher un backup manuel | Operator+ |
 
@@ -777,17 +902,40 @@ curl http://localhost:8080/api/v1/hosts \
 | `POST` | `/api/v1/system/journalctl` | Logs journalctl d'un service | Operator+ |
 | `POST` | `/api/v1/system/processes` | Snapshot des processus | Operator+ |
 
+#### Tâches custom (`tasks.yaml`)
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/hosts/:id/custom-tasks` | Tâches déclarées dans le `tasks.yaml` de l'hôte | Authentifié |
+| `POST` | `/api/v1/hosts/:id/custom-tasks/:taskId/run` | Exécuter une tâche une fois, sans créer de tâche planifiée | Operator+ |
+| `GET` | `/api/v1/hosts/:id/tasks-yaml` | Contenu brut du `tasks.yaml` tel que vu par l'agent | Authentifié |
+
 #### Commandes & Audit
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/commands/history` | Historique toutes commandes (hôte) | Authentifié |
 | `GET` | `/api/v1/commands/:id` | Statut d'une commande par UUID | Authentifié |
+| `POST` | `/api/v1/commands/:id/cancel` | Annuler une commande en attente/en cours | Operator+ |
 | `GET` | `/api/v1/audit/logs` | Logs d'audit paginés (filtres `category`/`from`/`to`) | Admin |
 | `GET` | `/api/v1/audit/logs/export` | Export CSV des logs d'audit (mêmes filtres, jusqu'à 20 000 lignes) | Admin |
 | `GET` | `/api/v1/audit/logs/me` | Ses propres logs d'audit | Authentifié |
 | `GET` | `/api/v1/audit/logs/host/:host_id` | Logs d'audit par hôte | Admin |
 | `GET` | `/api/v1/audit/logs/user/:username` | Logs d'audit par utilisateur | Admin |
 | `GET` | `/api/v1/audit/commands` | Historique paginé toutes commandes | Operator+ |
+
+#### Sécurité & logs web (Trafic / Menaces)
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/security/web-logs` | Résumé agrégé (trafic, top domaines/endpoints/hôtes, menaces, CrowdSec) | Authentifié |
+| `GET` | `/api/v1/security/web-logs/timeseries` | Séries temporelles de trafic | Authentifié |
+| `GET` | `/api/v1/security/web-logs/live` | Tail live des requêtes (rafraîchissement rapide) | Authentifié |
+| `GET` | `/api/v1/security/web-logs/ip/:ip` | Chronologie complète d'une IP | Authentifié |
+| `POST` | `/api/v1/security/web-logs/ip/:ip/decisions` | Bannir une IP via CrowdSec (`host_id` requis) | Admin |
+| `DELETE` | `/api/v1/security/web-logs/ip/:ip/decisions` | Lever un bannissement CrowdSec | Admin |
+| `GET` | `/api/v1/security/web-logs/domain/:domain` | Détail des requêtes pour un domaine | Authentifié |
+
+> Le scoring de menace est réglable par variables d'environnement
+> (`THREAT_WEIGHT_*` / `THREAT_THRESHOLD_*`) — voir
+> [Détection de menaces](#détection-de-menaces-scoring).
 
 #### Alertes
 | Méthode | Endpoint | Description | Rôle |
@@ -800,6 +948,11 @@ curl http://localhost:8080/api/v1/hosts \
 | `PATCH` | `/api/v1/alert-rules/:id` | Modifier une règle | Admin |
 | `DELETE` | `/api/v1/alert-rules/:id` | Supprimer une règle | Admin |
 | `POST` | `/api/v1/alert-rules/test` | Tester une règle | Admin |
+| `POST` | `/api/v1/alert-rules/test/logs` | Tester une règle de type logs sur un échantillon | Admin |
+| `GET` | `/api/v1/alert-rules/capabilities/agent` | Métriques agent disponibles pour une règle | Admin |
+| `GET` | `/api/v1/alert-rules/capabilities/proxmox` | Métriques Proxmox disponibles | Admin |
+| `GET` | `/api/v1/alert-rules/capabilities/synthetic` | Métriques synthétiques (uptime/SSL) disponibles | Admin |
+| `GET` | `/api/v1/alert-rules/capabilities/docker` | Métriques Docker disponibles | Admin |
 | `GET` | `/api/v1/alert-rule-templates` | Modèles de règles réutilisables | Authentifié |
 | `POST` | `/api/v1/alert-rule-templates` | Créer un modèle | Admin |
 | `PATCH` | `/api/v1/alert-rule-templates/:id` | Modifier un modèle | Admin |
@@ -810,6 +963,10 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 - `npm_requests`
 - `npm_traffic_bytes`
 - `npm_5xx_errors`
+
+> Guide complet du moteur d'alertes (hystérésis, cooldown, incidents, ack,
+> escalade, corrélation, fenêtres de maintenance, modèles) :
+> **[Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting)**.
 
 #### Fenêtres de maintenance
 | Méthode | Endpoint | Description | Rôle |
@@ -846,6 +1003,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `GET` | `/api/v1/uptime/probes/:id` | Détail d'une sonde | Authentifié |
 | `GET` | `/api/v1/uptime/probes/:id/history` | Historique des checks | Authentifié |
 | `GET` | `/api/v1/uptime/probes/:id/stats` | Statistiques agrégées | Authentifié |
+| `GET` | `/api/v1/uptime/probes/:id/history/buckets` | Historique agrégé en tranches (barres de disponibilité) | Authentifié |
 | `POST` | `/api/v1/uptime/probes` | Créer une sonde | Admin |
 | `PUT` | `/api/v1/uptime/probes/:id` | Modifier une sonde | Admin |
 | `DELETE` | `/api/v1/uptime/probes/:id` | Supprimer une sonde | Admin |
@@ -859,7 +1017,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `POST` | `/api/v1/ssl/certificates/:id/check-now` | Vérification immédiate | Admin |
 
 #### NPM (Nginx Proxy Manager)
-> Guide complet : [docs/npm.md](docs/npm.md)
+> Guide complet : [NPM](https://github.com/Rem7474/ServerSupervisor/wiki/NPM)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -883,7 +1041,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `DELETE` | `/api/v1/users/:id` | Supprimer un utilisateur |
 
 #### Git Webhooks & Suivi de releases
-> Guide complet : [docs/git-webhooks-releases.md](docs/git-webhooks-releases.md)
+> Guide complet : [Git-Webhooks-and-Releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -897,9 +1055,15 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `POST` | `/api/v1/release-trackers/:id/check-now` | Vérification immédiate | Admin |
 | `POST` | `/api/v1/release-trackers/:id/run` | Déclencher manuellement | Admin |
 | `GET` | `/api/v1/release-trackers/:id/executions` | Historique exécutions | Admin |
+| `GET` | `/api/v1/release-trackers/:id/version-history` | Historique des versions/digests vus, enrichi des notes de release | Admin |
+| `POST` | `/api/v1/release-trackers/bulk` | Créer plusieurs trackers en un appel (validation indépendante par entrée) | Admin |
+| `GET` | `/api/v1/release-trackers/trackable-containers` | Conteneurs Compose éligibles à la mise à jour auto (flux en masse) | Admin |
+| `GET` | `/api/v1/release-trackers/pickable-containers` | Conteneurs sélectionnables pour un tracker docker unitaire | Admin |
+| `GET/POST` | `/api/v1/registry-credentials` | Identifiants de registre privé (GHCR, Docker Hub, registre v2) | Admin |
+| `PUT/DELETE` | `/api/v1/registry-credentials/:id` | Modifier / supprimer des identifiants de registre | Admin |
 
 #### Runbooks
-> Guide complet : [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)
+> Guide complet : [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -910,7 +1074,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `GET` | `/api/v1/runbooks/:id/executions/:execution_id` | Détail d'une exécution | Admin |
 
 #### Tâches planifiées
-> Guide complet : [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md)
+> Guide complet : [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -919,14 +1083,15 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Operator+ (vérifié par hôte) |
 | `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Operator+ (vérifié par hôte) |
 | `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ (vérifié par hôte) |
+| `GET` | `/api/v1/scheduled-tasks/:id/executions` | Historique d'exécution d'une tâche | Authentifié |
 
-> Création/modification/suppression sont désormais vérifiées au même
+> Création/modification/suppression sont vérifiées au même
 > niveau que `run` (`requireHostAccess(..., "operator")`) — voir
-> [docs/runbooks-scheduled-tasks.md](docs/runbooks-scheduled-tasks.md#3-lasymétrie-en-un-coup-dœil)
+> [Runbooks-and-Scheduled-Tasks](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks#3-lasymétrie-en-un-coup-dœil)
 > pour le détail.
 
 #### Proxmox VE
-> Guide complet : [docs/proxmox.md](docs/proxmox.md)
+> Guide complet : [Proxmox](https://github.com/Rem7474/ServerSupervisor/wiki/Proxmox)
 
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -943,7 +1108,24 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `POST` | `/api/v1/proxmox/instances/test` | Tester sans sauvegarder | Admin |
 | `POST` | `/api/v1/proxmox/instances/:id/test` | Tester une connexion existante | Admin |
 | `POST` | `/api/v1/proxmox/instances/:id/poll-now` | Déclencher un poll immédiat | Admin |
-| `POST` | `/api/v1/proxmox/nodes/:id/apt-refresh` | Déclencher `apt update` sur le nœud (Sys.Modify requis) | Admin |
+| `POST` | `/api/v1/proxmox/nodes/:id/apt-refresh` | Déclencher `apt update` sur le nœud (Sys.Modify requis) | Authentifié |
+| `POST` | `/api/v1/proxmox/nodes/:id/guests/:vmid/migrate` | Migrer un guest vers un autre nœud (Sys.Modify requis) | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/services` | Services systemd du nœud | Authentifié |
+| `POST` | `/api/v1/proxmox/nodes/:id/services/:service/:action` | start / stop / restart / reload d'un service de nœud (Sys.Modify requis) | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/status` | Statut temps réel d'un nœud | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/syslog` | Journaux du nœud (onglet Journaux sécurité) | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/rrd` | Séries RRD natives du nœud | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/tasks/:upid/log` | Sortie d'une tâche PVE par UPID | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/guest-networks` | Réseaux des guests du nœud | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/guest-exposure` | Exposition publique des guests du nœud | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/metrics` | Résumé métriques tous nœuds | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/cpu-temp/history` | Historique température CPU (via source capteurs) | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/fan-rpm/history` | Historique RPM ventilateurs (via source capteurs) | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/sensor-source/candidates` | Hôtes agent éligibles comme source capteurs | Authentifié |
+| `PUT` | `/api/v1/proxmox/nodes/:id/sensor-source` | Désigner la source capteurs d'un nœud | Admin |
+| `GET` | `/api/v1/proxmox/guests/:id/metrics` | Résumé métriques d'un guest | Authentifié |
+| `GET` | `/api/v1/proxmox/guests/:id/link` | Lien guest↔hôte d'un guest | Authentifié |
+| `GET` | `/api/v1/proxmox/guests/:id/exposure` | Domaines publics routés vers ce guest | Authentifié |
 | `GET` | `/api/v1/proxmox/tasks` | Toutes les tâches récentes (`?connection_id=`) | Authentifié |
 | `GET` | `/api/v1/proxmox/nodes/:id/tasks` | Tâches d'un nœud | Authentifié |
 | `GET` | `/api/v1/proxmox/nodes/:id/disks` | Disques physiques d'un nœud | Authentifié |
@@ -952,6 +1134,12 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `GET` | `/api/v1/proxmox/links` | Liens guest↔hôte (`?status=`) | Authentifié |
 | `POST` | `/api/v1/proxmox/links` | Créer/remplacer un lien | Admin |
 | `GET/PUT/DELETE` | `/api/v1/proxmox/links/:id` | Détail / modification / suppression d'un lien | Admin |
+| `GET` | `/api/v1/hosts/:id/proxmox-link` | Lien Proxmox d'un hôte agent | Authentifié |
+| `GET` | `/api/v1/hosts/:id/proxmox-candidates` | Guests candidats à la liaison | Authentifié |
+| `GET` | `/api/v1/hosts/:id/proxmox-disks` | Disques Proxmox du nœud hébergeant cet hôte | Authentifié |
+
+> La console LXC est un WebSocket, pas une route REST — voir la section
+> [WebSocket](#websocket-streaming-temps-réel).
 
 #### Settings
 | Méthode | Endpoint | Description | Rôle |
@@ -971,6 +1159,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `/api/v1/ws/network` | Flux réseau |
 | `/api/v1/ws/apt` | Flux statut APT |
 | `/api/v1/ws/commands/stream/:id` | Sortie live d'une commande par UUID |
+| `/api/v1/ws/proxmox/console/:guest_id` | Console interactive d'un conteneur LXC (relais bidirectionnel vers `termproxy`) — **Admin** |
 | `/api/v1/ws/notifications` | Flux notifications (in-app + déclenche le push) |
 
 > Authentification WebSocket : cookie de session envoyé automatiquement à la connexion, avec repli sur l'envoi de `{"type":"auth","token":"<jwt>"}` en message une fois la connexion établie (pour les clients qui ne peuvent pas compter sur le cookie). Il n'y a **pas** de fallback `?token=` en query string — retiré volontairement (fuite potentielle dans les logs de proxy/l'historique navigateur).
@@ -981,17 +1170,51 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `POST` | `/api/agent/report` | Rapport agent (métriques + docker + apt + disques) |
 | `POST` | `/api/agent/command/result` | Résultat d'une commande |
 | `POST` | `/api/agent/command/stream` | Chunk de sortie en streaming |
+| `POST` | `/api/agent/apt-status` | Push du statut APT hors bande (après enrichissement CVE) |
+| `POST` | `/api/agent/restic-status` | Push du statut Restic hors bande (après un `run_backup`) |
 | `POST` | `/api/agent/audit` | Log d'action autonome (ex: apt update au démarrage) |
+| `GET` | `/api/agent/ws` | *Optionnel* — canal WebSocket ouvert par l'agent pour être réveillé dès qu'une commande est dispatchée, au lieu d'attendre le prochain `report_interval`. Ne transporte aucune commande (juste `{"type":"poll_now"}`) ; un agent sans cette connexion continue de fonctionner par polling normal. Désactivable via `disable_ws_push` dans `agent.yaml` |
 
 ---
 
 ## RBAC
 
+Deux couches se superposent : un **rôle global** par utilisateur, et des
+**permissions par hôte** qui peuvent l'élever localement.
+
+### Rôle global
+
 | Rôle | Description |
 |---|---|
-| `admin` | Accès complet — gestion des utilisateurs, hôtes, alertes, settings |
+| `admin` | Accès complet — gestion des utilisateurs, hôtes, alertes, settings, connexions Proxmox/NPM, console LXC |
 | `operator` | Peut exécuter des commandes (apt, docker, systemd) et consulter l'historique |
 | `viewer` | Lecture seule — dashboards, métriques, statuts |
+
+### Permissions par hôte
+
+Le rôle global ne suffit pas à décrire qui peut agir sur *quel* hôte. Une
+table de permissions par hôte (`host_permissions`, gérée via
+`/api/v1/hosts/:id/permissions`, admin uniquement) accorde à un utilisateur un
+niveau `viewer` ou `operator` **sur un hôte donné**. Le serveur l'applique via
+`HostPermissionMiddleware` / `requireHostAccess`, indépendamment du rôle
+global :
+
+- Les routes de lecture par hôte (`GET /hosts/:id/...` : métriques, disques,
+  flux réseau, exposition…) exigent `viewer` **sur cet hôte**.
+- Les routes d'écriture par hôte (`PATCH`/`DELETE /hosts/:id`, rotation de
+  clé, mise à jour d'agent, tâches planifiées, fenêtres de maintenance,
+  exécution d'une tâche custom) exigent `operator` **sur cet hôte**.
+
+C'est pour cette raison que la colonne « Rôle » des tableaux d'endpoints
+distingue `Operator+` (rôle global) de `Operator+ (par hôte)` : les deux ne
+se vérifient pas au même endroit, et un `operator` global n'a pas
+automatiquement la main sur tous les hôtes.
+
+Deux domaines restent hors de portée de ce découpage, par construction : une
+cible qui n'est pas un hôte agent (guest Proxmox, conteneur Docker, sonde
+synthétique) ne peut pas être ramenée à une ligne de `hosts`, donc seules les
+fenêtres de maintenance **globales** la couvrent, et les actions Proxmox
+suivent leur propre posture (voir [Proxmox](https://github.com/Rem7474/ServerSupervisor/wiki/Proxmox#6-actions-en-écriture--posture-de-permissions)).
 
 ---
 
@@ -1041,9 +1264,11 @@ ServerSupervisor/
 │       ├── api/                     # router.go (routes/middleware wiring) + middleware.go (JWT/CSRF/rate limit)
 │       ├── handlers/                # Traduction HTTP : bind → service → respondError (fichiers par domaine)
 │       ├── services/<domaine>/      # Logique métier + port Repository, un package par domaine :
-│       │                            #   agent, alertrule, apt, audit, authn, docker, gitwebhook, host, hostperm,
-│       │                            #   network, notifications, npm, proxmox, push, releasetracker,
-│       │                            #   scheduledtask, settings, ssl, uptime, user, weblogs
+│       │                            #   agent, alertrule, apt, audit, authn, backup, dashboard, discovery,
+│       │                            #   docker, dockerversions, gitwebhook, host, hostperm, maintenance,
+│       │                            #   network, notifications, notifychannels, npm, proxmox, push,
+│       │                            #   releasetracker, runbook, scheduledtask, settings, ssl, uptime,
+│       │                            #   user, weblogs
 │       ├── database/                # Implémentation des ports Repository (db_*.go) + migrations/*.sql
 │       ├── models/                  # Structs partagés, un fichier par domaine (pas de models.go unique)
 │       ├── apperr/                  # Erreurs typées → enveloppe HTTP uniforme {"error","code"}
@@ -1061,15 +1286,26 @@ ServerSupervisor/
 │       ├── releasetracker/          # Helpers purs de comparaison de version (pas le tracker lui-même)
 │       ├── synthetic/               # Sondes uptime HTTP/TCP + vérification de certificats SSL
 │       ├── config/                  # Config env vars + override runtime depuis la table settings
-│       └── notify/                  # Envoi SMTP + ntfy + template HTML d'alerte
+│       ├── notify/                  # Envoi SMTP + ntfy + template HTML d'alerte
+│       ├── auth/                    # Génération/vérification TOTP (second facteur)
+│       ├── cookies/                 # Fabrication des cookies de session (flag Secure, SameSite)
+│       ├── networkview/             # Construction du snapshot réseau / inventaire IP
+│       ├── threatdetect/            # Scoring de menace des logs web (pondérations THREAT_*)
+│       ├── logging/                 # Setup slog (JSON en prod, texte en dev)
+│       ├── errors/                  # Codes d'erreur nommés partagés (ADMIN_REQUIRED, ...)
+│       └── testutil/                # Postgres éphémère via testcontainers pour les tests d'intégration
 ├── agent/                           # Collecteur Go déployé sur chaque VM/hôte supervisé (pas sur Proxmox)
 │   ├── cmd/agent/main.go            # Flags, --init, --internal-update, --internal-healthcheck
 │   └── internal/
 │       ├── reporter/                # Collecte parallèle → POST /api/agent/report
 │       ├── dispatcher/              # Exécution des commandes (mutex apt + sémaphore + registry par module)
 │       ├── collector/               # Un fichier par domaine : system, docker, apt, disk, web_logs, systemd,
-│       │                            #   journal, processes, crowdsec
+│       │                            #   journal, processes, crowdsec, restic, network_flows (+ L7),
+│       │                            #   compose_update, container_ips, diagnostics
 │       ├── sender/                  # Structs Report/PendingCommand/CommandResult + client HTTP
+│       ├── agentws/                 # Canal WebSocket optionnel vers /api/agent/ws (push "poll_now")
+│       ├── security/                # Liste unique des motifs "valeur sensible" (filtrage env + redaction YAML)
+│       ├── logging/                 # Setup slog (texte pour journald par défaut)
 │       └── config/                  # Config YAML + env vars ; tasks.go charge tasks.yaml
 ├── frontend/                        # SPA Vue 3 + TypeScript (Tabler CSS)
 │   └── src/
@@ -1091,4 +1327,4 @@ ServerSupervisor/
 
 ## Licence
 
-MIT
+[GNU AGPLv3](LICENSE)

@@ -60,6 +60,7 @@ export function useHostDetail() {
   })
   const isEditing = ref(false)
   const tasksCount = ref(0)
+  const customTasksCount = ref(0)
   const aptCmdLoading = ref('')
   const agentUpdateLoading = ref(false)
 
@@ -683,6 +684,7 @@ export function useHostDetail() {
     activeTab,
     isEditing,
     tasksCount,
+    customTasksCount,
     aptCmdLoading,
     agentUpdateLoading,
     host,

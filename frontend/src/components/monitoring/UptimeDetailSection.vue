@@ -115,9 +115,17 @@
           </div>
         </div>
         <div class="card-body">
+          <!--
+            .tracking for the flex/gap layout, but items stay plain
+            flex-fill + bg-* rather than .tracking-block: in Tabler's
+            compiled CSS .tracking-block's own `background` rule is
+            defined after the bg-* utilities, so it would win over
+            bg-success/bg-danger at equal specificity and paint every
+            block gray.
+          -->
           <div
             v-if="heartbeatBar.length"
-            class="d-flex align-items-end gap-1"
+            class="tracking"
             style="height: 40px;"
           >
             <div
@@ -170,10 +178,13 @@
           class="card-body chart-body position-relative"
           style="height: 220px;"
         >
-          <Line
-            v-if="chartData"
-            :data="chartData"
+          <ApexChart
+            v-if="chartData && chartOptions"
+            ref="chartRef"
+            type="area"
+            height="100%"
             :options="chartOptions"
+            :series="chartData.series"
           />
           <LoadingSkeleton
             v-else
@@ -262,12 +273,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
+import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import EmptyState from '../EmptyState.vue'
 import { formatDateTime } from '../../utils/formatters'
-import { getChartPalette } from '../../utils/chartTheme'
+import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
 import { useUptimeProbeDetail, STATS_WINDOWS } from '../../composables/useUptimeProbeDetail'
 import type { UptimeProbe, UptimeHistoryBucket } from '../../types/generated'
 
@@ -310,17 +322,7 @@ function bucketTitle(b: UptimeHistoryBucket): string {
   return `${when} — ${outcome}${latency}`
 }
 
-const Line = defineAsyncComponent(async () => {
-  const [{ Line: LineComponent }, chart] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  chart.Chart.register(
-    chart.LineElement, chart.PointElement, chart.LineController,
-    chart.CategoryScale, chart.LinearScale, chart.Tooltip, chart.Legend, chart.Filler,
-  )
-  return LineComponent
-})
+const chartRef = ref<ApexChartInstance | null>(null)
 
 const {
   probe,
@@ -347,25 +349,52 @@ watch(probe, (p) => emit('loaded', p), { immediate: true })
 // most-recent of this section's and SslDetailSection's own lastUpdatedAt.
 defineExpose({ lastUpdatedAt })
 
-const palette = getChartPalette()
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: palette.tooltipBackground,
-      titleColor: palette.tooltipText,
-      bodyColor: palette.tooltipText,
-      borderColor: palette.tooltipBorder,
-      borderWidth: 1,
-      padding: 8,
+// Built once (on first data arrival) rather than as a `computed` over
+// `chartData`: vue3-apexcharts clones the whole `:options` prop via
+// JSON.parse(JSON.stringify(...)) on every *reactive* update after mount —
+// which silently drops every function (yaxis.labels.formatter,
+// tooltip.custom) since JSON can't represent them. Keeping this object's
+// identity stable after the initial build means later data refreshes (this
+// probe polls on a timer, see PROBE_REFRESH_SEC) flow through the
+// (function-free, always-safe) `:series` prop only; the category labels
+// (the one other thing that legitimately changes per refresh, since this
+// is a category- not datetime-axis chart) are pushed via the exposed
+// updateOptions() method directly in the watcher below (bypasses the
+// wrapper's buggy reactive watcher).
+const chartOptions = shallowRef<ApexOptions | null>(null)
+
+function buildChartOptions(categories: string[]): ApexOptions {
+  const palette = getApexChartPalette()
+  return {
+    chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    theme: { mode: 'dark' },
+    fill: { type: 'solid', opacity: 0.15 },
+    stroke: { curve: 'smooth', width: 2 },
+    markers: { size: 0, hover: { size: 4 } },
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    grid: { borderColor: palette.grid },
+    xaxis: {
+      type: 'category',
+      categories,
+      labels: { style: { colors: palette.tickText }, rotate: 0 },
+      tickAmount: 8,
+      axisBorder: { show: false },
+      axisTicks: { show: false },
     },
-  },
-  scales: {
-    x: { grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v} ms` } },
-  },
-  elements: { point: { radius: 0, hitRadius: 8 }, line: { tension: 0.3 } },
+    yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${Math.round(v)} ms` } },
+    tooltip: {
+      y: { formatter: (v: number) => (v != null ? `${Number(v)} ms` : '—') },
+    },
+  }
 }
+
+watch(() => chartData.value?.categories, (categories) => {
+  if (!categories) return
+  if (!chartOptions.value) {
+    chartOptions.value = buildChartOptions(categories)
+  } else {
+    chartRef.value?.updateOptions({ xaxis: { categories } }, false, false)
+  }
+}, { immediate: true })
 </script>

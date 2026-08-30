@@ -6,16 +6,26 @@
       class="position-absolute inset-0"
     />
   </Transition>
-  <canvas
-    ref="canvasEl"
+  <div
+    class="apex-chart-wrap"
     :style="{ opacity: (chartReady && !loading) ? 1 : 0, transition: 'opacity 0.3s' }"
-  />
+  >
+    <ApexChart
+      v-if="chartOptions"
+      ref="chartRef"
+      type="bar"
+      height="100%"
+      :options="chartOptions"
+      :series="series"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { Chart, ChartEvent, LegendItem, LegendElement } from 'chart.js'
+import { computed, ref, shallowRef, watch } from 'vue'
+import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
 
 interface Point {
   timestamp: string
@@ -31,17 +41,7 @@ const props = defineProps<{
   loading: boolean
 }>()
 
-const canvasEl = ref<HTMLCanvasElement | null>(null)
-let chart: Chart | null = null
-let chartLib: typeof Chart | null = null
-
-async function ensureChartLib() {
-  if (chartLib) return chartLib
-  const mod = await import('chart.js')
-  mod.Chart.register(...mod.registerables)
-  chartLib = mod.Chart
-  return chartLib
-}
+const chartRef = ref<ApexChartInstance | null>(null)
 
 function bucketLabel(ts: string): string {
   const d = new Date(ts)
@@ -51,57 +51,67 @@ function bucketLabel(ts: string): string {
     : d.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit' })
 }
 
-async function render() {
-  const Chart = await ensureChartLib()
-  if (!canvasEl.value) return
-  if (chart) {
-    chart.destroy()
-    chart = null
+const categories = computed(() => props.timeseries.map((p) => bucketLabel(p.timestamp)))
+
+const series = computed(() => [
+  { name: 'Humain', data: props.timeseries.map((p) => Number(p.human) || 0) },
+  { name: 'Bot/scan', data: props.timeseries.map((p) => Number(p.bot) || 0) },
+])
+
+// Built once (on first data arrival) rather than as a `computed` over
+// `timeseries`: vue3-apexcharts clones the whole `:options` prop via
+// JSON.parse(JSON.stringify(...)) on every *reactive* update after mount —
+// which silently drops every function (yaxis.labels.formatter,
+// tooltip.custom) since JSON can't represent them. Keeping this object's
+// identity stable after the initial build means later data refreshes flow
+// through the (function-free, always-safe) `:series` prop only; the
+// category labels (the one other thing that legitimately changes per
+// refresh, since this is a category- not datetime-axis chart) are pushed
+// via the exposed updateOptions() method directly in the watcher below
+// (bypasses the wrapper's buggy reactive watcher).
+const chartOptions = shallowRef<ApexOptions | null>(null)
+
+function buildChartOptions(): ApexOptions {
+  const palette = getApexChartPalette()
+  return {
+    chart: { type: 'bar', background: 'transparent', stacked: true, toolbar: { show: false }, animations: { enabled: false } },
+    theme: { mode: 'dark' },
+    colors: ['#378ADD', '#E24B4A'],
+    plotOptions: { bar: { columnWidth: '60%' } },
+    dataLabels: { enabled: false },
+    legend: { show: true, position: 'bottom', labels: { colors: palette.legendText } },
+    grid: { borderColor: palette.grid, xaxis: { lines: { show: false } } },
+    xaxis: {
+      type: 'category',
+      categories: categories.value,
+      labels: { style: { colors: palette.tickText } },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
+    yaxis: { labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${Math.round(v)}` } },
+    tooltip: {
+      shared: true,
+      intersect: false,
+      y: { formatter: (v: number) => `${v}` },
+    },
   }
-  const labels = props.timeseries.map((p) => bucketLabel(p.timestamp))
-  const human = props.timeseries.map((p) => Number(p.human) || 0)
-  const bot = props.timeseries.map((p) => Number(p.bot) || 0)
-  chart = new Chart(canvasEl.value, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Humain', data: human, backgroundColor: '#378ADD', stack: 'traffic' },
-        { label: 'Bot/scan', data: bot, backgroundColor: '#E24B4A', stack: 'traffic' },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          onHover: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'bar'>) => {
-            legend.chart.canvas.style.cursor = 'pointer'
-          },
-          onLeave: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'bar'>) => {
-            legend.chart.canvas.style.cursor = 'default'
-          },
-        },
-      },
-      scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true } },
-    },
-  })
 }
 
-onMounted(() => {
-  void render()
-})
-
-watch(
-  () => props.timeseries,
-  () => {
-    void render()
-  },
-  { deep: true }
-)
-
-onBeforeUnmount(() => {
-  if (chart) chart.destroy()
-})
+watch(categories, (cats) => {
+  if (!chartOptions.value) {
+    chartOptions.value = buildChartOptions()
+  } else {
+    chartRef.value?.updateOptions({ xaxis: { categories: cats } }, false, false)
+  }
+}, { immediate: true })
 </script>
+
+<style scoped>
+.apex-chart-wrap {
+  height: 100%;
+}
+
+:deep(.apexcharts-legend-series) {
+  cursor: pointer;
+}
+</style>

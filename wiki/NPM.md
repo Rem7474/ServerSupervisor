@@ -133,7 +133,7 @@ n'existe plus.
 
 ## Pour aller plus loin
 
-Voir aussi la section [NPM (Nginx Proxy Manager)](../README.md#npm-nginx-proxy-manager)
+Voir aussi la section [NPM (Nginx Proxy Manager)](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md#npm-nginx-proxy-manager)
 du README pour le tableau complet des routes API, et le host-exposure
 (`GET /api/v1/hosts/:id/exposure`, documenté dans le README principal du
 dépôt) qui corrèle les domaines NPM avec le trafic web observé sur un hôte.

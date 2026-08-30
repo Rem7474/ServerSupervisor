@@ -104,8 +104,11 @@ func (db *DB) GetHostByAPIKey(ctx context.Context, apiKey string) (*models.Host,
 		// Perform a dummy bcrypt comparison to normalise response time and
 		// prevent an attacker from distinguishing "host not found" from
 		// "wrong secret" via timing differences.
-		// The hash below is a valid bcrypt hash of an arbitrary placeholder value.
-		const dummyHash = "$2a$10$tz.0gDET5/Bc3.ScGwT4DOemFDsphktsjzR7Bkcxy7pWpZD5ls4My"
+		// The hash below is a valid bcrypt hash of an arbitrary placeholder value,
+		// not a real credential — nothing is ever hashed to produce it, and no
+		// secret it could "leak" exists. NOSONAR: false positive on go:S6437 /
+		// secrets:S8215, which can't distinguish this from a committed real secret.
+		const dummyHash = "$2a$10$tz.0gDET5/Bc3.ScGwT4DOemFDsphktsjzR7Bkcxy7pWpZD5ls4My" // NOSONAR
 		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(secret))
 		return nil, fmt.Errorf("invalid API key")
 	}

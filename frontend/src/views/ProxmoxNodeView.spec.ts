@@ -47,8 +47,8 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
 
-// Async children pull in Chart.js / chartTheme; replace them with trivial stubs
-// so their lazy import chain never runs (avoids post-teardown import errors).
+// Async children pull in ApexCharts / apexChartTheme; replace them with trivial
+// stubs so their lazy import chain never runs (avoids post-teardown import errors).
 vi.mock('../components/proxmox/ProxmoxNodeChartsPanel.vue', () => ({
   default: { name: 'ProxmoxNodeChartsPanel', template: '<div />' },
 }))
@@ -59,7 +59,7 @@ vi.mock('../components/host/CommandLogPanel.vue', () => ({
 import apiClient from '../api'
 import ProxmoxNodeView from './ProxmoxNodeView.vue'
 
-// Heavy/async children (Chart.js panel, command log) are verified separately;
+// Heavy/async children (ApexCharts panel, command log) are verified separately;
 // stub them so the happy-dom shell test stays focused and clean.
 const mountOpts = {
   global: {

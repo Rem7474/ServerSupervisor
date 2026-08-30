@@ -2,8 +2,12 @@
   <div class="network-config">
     <div class="network-config-row">
       <div class="network-config-item">
-        <label class="form-label">Reverse proxy</label>
+        <label
+          for="network-config-root-node-name"
+          class="form-label"
+        >Reverse proxy</label>
         <input
+          id="network-config-root-node-name"
           v-model="rootNodeName"
           type="text"
           class="form-control form-control-sm"
@@ -11,8 +15,12 @@
         >
       </div>
       <div class="network-config-item">
-        <label class="form-label">IP du proxy</label>
+        <label
+          for="network-config-root-node-ip"
+          class="form-label"
+        >IP du proxy</label>
         <input
+          id="network-config-root-node-ip"
           v-model="rootNodeIp"
           type="text"
           class="form-control form-control-sm"
@@ -21,11 +29,15 @@
       </div>
     </div>
     <div class="network-config-item mt-2">
-      <label class="form-label">
+      <label
+        for="network-config-root-host-id"
+        class="form-label"
+      >
         Hôte correspondant
         <span class="text-secondary fw-normal">(optionnel — supprime le nœud fantôme)</span>
       </label>
       <select
+        id="network-config-root-host-id"
         v-model="rootHostId"
         class="form-select form-select-sm"
       >
@@ -47,11 +59,15 @@
         v-if="rootHostId && proxyHostPorts.length > 0"
         class="mt-2"
       >
-        <label class="form-label">
+        <label
+          for="network-config-root-port-id"
+          class="form-label"
+        >
           Port spécifique
           <span class="text-secondary fw-normal">(optionnel)</span>
         </label>
         <select
+          id="network-config-root-port-id"
           v-model="rootPortId"
           class="form-select form-select-sm"
         >
@@ -78,7 +94,9 @@
     <div class="network-config-item mt-3">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div>
-          <label class="form-label mb-0">Services manuels via proxy</label>
+          <div class="form-label mb-0">
+            Services manuels via proxy
+          </div>
           <div class="text-secondary small mt-1">
             Services définis manuellement, non détectés automatiquement.
             Pour les ports découverts, utilisez la section "Ports découverts" ci-dessous
@@ -121,6 +139,7 @@
               <td>
                 <input
                   v-model="service.name"
+                  aria-label="Nom du service"
                   class="form-control form-control-sm"
                   placeholder="Ex: Vaultwarden"
                 >
@@ -128,6 +147,7 @@
               <td>
                 <input
                   v-model="service.domain"
+                  aria-label="Domaine"
                   class="form-control form-control-sm"
                   placeholder="vault.example.com"
                 >
@@ -135,6 +155,7 @@
               <td>
                 <input
                   v-model="service.path"
+                  aria-label="Chemin"
                   class="form-control form-control-sm"
                   placeholder="/"
                 >
@@ -143,6 +164,7 @@
                 <input
                   v-model.number="service.internalPort"
                   type="number"
+                  aria-label="Port interne"
                   class="form-control form-control-sm"
                   placeholder="3000"
                 >
@@ -150,6 +172,7 @@
               <td>
                 <select
                   v-model="service.hostId"
+                  aria-label="Host"
                   class="form-select form-select-sm"
                 >
                   <option value="">
@@ -167,6 +190,7 @@
               <td>
                 <label class="form-check form-switch"><input
                   v-model="service.linkToProxy"
+                  aria-label="Lier au proxy"
                   class="form-check-input"
                   type="checkbox"
                 ></label>
@@ -174,6 +198,7 @@
               <td>
                 <label class="form-check form-switch"><input
                   v-model="service.linkToAuthelia"
+                  aria-label="Lier à Authelia"
                   class="form-check-input"
                   type="checkbox"
                 ></label>
@@ -181,6 +206,7 @@
               <td>
                 <label class="form-check form-switch"><input
                   v-model="service.exposedToInternet"
+                  aria-label="Exposer sur Internet"
                   class="form-check-input"
                   type="checkbox"
                 ></label>
@@ -189,6 +215,7 @@
                 <input
                   v-model.number="service.externalPort"
                   type="number"
+                  aria-label="Port externe"
                   class="form-control form-control-sm"
                   placeholder="443"
                   :disabled="!service.exposedToInternet"
@@ -219,12 +246,15 @@
     </div>
 
     <div class="network-config-item mt-3">
-      <label class="form-label">Nœud Authelia (optionnel)</label>
+      <div class="form-label">
+        Nœud Authelia (optionnel)
+      </div>
       <div class="network-config-row">
         <div>
           <input
             v-model="autheliaLabel"
             type="text"
+            aria-label="Label affiché dans le graphe"
             class="form-control form-control-sm"
             placeholder="Ex: Authelia"
           >
@@ -236,6 +266,7 @@
           <input
             v-model="autheliaIp"
             type="text"
+            aria-label="IP ou domaine Authelia"
             class="form-control form-control-sm"
             placeholder="Ex: 192.168.1.11"
           >
@@ -245,11 +276,15 @@
         </div>
       </div>
       <div class="mt-2">
-        <label class="form-label">
+        <label
+          for="network-config-authelia-host-id"
+          class="form-label"
+        >
           Hôte correspondant
           <span class="text-secondary fw-normal">(optionnel)</span>
         </label>
         <select
+          id="network-config-authelia-host-id"
           v-model="autheliaHostId"
           class="form-select form-select-sm"
         >
@@ -268,11 +303,15 @@
           v-if="autheliaHostId && autheliaHostPorts.length > 0"
           class="mt-2"
         >
-          <label class="form-label">
+          <label
+            for="network-config-authelia-port-id"
+            class="form-label"
+          >
             Port spécifique
             <span class="text-secondary fw-normal">(optionnel)</span>
           </label>
           <select
+            id="network-config-authelia-port-id"
             v-model="autheliaPortId"
             class="form-select form-select-sm"
           >
@@ -298,12 +337,15 @@
     </div>
 
     <div class="network-config-item mt-3">
-      <label class="form-label">Nœud Internet / Routeur (optionnel)</label>
+      <div class="form-label">
+        Nœud Internet / Routeur (optionnel)
+      </div>
       <div class="network-config-row">
         <div>
           <input
             v-model="internetLabel"
             type="text"
+            aria-label="Label affiché dans le graphe"
             class="form-control form-control-sm"
             placeholder="Ex: Internet"
           >
@@ -315,6 +357,7 @@
           <input
             v-model="internetIp"
             type="text"
+            aria-label="IP publique ou domaine"
             class="form-control form-control-sm"
             placeholder="Ex: 1.2.3.4"
           >
@@ -327,7 +370,9 @@
 
     <div class="network-config-item mt-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
-        <label class="form-label mb-0">Ports decouverts par host</label>
+        <div class="form-label mb-0">
+          Ports decouverts par host
+        </div>
         <div class="text-secondary small">
           Nommer, masquer, lier au proxy
         </div>
@@ -405,6 +450,7 @@
                   <td>
                     <input
                       v-model="getPortSetting(host.id, port.port).name"
+                      aria-label="Nom du service"
                       class="form-control form-control-sm"
                       placeholder="Ex: Vaultwarden"
                     >
@@ -412,6 +458,7 @@
                   <td>
                     <input
                       v-model="getPortSetting(host.id, port.port).domain"
+                      aria-label="Domaine"
                       class="form-control form-control-sm"
                       placeholder="vault.example.com"
                     >
@@ -419,6 +466,7 @@
                   <td>
                     <input
                       v-model="getPortSetting(host.id, port.port).path"
+                      aria-label="Chemin"
                       class="form-control form-control-sm"
                       placeholder="/"
                     >
@@ -428,6 +476,7 @@
                       <input
                         :id="`port-enabled-${host.id}-${port.port}`"
                         v-model="getPortSetting(host.id, port.port).enabled"
+                        aria-label="Afficher ce port"
                         class="form-check-input"
                         type="checkbox"
                         @change="onEnabledChange(host.id, port.port, $event)"
@@ -441,6 +490,7 @@
                     >
                       <input
                         v-model="getPortSetting(host.id, port.port).linkToProxy"
+                        aria-label="Lier au proxy"
                         class="form-check-input"
                         type="checkbox"
                         :disabled="!getPortSetting(host.id, port.port).enabled"
@@ -451,6 +501,7 @@
                     <label class="form-check form-switch">
                       <input
                         v-model="getPortSetting(host.id, port.port).linkToAuthelia"
+                        aria-label="Lier à Authelia"
                         class="form-check-input"
                         type="checkbox"
                         :disabled="!getPortSetting(host.id, port.port).enabled"
@@ -461,6 +512,7 @@
                     <label class="form-check form-switch">
                       <input
                         v-model="getPortSetting(host.id, port.port).exposedToInternet"
+                        aria-label="Exposer sur Internet"
                         class="form-check-input"
                         type="checkbox"
                         :disabled="!getPortSetting(host.id, port.port).enabled"
@@ -471,6 +523,7 @@
                     <input
                       v-model.number="getPortSetting(host.id, port.port).externalPort"
                       type="number"
+                      aria-label="Port externe"
                       class="form-control form-control-sm"
                       placeholder="443"
                       :disabled="!getPortSetting(host.id, port.port).exposedToInternet"

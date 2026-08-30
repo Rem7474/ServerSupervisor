@@ -342,11 +342,21 @@ WHERE table_schema = 'public' AND table_name = 'hosts'
 				continue
 			}
 
-			// Fresh install path: the baseline declares the legacy migrations it
-			// subsumes via "-- ===== BEGIN <filename>.sql =====" markers. Only
-			// those get pre-marked as applied — anything added AFTER the baseline
-			// was generated must still execute, otherwise schema changes shipped
-			// in later migrations would silently never run on a fresh DB.
+			// Fresh install path: only the migrations the baseline actually
+			// subsumes may be pre-marked as applied — anything added AFTER the
+			// baseline was generated must still execute, otherwise schema
+			// changes shipped in later migrations would silently never run on a
+			// fresh DB.
+			//
+			// readBaselineManifest looks for "-- ===== BEGIN <file>.sql ====="
+			// markers. The current baseline (a pg_dump squash of 001..063) has
+			// none and instead ends with an explicit INSERT INTO
+			// schema_migrations listing those files, so the manifest comes back
+			// empty and nothing is pre-marked here — which is correct, since
+			// files 001..063 no longer ship. Keep this call: a future baseline
+			// regenerated with markers would need it, and an empty result is
+			// safe by construction (it can only ever under-mark, never
+			// over-mark).
 			baselineSubsumed, readErr := readBaselineManifest(migrationFS, e.Name())
 			if readErr != nil {
 				return fmt.Errorf("parse baseline manifest: %w", readErr)

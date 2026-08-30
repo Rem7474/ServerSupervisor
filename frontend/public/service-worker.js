@@ -256,6 +256,14 @@ self.addEventListener('sync', (event) => {
 
 // Message handling for client communication
 self.addEventListener('message', (event) => {
+  // Reject messages from anything but our own origin — a service worker is
+  // only ever supposed to be controlled by same-origin clients, but nothing
+  // stops a compromised same-origin context (or a browser bug) from being
+  // the actual sender, so don't skip this check just because cross-origin
+  // postMessage() to a foreign SW isn't normally reachable.
+  if (event.origin && event.origin !== self.location.origin) {
+    return
+  }
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting()
   }

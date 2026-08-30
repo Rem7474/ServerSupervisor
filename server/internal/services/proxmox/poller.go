@@ -10,11 +10,13 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/proxmoxclient"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // taskLimit is the number of recent tasks fetched per node per poll cycle.
@@ -28,6 +30,24 @@ func parseVMID(s string) int {
 		return 0
 	}
 	return v
+}
+
+// mergeTasksByUPID appends extra tasks not already present in base (keyed by
+// UPID, PVE's unique task identifier) — used to fold a type-filtered task
+// fetch (e.g. "vzdump") into the plain top-N task window without duplicating
+// a task both calls happened to return.
+func mergeTasksByUPID(base, extra []proxmoxclient.PVETask) []proxmoxclient.PVETask {
+	seen := make(map[string]bool, len(base))
+	for _, t := range base {
+		seen[t.UPID] = true
+	}
+	for _, t := range extra {
+		if !seen[t.UPID] {
+			base = append(base, t)
+			seen[t.UPID] = true
+		}
+	}
+	return base
 }
 
 // Poller runs the background Proxmox collection loop. It is background sync, so it
@@ -165,10 +185,44 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 			}
 		}
 
-		tasks, err := client.GetNodeTasks(n.Node, taskLimit)
-		if err != nil {
-			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get tasks: %v", conn.Name, n.Node, err))
+		// The plain top-taskLimit window and the vzdump-filtered window are
+		// independent PVE API calls (different filter params, neither reads
+		// the other's result) — fetched concurrently rather than back to
+		// back so this step's wall-clock cost is one round-trip, not two,
+		// per node per poll cycle.
+		var tasks, vzdumpTasks []proxmoxclient.PVETask
+		var tasksErr, vzdumpErr error
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			defer safego.Recover(ctx, "proxmox.poller.getNodeTasks")
+			tasks, tasksErr = client.GetNodeTasks(n.Node, taskLimit, "")
+		}()
+		go func() {
+			defer wg.Done()
+			defer safego.Recover(ctx, "proxmox.poller.getNodeVzdumpTasks")
+			vzdumpTasks, vzdumpErr = client.GetNodeTasks(n.Node, taskLimit, "vzdump")
+		}()
+		wg.Wait()
+
+		if tasksErr != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get tasks: %v", conn.Name, n.Node, tasksErr))
 		} else {
+			// The plain top-taskLimit window above can silently push an
+			// older vzdump (backup) task out on a node busy with other
+			// activity (replication, service actions, ...) — backups are
+			// operationally the task type users most need visible (and
+			// UpsertProxmoxBackupRun below depends on seeing it), so fetch
+			// them again with PVE's own server-side type filter and merge,
+			// deduped by UPID, rather than trust they survived the general
+			// window.
+			if vzdumpErr != nil {
+				slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get vzdump tasks: %v", conn.Name, n.Node, vzdumpErr))
+			} else {
+				tasks = mergeTasksByUPID(tasks, vzdumpTasks)
+			}
+
 			for _, t := range tasks {
 				var startTime, endTime *time.Time
 				if t.StartTime > 0 {

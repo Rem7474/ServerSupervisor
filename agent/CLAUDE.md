@@ -37,6 +37,10 @@ Flow: detached process via `systemd-run` → sha256 checksum verify → atomic `
 
 Fail-open by design: rotation, truncation, a missing/corrupt cursor file all degrade to "reprocess and possibly double-count," never to "stop collecting." Cursor writes are temp-file + `fsync` + atomic rename, not a direct `os.WriteFile`; rotation detection combines size **and** file identity (`os.SameFile`). Preserve both properties if you touch this file — a partial write or a size-only rotation check reintroduces the exact failure mode this was hardened against.
 
+## Smaller packages
+
+Listed so they aren't rediscovered as undocumented: `internal/agentws` (the optional WebSocket client for `/api/agent/ws` — receives only `{"type":"poll_now"}`, never command content; toggle with `disable_ws_push`), `internal/security` (the single authoritative list of "this key name holds a secret" patterns, shared by env-var filtering and YAML redaction — add to that list, don't grow a second one), `internal/logging` (slog setup, text-for-journald by default).
+
 ## Protocol contract with the server
 
 The agent and server share no code — the wire format is guarded by a golden-fixture contract test, not by shared types. If you add or rename a field on `Report` (`internal/sender`) or anything it embeds from `internal/collector`, regenerate `protocol/agent_report.golden.json` (`go test ./internal/sender -run TestReportContractGolden -update`) and update the mirrored struct in the server's `models.AgentReport`. See [protocol/README.md](../protocol/README.md) and the root CLAUDE.md's "Agent ↔ Server protocol" section.

@@ -15,5 +15,12 @@ export default defineConfig({
     // Browser-mode tests run under a separate config (vitest.browser.config.ts).
     exclude: ['**/node_modules/**', '**/*.browser.test.ts'],
     setupFiles: ['src/test/setup.ts'],
+    coverage: {
+      provider: 'v8',
+      // lcov for SonarCloud (sonar-project.properties), text for a quick local summary.
+      reporter: ['lcov', 'text'],
+      include: ['src/**/*.{ts,vue}'],
+      exclude: ['src/**/*.{test,spec}.{ts,js}', 'src/**/*.browser.test.ts', 'src/types/generated.ts'],
+    },
   },
 })

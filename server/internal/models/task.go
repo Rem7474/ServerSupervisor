@@ -29,9 +29,12 @@ type ScheduledTaskWithHost struct {
 }
 
 type ScheduledTaskRequest struct {
-	Name           string `json:"name" binding:"required"`
-	Module         string `json:"module" binding:"required"`
-	Action         string `json:"action" binding:"required"`
+	Name   string `json:"name" binding:"required"`
+	Module string `json:"module" binding:"required"`
+	// Not binding:"required" — the "custom" module ignores Action entirely
+	// (the agent only looks up Target in tasks.yaml), so it's validated
+	// conditionally in scheduledtask.validate() instead of unconditionally here.
+	Action         string `json:"action"`
 	Target         string `json:"target"`
 	Payload        string `json:"payload"`
 	CronExpression string `json:"cron_expression" binding:"required"`

@@ -35,3 +35,8 @@ func CollectSystem(_ bool) (*SystemMetrics, error) {
 func CollectMinimalMetrics() (*SystemMetrics, error) {
 	return nil, fmt.Errorf("system collector is only supported on linux")
 }
+
+// getCPUTemperature is a stub for non-Linux environments.
+func getCPUTemperature() float64 {
+	return 0
+}

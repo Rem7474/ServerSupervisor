@@ -1,9 +1,13 @@
 <template>
   <div>
     <div class="mb-3">
-      <label class="form-label required">Nom</label>
+      <label
+        for="alert-source-name"
+        class="form-label required"
+      >Nom</label>
       <input
-        v-model="form.name"
+        id="alert-source-name"
+        v-model="nameModel"
         type="text"
         class="form-control"
         placeholder="Ex: CPU élevé sur serveur web"
@@ -11,7 +15,9 @@
     </div>
 
     <div class="mb-3">
-      <label class="form-label required">Source des données</label>
+      <div class="form-label required">
+        Source des données
+      </div>
       <div
         class="btn-group w-100"
         role="group"
@@ -56,9 +62,13 @@
       v-if="form.source_type === 'agent'"
       class="mb-3"
     >
-      <label class="form-label">Hôte cible</label>
+      <label
+        for="alert-source-host-id"
+        class="form-label"
+      >Hôte cible</label>
       <select
-        v-model="form.host_id"
+        id="alert-source-host-id"
+        v-model="hostIdModel"
         class="form-select"
         :disabled="!metricSupportsHostFilter"
       >
@@ -132,9 +142,13 @@
       class="row g-2 mt-2"
     >
       <div class="col-md-4">
-        <label class="form-label">Scope Proxmox</label>
+        <label
+          for="alert-source-proxmox-scope-mode"
+          class="form-label"
+        >Scope Proxmox</label>
         <select
-          v-model="form.proxmox_scope.scope_mode"
+          id="alert-source-proxmox-scope-mode"
+          v-model="proxmoxScopeModeModel"
           class="form-select"
         >
           <option value="global">
@@ -176,9 +190,13 @@
         v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'connection'"
         class="col-md-8"
       >
-        <label class="form-label">Connexion</label>
+        <label
+          for="alert-source-proxmox-connection"
+          class="form-label"
+        >Connexion</label>
         <select
-          v-model="form.proxmox_scope.connection_id"
+          id="alert-source-proxmox-connection"
+          v-model="proxmoxConnectionIdModel"
           class="form-select"
         >
           <option value="">
@@ -197,9 +215,13 @@
         v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'node'"
         class="col-md-8"
       >
-        <label class="form-label">Nœud</label>
+        <label
+          for="alert-source-proxmox-node"
+          class="form-label"
+        >Nœud</label>
         <select
-          v-model="form.proxmox_scope.node_id"
+          id="alert-source-proxmox-node"
+          v-model="proxmoxNodeIdModel"
           class="form-select"
         >
           <option value="">
@@ -218,9 +240,13 @@
         v-if="metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'guest'"
         class="col-md-8"
       >
-        <label class="form-label">VM/LXC</label>
+        <label
+          for="alert-source-proxmox-guest"
+          class="form-label"
+        >VM/LXC</label>
         <select
-          v-model="form.proxmox_scope.guest_id"
+          id="alert-source-proxmox-guest"
+          v-model="proxmoxGuestIdModel"
           class="form-select"
         >
           <option value="">
@@ -239,9 +265,13 @@
         v-if="metricAllowsStorageScope && form.proxmox_scope.scope_mode === 'storage'"
         class="col-md-8"
       >
-        <label class="form-label">Stockage</label>
+        <label
+          for="alert-source-proxmox-storage"
+          class="form-label"
+        >Stockage</label>
         <select
-          v-model="form.proxmox_scope.storage_id"
+          id="alert-source-proxmox-storage"
+          v-model="proxmoxStorageIdModel"
           class="form-select"
         >
           <option value="">
@@ -260,9 +290,13 @@
         v-if="metricAllowsDiskScope && form.proxmox_scope.scope_mode === 'disk'"
         class="col-md-8"
       >
-        <label class="form-label">Disque physique</label>
+        <label
+          for="alert-source-proxmox-disk"
+          class="form-label"
+        >Disque physique</label>
         <select
-          v-model="form.proxmox_scope.disk_id"
+          id="alert-source-proxmox-disk"
+          v-model="proxmoxDiskIdModel"
           class="form-select"
         >
           <option value="">
@@ -291,9 +325,13 @@
       class="row g-2 mt-2"
     >
       <div class="col-md-4">
-        <label class="form-label required">Hôte</label>
+        <label
+          for="alert-source-docker-host"
+          class="form-label required"
+        >Hôte</label>
         <select
-          v-model="form.docker_scope.host_id"
+          id="alert-source-docker-host"
+          :value="form.docker_scope.host_id"
           class="form-select"
           @change="onDockerHostChange"
         >
@@ -320,9 +358,13 @@
         v-if="form.metric !== 'docker_compose_degraded_services'"
         class="col-md-4"
       >
-        <label class="form-label">Scope</label>
+        <label
+          for="alert-source-docker-scope-mode"
+          class="form-label"
+        >Scope</label>
         <select
-          v-model="form.docker_scope.scope_mode"
+          id="alert-source-docker-scope-mode"
+          :value="form.docker_scope.scope_mode"
           class="form-select"
           @change="onDockerScopeModeChange"
         >
@@ -338,7 +380,9 @@
         v-if="form.docker_scope.scope_mode === 'container' && form.docker_scope.host_id"
         class="col-md-8"
       >
-        <label class="form-label required">Container(s)</label>
+        <div class="form-label required">
+          Container(s)
+        </div>
         <div
           v-if="(selectedDockerHost?.containers || []).length === 0"
           class="form-hint"
@@ -378,9 +422,13 @@
         v-if="form.metric === 'docker_compose_degraded_services' && form.docker_scope.host_id"
         class="col-md-4"
       >
-        <label class="form-label required">Projet Compose</label>
+        <label
+          for="alert-source-docker-project"
+          class="form-label required"
+        >Projet Compose</label>
         <select
-          v-model="form.docker_scope.project_name"
+          id="alert-source-docker-project"
+          v-model="dockerProjectNameModel"
           class="form-select"
         >
           <option value="">
@@ -432,7 +480,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
+import type { AlertRuleFormData, DockerScope } from '../../composables/useAlertRuleForm'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 
 interface ScopeOption { id: string; label: string }
@@ -477,7 +525,61 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'select-metric', value: string): void
   (e: 'set-source-type', value: 'agent' | 'proxmox' | 'synthetic' | 'docker'): void
+  (e: 'update:form', value: AlertRuleFormData): void
 }>()
+
+// ── Shared form-field emit helpers ───────────────────────────────────
+// The `form` prop is owned by the parent (AlertRuleModal, via
+// useAlertRuleForm). This component never mutates it in place — every
+// field write emits a whole-object replacement for the parent to apply
+// (bound as `v-model:form` there), which also keeps sibling reads (e.g.
+// AlertRuleStepConditions) consistent.
+
+function updateForm<K extends keyof AlertRuleFormData>(key: K, value: AlertRuleFormData[K]): void {
+  emit('update:form', { ...props.form, [key]: value })
+}
+
+function updateProxmoxScope<K extends keyof AlertRuleFormData['proxmox_scope']>(
+  key: K,
+  value: AlertRuleFormData['proxmox_scope'][K],
+): void {
+  emit('update:form', { ...props.form, proxmox_scope: { ...props.form.proxmox_scope, [key]: value } })
+}
+
+function updateDockerScope<K extends keyof DockerScope>(key: K, value: DockerScope[K]): void {
+  emit('update:form', { ...props.form, docker_scope: { ...props.form.docker_scope, [key]: value } })
+}
+
+function fieldModel<K extends keyof AlertRuleFormData>(key: K) {
+  return computed<AlertRuleFormData[K]>({
+    get: () => props.form[key],
+    set: (value) => updateForm(key, value),
+  })
+}
+
+function proxmoxScopeModel<K extends keyof AlertRuleFormData['proxmox_scope']>(key: K) {
+  return computed<AlertRuleFormData['proxmox_scope'][K]>({
+    get: () => props.form.proxmox_scope[key],
+    set: (value) => updateProxmoxScope(key, value),
+  })
+}
+
+function dockerScopeModel<K extends keyof DockerScope>(key: K) {
+  return computed<DockerScope[K]>({
+    get: () => props.form.docker_scope[key],
+    set: (value) => updateDockerScope(key, value),
+  })
+}
+
+const nameModel = fieldModel('name')
+const hostIdModel = fieldModel('host_id')
+const proxmoxScopeModeModel = proxmoxScopeModel('scope_mode')
+const proxmoxConnectionIdModel = proxmoxScopeModel('connection_id')
+const proxmoxNodeIdModel = proxmoxScopeModel('node_id')
+const proxmoxGuestIdModel = proxmoxScopeModel('guest_id')
+const proxmoxStorageIdModel = proxmoxScopeModel('storage_id')
+const proxmoxDiskIdModel = proxmoxScopeModel('disk_id')
+const dockerProjectNameModel = dockerScopeModel('project_name')
 
 function isProxmoxMetric(metric: string): boolean {
   return getAlertMetricMeta(metric).category === 'proxmox'
@@ -491,26 +593,45 @@ const selectedDockerHost = computed(() =>
   props.dockerHosts.find(h => h.host_id === props.form.docker_scope?.host_id) ?? null
 )
 
-function onDockerHostChange(): void {
-  props.form.docker_scope.container_id = ''
-  props.form.docker_scope.container_ids = []
-  props.form.docker_scope.project_name = ''
+// Changing the host or the scope mode resets the container/project
+// selection in the same atomic update as the field itself — reading
+// `event.target.value` directly (rather than the prop, which may not have
+// propagated back down yet at this point in the native change handler)
+// keeps the whole docker_scope patch consistent in one emit.
+function onDockerHostChange(event: Event): void {
+  const hostId = (event.target as HTMLSelectElement).value
+  emit('update:form', {
+    ...props.form,
+    docker_scope: {
+      ...props.form.docker_scope,
+      host_id: hostId,
+      container_id: '',
+      container_ids: [],
+      project_name: '',
+    },
+  })
 }
 
-function onDockerScopeModeChange(): void {
-  props.form.docker_scope.container_id = ''
-  props.form.docker_scope.container_ids = []
-  props.form.docker_scope.project_name = ''
+function onDockerScopeModeChange(event: Event): void {
+  const scopeMode = (event.target as HTMLSelectElement).value
+  emit('update:form', {
+    ...props.form,
+    docker_scope: {
+      ...props.form.docker_scope,
+      scope_mode: scopeMode,
+      container_id: '',
+      container_ids: [],
+      project_name: '',
+    },
+  })
 }
 
 function toggleContainer(containerId: string, checked: boolean): void {
-  const ids = props.form.docker_scope.container_ids
-  if (checked) {
-    if (!ids.includes(containerId)) ids.push(containerId)
-  } else {
-    const idx = ids.indexOf(containerId)
-    if (idx >= 0) ids.splice(idx, 1)
-  }
+  const current = props.form.docker_scope.container_ids
+  const next = checked
+    ? (current.includes(containerId) ? current : [...current, containerId])
+    : current.filter((id) => id !== containerId)
+  updateDockerScope('container_ids', next)
 }
 </script>
 
@@ -521,10 +642,16 @@ function toggleContainer(containerId: string, checked: boolean): void {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* This app is dark-only (data-bs-theme="dark" fixed in index.html), so a
+   single un-scoped rule set is the actual styling — no [data-bs-theme='dark']
+   selector needed (a light/dark split here left the two states out of sync:
+   the "light" values below were dead, always shadowed by a
+   higher-specificity dark override with different colors — same pattern
+   already cleaned up in AlertRuleModal's step chips). */
 .metric-card {
   align-items: center;
-  background: var(--tblr-bg-surface);
-  border: 1px solid var(--tblr-border-color);
+  background: var(--ss-chip-idle-bg);
+  border: 1px solid var(--ss-chip-idle-border);
   border-radius: 0.8rem;
   cursor: pointer;
   display: flex;
@@ -542,7 +669,7 @@ function toggleContainer(containerId: string, checked: boolean): void {
 }
 
 .metric-card.selected {
-  background: linear-gradient(160deg, rgba(45, 140, 255, 0.14) 0%, rgba(45, 140, 255, 0.06) 100%);
+  background: linear-gradient(160deg, rgba(33, 118, 210, 0.34) 0%, rgba(18, 79, 150, 0.2) 100%);
   border-color: var(--ss-accent-blue);
   box-shadow: inset 0 0 0 1px var(--ss-accent-blue);
 }
@@ -561,15 +688,6 @@ function toggleContainer(containerId: string, checked: boolean): void {
   color: var(--tblr-body-color);
   font-size: 0.92rem;
   font-weight: 600;
-}
-
-[data-bs-theme='dark'] .metric-card {
-  background: var(--ss-chip-idle-bg);
-  border-color: var(--ss-chip-idle-border);
-}
-
-[data-bs-theme='dark'] .metric-card.selected {
-  background: linear-gradient(160deg, rgba(33, 118, 210, 0.34) 0%, rgba(18, 79, 150, 0.2) 100%);
 }
 
 @media (max-width: 768px) {

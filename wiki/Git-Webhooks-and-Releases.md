@@ -5,7 +5,7 @@ ServerSupervisor : le **suivi de releases** interroge périodiquement une
 API de dépôt ou de registre Docker (modèle *pull*), tandis qu'un **webhook
 Git** est appelé directement par votre plateforme Git à chaque push/tag
 (modèle *push*, temps réel). Les deux peuvent, optionnellement, déclencher
-la même chose côté agent : une [tâche custom](../README.md#tâches-custom-tasksyaml)
+la même chose côté agent : une [tâche custom](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md#tâches-custom-tasksyaml)
 déclarée dans `tasks.yaml`.
 
 ---
@@ -185,7 +185,7 @@ Commun aux deux features (`WebhookExecutionList.vue`, paginé 20/page) :
 
 ## Pour aller plus loin
 
-Voir aussi les sections [Runbooks & Tâches planifiées](runbooks-scheduled-tasks.md)
+Voir aussi les sections [Runbooks & Tâches planifiées](Runbooks-and-Scheduled-Tasks.md)
 pour l'autre mécanisme de dispatch de commandes, et la section
-[Git Webhooks & Suivi de releases](../README.md#git-webhooks--suivi-de-releases)
+[Git Webhooks & Suivi de releases](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md#git-webhooks--suivi-de-releases)
 du README pour le tableau complet des routes API.

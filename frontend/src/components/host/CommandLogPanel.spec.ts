@@ -88,4 +88,50 @@ describe('CommandLogPanel', () => {
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.find('pre.console-output').exists()).toBe(true)
   })
+
+  // mode="custom" is what ProxmoxConsole.vue reuses to render a live xterm.js
+  // terminal inside the same card/header/FAB shell every other console panel
+  // in the app uses — the log-viewer body and its copy/download/clear
+  // buttons (meaningless for a live PTY) are irrelevant in this mode.
+  describe('mode="custom"', () => {
+    it('renders the default slot instead of the log viewer, and hides copy/download/clear', () => {
+      const wrapper = mount(CommandLogPanel, {
+        props: { show: true, mode: 'custom', title: 'Console' },
+        slots: { default: '<div class="my-terminal">terminal here</div>' },
+      })
+      expect(wrapper.find('.my-terminal').exists()).toBe(true)
+      expect(wrapper.find('pre.console-output').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Aucun log sélectionné')
+      expect(wrapper.find('button[title="Copier la sortie"]').exists()).toBe(false)
+      expect(wrapper.find('button[title="Télécharger (.txt)"]').exists()).toBe(false)
+    })
+
+    it('still renders the close button and title-suffix/header-actions slots', async () => {
+      const wrapper = mount(CommandLogPanel, {
+        props: { show: true, mode: 'custom', title: 'Console' },
+        slots: {
+          default: '<div />',
+          'title-suffix': '<span class="my-badge">connecté</span>',
+          'header-actions': '<button class="my-action">Rouvrir</button>',
+        },
+      })
+      expect(wrapper.find('.my-badge').exists()).toBe(true)
+      expect(wrapper.find('.my-action').exists()).toBe(true)
+
+      await wrapper.find('button[title="Fermer"]').trigger('click')
+      expect(wrapper.emitted('close')).toBeTruthy()
+    })
+
+    it('shows the FAB reopen button when hidden (v-show, not unmounted), same as mode="log"', () => {
+      const wrapper = mount(CommandLogPanel, {
+        props: { show: false, mode: 'custom', title: 'Console' },
+        slots: { default: '<div class="my-terminal" />' },
+      })
+      expect(wrapper.find('.console-fab').isVisible()).toBe(true)
+      // The slotted content stays mounted (v-show), not torn down — this is
+      // the whole point of ProxmoxConsole reusing this shell instead of a
+      // v-if modal: hiding must not lose the live session.
+      expect(wrapper.find('.my-terminal').exists()).toBe(true)
+    })
+  })
 })

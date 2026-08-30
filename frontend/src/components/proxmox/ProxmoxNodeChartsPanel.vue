@@ -28,7 +28,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="CPU"
-          :chart-data="cpuChart || undefined"
+          :series="cpuChart || undefined"
           :options="pctOptions"
           :empty-text="error || 'Aucune donnée'"
         />
@@ -36,15 +36,15 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="RAM"
-          :chart-data="ramChart || undefined"
-          :options="ramOptions"
+          :series="ramChart || undefined"
+          :options="pctOptions"
           :empty-text="error || 'Aucune donnée'"
         />
       </div>
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="IO Wait"
-          :chart-data="iowaitChart || undefined"
+          :series="iowaitChart || undefined"
           :options="pctOptions"
           :empty-text="error || 'Aucune donnée'"
         />
@@ -52,7 +52,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="Réseau"
-          :chart-data="netChart || undefined"
+          :series="netChart || undefined"
           :options="netOptions"
           :empty-text="error || 'Aucune donnée'"
         />
@@ -60,7 +60,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="Température CPU"
-          :chart-data="tempChart || undefined"
+          :series="tempChart || undefined"
           :options="tempOptions"
           :empty-text="tempEmptyText"
         />
@@ -68,7 +68,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="RPM Ventilateurs"
-          :chart-data="fanChart || undefined"
+          :series="fanChart || undefined"
           :options="fanOptions"
           :empty-text="fanEmptyText"
         />
@@ -78,28 +78,19 @@
 </template>
 
 <script setup lang="ts">
-import type { TooltipItem } from 'chart.js'
-import RRDChartCard from './RRDChartCard.vue'
-import { getChartPalette } from '../../utils/chartTheme'
+import { computed } from 'vue'
+import type { ApexOptions } from 'apexcharts'
+import RRDChartCard, { type RRDChartSeries } from './RRDChartCard.vue'
+import { getApexChartPalette } from '../../utils/apexChartTheme'
+import dayjs from '../../utils/dayjs'
 
-const palette = getChartPalette()
-const tooltipBase = {
-  enabled: true, mode: 'index' as const, intersect: false,
-  backgroundColor: palette.tooltipBackground,
-  titleColor: palette.tooltipText,
-  bodyColor: palette.tooltipText,
-  borderColor: palette.tooltipBorder,
-  borderWidth: 1,
-  padding: 8,
-}
-
-withDefaults(defineProps<{
-  cpuChart?: object | null
-  ramChart?: object | null
-  iowaitChart?: object | null
-  netChart?: object | null
-  tempChart?: object | null
-  fanChart?: object | null
+const props = withDefaults(defineProps<{
+  cpuChart?: RRDChartSeries | null
+  ramChart?: RRDChartSeries | null
+  iowaitChart?: RRDChartSeries | null
+  netChart?: RRDChartSeries | null
+  tempChart?: RRDChartSeries | null
+  fanChart?: RRDChartSeries | null
   timeframe?: string
   loading?: boolean
   error?: string
@@ -138,88 +129,82 @@ function formatBytesPerSec(v: number | null | undefined): string {
   return `${v.toFixed(0)} B/s`
 }
 
-const pctOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      ...tooltipBase,
-      displayColors: false,
-      callbacks: { label: (ctx: TooltipItem<'line'>) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}%` },
-    },
-  },
-  scales: {
-    x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { display: true, min: 0, max: 100, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v}%` } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
+function formatAxisTime(value: string): string {
+  const d = dayjs(Number(value))
+  if (!d.isValid()) return ''
+  if (props.timeframe === 'hour' || props.timeframe === 'day') return d.format('HH:mm')
+  if (props.timeframe === 'week') return d.format('DD/MM HH:mm')
+  return d.format('DD/MM')
 }
 
-const ramOptions = {
-  ...pctOptions,
-  plugins: {
-    ...pctOptions.plugins,
-    tooltip: {
-      ...pctOptions.plugins.tooltip,
-      callbacks: {
-        label: (ctx: TooltipItem<'line'>) => {
-          const pct = ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'
-          return `${pct}%`
-        },
-      },
+function baseChartOptions(palette: ReturnType<typeof getApexChartPalette>): ApexOptions {
+  return {
+    chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+    theme: { mode: 'dark' },
+    fill: { type: 'solid', opacity: 0.1 },
+    stroke: { curve: 'smooth', width: 2 },
+    markers: { size: 0, hover: { size: 4 } },
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    grid: { borderColor: palette.grid },
+    xaxis: {
+      type: 'datetime',
+      labels: { style: { colors: palette.tickText }, formatter: formatAxisTime },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      tooltip: { enabled: false },
     },
-  },
+  }
 }
 
-const netOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: {
-    legend: { display: true, position: 'top', labels: { color: palette.legendText, boxWidth: 10, padding: 8 } },
+const pctOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  return {
+    ...baseChartOptions(palette),
+    yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
     tooltip: {
-      ...tooltipBase,
-      callbacks: { label: (ctx: TooltipItem<'line'>) => `${ctx.dataset.label}: ${formatBytesPerSec(ctx.parsed.y)}` },
+      x: { formatter: formatAxisTime },
+      y: { formatter: (v: number) => (v != null ? `${Number(v).toFixed(1)}%` : '—') },
     },
-  },
-  scales: {
-    x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { display: true, min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => formatBytesPerSec(typeof v === 'number' ? v : Number(v)) } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
+  }
+})
 
-const tempOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
+const netOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  return {
+    ...baseChartOptions(palette),
+    fill: { type: 'solid', opacity: [0.15, 0] },
+    legend: { show: true, position: 'top', labels: { colors: palette.legendText }, markers: { size: 5 } },
+    yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => formatBytesPerSec(v) } },
     tooltip: {
-      ...tooltipBase,
-      callbacks: { label: (ctx: TooltipItem<'line'>) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}°C` },
+      shared: true,
+      x: { formatter: formatAxisTime },
+      y: { formatter: (v: number) => formatBytesPerSec(v) },
     },
-  },
-  scales: {
-    x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v}°C` } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
+  }
+})
 
-const fanOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
+const tempOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  return {
+    ...baseChartOptions(palette),
+    yaxis: { labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}°C` } },
     tooltip: {
-      ...tooltipBase,
-      callbacks: { label: (ctx: TooltipItem<'line'>) => `${ctx.parsed.y != null ? Math.round(ctx.parsed.y) : '—'} RPM` },
+      x: { formatter: formatAxisTime },
+      y: { formatter: (v: number) => (v != null ? `${Number(v).toFixed(1)}°C` : '—') },
     },
-  },
-  scales: {
-    x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { display: true, min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v} RPM` } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
+  }
+})
+
+const fanOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  return {
+    ...baseChartOptions(palette),
+    yaxis: { min: 0, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${Math.round(v)} RPM` } },
+    tooltip: {
+      x: { formatter: formatAxisTime },
+      y: { formatter: (v: number) => (v != null ? `${Math.round(Number(v))} RPM` : '—') },
+    },
+  }
+})
 </script>

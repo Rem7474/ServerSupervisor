@@ -6,16 +6,24 @@
       class="position-absolute inset-0"
     />
   </Transition>
-  <canvas
-    ref="canvasEl"
+  <div
+    class="apex-chart-wrap"
     :style="{ opacity: (chartReady && !loading) ? 1 : 0, transition: 'opacity 0.3s' }"
-  />
+  >
+    <ApexChart
+      type="donut"
+      height="100%"
+      :options="chartOptions"
+      :series="series"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { Chart, ChartEvent, LegendItem, LegendElement } from 'chart.js'
+import { computed } from 'vue'
+import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import { getApexChartPalette, AsyncApexChart as ApexChart } from '../../utils/apexChartTheme'
 
 type StatusDistribution = Record<string, number>
 
@@ -25,73 +33,45 @@ const props = defineProps<{
   loading: boolean
 }>()
 
-const canvasEl = ref<HTMLCanvasElement | null>(null)
-let chart: Chart | null = null
-let chartLib: typeof Chart | null = null
-
-async function ensureChartLib() {
-  if (chartLib) return chartLib
-  const mod = await import('chart.js')
-  mod.Chart.register(...mod.registerables)
-  chartLib = mod.Chart
-  return chartLib
-}
-
-async function render() {
-  const Chart = await ensureChartLib()
-  if (!canvasEl.value) return
-  if (chart) {
-    chart.destroy()
-    chart = null
-  }
+const series = computed(() => {
   const d = props.statusDistribution || {}
-  chart = new Chart(canvasEl.value, {
-    type: 'doughnut',
-    data: {
-      labels: ['2xx', '3xx', '4xx', '5xx'],
-      datasets: [{
-        data: [
-          Number(d['2xx']) || 0,
-          Number(d['3xx']) || 0,
-          Number(d['4xx']) || 0,
-          Number(d['5xx']) || 0,
-        ],
-        backgroundColor: ['#639922', '#185FA5', '#BA7517', '#E24B4A'],
-        borderWidth: 0,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '70%',
-      plugins: {
-        legend: {
-          position: 'bottom',
-          onHover: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'doughnut'>) => {
-            legend.chart.canvas.style.cursor = 'pointer'
-          },
-          onLeave: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'doughnut'>) => {
-            legend.chart.canvas.style.cursor = 'default'
-          },
-        },
-      },
-    },
-  })
-}
-
-onMounted(() => {
-  void render()
+  return [
+    Number(d['2xx']) || 0,
+    Number(d['3xx']) || 0,
+    Number(d['4xx']) || 0,
+    Number(d['5xx']) || 0,
+  ]
 })
 
-watch(
-  () => props.statusDistribution,
-  () => {
-    void render()
-  },
-  { deep: true }
-)
-
-onBeforeUnmount(() => {
-  if (chart) chart.destroy()
+const chartOptions = computed((): ApexOptions => {
+  const palette = getApexChartPalette()
+  return {
+    chart: { type: 'donut', background: 'transparent', animations: { enabled: false } },
+    theme: { mode: 'dark' },
+    labels: ['2xx', '3xx', '4xx', '5xx'],
+    colors: ['#639922', '#185FA5', '#BA7517', '#E24B4A'],
+    stroke: { width: 0 },
+    dataLabels: { enabled: false },
+    plotOptions: { pie: { donut: { size: '70%' } } },
+    // onItemHover.highlightDataSeries: false — ApexCharts' legend-hover
+    // highlight path (highlightSeries → getSeriesByName) throws on this
+    // donut chart's plain-number series ("Cannot read properties of
+    // undefined (reading 'toString')" in escapeString), since donut/pie
+    // series have no per-item .name the way category-chart series do
+    // (labels live in options.labels instead). Disabling the hover
+    // highlight avoids the crash; the legend itself still shows/toggles
+    // series on click.
+    legend: { show: true, position: 'bottom', labels: { colors: palette.legendText }, onItemHover: { highlightDataSeries: false } },
+  }
 })
 </script>
+
+<style scoped>
+.apex-chart-wrap {
+  height: 100%;
+}
+
+:deep(.apexcharts-legend-series) {
+  cursor: pointer;
+}
+</style>

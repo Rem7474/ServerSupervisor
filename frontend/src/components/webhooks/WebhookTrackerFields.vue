@@ -1,7 +1,9 @@
 <template>
   <!-- Type selector -->
   <div class="col-12">
-    <label class="form-label required">Type de suivi</label>
+    <div class="form-label required">
+      Type de suivi
+    </div>
     <div class="row g-2">
       <div class="col-6">
         <label
@@ -9,7 +11,7 @@
           :class="form.tracker_type === 'git' ? 'tracker-type-card--active' : 'tracker-type-card--idle'"
         >
           <input
-            v-model="form.tracker_type"
+            v-model="trackerTypeModel"
             class="tracker-type-input"
             type="radio"
             value="git"
@@ -26,7 +28,7 @@
           :class="form.tracker_type === 'docker' ? 'tracker-type-card--active' : 'tracker-type-card--idle'"
         >
           <input
-            v-model="form.tracker_type"
+            v-model="trackerTypeModel"
             class="tracker-type-input"
             type="radio"
             value="docker"
@@ -43,9 +45,13 @@
   <!-- Git-specific fields -->
   <template v-if="form.tracker_type === 'git'">
     <div class="col-md-4">
-      <label class="form-label required">Provider</label>
+      <label
+        for="webhook-tracker-provider"
+        class="form-label required"
+      >Provider</label>
       <select
-        v-model="form.provider"
+        id="webhook-tracker-provider"
+        v-model="providerModel"
         class="form-select"
       >
         <option value="github">
@@ -60,18 +66,26 @@
       </select>
     </div>
     <div class="col-md-4">
-      <label class="form-label required">Owner / Org</label>
+      <label
+        for="webhook-tracker-repo-owner"
+        class="form-label required"
+      >Owner / Org</label>
       <input
-        v-model="form.repo_owner"
+        id="webhook-tracker-repo-owner"
+        v-model="repoOwnerModel"
         type="text"
         class="form-control"
         placeholder="ex: home-assistant"
       >
     </div>
     <div class="col-md-4">
-      <label class="form-label required">Depot</label>
+      <label
+        for="webhook-tracker-repo-name"
+        class="form-label required"
+      >Depot</label>
       <input
-        v-model="form.repo_name"
+        id="webhook-tracker-repo-name"
+        v-model="repoNameModel"
         type="text"
         class="form-control"
         placeholder="ex: core"
@@ -85,8 +99,12 @@
        that silently watched an image nobody was running. -->
   <template v-else>
     <div class="col-md-5">
-      <label class="form-label required">Hôte</label>
+      <label
+        for="webhook-tracker-source-host"
+        class="form-label required"
+      >Hôte</label>
       <select
+        id="webhook-tracker-source-host"
         v-model="containerSourceHostId"
         class="form-select"
       >
@@ -106,8 +124,12 @@
       </div>
     </div>
     <div class="col-md-7">
-      <label class="form-label required">Conteneur</label>
+      <label
+        for="webhook-tracker-container"
+        class="form-label required"
+      >Conteneur</label>
       <select
+        id="webhook-tracker-container"
         class="form-select"
         :disabled="!containerSourceHostId"
         :value="selectedContainerKey"
@@ -145,9 +167,13 @@
     </div>
 
     <div class="col-md-6">
-      <label class="form-label">Registre privé <span class="text-muted">(optionnel)</span></label>
+      <label
+        for="webhook-tracker-registry-credentials"
+        class="form-label"
+      >Registre privé <span class="text-muted">(optionnel)</span></label>
       <select
-        v-model="form.registry_credentials_id"
+        id="webhook-tracker-registry-credentials"
+        v-model="registryCredentialsIdModel"
         class="form-select"
       >
         <option value="">
@@ -178,9 +204,13 @@
         </div>
         <div class="row g-2">
           <div class="col-md-4">
-            <label class="form-label">Provider</label>
+            <label
+              for="webhook-tracker-linked-provider"
+              class="form-label"
+            >Provider</label>
             <select
-              v-model="form.provider"
+              id="webhook-tracker-linked-provider"
+              v-model="providerModel"
               class="form-select"
             >
               <option value="github">
@@ -195,18 +225,26 @@
             </select>
           </div>
           <div class="col-md-4">
-            <label class="form-label">Owner / Org</label>
+            <label
+              for="webhook-tracker-linked-repo-owner"
+              class="form-label"
+            >Owner / Org</label>
             <input
-              v-model="form.repo_owner"
+              id="webhook-tracker-linked-repo-owner"
+              v-model="repoOwnerModel"
               type="text"
               class="form-control"
               placeholder="ex: home-assistant"
             >
           </div>
           <div class="col-md-4">
-            <label class="form-label">Depot</label>
+            <label
+              for="webhook-tracker-linked-repo-name"
+              class="form-label"
+            >Depot</label>
             <input
-              v-model="form.repo_name"
+              id="webhook-tracker-linked-repo-name"
+              v-model="repoNameModel"
               type="text"
               class="form-control"
               placeholder="ex: core"
@@ -219,6 +257,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { WebhookFormData, RegistryCredential, PickableContainer } from '../../composables/useWebhookForm'
 
 const props = defineProps<{
@@ -235,7 +274,31 @@ const props = defineProps<{
 // and is reset on hydrate), so it is bound through as an explicit v-model.
 const containerSourceHostId = defineModel<string>('containerSourceHostId', { default: '' })
 
-const emit = defineEmits<{ (e: 'select-container', key: string): void }>()
+const emit = defineEmits<{
+  (e: 'select-container', key: string): void
+  (e: 'update:form', value: WebhookFormData): void
+}>()
+
+// The `form` prop is owned by the parent (WebhookModal, via
+// useWebhookForm). This component never mutates it in place — every field
+// write emits a whole-object replacement for the parent to apply (bound as
+// `v-model:form` there).
+function updateForm<K extends keyof WebhookFormData>(key: K, value: WebhookFormData[K]): void {
+  emit('update:form', { ...props.form, [key]: value })
+}
+
+function fieldModel<K extends keyof WebhookFormData>(key: K) {
+  return computed<WebhookFormData[K]>({
+    get: () => props.form[key],
+    set: (value) => updateForm(key, value),
+  })
+}
+
+const trackerTypeModel = fieldModel('tracker_type')
+const providerModel = fieldModel('provider')
+const repoOwnerModel = fieldModel('repo_owner')
+const repoNameModel = fieldModel('repo_name')
+const registryCredentialsIdModel = fieldModel('registry_credentials_id')
 
 function onContainerChange(event: Event): void {
   const key = (event.target as HTMLSelectElement).value

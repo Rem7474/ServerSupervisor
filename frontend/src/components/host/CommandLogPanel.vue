@@ -12,54 +12,58 @@
             class="icon icon-tabler me-1"
           />
           {{ title }}
+          <slot name="title-suffix" />
         </h3>
         <div class="d-flex gap-1">
-          <!-- Copy -->
-          <button
-            type="button"
-            class="btn btn-sm btn-ghost-secondary"
-            :title="copied ? 'Copié !' : 'Copier la sortie'"
-            :disabled="!command"
-            @click="copy"
-          >
-            <IconCopy
-              v-if="!copied"
-              :size="18"
-              class="icon"
-            />
-            <IconCheck
-              v-else
-              :size="18"
-              class="icon text-success"
-            />
-          </button>
-          <!-- Download -->
-          <button
-            type="button"
-            class="btn btn-icon btn-sm btn-ghost-secondary"
-            title="Télécharger (.txt)"
-            :disabled="!command"
-            @click="download"
-          >
-            <IconDownload
-              :size="18"
-              class="icon"
-            />
-          </button>
-          <!-- Clear (optional) -->
-          <button
-            v-if="clearable"
-            type="button"
-            class="btn btn-icon btn-sm btn-ghost-secondary"
-            title="Vider la console"
-            :disabled="!command"
-            @click="$emit('clear')"
-          >
-            <IconTrash
-              :size="18"
-              class="icon"
-            />
-          </button>
+          <template v-if="mode === 'log'">
+            <!-- Copy -->
+            <button
+              type="button"
+              class="btn btn-sm btn-ghost-secondary"
+              :title="copied ? 'Copié !' : 'Copier la sortie'"
+              :disabled="!command"
+              @click="copy"
+            >
+              <IconCopy
+                v-if="!copied"
+                :size="18"
+                class="icon"
+              />
+              <IconCheck
+                v-else
+                :size="18"
+                class="icon text-success"
+              />
+            </button>
+            <!-- Download -->
+            <button
+              type="button"
+              class="btn btn-icon btn-sm btn-ghost-secondary"
+              title="Télécharger (.txt)"
+              :disabled="!command"
+              @click="download"
+            >
+              <IconDownload
+                :size="18"
+                class="icon"
+              />
+            </button>
+            <!-- Clear (optional) -->
+            <button
+              v-if="clearable"
+              type="button"
+              class="btn btn-icon btn-sm btn-ghost-secondary"
+              title="Vider la console"
+              :disabled="!command"
+              @click="$emit('clear')"
+            >
+              <IconTrash
+                :size="18"
+                class="icon"
+              />
+            </button>
+          </template>
+          <slot name="header-actions" />
           <!-- Close -->
           <button
             type="button"
@@ -76,89 +80,92 @@
       </div>
 
       <div class="card-body d-flex flex-column flex-fill p-0 console-body">
-        <!-- Empty state -->
-        <div
-          v-if="!command"
-          class="d-flex align-items-center justify-content-center flex-fill text-secondary console-empty"
-        >
-          <div class="text-center p-4">
-            <IconChevronRight
-              :size="48"
-              class="icon icon-tabler mb-2 opacity-50"
-              :stroke-width="1.5"
-            />
-            <div class="opacity-75">
-              {{ emptyText }}
-            </div>
-            <div class="small mt-1 opacity-50">
-              Cliquez sur "Logs" pour afficher la sortie d'une commande
-            </div>
-          </div>
-        </div>
-
-        <!-- Active viewer -->
-        <div
-          v-else
-          class="d-flex flex-column flex-fill console-viewer"
-        >
-          <div class="console-header px-3 pt-3 pb-2">
-            <div class="d-flex align-items-start justify-content-between mb-2">
-              <div
-                class="flex-fill"
-                style="min-width: 0;"
-              >
-                <div
-                  class="fw-semibold text-light"
-                  style="font-size: 0.95rem;"
-                >
-                  {{ command.host_name || command.host_id }}
-                </div>
-                <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                  <span :class="moduleClass(command.module || '')">{{ moduleLabel(command.module || '') }}</span>
-                  <code class="console-cmd-label">
-                    {{ cmdLabel(command) }}
-                  </code>
-                </div>
-                <div
-                  v-if="command.created_at"
-                  class="text-secondary small mt-1"
-                >
-                  Exécutée {{ formatRelativeTime(command.created_at || '', '—', true) }}
-                </div>
+        <slot v-if="mode === 'custom'" />
+        <template v-else>
+          <!-- Empty state -->
+          <div
+            v-if="!command"
+            class="d-flex align-items-center justify-content-center flex-fill text-secondary console-empty"
+          >
+            <div class="text-center p-4">
+              <IconChevronRight
+                :size="48"
+                class="icon icon-tabler mb-2 opacity-50"
+                :stroke-width="1.5"
+              />
+              <div class="opacity-75">
+                {{ emptyText }}
               </div>
-              <span
-                :class="statusClass(command.status)"
-                class="ms-2"
-              >{{ command.status }}</span>
+              <div class="small mt-1 opacity-50">
+                Cliquez sur "Logs" pour afficher la sortie d'une commande
+              </div>
             </div>
           </div>
+
+          <!-- Active viewer -->
           <div
-            v-if="structuredOutput?.kind === 'processes'"
-            class="console-processes flex-fill p-3"
-          >
-            <ProcessesTable :processes="structuredOutput.data" />
-          </div>
-          <div
-            v-else-if="structuredOutput?.kind === 'systemd'"
-            class="console-processes flex-fill p-3"
-          >
-            <SystemdTable
-              :services="structuredOutput.data"
-              readonly
-            />
-          </div>
-          <div
-            v-else-if="structuredOutput?.kind === 'restic_backup_summary'"
-            class="console-processes flex-fill p-3"
-          >
-            <ResticBackupSummaryCard :summary="structuredOutput.data" />
-          </div>
-          <pre
             v-else
-            ref="outputEl"
-            class="console-output mb-0 flex-fill"
-          >{{ outputText }}</pre>
-        </div>
+            class="d-flex flex-column flex-fill console-viewer"
+          >
+            <div class="console-header px-3 pt-3 pb-2">
+              <div class="d-flex align-items-start justify-content-between mb-2">
+                <div
+                  class="flex-fill"
+                  style="min-width: 0;"
+                >
+                  <div
+                    class="fw-semibold text-light"
+                    style="font-size: 0.95rem;"
+                  >
+                    {{ command.host_name || command.host_id }}
+                  </div>
+                  <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                    <span :class="moduleClass(command.module || '')">{{ moduleLabel(command.module || '') }}</span>
+                    <code class="console-cmd-label">
+                      {{ cmdLabel(command) }}
+                    </code>
+                  </div>
+                  <div
+                    v-if="command.created_at"
+                    class="text-secondary small mt-1"
+                  >
+                    Exécutée {{ formatRelativeTime(command.created_at || '', '—', true) }}
+                  </div>
+                </div>
+                <span
+                  :class="statusClass(command.status)"
+                  class="ms-2"
+                >{{ command.status }}</span>
+              </div>
+            </div>
+            <div
+              v-if="structuredOutput?.kind === 'processes'"
+              class="console-processes flex-fill p-3"
+            >
+              <ProcessesTable :processes="structuredOutput.data" />
+            </div>
+            <div
+              v-else-if="structuredOutput?.kind === 'systemd'"
+              class="console-processes flex-fill p-3"
+            >
+              <SystemdTable
+                :services="structuredOutput.data"
+                readonly
+              />
+            </div>
+            <div
+              v-else-if="structuredOutput?.kind === 'restic_backup_summary'"
+              class="console-processes flex-fill p-3"
+            >
+              <ResticBackupSummaryCard :summary="structuredOutput.data" />
+            </div>
+            <pre
+              v-else
+              ref="outputEl"
+              class="console-output mb-0 flex-fill"
+            >{{ outputText }}</pre>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -209,6 +216,13 @@ const props = withDefaults(defineProps<{
   emptyText?: string
   wrapperClass?: string
   clearable?: boolean
+  // 'log' (default) renders the command-output viewer this component was
+  // built for. 'custom' hides the copy/download/clear buttons (meaningless
+  // outside a command log) and renders the default slot instead — reused by
+  // ProxmoxConsole.vue for a live terminal, so every "console" panel in the
+  // app shares the same card/header/FAB shell instead of each screen
+  // inventing its own.
+  mode?: 'log' | 'custom'
 }>(), {
   command: null,
   show: false,
@@ -216,6 +230,7 @@ const props = withDefaults(defineProps<{
   emptyText: 'Aucun log sélectionné',
   wrapperClass: '',
   clearable: false,
+  mode: 'log',
 })
 
 defineEmits<{

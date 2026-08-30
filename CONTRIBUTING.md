@@ -19,6 +19,22 @@ de `frontend/src/types/generated.ts` avec les modèles Go (`ci-server.yml`
 régénère et diff ce fichier) — voir la note sur les types générés dans
 [CLAUDE.md](CLAUDE.md) avant de modifier un modèle.
 
+## Tester son code via le vrai conteneur (stack racine, données réelles)
+
+`docker-compose.yml` pointe `server` sur l'image publiée (`ghcr.io/rem7474/serversupervisor`)
+plutôt que de builder depuis les sources, pour qu'un `docker compose up -d`
+frais fonctionne sans cloner le repo (voir le README). Pour tester ses propres
+changements de code à travers le vrai conteneur (pas `go run` sur l'hôte, pas
+le mode démo) avec des données persistées non-démo, `docker-compose.dev.yml`
+définit un `build:` local en overlay :
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+Distinct du mode démo ci-dessous (Option B) : ici on garde ses vraies données
+locales entre redémarrages, sans `DEMO_MODE`.
+
 ## Mode démo
 
 Un jeu de données de démonstration fixe et réaliste (hôtes/VMs, conteneurs

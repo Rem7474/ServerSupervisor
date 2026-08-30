@@ -20,6 +20,12 @@ type RefreshTokenRecord struct {
 
 // ========== Users ==========
 
+func (db *DB) HasAdminUser(ctx context.Context) (bool, error) {
+	var exists bool
+	err := db.conn.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE role = 'admin')`).Scan(&exists)
+	return exists, err
+}
+
 func (db *DB) CreateUser(ctx context.Context, username, passwordHash, role string, mustChangePassword ...bool) error {
 	mcp := len(mustChangePassword) > 0 && mustChangePassword[0]
 	_, err := db.conn.ExecContext(ctx, 

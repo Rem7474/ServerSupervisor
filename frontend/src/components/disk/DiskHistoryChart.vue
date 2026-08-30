@@ -54,11 +54,13 @@
       class="card-body"
       style="height: 13rem;"
     >
-      <Line
-        v-if="chartData"
-        :data="chartData"
+      <ApexChart
+        v-if="series && chartOptions"
+        ref="chartRef"
+        type="area"
+        height="100%"
         :options="chartOptions"
-        class="h-100"
+        :series="series"
       />
       <LoadingSkeleton
         v-else-if="loading"
@@ -75,12 +77,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, watch, onMounted, computed, defineAsyncComponent } from 'vue'
-import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
+import { ref, shallowRef, watch, onMounted, computed } from 'vue'
+import type { ApexOptions } from 'apexcharts'
 import { fetchDiskMetricsHistory } from '../../composables/useDiskMetricsHistory'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import dayjs from '../../utils/dayjs'
 import { getApiErrorMessage } from '../../api/client'
+import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
 
 interface ChartPoint {
   x: number
@@ -88,15 +92,6 @@ interface ChartPoint {
   used_gb?: number
   size_gb?: number
 }
-
-const Line = defineAsyncComponent(async () => {
-  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
-  return Line
-})
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -110,7 +105,9 @@ const props = withDefaults(defineProps<{
 const chartHours = ref(24)
 const selectedMount = ref<string>(props.mounts[0] ?? '')
 const points = ref<ChartPoint[]>([])
-const chartData = shallowRef<ChartData<'line'> | null>(null)
+const series = shallowRef<{ name: string; data: ChartPoint[] }[] | null>(null)
+const chartOptions = shallowRef<ApexOptions | null>(null)
+const chartRef = ref<ApexChartInstance | null>(null)
 const loading = ref(false)
 // Unlike `loading` (only true before the very first chart renders, so
 // periodic WS-tick refreshes don't blank + re-animate an already-visible
@@ -159,82 +156,66 @@ function formatChartTime(timestamp: number | string | undefined): string {
   return d.format('DD/MM')
 }
 
-function clampTimestamp(timestampMs: number): number {
-  if (!Number.isFinite(timestampMs)) return NaN
-  const now = Date.now()
-  return Math.min(timestampMs, now)
-}
-
-function getMaxPointTimestamp(list: ChartPoint[]): number | undefined {
-  let max = -Infinity
-  for (const point of list || []) {
-    if (Number.isFinite(point?.x) && point.x > max) max = point.x
-  }
-  if (!Number.isFinite(max)) return undefined
-  return Math.min(Date.now(), max)
-}
-
-function getMinPointTimestamp(list: ChartPoint[]): number | undefined {
-  let min = Infinity
-  for (const point of list || []) {
-    if (Number.isFinite(point?.x) && point.x < min) min = point.x
-  }
-  if (!Number.isFinite(min)) return undefined
-  return min
-}
-
-const chartOptions = computed((): ChartOptions<'line'> => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
+// Built once (on first data load) rather than as a `computed` over `points`:
+// vue3-apexcharts clones the whole `:options` prop via
+// JSON.parse(JSON.stringify(...)) on every *reactive* update after mount —
+// which silently drops every function (labels.formatter, tooltip.custom)
+// since JSON can't represent them. Keeping this object's identity stable
+// after the initial build means later data refreshes flow through the
+// (function-free, always-safe) `:series` prop only; the time-range window
+// (xaxis.min/max) is pushed via the exposed updateOptions() method directly
+// in loadHistory() instead (bypasses the wrapper's buggy watcher).
+function buildChartOptions(): ApexOptions {
+  const palette = getApexChartPalette()
+  return {
+    chart: {
+      type: 'area',
+      background: 'transparent',
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      animations: { enabled: false },
+      parentHeightOffset: 0,
+    },
+    theme: { mode: 'dark' },
+    colors: [palette.disk],
+    fill: { type: 'solid', opacity: 0.12 },
+    stroke: { curve: 'smooth', width: 2 },
+    markers: { size: 0, hover: { size: 4 } },
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    grid: { borderColor: palette.grid, strokeDashArray: 0 },
+    xaxis: {
+      type: 'datetime',
+      min: getMinPointTimestamp(points.value),
+      max: getMaxPointTimestamp(points.value),
+      labels: {
+        style: { colors: palette.tickText },
+        formatter: (v: string) => formatChartTime(Number(v)),
+      },
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      tooltip: { enabled: false },
+    },
+    yaxis: {
+      min: 0,
+      max: 100,
+      labels: {
+        style: { colors: palette.tickText },
+        formatter: (v: number) => `${v}%`,
+      },
+    },
     tooltip: {
-      enabled: true,
-      mode: 'index',
-      intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-      titleColor: '#fff',
-      bodyColor: '#fff',
-      borderColor: '#555',
-      borderWidth: 1,
-      padding: 10,
-      displayColors: false,
-      callbacks: {
-        title: (items: TooltipItem<'line'>[]) => formatChartTime(items[0]?.parsed?.x ?? undefined),
-        label: (ctx: TooltipItem<'line'>) => {
-          const p = points.value[ctx.dataIndex]
-          const y = ctx.parsed.y ?? 0
-          if (p?.used_gb != null && p?.size_gb) {
-            return `${y.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
-          }
-          return `${y.toFixed(1)}%`
+      x: { formatter: (v: number) => formatChartTime(v) },
+      y: {
+        formatter: (v: number, opts?: { dataPointIndex: number }) => {
+          const p = opts ? points.value[opts.dataPointIndex] : undefined
+          return p?.used_gb != null && p?.size_gb
+            ? `${v.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
+            : `${v.toFixed(1)}%`
         },
       },
     },
-  },
-  scales: {
-    x: {
-      type: 'linear',
-      display: true,
-      grid: { color: 'rgba(255,255,255,0.05)' },
-      min: getMinPointTimestamp(points.value),
-      max: getMaxPointTimestamp(points.value),
-      ticks: { color: '#6b7280', maxTicksLimit: 8, callback: (v: number | string) => formatChartTime(Number(v)) },
-    },
-    y: {
-      display: true,
-      min: 0,
-      max: 100,
-      grid: { color: 'rgba(255,255,255,0.05)' },
-      ticks: { color: '#6b7280', callback: (v: number | string) => `${v}%` },
-    },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}))
-
-function cssVar(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  }
 }
 
 async function loadHistory(hours: number): Promise<void> {
@@ -244,7 +225,7 @@ async function loadHistory(hours: number): Promise<void> {
   // refreshes (each WS tick) keep the existing chart visible and swap the
   // data in place, so the graph updates silently instead of blanking +
   // re-animating.
-  if (!chartData.value) loading.value = true
+  if (!series.value) loading.value = true
   rangeLoading.value = true
   try {
     const raw = await fetchDiskMetricsHistory(props.hostId, selectedMount.value, hours)
@@ -255,21 +236,20 @@ async function loadHistory(hours: number): Promise<void> {
       size_gb: p.size_gb,
     })).filter((p: ChartPoint) => Number.isFinite(p.x) && p.y != null)
 
-    if (!points.value.length) { chartData.value = null; return }
+    if (!points.value.length) { series.value = null; return }
 
-    chartData.value = {
-      datasets: [{
-        data: points.value,
-        borderColor: cssVar('--tblr-yellow'),
-        backgroundColor: `rgba(${cssVar('--tblr-yellow-rgb')},0.12)`,
-        fill: true,
-        tension: 0.3,
-        spanGaps: false,
-      }],
+    series.value = [{ name: 'Utilisé', data: points.value }]
+    if (!chartOptions.value) {
+      chartOptions.value = buildChartOptions()
+    } else {
+      chartRef.value?.updateOptions(
+        { xaxis: { min: getMinPointTimestamp(points.value), max: getMaxPointTimestamp(points.value) } },
+        false, false,
+      )
     }
   } catch (e: unknown) {
     console.error('Failed to load disk history:', getApiErrorMessage(e))
-    chartData.value = null
+    series.value = null
   } finally {
     loading.value = false
     rangeLoading.value = false

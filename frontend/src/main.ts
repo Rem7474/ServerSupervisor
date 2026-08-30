@@ -87,7 +87,26 @@ function toErrorMessage(reason: unknown): string {
 
 renderBootPlaceholder()
 
+// Chrome/Firefox dispatch this as a genuine `error` event (not just a
+// console warning) whenever a ResizeObserver callback itself triggers a
+// layout change that would need another notification in the same pass. It
+// is purely informational — browser vendors themselves document it as safe
+// to ignore — so treating it as fatal here would nuke the whole app over a
+// harmless notification-scheduling quirk from any component using
+// ResizeObserver (see ProxmoxConsole.vue for the primary fix: deferring the
+// observer's own work to the next frame so the loop doesn't happen in the
+// first place — this is a second, independent safety net for any other
+// component or third-party library that triggers the same message).
+function isBenignWindowError(event: ErrorEvent): boolean {
+  const msg = toErrorMessage(event.error ?? event.message).toLowerCase()
+  return msg.includes('resizeobserver loop')
+}
+
 window.addEventListener('error', (event: ErrorEvent) => {
+  if (isBenignWindowError(event)) {
+    console.warn('[app] Erreur ignorée (bénigne, ResizeObserver):', event.error ?? event.message)
+    return
+  }
   renderFatalFallback({
     title: 'Erreur JavaScript non gérée',
     message: toErrorMessage(event.error ?? event.message),

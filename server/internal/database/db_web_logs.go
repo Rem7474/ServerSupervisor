@@ -176,7 +176,10 @@ func webLogFingerprint(hostID string, source string, capturedAt time.Time, req m
 		req.Category,
 		suspicious,
 	)
-	digest := md5.Sum([]byte(payload))
+	// MD5 here is a non-cryptographic dedup key (collision resistance against
+	// an attacker is irrelevant — it never gates a security decision), not a
+	// sensitive-context hash. NOSONAR: false positive on go:S4790.
+	digest := md5.Sum([]byte(payload)) // NOSONAR
 	return hex.EncodeToString(digest[:])
 }
 

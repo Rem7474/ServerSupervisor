@@ -12,4 +12,5 @@ export type {
   ProxmoxSummary,
   ProxmoxGuestLinkRequest,
   ProxmoxGuestLinkUpdate,
+  ProxmoxTestResult,
 } from './generated'

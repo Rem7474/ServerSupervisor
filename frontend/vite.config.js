@@ -33,7 +33,7 @@ export default defineConfig({
           if (!id.includes('node_modules')) return undefined
 
           if (id.includes('cytoscape') || id.includes('d3-force')) return 'vendor-graph'
-          if (id.includes('chart.js') || id.includes('vue-chartjs')) return 'vendor-chart'
+          if (id.includes('apexcharts')) return 'vendor-apexcharts'
           if (id.includes('/d3-')) return 'vendor-d3'
           if (id.includes('world-atlas') || id.includes('topojson-client')) return 'vendor-map'
           if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vendor-vue'

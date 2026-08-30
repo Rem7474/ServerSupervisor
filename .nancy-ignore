@@ -1,0 +1,10 @@
+# CVE-2026-81521: go.mongodb.org/mongo-driver/v2 — a caller-supplied database
+# name in Client.BulkWrite isn't escaped before building the target namespace.
+# This server never talks to MongoDB (Postgres/TimescaleDB only, per
+# CLAUDE.md) — the driver is an indirect dependency pulled in only for its
+# bson sub-package, which gin/binding links in for optional BSON request
+# binding (`go mod why -m go.mongodb.org/mongo-driver/v2` confirms the only
+# path in is gin -> gin/binding -> mongo-driver/v2/bson). The vulnerable
+# mongo.Client.BulkWrite API lives in a different sub-package that is never
+# imported, so it is never linked into the binary.
+CVE-2026-81521

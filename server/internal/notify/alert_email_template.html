@@ -1,76 +1,192 @@
-<!DOCTYPE html>
-<html>
+<!--
+  Styled after Tabler's own email templates (tabler.io/emails): a centered
+  600px table-based layout, Inter font stack, and the exact same brand hex
+  values as frontend/CLAUDE.md's semantic color table (danger #d63939, warning
+  #f59f00, success #2fb344, primary #066fd1) — verified against Tabler's
+  compiled email CSS, not eyeballed. Table-based layout throughout (no
+  flexbox/grid) for email client compatibility. Severity color/badge driven
+  by {{.Severity}} ("crit"/"warn", see alerts.DetermineSeverity) rather than
+  always-red like the previous template.
+-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="supported-color-schemes" content="light dark" />
+  <title></title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-    .alert-header { background: #dc3545; color: white; padding: 20px; border-radius: 4px 4px 0 0; margin-bottom: 0; }
-    .alert-body { background: white; padding: 20px; border-radius: 0 0 4px 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .alert-header h1 { margin: 0; font-size: 24px; }
-    .alert-header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }
-    .metric-box { background: #f9f9f9; padding: 15px; margin: 15px 0; border-left: 4px solid #dc3545; border-radius: 4px; }
-    .metric-label { font-weight: 600; color: #555; font-size: 12px; text-transform: uppercase; }
-    .metric-value { font-size: 32px; font-weight: bold; color: #dc3545; margin: 8px 0; }
-    .metric-unit { font-size: 14px; color: #999; }
-    .details-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
-    .detail-item { border: 1px solid #e0e0e0; padding: 12px; border-radius: 4px; background: #fafafa; }
-    .detail-label { font-size: 12px; color: #999; text-transform: uppercase; font-weight: 600; }
-    .detail-value { font-size: 16px; color: #333; margin-top: 4px; word-break: break-all; }
-    .action-btn { display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-top: 20px; font-weight: 600; }
-    .action-btn:hover { background: #0056b3; }
-    .footer { text-align: center; padding: 20px; font-size: 12px; color: #999; }
-    .timestamp { color: #999; font-size: 13px; }
+    body { margin: 0; padding: 0; width: 100%; background-color: #f9fafb; }
+    img { border: 0; line-height: 100%; outline: none; text-decoration: none; }
+    a.btn:hover { background-color: #0667c2 !important; }
+    @media (prefers-color-scheme: dark) {
+      .bg-body { background-color: #212936 !important; }
+      .box { background-color: #2b3648 !important; border-color: #2b3648 !important; }
+      .text-body { color: rgba(255, 255, 255, 0.7) !important; }
+      .text-heading { color: rgba(255, 255, 255, 0.9) !important; }
+      .text-muted { color: rgba(255, 255, 255, 0.4) !important; }
+      .detail-item, .metric-box { background-color: #212936 !important; border-color: #354258 !important; }
+      .divider { border-top-color: #354258 !important; }
+    }
+    @media only screen and (max-width: 480px) {
+      .detail-col { display: block !important; width: 100% !important; padding-right: 0 !important; }
+      .detail-col + .detail-col { padding-top: 12px !important; }
+    }
   </style>
 </head>
-<body>
-  <div class="container">
-    <div class="alert-header">
-      <h1>🚨 {{.RuleName}}</h1>
-      <p>Alert triggered on {{.HostName}}</p>
-    </div>
-    
-    <div class="alert-body">
-      <!-- Metric Value -->
-      <div class="metric-box">
-        <div class="metric-label">Current Value</div>
-        <div class="metric-value">{{.Value}}<span class="metric-unit">{{.Unit}}</span></div>
-      </div>
+<body class="bg-body" style="margin: 0; padding: 0; width: 100%; background-color: #f9fafb; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" align="center" class="bg-body" bgcolor="#f9fafb" style="border-collapse: collapse; width: 100%;">
+      <tr>
+        <td align="center" style="padding: 32px 16px;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width: 600px; max-width: 100%; border-collapse: collapse;">
 
-      <!-- Details Grid -->
-      <div class="details-row">
-        <div class="detail-item">
-          <div class="detail-label">Metric</div>
-          <div class="detail-value">{{.Metric}}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Condition</div>
-          <div class="detail-value">{{.Operator}} {{.Threshold}}{{.Unit}}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Host</div>
-          <div class="detail-value">{{.HostName}}</div>
-        </div>
-        <div class="detail-item">
-          <div class="detail-label">Triggered At</div>
-          <div class="detail-value timestamp">{{.TriggeredAt}}</div>
-        </div>
-      </div>
+            <!-- Header -->
+            <tr>
+              <td style="padding-bottom: 24px;">
+                <span class="text-heading" style="font-size: 18px; font-weight: 700; color: #111827;">ServerSupervisor</span>
+              </td>
+            </tr>
 
-      <!-- Action Button -->
-      <a href="{{.IncidentLink}}" class="action-btn">View Incident Details</a>
+            <!-- Card -->
+            <tr>
+              <td class="box" bgcolor="#ffffff" style="background-color: #ffffff; border: 1px solid #e8ebee; border-radius: 8px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);">
 
-      <!-- Footer Message -->
-      <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 13px; color: #666;">
-        This alert was triggered by rule <strong>{{.RuleName}}</strong> (ID: {{.RuleID}}) configured in ServerSupervisor.
-        {{ if .CooldownMessage }}<br>No further notifications will be sent from this rule for {{.CooldownMessage}}.{{ end }}
-      </p>
-    </div>
+                <!-- Severity accent bar -->
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                  <tr>
+                    <td height="4" bgcolor="{{ if eq .Severity "warn" }}#f59f00{{ else }}#d63939{{ end }}" style="background-color: {{ if eq .Severity "warn" }}#f59f00{{ else }}#d63939{{ end }}; line-height: 4px; font-size: 4px; border-radius: 8px 8px 0 0;">&nbsp;</td>
+                  </tr>
+                </table>
 
-    <div class="footer">
-      <p>ServerSupervisor &copy; 2024</p>
-    </div>
-  </div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 28px 28px 8px 28px;">
+                      <table role="presentation" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td bgcolor="{{ if eq .Severity "warn" }}#f59f00{{ else }}#d63939{{ end }}" style="background-color: {{ if eq .Severity "warn" }}#f59f00{{ else }}#d63939{{ end }}; border-radius: 4px; padding: 3px 8px;">
+                            <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #ffffff; text-transform: uppercase;">{{ if eq .Severity "warn" }}Avertissement{{ else }}Critique{{ end }}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px 28px 0 28px;">
+                      <h1 class="text-heading" style="margin: 0; font-size: 22px; line-height: 130%; font-weight: 700; color: #111827;">{{.RuleName}}</h1>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted" style="padding: 6px 28px 0 28px; font-size: 14px; color: #667382;">
+                      Déclenchée sur <strong>{{.HostName}}</strong>
+                    </td>
+                  </tr>
+
+                  <!-- Metric value -->
+                  <tr>
+                    <td style="padding: 20px 28px 0 28px;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="metric-box" bgcolor="#f9fafb" style="background-color: #f9fafb; border-radius: 8px; border-collapse: collapse;">
+                        <tr>
+                          <td style="padding: 16px 20px;">
+                            <div class="text-muted" style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #667382; text-transform: uppercase;">Valeur actuelle</div>
+                            <div style="margin-top: 4px; font-size: 30px; line-height: 130%; font-weight: 700; color: {{ if eq .Severity "warn" }}#f59f00{{ else }}#d63939{{ end }};">
+                              {{.Value}}<span class="text-muted" style="font-size: 15px; font-weight: 500; color: #667382;">{{.Unit}}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Details -->
+                  <tr>
+                    <td style="padding: 16px 28px 0 28px;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                        <tr>
+                          <td class="detail-col" width="50%" style="padding: 0 8px 12px 0; vertical-align: top;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="detail-item" bgcolor="#fafbfc" style="background-color: #fafbfc; border: 1px solid #e8ebee; border-radius: 6px; border-collapse: separate;">
+                              <tr>
+                                <td style="padding: 10px 14px;">
+                                  <div class="text-muted" style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #667382; text-transform: uppercase;">Métrique</div>
+                                  <div class="text-body" style="margin-top: 2px; font-size: 14px; color: #4b5563;">{{.Metric}}</div>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                          <td class="detail-col" width="50%" style="padding: 0 0 12px 8px; vertical-align: top;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="detail-item" bgcolor="#fafbfc" style="background-color: #fafbfc; border: 1px solid #e8ebee; border-radius: 6px; border-collapse: separate;">
+                              <tr>
+                                <td style="padding: 10px 14px;">
+                                  <div class="text-muted" style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #667382; text-transform: uppercase;">Condition</div>
+                                  <div class="text-body" style="margin-top: 2px; font-size: 14px; color: #4b5563;">{{.Operator}} {{.Threshold}}{{.Unit}}</div>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="detail-col" width="50%" style="padding: 0 8px 0 0; vertical-align: top;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="detail-item" bgcolor="#fafbfc" style="background-color: #fafbfc; border: 1px solid #e8ebee; border-radius: 6px; border-collapse: separate;">
+                              <tr>
+                                <td style="padding: 10px 14px;">
+                                  <div class="text-muted" style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #667382; text-transform: uppercase;">Hôte</div>
+                                  <div class="text-body" style="margin-top: 2px; font-size: 14px; color: #4b5563;">{{.HostName}}</div>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                          <td class="detail-col" width="50%" style="padding: 0 0 0 8px; vertical-align: top;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="detail-item" bgcolor="#fafbfc" style="background-color: #fafbfc; border: 1px solid #e8ebee; border-radius: 6px; border-collapse: separate;">
+                              <tr>
+                                <td style="padding: 10px 14px;">
+                                  <div class="text-muted" style="font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #667382; text-transform: uppercase;">Déclenchée le</div>
+                                  <div class="text-body" style="margin-top: 2px; font-size: 14px; color: #4b5563;">{{.TriggeredAt}}</div>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- CTA -->
+                  <tr>
+                    <td style="padding: 20px 28px 28px 28px;">
+                      <table role="presentation" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td bgcolor="#066fd1" style="background-color: #066fd1; border-radius: 6px;">
+                            <a href="{{.IncidentLink}}" class="btn" style="display: inline-block; padding: 10px 20px; font-size: 14px; font-weight: 600; color: #ffffff; text-decoration: none;">Voir l'incident</a>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <!-- Footer note -->
+                  <tr>
+                    <td class="divider" style="padding: 0 28px 24px 28px; border-top: 1px solid #e8ebee;">
+                      <p class="text-muted" style="margin: 16px 0 0 0; font-size: 12px; line-height: 150%; color: #667382;">
+                        Cette alerte a été déclenchée par la règle <strong>{{.RuleName}}</strong> (ID {{.RuleID}}) configurée dans ServerSupervisor.
+                        {{ if .CooldownMessage }}Aucune nouvelle notification ne sera envoyée pour cette règle pendant {{.CooldownMessage}}.{{ end }}
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td align="center" class="text-muted" style="padding: 20px 0; font-size: 12px; color: #667382;">
+                ServerSupervisor
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
 </body>
 </html>

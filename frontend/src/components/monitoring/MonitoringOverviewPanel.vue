@@ -186,7 +186,7 @@
               <td>
                 <div
                   v-if="row.probe && probeHistory[row.probe.id]?.length"
-                  class="d-flex align-items-end gap-1"
+                  class="tracking"
                   style="height: 20px; min-width: 110px;"
                 >
                   <div
@@ -360,8 +360,12 @@
                 </div>
                 <div class="row g-3">
                   <div class="col-md-7">
-                    <label class="form-label required">Nom</label>
+                    <label
+                      for="monitoring-edit-probe-name"
+                      class="form-label required"
+                    >Nom</label>
                     <input
+                      id="monitoring-edit-probe-name"
                       v-model="probeForm.name"
                       type="text"
                       class="form-control"
@@ -370,8 +374,12 @@
                     >
                   </div>
                   <div class="col-md-5">
-                    <label class="form-label required">Type</label>
+                    <label
+                      for="monitoring-edit-probe-type"
+                      class="form-label required"
+                    >Type</label>
                     <select
+                      id="monitoring-edit-probe-type"
                       v-model="probeForm.type"
                       class="form-select"
                     >
@@ -387,8 +395,12 @@
                     </select>
                   </div>
                   <div class="col-12">
-                    <label class="form-label required">{{ probeTargetLabel }}</label>
+                    <label
+                      for="monitoring-edit-probe-target"
+                      class="form-label required"
+                    >{{ probeTargetLabel }}</label>
                     <input
+                      id="monitoring-edit-probe-target"
                       v-model="probeForm.target"
                       type="text"
                       class="form-control"
@@ -404,8 +416,12 @@
                     </div>
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label">Intervalle (sec)</label>
+                    <label
+                      for="monitoring-edit-probe-interval"
+                      class="form-label"
+                    >Intervalle (sec)</label>
                     <input
+                      id="monitoring-edit-probe-interval"
                       v-model.number="probeForm.interval_sec"
                       type="number"
                       min="10"
@@ -413,8 +429,12 @@
                     >
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label">Timeout (sec)</label>
+                    <label
+                      for="monitoring-edit-probe-timeout"
+                      class="form-label"
+                    >Timeout (sec)</label>
                     <input
+                      id="monitoring-edit-probe-timeout"
                       v-model.number="probeForm.timeout_sec"
                       type="number"
                       min="1"
@@ -424,8 +444,12 @@
                   </div>
                   <template v-if="probeForm.type === 'http'">
                     <div class="col-md-4">
-                      <label class="form-label">Statut HTTP attendu</label>
+                      <label
+                        for="monitoring-edit-probe-expected-status"
+                        class="form-label"
+                      >Statut HTTP attendu</label>
                       <input
+                        id="monitoring-edit-probe-expected-status"
                         v-model.number="probeForm.expected_status"
                         type="number"
                         min="100"
@@ -434,8 +458,12 @@
                       >
                     </div>
                     <div class="col-12">
-                      <label class="form-label">Regex corps attendu (optionnel)</label>
+                      <label
+                        for="monitoring-edit-probe-expected-body-regex"
+                        class="form-label"
+                      >Regex corps attendu (optionnel)</label>
                       <input
+                        id="monitoring-edit-probe-expected-body-regex"
                         v-model="probeForm.expected_body_regex"
                         type="text"
                         class="form-control"
@@ -505,8 +533,12 @@
                   {{ certFormError }}
                 </div>
                 <div class="mb-3">
-                  <label class="form-label required">Nom</label>
+                  <label
+                    for="monitoring-edit-cert-name"
+                    class="form-label required"
+                  >Nom</label>
                   <input
+                    id="monitoring-edit-cert-name"
                     v-model="certForm.name"
                     type="text"
                     class="form-control"
@@ -516,8 +548,12 @@
                 </div>
                 <div class="row g-3">
                   <div class="col-md-8">
-                    <label class="form-label required">Hôte</label>
+                    <label
+                      for="monitoring-edit-cert-host"
+                      class="form-label required"
+                    >Hôte</label>
                     <input
+                      id="monitoring-edit-cert-host"
                       v-model="certForm.host"
                       type="text"
                       class="form-control"
@@ -526,8 +562,12 @@
                     >
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label required">Port</label>
+                    <label
+                      for="monitoring-edit-cert-port"
+                      class="form-label required"
+                    >Port</label>
                     <input
+                      id="monitoring-edit-cert-port"
                       v-model.number="certForm.port"
                       type="number"
                       min="1"
@@ -536,8 +576,12 @@
                     >
                   </div>
                   <div class="col-12">
-                    <label class="form-label">SNI (override, optionnel)</label>
+                    <label
+                      for="monitoring-edit-cert-sni"
+                      class="form-label"
+                    >SNI (override, optionnel)</label>
                     <input
+                      id="monitoring-edit-cert-sni"
                       v-model="certForm.server_name"
                       type="text"
                       class="form-control"
@@ -606,8 +650,12 @@
                   {{ probeFormError || certFormError }}
                 </div>
                 <div class="mb-3">
-                  <label class="form-label required">Nom</label>
+                  <label
+                    for="monitoring-create-name"
+                    class="form-label required"
+                  >Nom</label>
                   <input
+                    id="monitoring-create-name"
                     v-model="sharedName"
                     type="text"
                     class="form-control"
@@ -619,8 +667,12 @@
                 <template v-if="createIncludeProbe">
                   <div class="row g-3">
                     <div class="col-md-5">
-                      <label class="form-label required">Type</label>
+                      <label
+                        for="monitoring-create-probe-type"
+                        class="form-label required"
+                      >Type</label>
                       <select
+                        id="monitoring-create-probe-type"
                         v-model="probeForm.type"
                         class="form-select"
                       >
@@ -636,8 +688,12 @@
                       </select>
                     </div>
                     <div class="col-md-7">
-                      <label class="form-label required">{{ probeTargetLabel }}</label>
+                      <label
+                        for="monitoring-create-probe-target"
+                        class="form-label required"
+                      >{{ probeTargetLabel }}</label>
                       <input
+                        id="monitoring-create-probe-target"
                         v-model="probeForm.target"
                         type="text"
                         class="form-control"
@@ -653,8 +709,12 @@
                       </div>
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">Intervalle (sec)</label>
+                      <label
+                        for="monitoring-create-probe-interval"
+                        class="form-label"
+                      >Intervalle (sec)</label>
                       <input
+                        id="monitoring-create-probe-interval"
                         v-model.number="probeForm.interval_sec"
                         type="number"
                         min="10"
@@ -662,8 +722,12 @@
                       >
                     </div>
                     <div class="col-md-4">
-                      <label class="form-label">Timeout (sec)</label>
+                      <label
+                        for="monitoring-create-probe-timeout"
+                        class="form-label"
+                      >Timeout (sec)</label>
                       <input
+                        id="monitoring-create-probe-timeout"
                         v-model.number="probeForm.timeout_sec"
                         type="number"
                         min="1"
@@ -673,8 +737,12 @@
                     </div>
                     <template v-if="probeForm.type === 'http'">
                       <div class="col-md-4">
-                        <label class="form-label">Statut HTTP attendu</label>
+                        <label
+                          for="monitoring-create-probe-expected-status"
+                          class="form-label"
+                        >Statut HTTP attendu</label>
                         <input
+                          id="monitoring-create-probe-expected-status"
                           v-model.number="probeForm.expected_status"
                           type="number"
                           min="100"
@@ -683,8 +751,12 @@
                         >
                       </div>
                       <div class="col-12">
-                        <label class="form-label">Regex corps attendu (optionnel)</label>
+                        <label
+                          for="monitoring-create-probe-expected-body-regex"
+                          class="form-label"
+                        >Regex corps attendu (optionnel)</label>
                         <input
+                          id="monitoring-create-probe-expected-body-regex"
                           v-model="probeForm.expected_body_regex"
                           type="text"
                           class="form-control"
@@ -733,8 +805,12 @@
                   <div class="row g-3">
                     <template v-if="!createIncludeProbe">
                       <div class="col-md-8">
-                        <label class="form-label required">Hôte</label>
+                        <label
+                          for="monitoring-create-cert-host"
+                          class="form-label required"
+                        >Hôte</label>
                         <input
+                          id="monitoring-create-cert-host"
                           v-model="certForm.host"
                           type="text"
                           class="form-control"
@@ -743,8 +819,12 @@
                         >
                       </div>
                       <div class="col-md-4">
-                        <label class="form-label required">Port</label>
+                        <label
+                          for="monitoring-create-cert-port"
+                          class="form-label required"
+                        >Port</label>
                         <input
+                          id="monitoring-create-cert-port"
                           v-model.number="certForm.port"
                           type="number"
                           min="1"
@@ -760,8 +840,12 @@
                       Certificat SSL vérifié sur <code>{{ certForm.host || '—' }}:{{ certForm.port }}</code> (dérivé de la cible de la sonde ci-dessus).
                     </div>
                     <div class="col-12">
-                      <label class="form-label">SNI (override, optionnel)</label>
+                      <label
+                        for="monitoring-create-cert-sni"
+                        class="form-label"
+                      >SNI (override, optionnel)</label>
                       <input
+                        id="monitoring-create-cert-sni"
                         v-model="certForm.server_name"
                         type="text"
                         class="form-control"

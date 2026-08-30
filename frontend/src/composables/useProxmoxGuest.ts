@@ -1,11 +1,13 @@
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import type { ApexOptions } from 'apexcharts'
 import dayjs from '../utils/dayjs'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
-import type { ChartData } from 'chart.js'
+import { getApexChartPalette } from '../utils/apexChartTheme'
+import { breakLargeGaps } from '../utils/chartTimeAxis'
 import type { ProxmoxGuestLink } from '../types/generated'
 
 export type { GuestPowerAction }
@@ -13,6 +15,8 @@ export type { GuestPowerAction }
 const GUEST_REFRESH_SEC = 30
 
 interface GuestMetricPoint { timestamp: string; cpu_avg?: number; memory_avg?: number; [key: string]: unknown }
+interface ChartPoint { x: number; y: number | null }
+type GuestChartSeries = { name: string; data: ChartPoint[]; color: string }[]
 
 interface ProxmoxGuest {
   id: string
@@ -43,7 +47,7 @@ export function useProxmoxGuest() {
   const summaryLoading = ref(false)
   const error = ref('')
   const hours = ref(24)
-  const chartData = ref<ChartData<'line'> | null>(null)
+  const series = shallowRef<GuestChartSeries | null>(null)
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
   const actionLoading = computed(() => guestActions.isLoading(guest.value?.id))
@@ -73,6 +77,17 @@ export function useProxmoxGuest() {
     if (inputHours <= 24) return 5
     if (inputHours <= 168) return 15
     return 60
+  }
+
+  // The requested window, not the min/max of whatever points came back —
+  // sparse data (e.g. the guest was off for most of the range) used to
+  // shrink/shift the visible axis to just the span of real samples, which
+  // for 1h/6h (1-minute buckets, so a single stale or missing sample swings
+  // the axis a lot) made the chart look broken rather than just showing a
+  // gap in an otherwise correctly-scaled 1h/6h/24h/... window.
+  function chartWindow(): { min: number; max: number } {
+    const max = Date.now()
+    return { min: max - hours.value * 60 * 60 * 1000, max }
   }
 
   async function loadGuest(): Promise<void> {
@@ -177,8 +192,56 @@ export function useProxmoxGuest() {
     }
   }
 
-  function cssVar(name: string): string {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  function formatChartTime(timestampMs: number): string {
+    const d = dayjs(timestampMs)
+    if (!d.isValid()) return ''
+    return hours.value >= 24 ? d.format('DD/MM HH:mm') : d.format('HH:mm')
+  }
+
+  // Rebuilt on every load (not a `computed` over `series`, just a plain
+  // shallowRef reassigned in loadGuestSummary): the view only ever renders
+  // <ApexChart> while `!summaryLoading`, and loadGuestSummary sets
+  // summaryLoading true for its whole duration — so the chart component is
+  // fully unmounted before this is reassigned and remounts fresh afterwards,
+  // reading the new object as its initial `:options` prop. That sidesteps
+  // vue3-apexcharts' real footgun (it clones `:options` via
+  // JSON.parse(JSON.stringify(...)) on every *reactive* update to an
+  // *already-mounted* instance, silently dropping functions like
+  // labels.formatter/tooltip.custom) without needing a second, imperative
+  // update path — a prior version pushed xaxis.min/max via the chart
+  // instance's exposed updateOptions() method instead, but that instance is
+  // unmounted (ref already null) by the time loadGuestSummary reaches it, so
+  // range changes silently never reached the chart.
+  const chartOptions = shallowRef<ApexOptions | null>(null)
+
+  function buildChartOptions(): ApexOptions {
+    const palette = getApexChartPalette()
+    const { min, max } = chartWindow()
+    return {
+      chart: { type: 'area', background: 'transparent', toolbar: { show: false }, zoom: { enabled: false }, animations: { enabled: false }, parentHeightOffset: 0 },
+      theme: { mode: 'dark' },
+      fill: { type: 'solid', opacity: 0.1 },
+      stroke: { curve: 'smooth', width: 2 },
+      markers: { size: 0, hover: { size: 5 } },
+      dataLabels: { enabled: false },
+      legend: { show: true, position: 'top', labels: { colors: palette.legendText }, markers: { size: 5 } },
+      grid: { borderColor: palette.grid },
+      xaxis: {
+        type: 'datetime',
+        min,
+        max,
+        labels: { style: { colors: palette.tickText }, formatter: (v: string) => formatChartTime(Number(v)) },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        tooltip: { enabled: false },
+      },
+      yaxis: { min: 0, max: 100, labels: { style: { colors: palette.tickText }, formatter: (v: number) => `${v.toFixed(0)}%` } },
+      tooltip: {
+        shared: true,
+        x: { formatter: (v: number) => formatChartTime(v) },
+        y: { formatter: (v: number) => (v != null ? `${Number(v).toFixed(1)}%` : '—') },
+      },
+    }
   }
 
   async function loadGuestSummary(): Promise<void> {
@@ -189,33 +252,32 @@ export function useProxmoxGuest() {
       const res = await api.getProxmoxGuestMetrics(guest.value.id, hours.value, bucketMinutes, signal)
       const points = Array.isArray(res.data) ? res.data : []
       if (!points.length) {
-        chartData.value = null
+        series.value = null
+        chartOptions.value = null
         return
       }
-      const labels = points.map((p: GuestMetricPoint) =>
-        hours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
-      )
-      chartData.value = {
-        labels,
-        datasets: [
-          {
-            label: 'CPU %',
-            data: points.map((p: GuestMetricPoint) => Number(p.cpu_avg ?? 0)),
-            borderColor: cssVar('--tblr-blue'),
-            backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.10)`,
-            fill: true,
-          },
-          {
-            label: 'RAM %',
-            data: points.map((p: GuestMetricPoint) => Number(p.memory_avg ?? 0)),
-            borderColor: cssVar('--tblr-green'),
-            backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.10)`,
-            fill: true,
-          },
-        ],
-      }
+      const palette = getApexChartPalette()
+      // A gap wider than a few sampling intervals is a real hole in the
+      // data (guest was off, polling stalled, ...) — break the line there
+      // instead of letting ApexCharts draw a straight/smooth interpolation
+      // across it, which visually reads as fabricated low/flat activity.
+      const maxGapMs = bucketMinutes * 60 * 1000 * 3
+      series.value = [
+        {
+          name: 'CPU %',
+          data: breakLargeGaps(points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.cpu_avg ?? 0) })), maxGapMs),
+          color: palette.cpu,
+        },
+        {
+          name: 'RAM %',
+          data: breakLargeGaps(points.map((p: GuestMetricPoint) => ({ x: dayjs(p.timestamp).valueOf(), y: Number(p.memory_avg ?? 0) })), maxGapMs),
+          color: palette.ram,
+        },
+      ]
+      chartOptions.value = buildChartOptions()
     } catch {
-      chartData.value = null
+      series.value = null
+      chartOptions.value = null
     } finally {
       summaryLoading.value = false
     }
@@ -230,6 +292,26 @@ export function useProxmoxGuest() {
     if (!guest.value) return
     await guestActions.performGuestAction(guest.value, action, loadGuest)
   }
+
+  // null = not checked yet (or the check itself failed — fail open, don't
+  // block the console button on a fetch error). Only meaningful for lxc
+  // guests; PVE console credentials live on the guest's Proxmox connection,
+  // not the guest itself, so this needs a separate lookup.
+  const consoleConfigured = ref<boolean | null>(null)
+
+  watch(guest, (g) => {
+    consoleConfigured.value = null
+    if (!g || g.guest_type !== 'lxc') return
+    api.getProxmoxInstance(g.connection_id)
+      .then((res) => { consoleConfigured.value = res.data.console_configured })
+      .catch(() => { consoleConfigured.value = null })
+  }, { immediate: true })
+
+  const consoleButtonTitle = computed(() => {
+    if (!guest.value || guest.value.guest_type !== 'lxc') return 'VM QEMU : bientôt disponible'
+    if (consoleConfigured.value === false) return 'Console PVE non configurée pour cette connexion (Paramètres → Proxmox VE)'
+    return 'Ouvrir une console interactive'
+  })
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined
   onMounted(async () => {
@@ -251,7 +333,8 @@ export function useProxmoxGuest() {
     summaryLoading,
     error,
     hours,
-    chartData,
+    series,
+    chartOptions,
     autoRefresh,
     lastUpdatedAt,
     GUEST_REFRESH_SEC,
@@ -266,5 +349,7 @@ export function useProxmoxGuest() {
     linkMsgOk,
     confirmLink,
     ignoreLink,
+    consoleConfigured,
+    consoleButtonTitle,
   }
 }

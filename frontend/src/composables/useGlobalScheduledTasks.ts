@@ -173,7 +173,7 @@ export function useGlobalScheduledTasks() {
 
   const hostList = computed(() => {
     const names = [...new Set(tasks.value.map((t) => t.host_name))]
-    return names.sort()
+    return names.sort((a, b) => a.localeCompare(b))
   })
 
   const filteredTasks = computed(() => {
@@ -372,6 +372,7 @@ export function useGlobalScheduledTasks() {
       addToast(`${task.name} déclenchée — commande ${data.command_id}`, 'success')
       await loadTasks()
       await pendingCommand.track(data.command_id)
+      await loadTasks()
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, 'Erreur')
     } finally {

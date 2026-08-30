@@ -1,0 +1,19 @@
+# CVE-2026-56860 / GO-2026-6218: quadratic complexity in net/url path
+# resolution. This is a Go standard library fix (net/url@go1.25.13),
+# already applied here — server/go.mod pins `go 1.25.13` and govulncheck
+# confirms 0 vulnerabilities. OSS Index also tags this CVE against the
+# golang.org/x/net module coordinate, but x/net has no release beyond
+# v0.58.0 (already pinned) that changes anything for it — there is no
+# further fix to bump to. Revisit if OSS Index publishes a corrected
+# mapping or x/net ships a release addressing it directly.
+CVE-2026-56860
+
+# CVE-2026-56859: encoding/xml DecodeElement depth-counter reset leading to
+# stack exhaustion (go.dev/issue/80481). Also a Go standard library fix,
+# already applied here — both Go 1.25.13 and 1.26.6 include it, and
+# govulncheck confirms 0 reachable vulnerabilities (the one module-level
+# entry it lists is this same CVE, not called by our code). OSS Index tags
+# it against golang.org/x/net for the same reason as CVE-2026-56860 above:
+# no x/net release beyond the one already pinned addresses it. Same
+# revisit condition as CVE-2026-56860.
+CVE-2026-56859
