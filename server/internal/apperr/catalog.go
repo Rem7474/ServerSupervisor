@@ -1,8 +1,11 @@
-package errors
+package apperr
 
 import "strings"
 
-// Error codes — used to identify error types consistently
+// Error codes — stable identifiers for ErrorCatalog, independent of the
+// coarse HTTP-category Code above (e.g. "not_found"). A handler/service
+// attaches one via Error.I18n so respondError can render it in the
+// caller's language; Message stays the English/dev-facing fallback.
 const (
 	// Authentication & Authorization
 	CodeAdminRequired    = "ADMIN_REQUIRED"
@@ -32,15 +35,22 @@ const (
 	// Notifications
 	CodeInvalidMetric   = "INVALID_METRIC"
 	CodeInvalidOperator = "INVALID_OPERATOR"
+
+	// Git release providers (internal/gitprovider)
+	CodeGitProviderUnauthorized = "GIT_PROVIDER_UNAUTHORIZED"
+	CodeGitProviderRateLimited  = "GIT_PROVIDER_RATE_LIMITED"
+	CodeGitProviderNotFound     = "GIT_PROVIDER_NOT_FOUND"
+	CodeGitProviderError        = "GIT_PROVIDER_ERROR"
 )
 
-// ErrorMessage holds translated strings for errors
+// ErrorMessage holds translated strings for a catalog entry. {name}
+// placeholders are substituted from the Params passed to GetMessage.
 type ErrorMessage struct {
-	EN string // English message
-	FR string // French message
+	EN string
+	FR string
 }
 
-// ErrorCatalog maps error codes to translated messages
+// ErrorCatalog maps stable i18n keys to translated messages.
 var ErrorCatalog = map[string]ErrorMessage{
 	CodeAdminRequired: {
 		EN: "admin access required",
@@ -118,53 +128,72 @@ var ErrorCatalog = map[string]ErrorMessage{
 		EN: "invalid operator",
 		FR: "opérateur invalide",
 	},
+	CodeGitProviderUnauthorized: {
+		EN: "invalid or expired GitHub token (401) — check GITHUB_TOKEN in settings",
+		FR: "token GitHub invalide ou expiré (401) — vérifiez GITHUB_TOKEN dans les paramètres",
+	},
+	CodeGitProviderRateLimited: {
+		EN: "GitHub rate limit reached (403) — configure a GITHUB_TOKEN to raise the limit",
+		FR: "limite de taux GitHub atteinte (403) — configurez un GITHUB_TOKEN pour augmenter la limite",
+	},
+	CodeGitProviderNotFound: {
+		EN: "repository not found on GitHub (404) — check owner/repo",
+		FR: "dépôt introuvable sur GitHub (404) — vérifiez owner/repo",
+	},
+	CodeGitProviderError: {
+		EN: "GitHub API error ({status})",
+		FR: "erreur GitHub API ({status})",
+	},
 }
 
-// ErrorResponse is the standard error response structure
+// ErrorResponse is the standalone error-response shape used by call sites
+// that render an error directly (outside the apperr.Error/respondError
+// path), e.g. request-validation checks that fail before a service call.
 type ErrorResponse struct {
 	Error string `json:"error"`
-	Code  string `json:"code,omitempty"` // Optional: error code for client-side handling
+	Code  string `json:"code,omitempty"`
 }
 
-// NewErrorResponse creates an ErrorResponse from error code and language
-func NewErrorResponse(errorCode, lang string) ErrorResponse {
+// NewErrorResponse builds an ErrorResponse from an i18n key and language.
+func NewErrorResponse(errorCode, lang string, params map[string]string) ErrorResponse {
 	return ErrorResponse{
-		Error: GetMessage(errorCode, lang),
+		Error: GetMessage(errorCode, lang, params),
 		Code:  errorCode,
 	}
 }
 
-// GetMessage returns translated error message for given code and language
-// Defaults to English if language is not "fr" or message not found
-func GetMessage(errorCode, lang string) string {
+// GetMessage returns the translated message for a catalog key, with any
+// {name} placeholders substituted from params. Falls back to English if lang
+// isn't "fr"; falls back to the bare code if it isn't in the catalog.
+func GetMessage(errorCode, lang string, params map[string]string) string {
 	msg, found := ErrorCatalog[errorCode]
 	if !found {
 		return "error: " + errorCode
 	}
 
-	// Normalize language to lowercase
-	lang = strings.ToLower(lang)
-	if lang == "fr" {
-		return msg.FR
+	text := msg.EN
+	if strings.ToLower(lang) == "fr" {
+		text = msg.FR
 	}
-	return msg.EN
+	for name, value := range params {
+		text = strings.ReplaceAll(text, "{"+name+"}", value)
+	}
+	return text
 }
 
-// GetMessageFromHeader extracts language from Accept-Language header
-// Format: "fr-FR,fr;q=0.9,en;q=0.8" returns "fr"
-// Defaults to "en" if not found or empty
+// GetLanguageFromAcceptLanguage extracts a supported language ("fr" or "en")
+// from an Accept-Language header, e.g. "fr-FR,fr;q=0.9,en;q=0.8" → "fr".
+// Defaults to "en" if not found, empty, or unsupported.
 func GetLanguageFromAcceptLanguage(acceptLanguage string) string {
 	if acceptLanguage == "" {
 		return "en"
 	}
 
-	// Split by comma and get first component
 	parts := strings.Split(acceptLanguage, ",")
 	if len(parts) == 0 {
 		return "en"
 	}
 
-	// Get language code (e.g., "fr" from "fr-FR" or "fr;q=0.9")
 	first := strings.TrimSpace(parts[0])
 	if idx := strings.Index(first, "-"); idx > 0 {
 		first = first[:idx]
@@ -173,8 +202,7 @@ func GetLanguageFromAcceptLanguage(acceptLanguage string) string {
 		first = first[:idx]
 	}
 
-	lang := strings.ToLower(strings.TrimSpace(first))
-	if lang == "fr" {
+	if strings.ToLower(strings.TrimSpace(first)) == "fr" {
 		return "fr"
 	}
 	return "en"
