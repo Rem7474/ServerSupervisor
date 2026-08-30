@@ -68,3 +68,44 @@ describe('SettingsThreatDetectionCard (characterization)', () => {
     expect(wrapper.emitted('save')).toBeTruthy()
   })
 })
+
+describe('SettingsThreatDetectionCard — every field writes emit a whole-object update:form, never mutate the prop', () => {
+  // Each field is wired to its own fieldModel('<key>') call by hand in the
+  // component — a copy-paste error there (e.g. two fields sharing a key)
+  // would make one field silently control another's value. Checking every
+  // id individually catches exactly that, which a single representative
+  // field wouldn't.
+  const fieldIdToKey: Record<string, keyof ReturnType<typeof defaultForm>> = {
+    'threat-weight-wordpress': 'threatWeightWordpress',
+    'threat-weight-adminpanel': 'threatWeightAdminpanel',
+    'threat-weight-pathtraversal': 'threatWeightPathtraversal',
+    'threat-weight-knownscanner': 'threatWeightKnownscanner',
+    'threat-weight-suspiciousmethod': 'threatWeightSuspiciousmethod',
+    'threat-weight-status-2xx': 'threatWeightStatus2xx',
+    'threat-weight-status-3xx': 'threatWeightStatus3xx',
+    'threat-weight-status-404': 'threatWeightStatus404',
+    'threat-weight-status-4xx': 'threatWeightStatus4xx',
+    'threat-weight-status-5xx': 'threatWeightStatus5xx',
+    'threat-weight-breadth': 'threatWeightBreadth',
+    'threat-weight-hits': 'threatWeightHits',
+    'threat-threshold-medium': 'threatThresholdMedium',
+    'threat-threshold-high': 'threatThresholdHigh',
+    'threat-threshold-critical': 'threatThresholdCritical',
+  }
+
+  for (const [id, key] of Object.entries(fieldIdToKey)) {
+    it(`#${id} writes only ${key}`, async () => {
+      const form = defaultForm()
+      const wrapper = mount(SettingsThreatDetectionCard, { props: { form } })
+
+      await wrapper.find(`#${id}`).setValue(999)
+
+      const next = wrapper.emitted('update:form')![0][0] as ReturnType<typeof defaultForm>
+      expect(next[key]).toBe(999)
+      for (const otherKey of Object.keys(form) as Array<keyof ReturnType<typeof defaultForm>>) {
+        if (otherKey !== key) expect(next[otherKey]).toBe(form[otherKey])
+      }
+      expect(form[key]).not.toBe(999) // prop untouched
+    })
+  }
+})

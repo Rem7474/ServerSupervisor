@@ -95,3 +95,102 @@ describe('AlertRuleStepSource (characterization, per source-type branches)', () 
     expect(wrapper.find('#alert-source-docker-project').exists()).toBe(true)
   })
 })
+
+describe('AlertRuleStepSource — field writes emit a whole-object update:form, never mutate the prop', () => {
+  it('hostIdModel (plain fieldModel) emits the merged form without touching sibling fields', async () => {
+    const form = formFor('cpu', { host_id: '' })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form }) })
+
+    await wrapper.find('#alert-source-host-id').setValue('host-1')
+
+    const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
+    expect(next.host_id).toBe('host-1')
+    expect(next.metric).toBe('cpu')
+    expect(form.host_id).toBe('') // prop untouched
+  })
+
+  it('onDockerHostChange atomically resets container_id/container_ids/project_name alongside host_id', async () => {
+    const form = formFor('docker_container_state', {
+      docker_scope: { ...formFor('cpu').docker_scope, host_id: 'host-1', container_ids: ['c1'], project_name: 'app' },
+    })
+    const wrapper = mount(AlertRuleStepSource, {
+      props: baseProps({
+        form,
+        dockerHosts: [
+          { host_id: 'host-1', host_name: 'srv-web', containers: [], projects: [] },
+          { host_id: 'host-2', host_name: 'srv-db', containers: [], projects: [] },
+        ],
+      }),
+    })
+
+    await wrapper.find('#alert-source-docker-host').setValue('host-2')
+
+    const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
+    expect(next.docker_scope.host_id).toBe('host-2')
+    expect(next.docker_scope.container_ids).toEqual([])
+    expect(next.docker_scope.project_name).toBe('')
+    // Sibling docker_scope fields (e.g. scope_mode) untouched by this reset.
+    expect(next.docker_scope.scope_mode).toBe(form.docker_scope.scope_mode)
+    expect(form.docker_scope.container_ids).toEqual(['c1']) // prop untouched
+  })
+
+  it('onDockerScopeModeChange resets the container selection when switching scope mode', async () => {
+    const form = formFor('docker_container_state', {
+      docker_scope: { ...formFor('cpu').docker_scope, scope_mode: 'container', host_id: 'host-1', container_ids: ['c1'] },
+    })
+    const wrapper = mount(AlertRuleStepSource, {
+      props: baseProps({
+        form,
+        dockerHosts: [{ host_id: 'host-1', host_name: 'srv-web', containers: [{ id: 'c1', name: 'web', state: 'running' }], projects: [] }],
+      }),
+    })
+
+    await wrapper.find('#alert-source-docker-scope-mode').setValue('host')
+
+    const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
+    expect(next.docker_scope.scope_mode).toBe('host')
+    expect(next.docker_scope.container_ids).toEqual([])
+    expect(form.docker_scope.scope_mode).toBe('container') // prop untouched
+  })
+
+  it('toggleContainer adds/removes one container id without clearing the others', async () => {
+    const form = formFor('docker_container_state', {
+      docker_scope: { ...formFor('cpu').docker_scope, scope_mode: 'container', host_id: 'host-1', container_ids: ['c1'] },
+    })
+    const wrapper = mount(AlertRuleStepSource, {
+      props: baseProps({
+        form,
+        dockerHosts: [{
+          host_id: 'host-1',
+          host_name: 'srv-web',
+          containers: [
+            { id: 'c1', name: 'web', state: 'running' },
+            { id: 'c2', name: 'worker', state: 'running' },
+          ],
+          projects: [],
+        }],
+      }),
+    })
+
+    const checkboxes = wrapper.findAll('.docker-container-checklist input[type="checkbox"]')
+    expect(checkboxes).toHaveLength(2)
+    await checkboxes[1].setValue(true) // check c2, c1 already selected in the form
+
+    const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
+    expect(next.docker_scope.container_ids.sort()).toEqual(['c1', 'c2'])
+    expect(form.docker_scope.container_ids).toEqual(['c1']) // prop untouched
+  })
+
+  it('proxmoxScopeModeModel (proxmoxScopeModel factory) emits the merged form', async () => {
+    const form = formFor('proxmox_node_cpu_percent', {
+      proxmox_scope: { ...formFor('cpu').proxmox_scope, scope_mode: 'connection' },
+    })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form }) })
+
+    await wrapper.find('#alert-source-proxmox-scope-mode').setValue('node')
+
+    const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
+    expect(next.proxmox_scope.scope_mode).toBe('node')
+    expect(form.proxmox_scope.scope_mode).toBe('connection') // prop untouched
+  })
+})
