@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/errors"
+	"github.com/serversupervisor/server/internal/apperr"
 )
 
 // ─── Live node status (proxied from PVE, not stored in DB) ───────────────────
@@ -26,8 +26,8 @@ func (h *ProxmoxHandler) GetNodeRRD(c *gin.Context) {
 	switch timeframe {
 	case "hour", "day", "week", "month", "year":
 	default:
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusBadRequest, errors.NewErrorResponse(errors.CodeInvalidTimeframe, lang))
+		lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusBadRequest, apperr.NewErrorResponse(apperr.CodeInvalidTimeframe, lang, nil))
 		return
 	}
 	points, err := h.svc.NodeRRD(c.Request.Context(), c.Param("id"), timeframe)
