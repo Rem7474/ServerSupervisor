@@ -55,3 +55,64 @@ describe('AlertRuleStepConditions (characterization, per-metric branches)', () =
     }
   })
 })
+
+describe('AlertRuleStepConditions — field writes emit a whole-object update:form, never mutate the prop', () => {
+  it('toggleState adds/removes a docker state without touching the other severity list', async () => {
+    const form = formFor('docker_container_state')
+    const wrapper = mountStep(form)
+
+    const warnExited = wrapper.find('input[type="checkbox"]')
+    await warnExited.setValue(true)
+
+    let emitted = wrapper.emitted('update:form')
+    expect(emitted).toHaveLength(1)
+    let next = emitted![0][0] as AlertRuleFormData
+    expect(next.docker_scope.warn_states).toContain('created')
+    expect(next.docker_scope.crit_states).toEqual(form.docker_scope.crit_states)
+    // The original prop object must be untouched — this is exactly the
+    // regression S8951 flagged (mutating props.form in place).
+    expect(form.docker_scope.warn_states).not.toContain('created')
+
+    // Feed the emitted value back in (as the real v-model:form parent
+    // would) and uncheck it again.
+    await wrapper.setProps({ form: next })
+    await warnExited.setValue(false)
+    emitted = wrapper.emitted('update:form')
+    next = emitted![1][0] as AlertRuleFormData
+    expect(next.docker_scope.warn_states).not.toContain('created')
+  })
+
+  it('durationModel emits the merged form with only duration changed', async () => {
+    const form = formFor('docker_container_state', { duration: 60 })
+    const wrapper = mountStep(form)
+
+    await wrapper.find('#alert-cond-duration').setValue(120)
+
+    const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
+    expect(next.duration).toBe(120)
+    expect(next.metric).toBe('docker_container_state')
+    expect(form.duration).toBe(60) // prop untouched
+  })
+
+  it('operatorModel (a non-numeric field) emits the merged form via the same fieldModel factory', async () => {
+    const form = formFor('cpu', { operator: '>' })
+    const wrapper = mountStep(form)
+
+    await wrapper.find('#alert-cond-operator').setValue('<')
+
+    const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
+    expect(next.operator).toBe('<')
+    expect(form.operator).toBe('>') // prop untouched
+  })
+
+  it('threshold_clear_warn/crit writes go through the same updateForm path as the trigger thresholds', async () => {
+    const form = formFor('cpu', { operator: '>', threshold_warn: 80, threshold_clear_warn: 70 })
+    const wrapper = mountStep(form)
+
+    await wrapper.find('#alert-cond-threshold-clear-warn').setValue(75)
+
+    const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
+    expect(next.threshold_clear_warn).toBe(75)
+    expect(next.threshold_warn).toBe(80) // untouched sibling field
+  })
+})

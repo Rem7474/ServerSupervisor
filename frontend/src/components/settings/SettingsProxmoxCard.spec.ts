@@ -101,8 +101,13 @@ describe('SettingsProxmoxCard — test connection', () => {
     await wrapper.find('input[placeholder="Mon cluster PVE"]').setValue('new-conn')
     await wrapper.find('input[placeholder="https://pve.example.com:8006/api2/json"]').setValue('https://pve2:8006/api2/json')
     await wrapper.find('input[placeholder="root@pam!supervision"]').setValue('root@pam!tok')
+    // Two distinct fields share autocomplete="new-password" (token secret,
+    // then PVE console password) — find() only grabs the first, so the
+    // second is queried by id instead to actually exercise form.pve_password
+    // (v-model'd there, otherwise never touched by any test).
     await wrapper.find('input[autocomplete="new-password"]').setValue('secret')
     await wrapper.find('input[placeholder="root@pam"]').setValue('root@pam')
+    await wrapper.find('#proxmox-pve-password').setValue('pve-secret')
 
     const testBtn = wrapper.findAll('button').find((b) => b.text().includes('Tester la connexion'))
     await testBtn!.trigger('click')
@@ -114,6 +119,7 @@ describe('SettingsProxmoxCard — test connection', () => {
       token_id: 'root@pam!tok',
       token_secret: 'secret',
       pve_username: 'root@pam',
+      pve_password: 'pve-secret',
     }))
   })
 })
