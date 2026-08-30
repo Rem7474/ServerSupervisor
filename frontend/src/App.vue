@@ -4,7 +4,7 @@
     <a
       href="#main-content"
       class="skip-link visually-hidden-focusable"
-    >Aller au contenu principal</a>
+    >{{ t('common.skipToContent') }}</a>
 
     <!-- Sidebar + Main -->
     <div v-if="auth.isAuthenticated">
@@ -14,7 +14,7 @@
           <button
             class="navbar-toggler"
             type="button"
-            aria-label="Ouvrir le menu de navigation"
+            :aria-label="t('common.openNavMenu')"
             aria-controls="navbar-menu"
             :aria-expanded="navbarOpen"
             @click="navbarOpen = !navbarOpen"
@@ -34,7 +34,7 @@
             class="badge bg-danger-lt text-danger ms-2 py-2 hosts-down-badge d-none d-md-inline-flex align-items-center"
           >
             <IconAlertTriangle class="icon icon-sm me-1" />
-            {{ hostsDownCount }} HORS LIGNE
+            {{ hostsDownCount }} {{ t('common.offlineBadge') }}
           </span>
 
           <div class="navbar-nav flex-row order-last">
@@ -42,20 +42,20 @@
               <button
                 type="button"
                 class="btn btn-outline-secondary d-none d-sm-flex align-items-center gap-2 command-palette-trigger"
-                title="Rechercher (Ctrl+K)"
+                :title="t('common.searchShortcut')"
                 @click="paletteToggle"
               >
                 <IconSearch
                   :size="16"
                   class="icon"
                 />
-                <span class="text-secondary small">Rechercher…</span>
+                <span class="text-secondary small">{{ t('common.search') }}</span>
                 <kbd class="ms-2">Ctrl K</kbd>
               </button>
               <button
                 type="button"
                 class="btn btn-icon d-sm-none"
-                aria-label="Rechercher"
+                :aria-label="t('common.searchAriaLabel')"
                 @click="paletteToggle"
               >
                 <IconSearch :size="18" />
@@ -85,24 +85,56 @@
                   class="dropdown-menu dropdown-menu-end show user-dropdown"
                 >
                   <div class="dropdown-header">
-                    Compte
+                    {{ t('common.account') }}
                   </div>
                   <div class="dropdown-item text-secondary small">
-                    Rôle: {{ auth.role || 'inconnu' }}
+                    {{ t('common.role', { role: auth.role || t('common.roleUnknown') }) }}
                   </div>
+                  <div class="dropdown-item d-flex align-items-center justify-content-between">
+                    <span class="text-secondary small">{{ t('common.language') }}</span>
+                    <div
+                      class="btn-group btn-group-sm"
+                      role="group"
+                      :aria-label="t('common.language')"
+                    >
+                      <button
+                        type="button"
+                        class="btn btn-icon"
+                        :class="locale === 'fr' ? 'btn-primary' : 'btn-outline-secondary'"
+                        :title="t('common.languageFrench')"
+                        :aria-label="t('common.languageFrench')"
+                        :aria-pressed="locale === 'fr'"
+                        @click="switchLocale('fr')"
+                      >
+                        <span class="flag flag-xs flag-country-fr" />
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-icon"
+                        :class="locale === 'en' ? 'btn-primary' : 'btn-outline-secondary'"
+                        :title="t('common.languageEnglish')"
+                        :aria-label="t('common.languageEnglish')"
+                        :aria-pressed="locale === 'en'"
+                        @click="switchLocale('en')"
+                      >
+                        <span class="flag flag-xs flag-country-gb" />
+                      </button>
+                    </div>
+                  </div>
+                  <div class="dropdown-divider" />
                   <router-link
                     to="/account"
                     class="dropdown-item"
                     @click="userMenuOpen = false"
                   >
-                    Mon compte
+                    {{ t('common.myAccount') }}
                   </router-link>
                   <div class="dropdown-divider" />
                   <button
                     class="dropdown-item text-danger"
                     @click="handleLogout"
                   >
-                    Déconnexion
+                    {{ t('common.logout') }}
                   </button>
                 </div>
               </div>
@@ -128,7 +160,7 @@
             :class="['collapse navbar-collapse', { show: navbarOpen }]"
           >
             <ul class="navbar-nav">
-              <!-- Badge hôtes hors ligne (mobile: row 1's copy is hidden below md) -->
+              <!-- Offline-hosts badge (mobile: row 1's copy is hidden below md) -->
               <li
                 v-if="hostsDownCount > 0"
                 class="nav-item d-flex d-md-none align-items-center"
@@ -183,7 +215,7 @@
                     <span
                       v-if="item.to === '/proxmox' && suggestedProxmoxLinksCount > 0"
                       class="badge bg-azure-lt text-azure ms-1"
-                      :title="`${suggestedProxmoxLinksCount} liaison(s) hôte ↔ VM/LXC suggérée(s), à confirmer`"
+                      :title="t('common.proxmoxSuggestedLinks', { count: suggestedProxmoxLinksCount })"
                     >{{ suggestedProxmoxLinksCount }}</span>
                   </router-link>
                 </div>
@@ -204,8 +236,8 @@
             :size="20"
             class="icon flex-shrink-0"
           />
-          <span v-if="!isOnline">Pas de connexion réseau — les données affichées peuvent être obsolètes.</span>
-          <span v-else>Serveur injoignable — reconnexion en cours, les données affichées peuvent être obsolètes.</span>
+          <span v-if="!isOnline">{{ t('common.offlineNetwork') }}</span>
+          <span v-else>{{ t('common.serverUnreachable') }}</span>
         </div>
       </div>
 
@@ -219,7 +251,7 @@
           <button
             type="button"
             class="btn-close"
-            aria-label="Fermer"
+            :aria-label="t('common.close')"
             @click="httpError = ''"
           />
         </div>
@@ -255,9 +287,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { useRouter, useRoute } from 'vue-router'
+import { setLocale, type SupportedLocale } from './i18n'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
@@ -271,10 +305,15 @@ import { useAttentionCenter } from './composables/useAttentionCenter'
 import apiClient from './api'
 import { visibleNavSections, type NavSection } from './config/navigation'
 
+const { t, locale } = useI18n()
 const auth = useAuthStore()
 const hostsStore = useHostsStore()
 const router = useRouter()
 const route = useRoute()
+
+function switchLocale(l: SupportedLocale): void {
+  setLocale(l)
+}
 const { isOpen: paletteOpen, toggle: paletteToggle } = useCommandPalette()
 const navbarOpen = ref(false)
 const userMenuOpen = ref(false)
@@ -288,7 +327,7 @@ let unsubscribeHttpErrors: () => void = () => {}
 let unsubscribeNetworkOk: () => void = () => {}
 let resumeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
-// Computed property: compter les hôtes hors ligne
+// Count offline hosts
 const hostsDownCount = computed(() => {
   return hostsStore.hosts.filter(
     (h) => h.status === 'offline'
@@ -333,7 +372,7 @@ function handlePageShow(event: PageTransitionEvent): void {
   }
 }
 
-const visibleSections = computed(() => visibleNavSections(auth))
+const visibleSections = computed(() => visibleNavSections(auth, t))
 
 function isItemActive(to: string): boolean {
   return to === '/' ? route.path === '/' : route.path.startsWith(to)

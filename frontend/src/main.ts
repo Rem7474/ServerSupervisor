@@ -4,6 +4,7 @@ import App from './App.vue'
 import router from './router'
 import { i18n } from './i18n'
 import '@tabler/core/dist/css/tabler.min.css'
+import '@tabler/core/dist/css/tabler-flags.min.css'
 import './style.css'
 
 type FatalDetail = {

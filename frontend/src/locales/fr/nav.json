@@ -1,1 +1,51 @@
-{}
+{
+  "sections": {
+    "control": {
+      "label": "Centre de contrôle",
+      "items": {
+        "dashboard": "Dashboard",
+        "alerts": "Alertes",
+        "commands": "Commandes"
+      }
+    },
+    "hosts": {
+      "label": "Hôtes",
+      "items": {
+        "docker": "Docker",
+        "updates": "Mises à jour",
+        "monitoring": "Monitoring"
+      }
+    },
+    "automation": {
+      "label": "Automatisation",
+      "items": {
+        "scheduledTasks": "Tâches planifiées",
+        "runbooks": "Runbooks",
+        "gitAutomation": "Git / Automatisation"
+      }
+    },
+    "security": {
+      "label": "Sécurité",
+      "items": {
+        "webThreats": "Menaces web",
+        "webStats": "Stats web"
+      }
+    },
+    "infrastructure": {
+      "label": "Infrastructure",
+      "items": {
+        "proxmox": "Proxmox",
+        "network": "Réseau",
+        "npm": "NPM"
+      }
+    },
+    "settings": {
+      "label": "Réglages",
+      "items": {
+        "settings": "Paramètres",
+        "users": "Utilisateurs",
+        "audit": "Audit"
+      }
+    }
+  }
+}
