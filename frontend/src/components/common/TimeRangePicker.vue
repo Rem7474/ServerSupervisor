@@ -17,7 +17,7 @@
         :disabled="loading"
         @click="showCustomFields = !showCustomFields"
       >
-        Personnalisé…
+        {{ t('common.custom') }}
       </button>
     </div>
 
@@ -26,7 +26,7 @@
       class="d-flex align-items-end gap-2 flex-wrap"
     >
       <div>
-        <label class="form-label mb-0 small">Du</label>
+        <label class="form-label mb-0 small">{{ t('common.from') }}</label>
         <input
           v-model="fromLocal"
           type="datetime-local"
@@ -34,7 +34,7 @@
         >
       </div>
       <div>
-        <label class="form-label mb-0 small">Au</label>
+        <label class="form-label mb-0 small">{{ t('common.to') }}</label>
         <input
           v-model="toLocal"
           type="datetime-local"
@@ -47,7 +47,7 @@
         :disabled="loading"
         @click="applyCustom"
       >
-        Appliquer
+        {{ t('common.apply') }}
       </button>
       <div
         v-if="validationError"
@@ -61,8 +61,11 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import dayjs from '../../utils/dayjs'
 import type { TimeRangeModel, TimeRangePreset } from '../../types/timeRange'
+
+const { t } = useI18n()
 
 export type { TimeRangeModel, TimeRangePreset }
 
@@ -113,17 +116,17 @@ function selectPreset(value: string): void {
 function applyCustom(): void {
   validationError.value = ''
   if (!fromLocal.value || !toLocal.value) {
-    validationError.value = 'Renseignez les deux dates.'
+    validationError.value = t('common.fillBothDates')
     return
   }
   const from = new Date(fromLocal.value)
   const to = new Date(toLocal.value)
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-    validationError.value = 'Date invalide.'
+    validationError.value = t('common.invalidDate')
     return
   }
   if (to.getTime() <= from.getTime()) {
-    validationError.value = 'La date de fin doit être après le début.'
+    validationError.value = t('common.endAfterStart')
     return
   }
   modelValue.value = {

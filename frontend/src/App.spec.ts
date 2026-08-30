@@ -27,8 +27,13 @@ import App from './App.vue'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { emitHttpError, emitNetworkOk } from './utils/httpErrorBus'
+import { setLocale } from './i18n'
 
 function mountApp() {
+  // This suite's assertions are written against French copy (this app's
+  // default for its target audience) — happy-dom's navigator.language
+  // doesn't match, so without this the i18n auto-detect falls back to 'en'.
+  setLocale('fr')
   setActivePinia(createPinia())
   const auth = useAuthStore()
   auth.setAuth({ role: 'admin', username: 'admin' } as never, 'admin')

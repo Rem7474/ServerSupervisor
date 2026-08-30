@@ -27,21 +27,25 @@
         class="btn btn-sm btn-outline-danger"
         @click="reset"
       >
-        Réessayer
+        {{ t('common.retry') }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onErrorCaptured } from 'vue'
+import { ref, computed, onErrorCaptured } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle } from '@tabler/icons-vue'
 
-withDefaults(defineProps<{
+const { t } = useI18n()
+
+const props = withDefaults(defineProps<{
   title?: string
 }>(), {
-  title: 'Une erreur inattendue s\'est produite',
+  title: '',
 })
+const title = computed(() => props.title || t('common.unexpectedError'))
 
 const caught = ref(false)
 const message = ref('')
