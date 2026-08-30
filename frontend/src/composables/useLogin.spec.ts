@@ -131,4 +131,38 @@ describe('composables/useLogin', () => {
 
     expect(login.error.value).toBe('Identifiants invalides')
   })
+
+  it('redirects to /account when must_change_password is true', async () => {
+    mockGetOIDCStatus.mockResolvedValueOnce({ data: { enabled: false } })
+    mockLogin.mockResolvedValueOnce({
+      data: { role: 'admin', username: 'admin', must_change_password: true },
+    })
+
+    const { result: login } = withSetup(() => useLogin())
+    login.username.value = 'admin'
+    login.password.value = 'secret123'
+
+    await login.handleLogin()
+
+    expect(mockPush).toHaveBeenCalledWith('/account')
+  })
+
+  it('triggers loginWithOIDC with redirect parameter', async () => {
+    mockQuery.value = { redirect: '/hosts/h1' }
+    mockGetOIDCStatus.mockResolvedValueOnce({ data: { enabled: true } })
+
+    const { result: login } = withSetup(() => useLogin())
+    await flushPromises()
+
+    // Test window.location redirect invocation
+    const originalLocation = window.location
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (window as any).location
+    window.location = { href: '' } as unknown as Location
+
+    login.loginWithOIDC()
+    expect(window.location.href).toBe('/api/auth/oidc/login?return_to=%2Fhosts%2Fh1')
+
+    window.location = originalLocation
+  })
 })

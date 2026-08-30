@@ -387,6 +387,18 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 	if v, ok := settings["oidc_redirect_url"]; ok && v != "" {
 		c.OIDCRedirectURL = v
 	}
+	if v, ok := settings["oidc_scopes"]; ok && v != "" {
+		c.OIDCScopes = parseCSV(v)
+	}
+	if v, ok := settings["oidc_username_claim"]; ok && v != "" {
+		c.OIDCUsernameClaim = v
+	}
+	if v, ok := settings["oidc_email_claim"]; ok && v != "" {
+		c.OIDCEmailClaim = v
+	}
+	if v, ok := settings["oidc_groups_claim"]; ok && v != "" {
+		c.OIDCGroupsClaim = v
+	}
 	if v, ok := settings["oidc_admin_group"]; ok && v != "" {
 		c.OIDCAdminGroup = v
 	}
@@ -404,6 +416,9 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 	}
 	if v, ok := settings["oidc_allow_local_login"]; ok {
 		c.OIDCAllowLocalLogin = v == "true" || v == "1"
+	}
+	if v, ok := settings["oidc_insecure_skip_verify"]; ok {
+		c.OIDCInsecureSkipVerify = v == "true" || v == "1"
 	}
 
 	overrideFloat(settings, "threat_weight_wordpress", &c.ThreatWeightWordPress)
@@ -502,6 +517,9 @@ func (c *Config) ValidateStrict() error {
 		if c.OIDCClientID == "" {
 			problems = append(problems, "OIDC_CLIENT_ID is required when OIDC_ENABLED is true")
 		}
+		if c.OIDCRedirectURL == "" {
+			problems = append(problems, "OIDC_REDIRECT_URL is required when OIDC_ENABLED is true")
+		}
 	}
 	if len(problems) == 0 {
 		return nil
@@ -559,32 +577,28 @@ func getBoolEnv(key string, fallback bool) bool {
 	return fallback
 }
 
+func parseCSV(v string) []string {
+	parts := strings.Split(v, ",")
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func getCSVEnv(key string) []string {
 	if v := os.Getenv(key); v != "" {
-		parts := strings.Split(v, ",")
-		var out []string
-		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if p != "" {
-				out = append(out, p)
-			}
-		}
-		return out
+		return parseCSV(v)
 	}
 	return nil
 }
 
 func getCSVEnvOrDefault(key string, fallback []string) []string {
 	if v := os.Getenv(key); v != "" {
-		parts := strings.Split(v, ",")
-		var out []string
-		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if p != "" {
-				out = append(out, p)
-			}
-		}
-		if len(out) > 0 {
+		if out := parseCSV(v); len(out) > 0 {
 			return out
 		}
 	}
