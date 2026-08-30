@@ -99,19 +99,25 @@
                     >
                       <button
                         type="button"
-                        class="btn"
+                        class="btn btn-icon"
                         :class="locale === 'fr' ? 'btn-primary' : 'btn-outline-secondary'"
+                        :title="t('common.languageFrench')"
+                        :aria-label="t('common.languageFrench')"
+                        :aria-pressed="locale === 'fr'"
                         @click="switchLocale('fr')"
                       >
-                        FR
+                        <span class="flag flag-xs flag-country-fr" />
                       </button>
                       <button
                         type="button"
-                        class="btn"
+                        class="btn btn-icon"
                         :class="locale === 'en' ? 'btn-primary' : 'btn-outline-secondary'"
+                        :title="t('common.languageEnglish')"
+                        :aria-label="t('common.languageEnglish')"
+                        :aria-pressed="locale === 'en'"
                         @click="switchLocale('en')"
                       >
-                        EN
+                        <span class="flag flag-xs flag-country-gb" />
                       </button>
                     </div>
                   </div>

@@ -15,6 +15,8 @@
   "logout": "Déconnexion",
   "close": "Fermer",
   "language": "Langue",
+  "languageFrench": "Français",
+  "languageEnglish": "English",
   "proxmoxSuggestedLinks": "{count} liaison(s) hôte ↔ VM/LXC suggérée(s), à confirmer",
   "offlineNetwork": "Pas de connexion réseau — les données affichées peuvent être obsolètes.",
   "serverUnreachable": "Serveur injoignable — reconnexion en cours, les données affichées peuvent être obsolètes.",
