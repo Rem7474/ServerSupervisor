@@ -154,15 +154,12 @@ describe('composables/useLogin', () => {
     const { result: login } = withSetup(() => useLogin())
     await flushPromises()
 
-    // Test window.location redirect invocation
-    const originalLocation = window.location
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (window as any).location
-    window.location = { href: '' } as unknown as Location
+    const mockLocation = { href: '' }
+    vi.stubGlobal('location', mockLocation)
 
     login.loginWithOIDC()
-    expect(window.location.href).toBe('/api/auth/oidc/login?return_to=%2Fhosts%2Fh1')
+    expect(mockLocation.href).toBe('/api/auth/oidc/login?return_to=%2Fhosts%2Fh1')
 
-    window.location = originalLocation
+    vi.unstubAllGlobals()
   })
 })
