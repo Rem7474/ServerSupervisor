@@ -60,6 +60,25 @@ type Config struct {
 	AdminUser              string
 	AdminPassword          string
 
+	// OIDC / SSO
+	OIDCEnabled            bool
+	OIDCDisplayName        string
+	OIDCIssuerURL          string
+	OIDCClientID           string
+	OIDCClientSecret       string
+	OIDCRedirectURL        string
+	OIDCScopes             []string
+	OIDCUsernameClaim      string
+	OIDCEmailClaim         string
+	OIDCGroupsClaim        string
+	OIDCAdminGroup         string
+	OIDCOperatorGroup      string
+	OIDCViewerGroup        string
+	OIDCDefaultRole        string
+	OIDCAutoCreateUser     bool
+	OIDCAllowLocalLogin    bool
+	OIDCInsecureSkipVerify bool
+
 	// Rate limiting
 	RateLimitRPS        int
 	RateLimitBurst      int
@@ -213,6 +232,25 @@ func Load() *Config {
 		AdminUser:              getEnv("ADMIN_USER", "admin"),
 		AdminPassword:          getEnv("ADMIN_PASSWORD", ""),
 
+		// OIDC / SSO
+		OIDCEnabled:            getBoolEnv("OIDC_ENABLED", false),
+		OIDCDisplayName:        getEnv("OIDC_DISPLAY_NAME", "SSO / OpenID Connect"),
+		OIDCIssuerURL:          getEnv("OIDC_ISSUER_URL", ""),
+		OIDCClientID:           getEnv("OIDC_CLIENT_ID", ""),
+		OIDCClientSecret:       getEnv("OIDC_CLIENT_SECRET", ""),
+		OIDCRedirectURL:        getEnv("OIDC_REDIRECT_URL", ""),
+		OIDCScopes:             getCSVEnvOrDefault("OIDC_SCOPES", []string{"openid", "profile", "email", "groups"}),
+		OIDCUsernameClaim:      getEnv("OIDC_USERNAME_CLAIM", "preferred_username"),
+		OIDCEmailClaim:         getEnv("OIDC_EMAIL_CLAIM", "email"),
+		OIDCGroupsClaim:        getEnv("OIDC_GROUPS_CLAIM", "groups"),
+		OIDCAdminGroup:         getEnv("OIDC_ADMIN_GROUP", "serversupervisor-admins"),
+		OIDCOperatorGroup:      getEnv("OIDC_OPERATOR_GROUP", "serversupervisor-operators"),
+		OIDCViewerGroup:        getEnv("OIDC_VIEWER_GROUP", "serversupervisor-viewers"),
+		OIDCDefaultRole:        getEnv("OIDC_DEFAULT_ROLE", "viewer"),
+		OIDCAutoCreateUser:     getBoolEnv("OIDC_AUTO_CREATE_USER", true),
+		OIDCAllowLocalLogin:    getBoolEnv("OIDC_ALLOW_LOCAL_LOGIN", true),
+		OIDCInsecureSkipVerify: getBoolEnv("OIDC_INSECURE_SKIP_VERIFY", false),
+
 		RateLimitRPS:        getIntEnv("RATE_LIMIT_RPS", 100),
 		RateLimitBurst:      getIntEnv("RATE_LIMIT_BURST", 200),
 		AgentRateLimitRPS:   getIntEnv("AGENT_RATE_LIMIT_RPS", 20),
@@ -331,6 +369,42 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 			c.JWTSecret = v
 		}
 	}
+	if v, ok := settings["oidc_enabled"]; ok {
+		c.OIDCEnabled = v == "true" || v == "1"
+	}
+	if v, ok := settings["oidc_display_name"]; ok && v != "" {
+		c.OIDCDisplayName = v
+	}
+	if v, ok := settings["oidc_issuer_url"]; ok && v != "" {
+		c.OIDCIssuerURL = v
+	}
+	if v, ok := settings["oidc_client_id"]; ok && v != "" {
+		c.OIDCClientID = v
+	}
+	if v, ok := settings["oidc_client_secret"]; ok && v != "" {
+		c.OIDCClientSecret = v
+	}
+	if v, ok := settings["oidc_redirect_url"]; ok && v != "" {
+		c.OIDCRedirectURL = v
+	}
+	if v, ok := settings["oidc_admin_group"]; ok && v != "" {
+		c.OIDCAdminGroup = v
+	}
+	if v, ok := settings["oidc_operator_group"]; ok && v != "" {
+		c.OIDCOperatorGroup = v
+	}
+	if v, ok := settings["oidc_viewer_group"]; ok && v != "" {
+		c.OIDCViewerGroup = v
+	}
+	if v, ok := settings["oidc_default_role"]; ok && v != "" {
+		c.OIDCDefaultRole = v
+	}
+	if v, ok := settings["oidc_auto_create_user"]; ok {
+		c.OIDCAutoCreateUser = v == "true" || v == "1"
+	}
+	if v, ok := settings["oidc_allow_local_login"]; ok {
+		c.OIDCAllowLocalLogin = v == "true" || v == "1"
+	}
 
 	overrideFloat(settings, "threat_weight_wordpress", &c.ThreatWeightWordPress)
 	overrideFloat(settings, "threat_weight_adminpanel", &c.ThreatWeightAdminPanel)
@@ -421,6 +495,14 @@ func (c *Config) ValidateStrict() error {
 	if c.DBPassword == "supervisor" {
 		problems = append(problems, "DB_PASSWORD must not be the default 'supervisor' in production")
 	}
+	if c.OIDCEnabled {
+		if c.OIDCIssuerURL == "" {
+			problems = append(problems, "OIDC_ISSUER_URL is required when OIDC_ENABLED is true")
+		}
+		if c.OIDCClientID == "" {
+			problems = append(problems, "OIDC_CLIENT_ID is required when OIDC_ENABLED is true")
+		}
+	}
 	if len(problems) == 0 {
 		return nil
 	}
@@ -491,3 +573,21 @@ func getCSVEnv(key string) []string {
 	}
 	return nil
 }
+
+func getCSVEnvOrDefault(key string, fallback []string) []string {
+	if v := os.Getenv(key); v != "" {
+		parts := strings.Split(v, ",")
+		var out []string
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				out = append(out, p)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return fallback
+}
+

@@ -16,32 +16,57 @@
           <h2 class="card-title text-center mb-4">
             Se connecter
           </h2>
-          <div class="mb-3">
-            <label class="form-label">Utilisateur</label>
-            <input
-              ref="usernameInput"
-              v-model="username"
-              type="text"
-              class="form-control"
-              placeholder="admin"
-              name="username"
-              autocomplete="username webauthn"
-              required
-              :disabled="loading || needsMFA"
+
+          <!-- OIDC / SSO Button -->
+          <div
+            v-if="oidcStatus?.enabled"
+            class="mb-3"
+          >
+            <button
+              type="button"
+              class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2"
+              @click="loginWithOIDC"
             >
+              <IconKey :size="18" />
+              <span>{{ `Se connecter avec ${oidcStatus.display_name || 'SSO / OpenID Connect'}` }}</span>
+            </button>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Mot de passe</label>
-            <input
-              v-model="password"
-              type="password"
-              class="form-control"
-              placeholder="••••••••"
-              name="password"
-              autocomplete="current-password"
-              required
-              :disabled="loading || needsMFA"
-            >
+
+          <div
+            v-if="oidcStatus?.enabled && oidcStatus?.allow_local_login"
+            class="hr-text my-3"
+          >
+            ou identifiants locaux
+          </div>
+
+          <div v-if="!oidcStatus?.enabled || oidcStatus?.allow_local_login">
+            <div class="mb-3">
+              <label class="form-label">Utilisateur</label>
+              <input
+                ref="usernameInput"
+                v-model="username"
+                type="text"
+                class="form-control"
+                placeholder="admin"
+                name="username"
+                autocomplete="username webauthn"
+                required
+                :disabled="loading || needsMFA"
+              >
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Mot de passe</label>
+              <input
+                v-model="password"
+                type="password"
+                class="form-control"
+                placeholder="••••••••"
+                name="password"
+                autocomplete="current-password"
+                required
+                :disabled="loading || needsMFA"
+              >
+            </div>
           </div>
 
           <Transition name="slide-down">
@@ -100,7 +125,7 @@
           </div>
 
           <div
-            v-if="!needsMFA || mfaMethods?.totp"
+            v-if="(!oidcStatus?.enabled || oidcStatus?.allow_local_login) && (!needsMFA || mfaMethods?.totp)"
             class="form-footer"
           >
             <button
@@ -119,6 +144,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
+import { IconKey } from '@tabler/icons-vue'
 import { useLogin } from '../composables/useLogin'
 
 const {
@@ -132,6 +158,8 @@ const {
   mfaMethods,
   webauthnAvailable,
   webauthnLoading,
+  oidcStatus,
+  loginWithOIDC,
   handleLogin,
   loginWithWebAuthn,
 } = useLogin()

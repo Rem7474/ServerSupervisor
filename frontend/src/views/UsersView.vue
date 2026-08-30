@@ -150,11 +150,23 @@
               :key="user.id"
             >
               <td class="fw-semibold">
-                {{ user.username }}
-                <span
-                  v-if="user.username === auth.username"
-                  class="badge bg-blue-lt text-blue ms-2"
-                >Vous</span>
+                <div>
+                  {{ user.username }}
+                  <span
+                    v-if="user.username === auth.username"
+                    class="badge bg-blue-lt text-blue ms-2"
+                  >Vous</span>
+                  <span
+                    v-if="user.auth_provider === 'oidc'"
+                    class="badge bg-purple-lt text-purple ms-2"
+                  >SSO</span>
+                </div>
+                <div
+                  v-if="user.email"
+                  class="text-secondary small font-monospace mt-1"
+                >
+                  {{ user.email }}
+                </div>
               </td>
               <td>
                 <select 

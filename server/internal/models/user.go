@@ -9,6 +9,9 @@ type User struct {
 	Username           string    `json:"username" db:"username"`
 	PasswordHash       string    `json:"-" db:"password_hash"`
 	Role               string    `json:"role" db:"role"`      // admin, operator, viewer
+	AuthProvider       string    `json:"auth_provider" db:"auth_provider"` // local, oidc
+	OIDCSub            *string   `json:"oidc_sub,omitempty" db:"oidc_sub"`
+	Email              *string   `json:"email,omitempty" db:"email"`
 	TOTPSecret         string    `json:"-" db:"totp_secret"`  // Encrypted TOTP secret (empty if MFA disabled)
 	BackupCodes        string    `json:"-" db:"backup_codes"` // JSON array of backup codes (hashed)
 	MFAEnabled         bool      `json:"mfa_enabled" db:"mfa_enabled"`
