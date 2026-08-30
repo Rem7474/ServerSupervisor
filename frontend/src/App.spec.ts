@@ -187,6 +187,27 @@ describe('App.vue — logout', () => {
   })
 })
 
+describe('App.vue — language switcher', () => {
+  it('switches the UI language and persists the choice', async () => {
+    const { wrapper } = mountApp()
+
+    await wrapper.find('.user-menu > .btn').trigger('click')
+    expect(wrapper.text()).toContain('Mon compte')
+
+    await wrapper.find('[aria-label="English"]').trigger('click')
+
+    expect(wrapper.text()).toContain('My account')
+    expect(wrapper.text()).not.toContain('Mon compte')
+    expect(localStorage.getItem('locale')).toBe('en')
+
+    await wrapper.find('[aria-label="Français"]').trigger('click')
+    expect(wrapper.text()).toContain('Mon compte')
+    expect(localStorage.getItem('locale')).toBe('fr')
+
+    wrapper.unmount()
+  })
+})
+
 describe('App.vue — app-resume debounce', () => {
   beforeEach(() => {
     vi.useFakeTimers()
