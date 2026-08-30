@@ -49,6 +49,23 @@ describe('DashboardKPIs — updates card', () => {
     const wrapper = mount(DashboardKPIs)
     expect(wrapper.text()).toContain('Tout est à jour')
   })
+
+  it('shows the critical/high CVE badges and the pluralized affected-host count', () => {
+    const wrapper = mount(DashboardKPIs, {
+      props: { cveSummary: { critical_count: 3, hosts_with_critical: 2, high_count: 1, hosts_with_high: 1 } },
+    })
+    expect(wrapper.text()).toContain('CRIT 3')
+    expect(wrapper.text()).toContain('2 hôtes')
+    expect(wrapper.text()).toContain('HIGH 1')
+  })
+
+  it('shows a singular host count for exactly one affected host', () => {
+    const wrapper = mount(DashboardKPIs, {
+      props: { cveSummary: { critical_count: 1, hosts_with_critical: 1 } },
+    })
+    expect(wrapper.text()).toContain('1 hôte')
+    expect(wrapper.text()).not.toContain('1 hôtes')
+  })
 })
 
 describe('DashboardKPIs — Proxmox cards', () => {

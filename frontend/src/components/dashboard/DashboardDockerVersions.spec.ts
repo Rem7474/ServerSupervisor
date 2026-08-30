@@ -30,14 +30,16 @@ describe('DashboardDockerVersions', () => {
     const wrapper = mount(DashboardDockerVersions, {
       props: {
         versions: [
-          { docker_image: 'nginx', host_id: 'h1', hostname: 'web-01', is_up_to_date: false, running_version: '1.0', tracker_id: 't1' },
-          { docker_image: 'redis', host_id: 'h2', hostname: 'web-02', is_up_to_date: true, running_version: '2.0' },
+          { docker_image: 'nginx', host_id: 'h1', hostname: 'web-01', is_up_to_date: false, running_version: '1.0', tracker_id: 't1', container_count: 3 },
+          { docker_image: 'redis', host_id: 'h2', hostname: 'web-02', is_up_to_date: true, running_version: '2.0', container_count: 1 },
         ],
       },
     })
     expect(wrapper.text()).toContain('1 en retard')
     expect(wrapper.text()).toContain('Mise à jour disponible')
     expect(wrapper.text()).toContain('À jour')
+    expect(wrapper.find('[title="3 conteneurs utilisent cette image"]').exists()).toBe(true)
+    expect(wrapper.find('[title="1 conteneur utilise cette image"]').exists()).toBe(true)
   })
 
   it('disables the trigger button for a non-admin/operator with an explanatory tooltip', () => {

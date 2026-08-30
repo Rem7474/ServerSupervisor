@@ -129,6 +129,12 @@ describe('DashboardView — banner items', () => {
     expect(wrapper.text()).toContain('3 tâches échouées (24h)')
   })
 
+  it('reports offline storage on its own, singular form', () => {
+    proxmoxSummary.value = { nodes_down: 0, storage_near_full: 0, storage_offline: 1, recent_failed_tasks: 0 }
+    const wrapper = mountView()
+    expect(wrapper.text()).toContain('1 stockage hors ligne')
+  })
+
   it('shows attention-center items passed through as-is', () => {
     attentionItems.value = [{ key: 'proxmox-links', label: 'Liaisons suggérées', to: '/proxmox', severity: 'info', count: 2 }]
     const wrapper = mountView()
