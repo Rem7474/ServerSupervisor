@@ -88,13 +88,9 @@ src/components/security/TrafficOverviewPanel.vue
 src/components/security/TrafficThreatsFilterBar.vue
 src/components/settings/SettingsDatabaseCard.vue
 src/components/settings/SettingsMaintenanceCard.vue
-src/components/settings/SettingsNPMCard.vue
-src/components/settings/SettingsProxmoxCard.vue
-src/components/settings/SettingsRegistryCredentialsCard.vue
 src/components/settings/SettingsRetentionCard.vue
 src/components/settings/SettingsSmtpCard.vue
 src/components/settings/SettingsSystemInfoCard.vue
-src/components/settings/SettingsThreatDetectionCard.vue
 src/components/webhooks/PayloadViewerModal.vue
 src/components/webhooks/TrackableContainersModal.vue
 src/components/webhooks/TrackerConfigCard.vue

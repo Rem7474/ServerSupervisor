@@ -14,7 +14,7 @@
           :size="16"
           class="icon me-1"
         />
-        Ajouter une connexion
+        {{ t('settings.addConnection') }}
       </button>
     </div>
 
@@ -25,7 +25,7 @@
     >
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">Nom *</label>
+          <label class="form-label">{{ t('settings.name') }} *</label>
           <input
             v-model="form.name"
             type="text"
@@ -34,7 +34,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">URL API *</label>
+          <label class="form-label">{{ t('settings.apiUrl') }} *</label>
           <input
             v-model="form.api_url"
             type="text"
@@ -43,7 +43,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Token ID *</label>
+          <label class="form-label">{{ t('settings.tokenId') }} *</label>
           <input
             v-model="form.token_id"
             type="text"
@@ -52,7 +52,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Token secret {{ editingId ? '(vide = inchangé)' : '*' }}</label>
+          <label class="form-label">{{ t('settings.tokenSecret') }} {{ editingId ? t('settings.unchangedIfEmpty') : '*' }}</label>
           <input
             v-model="form.token_secret"
             type="password"
@@ -61,7 +61,7 @@
           >
         </div>
         <div class="col-md-4">
-          <label class="form-label">Intervalle de collecte (s)</label>
+          <label class="form-label">{{ t('settings.pollIntervalCollect') }}</label>
           <input
             v-model.number="form.poll_interval_sec"
             type="number"
@@ -76,7 +76,7 @@
               class="form-check-input"
               type="checkbox"
             >
-            <span class="form-check-label">Ignorer TLS (self-signed)</span>
+            <span class="form-check-label">{{ t('settings.ignoreTls') }}</span>
           </label>
         </div>
         <div class="col-md-4 d-flex align-items-end gap-3">
@@ -86,24 +86,24 @@
               class="form-check-input"
               type="checkbox"
             >
-            <span class="form-check-label">Activé</span>
+            <span class="form-check-label">{{ t('settings.enabled') }}</span>
           </label>
         </div>
         <div class="col-12">
           <label class="form-label">
-            Identifiants console PVE (optionnel)
+            {{ t('settings.pveConsoleCredsOptional') }}
           </label>
           <div class="form-hint mb-2">
-            Nécessaires uniquement pour ouvrir une console interactive sur un conteneur LXC — l'API PVE
-            n'accepte pas le token pour cette fonctionnalité, un utilisateur PVE avec le rôle
-            <code>VM.Console</code> est requis (ex. <code>root@pam</code>).
+            {{ t('settings.pveConsoleHintIntro') }}
+            <code>VM.Console</code>
+            {{ t('settings.pveConsoleHintExample') }} <code>root@pam</code>).
           </div>
         </div>
         <div class="col-md-6">
           <label
             for="proxmox-pve-username"
             class="form-label"
-          >Utilisateur PVE</label>
+          >{{ t('settings.pveUsername') }}</label>
           <input
             id="proxmox-pve-username"
             v-model="form.pve_username"
@@ -116,7 +116,7 @@
           <label
             for="proxmox-pve-password"
             class="form-label"
-          >Mot de passe PVE {{ editingId ? '(vide = inchangé)' : '' }}</label>
+          >{{ t('settings.pvePassword') }} {{ editingId ? t('settings.unchangedIfEmpty') : '' }}</label>
           <input
             id="proxmox-pve-password"
             v-model="form.pve_password"
@@ -133,14 +133,14 @@
           :disabled="saving"
           @click="save"
         >
-          {{ saving ? 'Enregistrement...' : (editingId ? 'Mettre à jour' : 'Créer') }}
+          {{ saving ? t('common.saving') : (editingId ? t('settings.update') : t('settings.create')) }}
         </button>
         <button
           type="button"
           class="btn btn-outline-secondary"
           @click="cancelForm"
         >
-          Annuler
+          {{ t('settings.cancel') }}
         </button>
         <button
           type="button"
@@ -148,7 +148,7 @@
           :disabled="testing"
           @click="testForm"
         >
-          {{ testing ? 'Test...' : 'Tester la connexion' }}
+          {{ testing ? t('settings.testingShort') : t('settings.testConnection') }}
         </button>
         <span
           v-if="formMsg"
@@ -162,14 +162,14 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Nom</th>
-            <th>URL API</th>
-            <th>Token ID</th>
-            <th>Console</th>
-            <th>Nœuds</th>
-            <th>Guests</th>
-            <th>Statut</th>
-            <th>Dernier contact</th>
+            <th>{{ t('settings.name') }}</th>
+            <th>{{ t('settings.apiUrl') }}</th>
+            <th>{{ t('settings.tokenId') }}</th>
+            <th>{{ t('settings.consoleColumn') }}</th>
+            <th>{{ t('settings.nodesColumn') }}</th>
+            <th>{{ t('settings.guestsColumn') }}</th>
+            <th>{{ t('common.status') }}</th>
+            <th>{{ t('settings.lastContact') }}</th>
             <th v-if="authIsAdmin" />
           </tr>
         </thead>
@@ -181,7 +181,7 @@
           </tr>
           <tr v-else-if="instances.length === 0">
             <td colspan="9">
-              <EmptyState title="Aucune connexion Proxmox configurée." />
+              <EmptyState :title="t('settings.noProxmoxConnections')" />
             </td>
           </tr>
           <tr
@@ -201,11 +201,11 @@
               <span
                 v-if="inst.console_configured"
                 class="badge bg-success-lt text-success"
-              >Configurée</span>
+              >{{ t('settings.configuredBadge') }}</span>
               <span
                 v-else
                 class="badge bg-secondary-lt text-secondary"
-              >Non configurée</span>
+              >{{ t('settings.notConfiguredBadge') }}</span>
             </td>
             <td>{{ inst.node_count }}</td>
             <td>{{ inst.guest_count }}</td>
@@ -213,12 +213,12 @@
               <span
                 v-if="!inst.enabled"
                 class="badge bg-secondary-lt text-secondary"
-              >Désactivé</span>
+              >{{ t('settings.disabled') }}</span>
               <span
                 v-else-if="inst.last_error"
                 class="badge bg-danger-lt text-danger"
                 :title="inst.last_error"
-              >Erreur</span>
+              >{{ t('settings.errorBadge') }}</span>
               <span
                 v-else-if="inst.last_success_at"
                 class="badge bg-success-lt text-success"
@@ -226,7 +226,7 @@
               <span
                 v-else
                 class="badge bg-warning-lt text-warning"
-              >En attente</span>
+              >{{ t('settings.pendingBadge') }}</span>
             </td>
             <td class="text-muted small">
               <span v-if="inst.last_success_at">{{ formatDate(inst.last_success_at) }}</span>
@@ -240,7 +240,7 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Modifier"
+                  :title="t('settings.edit')"
                   @click="openEditForm(inst)"
                 >
                   <IconPencil
@@ -251,7 +251,7 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Tester"
+                  :title="t('settings.testTooltip')"
                   @click="testById(inst)"
                 >
                   <IconClock
@@ -262,7 +262,7 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-primary"
-                  title="Collecter maintenant"
+                  :title="t('settings.pollNowTooltip')"
                   @click="pollNow(inst)"
                 >
                   <IconRefresh
@@ -273,7 +273,7 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-danger"
-                  title="Supprimer"
+                  :title="t('settings.delete')"
                   @click="remove(inst)"
                 >
                   <IconTrash
@@ -299,6 +299,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconClock, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
 import type { ProxmoxConnection, ProxmoxTestResult } from '../../types/proxmox'
@@ -307,6 +308,7 @@ import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 
+const { t, locale } = useI18n()
 const { confirm } = useConfirmDialog()
 
 // Use the shared domain type (the settings card only reads a subset of fields).
@@ -407,7 +409,7 @@ function cancelForm(): void {
 
 async function save(): Promise<void> {
   if (!form.value.name || !form.value.api_url || !form.value.token_id) {
-    formMsg.value = 'Nom, URL API et Token ID sont obligatoires.'
+    formMsg.value = t('settings.nameUrlTokenRequired')
     formOk.value = false
     return
   }
@@ -419,20 +421,20 @@ async function save(): Promise<void> {
       await api.updateProxmoxInstance(editingId.value, form.value)
     } else {
       if (!form.value.token_secret) {
-        formMsg.value = 'Le token secret est obligatoire à la création.'
+        formMsg.value = t('settings.tokenSecretRequiredOnCreate')
         formOk.value = false
         saving.value = false
         return
       }
       await api.createProxmoxInstance(form.value)
     }
-    formMsg.value = editingId.value ? 'Connexion mise à jour.' : 'Connexion créée.'
+    formMsg.value = editingId.value ? t('settings.connectionUpdated') : t('settings.connectionCreated')
     formOk.value = true
     await load()
     showForm.value = false
     editingId.value = null
   } catch (e: unknown) {
-    formMsg.value = getApiErrorMessage(e, 'Erreur lors de l\'enregistrement.')
+    formMsg.value = getApiErrorMessage(e, t('settings.saveError'))
     formOk.value = false
   } finally {
     saving.value = false
@@ -448,15 +450,18 @@ async function save(): Promise<void> {
 // implied by a green badge.
 function formatTestResult(result: ProxmoxTestResult): { message: string, tone: 'success' | 'warning' | 'danger' } {
   if (!result.success) {
-    return { message: result.error || 'Échec de connexion.', tone: 'danger' }
+    return { message: result.error || t('settings.connectionFailed'), tone: 'danger' }
   }
   if (!result.console_configured) {
-    return { message: 'Connexion API réussie. Console non configurée (identifiants PVE absents).', tone: 'warning' }
+    return { message: t('settings.apiSuccessConsoleNotConfigured'), tone: 'warning' }
   }
   if (result.console_ok) {
-    return { message: 'Connexion API réussie, identifiants console valides. Le rôle VM.Console sera vérifié à l\'ouverture d\'une console sur un conteneur.', tone: 'success' }
+    return { message: t('settings.apiSuccessConsoleValid'), tone: 'success' }
   }
-  return { message: `Connexion API réussie, mais échec de connexion console : ${result.console_error || 'erreur inconnue'}`, tone: 'warning' }
+  return {
+    message: t('settings.apiSuccessConsoleFailed', { error: result.console_error || t('settings.unknownError') }),
+    tone: 'warning',
+  }
 }
 
 async function testForm(): Promise<void> {
@@ -465,8 +470,8 @@ async function testForm(): Promise<void> {
   formWarn.value = false
   try {
     // Editing: test the connection as actually stored server-side, so
-    // fields left blank on purpose ("vide = inchangé") are honored instead
-    // of being sent empty and failing the test.
+    // fields left blank on purpose (unchanged) are honored instead of being
+    // sent empty and failing the test.
     if (editingId.value) {
       const res = await api.testProxmoxInstanceById(editingId.value)
       const { message, tone } = formatTestResult(res.data)
@@ -476,7 +481,7 @@ async function testForm(): Promise<void> {
       return
     }
     if (!form.value.api_url || !form.value.token_id || !form.value.token_secret) {
-      formMsg.value = 'Renseignez l\'URL, le token ID et le secret pour tester.'
+      formMsg.value = t('settings.fillUrlTokenSecretToTest')
       formOk.value = false
       return
     }
@@ -493,7 +498,7 @@ async function testForm(): Promise<void> {
     formOk.value = tone !== 'danger'
     formWarn.value = tone === 'warning'
   } catch (e: unknown) {
-    formMsg.value = getApiErrorMessage(e, 'Erreur réseau.')
+    formMsg.value = getApiErrorMessage(e, t('settings.networkError'))
     formOk.value = false
   } finally {
     testing.value = false
@@ -510,7 +515,7 @@ async function testById(inst: ProxmoxInstance): Promise<void> {
     listOk.value = tone !== 'danger'
     listWarn.value = tone === 'warning'
   } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, 'Erreur réseau.')
+    listMsg.value = getApiErrorMessage(e, t('settings.networkError'))
     listOk.value = false
   }
 }
@@ -519,19 +524,19 @@ async function pollNow(inst: ProxmoxInstance): Promise<void> {
   listWarn.value = false
   try {
     await api.pollProxmoxNow(inst.id)
-    listMsg.value = `[${inst.name}] Collecte déclenchée.`
+    listMsg.value = t('settings.collectTriggeredFor', { name: inst.name })
     listOk.value = true
     setTimeout(load, 3000)
   } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, 'Erreur.')
+    listMsg.value = getApiErrorMessage(e, t('settings.genericErrorPeriod'))
     listOk.value = false
   }
 }
 
 async function remove(inst: ProxmoxInstance): Promise<void> {
   const confirmed = await confirm({
-    title: 'Supprimer la connexion Proxmox ?',
-    message: `Supprimer la connexion Proxmox « ${inst.name} » ? Toutes les données collectées seront effacées.`,
+    title: t('settings.deleteProxmoxConnectionTitle'),
+    message: t('settings.deleteProxmoxConnectionMsg', { name: inst.name }),
     variant: 'danger',
   })
   if (!confirmed) return
@@ -539,17 +544,17 @@ async function remove(inst: ProxmoxInstance): Promise<void> {
   try {
     await api.deleteProxmoxInstance(inst.id)
     await load()
-    listMsg.value = 'Connexion supprimée.'
+    listMsg.value = t('settings.connectionDeleted')
     listOk.value = true
   } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, 'Erreur lors de la suppression.')
+    listMsg.value = getApiErrorMessage(e, t('settings.deleteError'))
     listOk.value = false
   }
 }
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 
 onMounted(load)

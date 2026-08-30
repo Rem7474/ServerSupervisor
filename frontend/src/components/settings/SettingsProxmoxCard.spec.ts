@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const {
   getProxmoxInstances,
@@ -45,6 +46,7 @@ async function mountAndOpenEdit() {
 describe('SettingsProxmoxCard — test connection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
   })
 
   it('editing an existing connection tests the stored connection by id, not the (possibly blank) form fields', async () => {

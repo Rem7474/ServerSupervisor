@@ -35,5 +35,7 @@
   "status": "Statut",
   "noConnectionsRecorded": "Aucune connexion enregistrée",
   "success": "Succès",
-  "failure": "Échec"
+  "failure": "Échec",
+  "save": "Enregistrer",
+  "saving": "Enregistrement..."
 }

@@ -35,5 +35,7 @@
   "status": "Status",
   "noConnectionsRecorded": "No connections recorded",
   "success": "Success",
-  "failure": "Failure"
+  "failure": "Failure",
+  "save": "Save",
+  "saving": "Saving..."
 }

@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import SettingsThreatDetectionCard from './SettingsThreatDetectionCard.vue'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 function defaultForm() {
   return {
