@@ -25,18 +25,8 @@ src/components/alerts/AlertRuleTemplateModal.vue
 src/components/alerts/MaintenanceWindowsPanel.vue
 src/components/alerts/WarRoomPanel.vue
 src/components/alerts/WarRoomSeverityColumn.vue
-src/components/apt/AptHostCard.vue
-src/components/apt/AptPendingPackagesList.vue
-src/components/apt/AptScheduleModal.vue
-src/components/apt/AptToolbar.vue
-src/components/apt/CVEList.vue
 src/components/dashboard/DashboardDockerVersions.vue
 src/components/dashboard/DashboardKPIs.vue
-src/components/disk/DiskHealthCard.vue
-src/components/disk/DiskHistoryChart.vue
-src/components/disk/DiskMetricsCard.vue
-src/components/docker/ComposeProjectsTab.vue
-src/components/docker/DockerContainersTab.vue
 src/components/host/CommandLogPanel.vue
 src/components/host/HostAptTab.vue
 src/components/host/HostBackupTab.vue
@@ -108,7 +98,6 @@ src/views/AccountSecurityView.vue
 src/views/AccountView.vue
 src/views/AddHostView.vue
 src/views/AlertsView.vue
-src/views/AptView.vue
 src/views/AuditLogsView.vue
 src/views/DashboardView.vue
 src/views/GitWebhookDetailView.vue

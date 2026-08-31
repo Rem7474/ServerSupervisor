@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import AptHostCard from './AptHostCard.vue'
 import type { Host } from '../../types/host'
 import type { UUConfig } from '../../types/generated'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 const HOST: Host = { id: 'h1', name: 'web-01', hostname: 'web-01', status: 'online' } as Host
 const UU_CONFIG: UUConfig = { security_only: true, auto_reboot: false, auto_reboot_time: '02:00', remove_unused: false }

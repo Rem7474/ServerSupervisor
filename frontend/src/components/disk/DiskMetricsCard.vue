@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        Santé des disques
+        {{ t('monitoring.diskUsageTitle') }}
       </h3>
     </div>
     <div
@@ -20,8 +20,8 @@
     >
       <EmptyState
         :icon="IconClock"
-        title="Aucune donnée de disque disponible"
-        subtitle="L'agent doit être actif pour collecter les métriques disque"
+        :title="t('monitoring.noDiskData')"
+        :subtitle="t('monitoring.noDiskDataHint')"
       />
     </div>
     <div
@@ -31,13 +31,13 @@
       <table class="table table-vcenter card-table mb-0">
         <thead>
           <tr>
-            <th>Point de montage</th>
-            <th>Utilisation</th>
+            <th>{{ t('monitoring.mountPoint') }}</th>
+            <th>{{ t('monitoring.usage') }}</th>
             <th style="width: 220px;">
-              Utilisation espace
+              {{ t('monitoring.spaceUsage') }}
             </th>
             <th style="width: 220px;">
-              Inodes
+              {{ t('monitoring.inodes') }}
             </th>
           </tr>
         </thead>
@@ -72,9 +72,9 @@
                 v-if="metric.forecast_days_until_full != null"
                 class="small mt-1"
                 :class="forecastClass(metric.forecast_days_until_full)"
-                :title="`Estimation basée sur la tendance des 30 derniers jours`"
+                :title="t('monitoring.forecastTooltip')"
               >
-                Saturation dans ~{{ Math.round(metric.forecast_days_until_full) }} j
+                {{ t('monitoring.forecastFull', { days: Math.round(metric.forecast_days_until_full) }) }}
               </div>
             </td>
             <td>
@@ -105,10 +105,13 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconClock } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { useDiskMetrics, type DiskMetric } from '../../composables/useDiskMetrics'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   hostId: string

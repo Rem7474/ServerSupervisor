@@ -35,5 +35,10 @@
   "status": "Status",
   "noConnectionsRecorded": "No connections recorded",
   "success": "Success",
-  "failure": "Failure"
+  "failure": "Failure",
+  "cancel": "Cancel",
+  "error": "Error",
+  "bulkConfirmTitle": "{action} on {count} item? | {action} on {count} items?",
+  "cannotUndo": "This action cannot be undone",
+  "yesAction": "Yes, {action}"
 }

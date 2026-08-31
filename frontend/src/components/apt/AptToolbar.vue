@@ -2,7 +2,7 @@
   <DataToolbar
     searchable
     :search="search"
-    search-placeholder="Rechercher un hôte…"
+    :search-placeholder="t('apt.searchHostPlaceholder')"
     @update:search="search = $event"
   >
     <template #right>
@@ -23,22 +23,22 @@
         class="form-select form-select-sm sort-select"
       >
         <option value="name">
-          Trier par nom
+          {{ t('apt.sortByName') }}
         </option>
         <option value="pending">
-          Trier par paquets en attente
+          {{ t('apt.sortByPending') }}
         </option>
         <option value="security">
-          Trier par mises à jour sécurité
+          {{ t('apt.sortBySecurity') }}
         </option>
         <option value="cve">
-          Trier par CVE
+          {{ t('apt.sortByCve') }}
         </option>
       </select>
       <button
         type="button"
         class="btn btn-sm btn-outline-secondary"
-        :title="sortDir === 'asc' ? 'Croissant' : 'Décroissant'"
+        :title="sortDir === 'asc' ? t('apt.sortAscTitle') : t('apt.sortDescTitle')"
         @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
       >
         <IconSortAscending
@@ -74,7 +74,7 @@
                 class="spinner-border spinner-border-sm me-1"
                 role="status"
               />
-              apt update ({{ selectedCount }})
+              {{ t('apt.aptUpdateWithCount', { count: selectedCount }) }}
             </button>
             <button
               type="button"
@@ -87,7 +87,7 @@
                 class="spinner-border spinner-border-sm me-1"
                 role="status"
               />
-              apt upgrade ({{ selectedCount }})
+              {{ t('apt.aptUpgradeWithCount', { count: selectedCount }) }}
             </button>
             <button
               type="button"
@@ -100,7 +100,7 @@
                 class="spinner-border spinner-border-sm me-1"
                 role="status"
               />
-              apt dist-upgrade ({{ selectedCount }})
+              {{ t('apt.aptDistUpgradeWithCount', { count: selectedCount }) }}
             </button>
           </template>
           <button
@@ -115,12 +115,12 @@
               class="spinner-border spinner-border-sm me-1"
               role="status"
             />
-            Mettre à jour les agents ({{ outdatedCount }})
+            {{ t('apt.updateAgentsWithCount', { count: outdatedCount }) }}
           </button>
           <span
             v-if="selectedCount === 0"
             class="text-secondary small align-self-center"
-          >Sélectionner des hôtes pour les actions groupées</span>
+          >{{ t('apt.selectHostsForBulkActions') }}</span>
         </div>
       </div>
     </template>
@@ -129,8 +129,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import DataToolbar from '../common/DataToolbar.vue'
 import { IconSortAscending, IconSortDescending } from '@tabler/icons-vue'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   filterOptions: { value: string, label: string }[]
@@ -153,15 +156,15 @@ const sortKey = defineModel<'name' | 'pending' | 'security' | 'cve'>('sortKey', 
 const sortDir = defineModel<'asc' | 'desc'>('sortDir', { required: true })
 const allSelected = defineModel<boolean>('allSelected', { required: true })
 
-// "Sélectionner tous les hôtes" is misleading once a search/filtre reduces
-// the visible list — the checkbox only ever selects the filtered subset
-// (see useApt.ts's selectAll), so say so explicitly rather than implying a
-// fleet-wide selection right before a bulk action like dist-upgrade.
+// "Select all hosts" is misleading once a search/filter reduces the visible
+// list — the checkbox only ever selects the filtered subset (see useApt.ts's
+// selectAll), so say so explicitly rather than implying a fleet-wide
+// selection right before a bulk action like dist-upgrade.
 const isFiltered = computed(() => !!search.value.trim() || quickFilter.value !== 'all')
 const selectAllLabel = computed(() =>
   isFiltered.value
-    ? `Sélectionner les ${props.filteredCount} hôte${props.filteredCount > 1 ? 's' : ''} affiché${props.filteredCount > 1 ? 's' : ''}`
-    : 'Sélectionner tous les hôtes'
+    ? t('apt.selectFilteredHosts', { count: props.filteredCount }, props.filteredCount)
+    : t('apt.selectAllHosts')
 )
 </script>
 

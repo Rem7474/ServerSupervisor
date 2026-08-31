@@ -1,10 +1,15 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 vi.mock('../../api', () => ({ default: { runReleaseTracker: vi.fn() } }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 
 import DockerContainersTab from './DockerContainersTab.vue'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 function makeContainers(n: number) {
   return Array.from({ length: n }, (_, i) => ({

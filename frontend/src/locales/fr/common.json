@@ -35,5 +35,10 @@
   "status": "Statut",
   "noConnectionsRecorded": "Aucune connexion enregistrée",
   "success": "Succès",
-  "failure": "Échec"
+  "failure": "Échec",
+  "cancel": "Annuler",
+  "error": "Erreur",
+  "bulkConfirmTitle": "{action} sur {count} élément ? | {action} sur {count} éléments ?",
+  "cannotUndo": "Cette action ne peut pas être annulée",
+  "yesAction": "Oui, {action}"
 }
