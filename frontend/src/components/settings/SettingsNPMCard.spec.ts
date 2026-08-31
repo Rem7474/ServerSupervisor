@@ -3,16 +3,17 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setLocale } from '../../i18n'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
-const { listConnections, createConnection, testConnection, deleteConnection, refreshNow } = vi.hoisted(() => ({
+const { listConnections, createConnection, updateConnection, testConnection, deleteConnection, refreshNow } = vi.hoisted(() => ({
   listConnections: vi.fn(),
   createConnection: vi.fn(),
+  updateConnection: vi.fn(),
   testConnection: vi.fn(),
   deleteConnection: vi.fn(),
   refreshNow: vi.fn(),
 }))
 
 vi.mock('../../api/npm', () => ({
-  npmApi: { listConnections, createConnection, testConnection, deleteConnection, refreshNow },
+  npmApi: { listConnections, createConnection, updateConnection, testConnection, deleteConnection, refreshNow },
 }))
 
 import SettingsNPMCard from './SettingsNPMCard.vue'
@@ -124,5 +125,133 @@ describe('SettingsNPMCard', () => {
     const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
     await flushPromises()
     expect(wrapper.text()).toContain('No NPM connection configured.')
+  })
+})
+
+describe('SettingsNPMCard — save flow', () => {
+  it('rejects saving without the required fields', async () => {
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+    await wrapper.find('.btn-primary.btn-sm').trigger('click')
+    await wrapper.find('.btn-primary').trigger('click')
+
+    expect(wrapper.text()).toContain('Nom, URL API et identifiant sont obligatoires.')
+    expect(createConnection).not.toHaveBeenCalled()
+  })
+
+  it('rejects creating a connection without a password', async () => {
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+    await wrapper.find('.btn-primary.btn-sm').trigger('click')
+    await wrapper.find('input[placeholder="Mon NPM"]').setValue('main')
+    await wrapper.find('input[placeholder="http://192.168.1.10:81"]').setValue('http://npm:81')
+    await wrapper.find('input[placeholder="admin@example.com"]').setValue('a@b.com')
+    await wrapper.find('.btn-primary').trigger('click')
+
+    expect(wrapper.text()).toContain('Le mot de passe est obligatoire à la création.')
+    expect(createConnection).not.toHaveBeenCalled()
+  })
+
+  it('creates a connection once every required field is filled', async () => {
+    createConnection.mockResolvedValue({ data: {} })
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+    await wrapper.find('.btn-primary.btn-sm').trigger('click')
+    await wrapper.find('input[placeholder="Mon NPM"]').setValue('main')
+    await wrapper.find('input[placeholder="http://192.168.1.10:81"]').setValue('http://npm:81')
+    await wrapper.find('input[placeholder="admin@example.com"]').setValue('a@b.com')
+    await wrapper.find('input[autocomplete="new-password"]').setValue('secret')
+    await wrapper.find('.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(createConnection).toHaveBeenCalledWith(expect.objectContaining({ api_url: 'http://npm:81', identity: 'a@b.com' }))
+    expect(listConnections).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows a translated error when saving fails', async () => {
+    createConnection.mockRejectedValue({ response: { data: {} } })
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+    await wrapper.find('.btn-primary.btn-sm').trigger('click')
+    await wrapper.find('input[placeholder="Mon NPM"]').setValue('main')
+    await wrapper.find('input[placeholder="http://192.168.1.10:81"]').setValue('http://npm:81')
+    await wrapper.find('input[placeholder="admin@example.com"]').setValue('a@b.com')
+    await wrapper.find('input[autocomplete="new-password"]').setValue('secret')
+    await wrapper.find('.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Erreur lors de l'enregistrement.")
+  })
+
+  it('pre-fills the form and updates (not creates) when editing an existing connection', async () => {
+    listConnections.mockResolvedValue({ data: { connections: [connection] } })
+    updateConnection.mockResolvedValue({ data: {} })
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+
+    await wrapper.find('button[title="Modifier"]').trigger('click')
+    expect((wrapper.find('input[placeholder="http://192.168.1.10:81"]').element as HTMLInputElement).value).toBe(connection.api_url)
+
+    await wrapper.find('.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(updateConnection).toHaveBeenCalledWith('n1', expect.objectContaining({ name: connection.name }))
+    expect(createConnection).not.toHaveBeenCalled()
+  })
+})
+
+describe('SettingsNPMCard — test/refresh/delete error paths', () => {
+  it('shows a translated success message when the test connection succeeds', async () => {
+    testConnection.mockResolvedValue({ data: { success: true } })
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+    await wrapper.find('.btn-primary.btn-sm').trigger('click')
+    await wrapper.find('input[placeholder="http://192.168.1.10:81"]').setValue('http://npm:81')
+    await wrapper.find('input[placeholder="admin@example.com"]').setValue('a@b.com')
+    await wrapper.find('input[autocomplete="new-password"]').setValue('secret')
+    await wrapper.find('.btn-outline-secondary.ms-2').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Connexion réussie !')
+  })
+
+  it('shows a translated network-error message when the test request itself fails', async () => {
+    testConnection.mockRejectedValue({ response: { data: {} } })
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+    await wrapper.find('.btn-primary.btn-sm').trigger('click')
+    await wrapper.find('input[placeholder="http://192.168.1.10:81"]').setValue('http://npm:81')
+    await wrapper.find('input[placeholder="admin@example.com"]').setValue('a@b.com')
+    await wrapper.find('input[autocomplete="new-password"]').setValue('secret')
+    await wrapper.find('.btn-outline-secondary.ms-2').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Erreur réseau.')
+  })
+
+  it('shows a translated error when the immediate refresh fails', async () => {
+    listConnections.mockResolvedValue({ data: { connections: [connection] } })
+    refreshNow.mockRejectedValue({ response: { data: {} } })
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+
+    await wrapper.find('button[title="Rafraîchir maintenant"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Erreur.')
+  })
+
+  it('shows a translated error when deletion fails', async () => {
+    listConnections.mockResolvedValue({ data: { connections: [connection] } })
+    deleteConnection.mockRejectedValue({ response: { data: {} } })
+    const wrapper = mount(SettingsNPMCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+
+    const clickPromise = wrapper.find('button[title="Supprimer"]').trigger('click')
+    useConfirmDialog().onConfirm()
+    await clickPromise
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Erreur lors de la suppression.')
   })
 })

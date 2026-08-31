@@ -3,6 +3,7 @@
   "addCredential": "+ Add a credential",
   "registryDesc": "Credentials used by Docker trackers to query images on private registries (GHCR, Harbor, company registries…). The password is never shown again.",
   "name": "Name",
+  "password": "Password",
   "registryHostLabel": "Registry host",
   "host": "Host",
   "passwordToken": "Password / token",

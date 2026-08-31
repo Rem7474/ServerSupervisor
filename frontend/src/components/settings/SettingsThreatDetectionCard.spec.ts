@@ -58,9 +58,23 @@ describe('SettingsThreatDetectionCard (characterization)', () => {
     }
   })
 
+  it('shows no incoherence warning when thresholds are strictly increasing', () => {
+    const wrapper = mount(SettingsThreatDetectionCard, {
+      props: { form: defaultForm() },
+    })
+    expect(wrapper.text()).not.toContain('devraient être croissants')
+  })
+
   it('shows an incoherence warning when thresholds are not increasing', () => {
     const wrapper = mount(SettingsThreatDetectionCard, {
       props: { form: { ...defaultForm(), threatThresholdMedium: 50, threatThresholdHigh: 30 } },
+    })
+    expect(wrapper.text()).toContain('devraient être croissants')
+  })
+
+  it('shows an incoherence warning when medium < high but high is not < critical', () => {
+    const wrapper = mount(SettingsThreatDetectionCard, {
+      props: { form: { ...defaultForm(), threatThresholdMedium: 10, threatThresholdHigh: 60, threatThresholdCritical: 30 } },
     })
     expect(wrapper.text()).toContain('devraient être croissants')
   })

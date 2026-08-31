@@ -84,6 +84,37 @@ describe('SettingsRegistryCredentialsCard', () => {
     expect(getRegistryCredentials).toHaveBeenCalledTimes(2)
   })
 
+  it('shows a translated error when saving fails', async () => {
+    createRegistryCredential.mockRejectedValue({ response: { data: {} } })
+    const wrapper = mount(SettingsRegistryCredentialsCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+    await wrapper.find('.btn-primary.btn-sm').trigger('click')
+    await wrapper.find('input[placeholder="GHCR mon-org"]').setValue('GHCR')
+    await wrapper.find('input[placeholder="ghcr.io"]').setValue('ghcr.io')
+    await wrapper.find('input[autocomplete="off"]').setValue('bot')
+    await wrapper.find('input[autocomplete="new-password"]').setValue('token123')
+    await wrapper.find('.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Erreur lors de l'enregistrement.")
+  })
+
+  it('pre-fills the form and updates (not creates) when editing an existing credential', async () => {
+    getRegistryCredentials.mockResolvedValue({ data: { credentials: [credential] } })
+    updateRegistryCredential.mockResolvedValue({ data: {} })
+    const wrapper = mount(SettingsRegistryCredentialsCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+
+    await wrapper.find('button[title="Modifier"]').trigger('click')
+    expect((wrapper.find('input[placeholder="GHCR mon-org"]').element as HTMLInputElement).value).toBe(credential.name)
+
+    await wrapper.find('.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(updateRegistryCredential).toHaveBeenCalledWith('c1', expect.objectContaining({ name: credential.name }))
+    expect(createRegistryCredential).not.toHaveBeenCalled()
+  })
+
   it('asks for confirmation before deleting, and deletes once confirmed', async () => {
     getRegistryCredentials.mockResolvedValue({ data: { credentials: [credential] } })
     deleteRegistryCredential.mockResolvedValue({ data: {} })
@@ -99,6 +130,20 @@ describe('SettingsRegistryCredentialsCard', () => {
     await flushPromises()
 
     expect(deleteRegistryCredential).toHaveBeenCalledWith('c1')
+  })
+
+  it('shows a translated error when deletion fails', async () => {
+    getRegistryCredentials.mockResolvedValue({ data: { credentials: [credential] } })
+    deleteRegistryCredential.mockRejectedValue({ response: { data: {} } })
+    const wrapper = mount(SettingsRegistryCredentialsCard, { props: { authIsAdmin: true } })
+    await flushPromises()
+
+    const clickPromise = wrapper.find('button[title="Supprimer"]').trigger('click')
+    useConfirmDialog().onConfirm()
+    await clickPromise
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Erreur lors de la suppression.')
   })
 
   it('translates in English', async () => {

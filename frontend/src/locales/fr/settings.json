@@ -3,6 +3,7 @@
   "addCredential": "+ Ajouter un identifiant",
   "registryDesc": "Identifiants utilisés par les trackers Docker pour interroger des images sur des registres privés (GHCR, Harbor, registres d'entreprise…). Le mot de passe n'est jamais réaffiché.",
   "name": "Nom",
+  "password": "Mot de passe",
   "registryHostLabel": "Hôte du registre",
   "host": "Hôte",
   "passwordToken": "Mot de passe / token",
