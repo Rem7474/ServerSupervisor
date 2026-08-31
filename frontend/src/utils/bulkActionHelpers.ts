@@ -10,8 +10,8 @@ export async function confirmBulkAction(
   const { t } = i18n.global
 
   return await confirm({
-    title: t('common.bulkConfirmTitle', { action, count }, count),
-    message: warningMessage || t('common.cannotUndo'),
+    title: t('common.bulkConfirmTitle', { action }, count),
+    message: warningMessage || t('common.cannotBeUndone'),
     destructive: true,
     variant: 'danger',
     okLabel: t('common.yesAction', { action }),

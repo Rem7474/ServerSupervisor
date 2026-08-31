@@ -25,8 +25,6 @@ src/components/alerts/AlertRuleTemplateModal.vue
 src/components/alerts/MaintenanceWindowsPanel.vue
 src/components/alerts/WarRoomPanel.vue
 src/components/alerts/WarRoomSeverityColumn.vue
-src/components/dashboard/DashboardDockerVersions.vue
-src/components/dashboard/DashboardKPIs.vue
 src/components/host/CommandLogPanel.vue
 src/components/host/HostAptTab.vue
 src/components/host/HostBackupTab.vue
@@ -99,12 +97,10 @@ src/views/AccountView.vue
 src/views/AddHostView.vue
 src/views/AlertsView.vue
 src/views/AuditLogsView.vue
-src/views/DashboardView.vue
 src/views/GitWebhookDetailView.vue
 src/views/GitWebhooksView.vue
 src/views/GlobalScheduledTasksView.vue
 src/views/HostDetailView.vue
-src/views/LoginView.vue
 src/views/MonitoringHostDetailView.vue
 src/views/MonitoringView.vue
 src/views/NPMView.vue

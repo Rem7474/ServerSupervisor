@@ -36,9 +36,14 @@
   "noConnectionsRecorded": "No connections recorded",
   "success": "Success",
   "failure": "Failure",
-  "cancel": "Cancel",
+  "all": "All",
   "error": "Error",
+  "noData": "No data",
+  "statusOnline": "Online",
+  "statusOffline": "Offline",
+  "statusUnknown": "Unknown",
   "bulkConfirmTitle": "{action} on {count} item? | {action} on {count} items?",
-  "cannotUndo": "This action cannot be undone",
-  "yesAction": "Yes, {action}"
+  "cannotBeUndone": "This action cannot be undone",
+  "yesAction": "Yes, {action}",
+  "cancel": "Cancel"
 }
