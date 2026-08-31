@@ -4,17 +4,17 @@
       <div class="card card-sm h-100">
         <div class="card-body">
           <div class="subheader">
-            Hôtes
+            {{ t('dashboard.hostsLabel') }}
           </div>
           <div class="h1 mb-0">
             {{ hosts.length }}
           </div>
           <div class="text-secondary small mt-1">
-            <span class="text-success me-2">{{ onlineCount }} en ligne</span>
+            <span class="text-success me-2">{{ t('dashboard.onlineCount', { count: onlineCount }) }}</span>
             <span
               v-if="offlineCount > 0"
               class="text-danger"
-            >{{ offlineCount }} hors ligne</span>
+            >{{ t('dashboard.offlineCount', { count: offlineCount }) }}</span>
           </div>
         </div>
       </div>
@@ -23,7 +23,7 @@
       <div class="card card-sm h-100">
         <div class="card-body">
           <div class="subheader">
-            Mises à jour
+            {{ t('dashboard.updatesLabel') }}
           </div>
           <div
             class="h1 mb-0"
@@ -35,9 +35,9 @@
             <span
               v-if="aptPending > 0"
               class="me-2"
-            >{{ aptPending }} paquet{{ aptPending > 1 ? 's' : '' }} APT</span>
-            <span v-if="outdatedDockerImages > 0">{{ outdatedDockerImages }} image{{ outdatedDockerImages > 1 ? 's' : '' }} Docker</span>
-            <span v-if="outdatedVersions === 0">Tout est à jour</span>
+            >{{ t('dashboard.aptPendingPackages', aptPending) }}</span>
+            <span v-if="outdatedDockerImages > 0">{{ t('dashboard.outdatedDockerImages', outdatedDockerImages) }}</span>
+            <span v-if="outdatedVersions === 0">{{ t('dashboard.allUpToDate') }}</span>
           </div>
           <div
             v-if="cveSummary && ((cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0 || (cveSummary.high_count || 0) > 0 || (cveSummary.hosts_with_high || 0) > 0)"
@@ -47,7 +47,7 @@
               v-if="(cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0"
               class="badge bg-danger-lt text-danger"
             >CRIT {{ cveSummary.critical_count || 0 }}</span>
-            <span v-if="(cveSummary.hosts_with_critical || 0) > 0">{{ cveSummary.hosts_with_critical || 0 }} hôte{{ (cveSummary.hosts_with_critical || 0) > 1 ? 's' : '' }}</span>
+            <span v-if="(cveSummary.hosts_with_critical || 0) > 0">{{ t('dashboard.hostCount', cveSummary.hosts_with_critical || 0) }}</span>
             <span v-if="(cveSummary.high_count || 0) > 0 || (cveSummary.hosts_with_high || 0) > 0">
               <span v-if="(cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0">·</span>
               <span class="badge bg-warning-lt text-warning">HIGH {{ cveSummary.high_count || 0 }}</span>
@@ -56,13 +56,13 @@
         </div>
       </div>
     </div>
-    <!-- Proxmox KPIs (masqués si non configuré) -->
+    <!-- Proxmox KPIs (hidden when not configured) -->
     <template v-if="hasProxmox">
       <div class="col-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Proxmox — Nœuds
+              {{ t('dashboard.proxmoxNodesLabel') }}
             </div>
             <div
               class="h1 mb-0"
@@ -81,7 +81,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Proxmox — Stockage
+              {{ t('dashboard.proxmoxStorageLabel') }}
             </div>
             <div
               class="h1 mb-0"
@@ -101,7 +101,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              En ligne
+              {{ t('common.statusOnline') }}
             </div>
             <div class="h1 mb-0 text-success">
               {{ onlineCount }}
@@ -113,7 +113,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Hors ligne
+              {{ t('common.statusOffline') }}
             </div>
             <div class="h1 mb-0 text-danger">
               {{ offlineCount }}
@@ -127,6 +127,7 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { formatBytes } from '../../utils/formatters'
 import { useDashboardStore } from '../../stores/dashboard'
 
@@ -144,6 +145,8 @@ withDefaults(defineProps<{
   cveSummary: null,
   cveTimestampText: '',
 })
+
+const { t } = useI18n()
 
 const dashboardStore = useDashboardStore()
 const {

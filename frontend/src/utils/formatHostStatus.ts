@@ -1,14 +1,16 @@
-/** Retourne le libellé localisé du statut d'un hôte. */
+import { i18n } from '../i18n'
+
+/** Returns the localized label for a host status. */
 export function formatHostStatus(status: string): string {
   switch (status) {
-    case 'online':  return 'En ligne'
+    case 'online':  return i18n.global.t('common.statusOnline')
     case 'warning': return 'Warning'
-    case 'offline': return 'Hors ligne'
-    default:        return 'Inconnu'
+    case 'offline': return i18n.global.t('common.statusOffline')
+    default:        return i18n.global.t('common.statusUnknown')
   }
 }
 
-/** Retourne la classe CSS Tabler correspondant au statut d'un hôte. */
+/** Returns the Tabler CSS class matching a host status. */
 export function hostStatusClass(status: string): string {
   switch (status) {
     case 'online':  return 'status status-success'

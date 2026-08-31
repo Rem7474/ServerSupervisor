@@ -1,6 +1,6 @@
 <template>
   <div>
-    <!-- ─── En-tête ─────────────────────────────────────────────────────────── -->
+    <!-- ─── Header ─────────────────────────────────────────────────────────── -->
     <div
       class="page-header d-flex flex-column flex-md-row align-items-md-center
                 justify-content-between gap-3 mb-4"
@@ -13,7 +13,7 @@
           Dashboard
         </h2>
         <div class="text-secondary">
-          Vue d'ensemble de l'infrastructure
+          {{ t('dashboard.subtitle') }}
         </div>
       </div>
       <router-link
@@ -24,7 +24,7 @@
           :size="14"
           class="icon"
         />
-        <span class="d-none d-sm-inline ms-1">Ajouter un hôte</span>
+        <span class="d-none d-sm-inline ms-1">{{ t('dashboard.addHost') }}</span>
       </router-link>
     </div>
 
@@ -48,7 +48,7 @@
             :size="24"
             class="icon me-1"
           />
-          Points d'attention
+          {{ t('dashboard.attentionPoints') }}
         </h3>
       </div>
       <div class="list-group list-group-flush">
@@ -78,7 +78,7 @@
       </div>
     </div>
 
-    <!-- ─── État explicite quand rien ne nécessite d'attention ──────────────── -->
+    <!-- ─── Explicit state when nothing needs attention ──────────────── -->
     <div
       v-else-if="!loading && hosts.length > 0"
       class="alert alert-success d-flex align-items-center gap-2 mb-3"
@@ -87,7 +87,7 @@
         :size="16"
         class="icon flex-shrink-0"
       />
-      <span>Tout est opérationnel — aucune alerte, mise à jour de sécurité ou anomalie Proxmox en attente.</span>
+      <span>{{ t('dashboard.allOperational') }}</span>
     </div>
 
     <!-- ─── KPIs ─────────────────────────────────────────────────────────────── -->
@@ -120,33 +120,33 @@
             <label
               class="form-label"
               for="dashboard-search"
-            >Recherche d'hôte</label>
+            >{{ t('dashboard.searchHostLabel') }}</label>
             <input
               id="dashboard-search"
               v-model="searchQuery"
               type="text"
               class="form-control"
-              placeholder="Rechercher un hôte…"
+              :placeholder="t('dashboard.searchHostPlaceholder')"
             >
           </div>
           <div class="col-12 col-md-4 col-lg-2">
             <label
               class="form-label"
               for="dashboard-status-filter"
-            >Filtre de statut</label>
+            >{{ t('dashboard.statusFilterLabel') }}</label>
             <select
               id="dashboard-status-filter"
               v-model="statusFilter"
               class="form-select"
             >
               <option value="all">
-                Tous
+                {{ t('common.all') }}
               </option>
               <option value="online">
-                En ligne
+                {{ t('common.statusOnline') }}
               </option>
               <option value="offline">
-                Hors ligne
+                {{ t('common.statusOffline') }}
               </option>
               <option value="warning">
                 Warning
@@ -160,14 +160,14 @@
             <label
               class="form-label"
               for="dashboard-tag-filter"
-            >Tag</label>
+            >{{ t('dashboard.tagLabel') }}</label>
             <select
               id="dashboard-tag-filter"
               v-model="tagFilter"
               class="form-select"
             >
               <option value="all">
-                Tous
+                {{ t('common.all') }}
               </option>
               <option
                 v-for="tag in allTags"
@@ -182,7 +182,7 @@
       </div>
     </div>
 
-    <!-- ─── Table des hôtes ──────────────────────────────────────────────────── -->
+    <!-- ─── Hosts table ──────────────────────────────────────────────────── -->
     <div class="card mb-4">
       <div class="table-responsive">
         <table class="table table-vcenter card-table">
@@ -194,14 +194,14 @@
                     class="form-check-input"
                     type="checkbox"
                     :checked="allVisibleHostsSelected"
-                    aria-label="Sélectionner tous les hôtes affichés"
+                    :aria-label="t('dashboard.selectAllVisible')"
                     @change="toggleSelectAllVisibleHosts(($event.target as HTMLInputElement).checked)"
                   >
                 </label>
               </th>
               <th>
                 <SortableHeader
-                  label="Nom"
+                  :label="t('dashboard.nameColumn')"
                   :active="sortKey === 'name'"
                   :direction="sortDir"
                   @toggle="toggleSort('name')"
@@ -209,7 +209,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="État"
+                  :label="t('dashboard.stateColumn')"
                   :active="sortKey === 'status'"
                   :direction="sortDir"
                   @toggle="toggleSort('status')"
@@ -223,7 +223,7 @@
                   @toggle="toggleSort('ip_os')"
                 />
               </th>
-              <th title="Vert < 70 % · Jaune 70-90 % · Rouge > 90 %">
+              <th :title="t('dashboard.cpuTooltip')">
                 <SortableHeader
                   label="CPU"
                   :active="sortKey === 'cpu'"
@@ -231,7 +231,7 @@
                   @toggle="toggleSort('cpu')"
                 />
               </th>
-              <th title="Vert < 75 % · Jaune 75-90 % · Rouge > 90 %">
+              <th :title="t('dashboard.ramDiskTooltip')">
                 <SortableHeader
                   label="RAM"
                   :active="sortKey === 'ram'"
@@ -239,15 +239,15 @@
                   @toggle="toggleSort('ram')"
                 />
               </th>
-              <th title="Vert < 75 % · Jaune 75-90 % · Rouge > 90 %">
+              <th :title="t('dashboard.ramDiskTooltip')">
                 <SortableHeader
-                  label="Disque"
+                  :label="t('dashboard.diskColumn')"
                   :active="sortKey === 'disk'"
                   :direction="sortDir"
                   @toggle="toggleSort('disk')"
                 />
               </th>
-              <th title="Paquets APT en attente">
+              <th :title="t('dashboard.aptPendingTooltip')">
                 <SortableHeader
                   label="APT"
                   :active="sortKey === 'apt'"
@@ -265,7 +265,7 @@
               </th>
               <th class="last-activity-col">
                 <SortableHeader
-                  label="Dernière activité"
+                  :label="t('dashboard.lastActivityColumn')"
                   :active="sortKey === 'last_seen'"
                   :direction="sortDir"
                   @toggle="toggleSort('last_seen')"
@@ -296,10 +296,10 @@
                     :to="`/hosts/${host.id}`"
                     class="fw-semibold text-decoration-none"
                   >
-                    {{ host.name || host.hostname || 'Sans nom' }}
+                    {{ host.name || host.hostname || t('dashboard.unnamed') }}
                   </router-link>
                   <div class="text-secondary small">
-                    {{ host.hostname || 'Non connecté' }}
+                    {{ host.hostname || t('dashboard.notConnected') }}
                   </div>
                   <div
                     v-if="proxmoxGuestPath(host.id) || (host.tags && host.tags.length > 0) || isNeverConnectedHost(host)"
@@ -309,16 +309,16 @@
                       v-if="isNeverConnectedHost(host)"
                       :to="`/hosts/${host.id}`"
                       class="badge bg-warning-lt text-warning text-decoration-none badge-link"
-                      title="Hôte enregistré, mais l'agent ne s'est jamais connecté — ouvrez la fiche hôte pour régénérer la clé et récupérer la commande d'installation."
+                      :title="t('dashboard.neverConnectedTooltip')"
                     >
-                      Installation en attente
+                      {{ t('dashboard.installPending') }}
                     </router-link>
                     <router-link
                       v-if="proxmoxGuestPath(host.id)"
                       :to="proxmoxGuestPath(host.id)"
                       class="badge bg-orange-lt text-orange text-decoration-none badge-link"
                     >
-                      Stats Proxmox
+                      {{ t('dashboard.proxmoxStats') }}
                     </router-link>
                     <span
                       v-for="tag in host.tags"
@@ -377,7 +377,7 @@
                   <span
                     v-if="isNeverConnectedHost(host)"
                     class="text-secondary small"
-                  >Jamais connecté</span>
+                  >{{ t('dashboard.neverConnectedShort') }}</span>
                   <RelativeTime
                     v-else
                     :date="(host.last_seen as any) || ''"
@@ -386,7 +386,7 @@
               </tr>
               <tr v-if="hosts.length > 0 && sortedHosts.length === 0">
                 <td colspan="10">
-                  <EmptyState title="Aucun hôte ne correspond à votre recherche." />
+                  <EmptyState :title="t('dashboard.noHostsMatchSearch')" />
                 </td>
               </tr>
             </template>
@@ -420,15 +420,15 @@
         class="py-3"
       >
         <EmptyState
-          title="Aucun hôte enregistré"
-          subtitle="Ajoutez votre premier hôte pour commencer à surveiller votre infrastructure."
-          cta-label="Ajouter un hôte"
+          :title="t('dashboard.noHostsRegistered')"
+          :subtitle="t('dashboard.noHostsSubtitle')"
+          :cta-label="t('dashboard.addHost')"
           cta-to="/hosts/new"
         />
       </div>
     </div>
 
-    <!-- ─── Graphique de tendance (collapsible, replié par défaut) ──────────── -->
+    <!-- ─── Trend chart (collapsible, collapsed by default) ──────────── -->
     <div class="card mb-4">
       <div
         class="card-header dashboard-chart-header clickable-row"
@@ -441,7 +441,7 @@
         @keydown.space.prevent="chartOpen = !chartOpen"
       >
         <h3 class="card-title mb-0">
-          Tendance CPU / RAM
+          {{ t('dashboard.trendTitle') }}
           <IconChevronDown
             :size="16"
             class="ms-auto chart-chevron"
@@ -459,7 +459,7 @@
               <div
                 class="summary-source-switch"
                 role="group"
-                aria-label="Source des métriques du graphe"
+                :aria-label="t('dashboard.chartSourceAriaLabel')"
               >
                 <button
                   v-for="src in chartSources"
@@ -474,7 +474,7 @@
               </div>
             </template>
             <template v-else>
-              Moyenne sur tous les hôtes
+              {{ t('dashboard.averageAllHosts') }}
             </template>
           </div>
           <div class="btn-group btn-group-sm">
@@ -485,7 +485,7 @@
               :class="summaryHours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
               @click="changeSummaryRange(h)"
             >
-              {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
+              {{ h >= 24 ? t('dashboard.rangeDays', { n: h / 24 }) : t('dashboard.rangeHours', { n: h }) }}
             </button>
           </div>
         </div>
@@ -508,7 +508,7 @@
             v-else
             class="h-100 d-flex align-items-center justify-content-center text-secondary"
           >
-            Aucune donnée
+            {{ t('common.noData') }}
           </div>
         </div>
       </div>
@@ -517,7 +517,7 @@
     <!-- ─── Versions Docker (collapsible) ───────────────────────────────────── -->
     <DashboardDockerVersions :versions="(versionComparisons as any)" />
 
-    <!-- ─── Barre d'actions groupées ──────────────────────────────────────────── -->
+    <!-- ─── Bulk action bar ──────────────────────────────────────────── -->
     <BulkActionBar
       v-if="canRunApt"
       :count="selectedCount"
@@ -559,6 +559,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import ProxmoxClusterCard from '../components/proxmox/ProxmoxClusterCard.vue'
@@ -572,10 +573,12 @@ import { IconAlertTriangle, IconPlus, IconListCheck, IconChevronRight, IconChevr
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { isNeverConnectedHost } from '../utils/hosts'
-import { pluralize } from '../utils/formatters'
 import { useDashboard, type DashboardProxmoxLinkRecord } from '../composables/useDashboard'
 import { useAttentionCenter } from '../composables/useAttentionCenter'
 import { AsyncApexChart as ApexChart } from '../utils/apexChartTheme'
+
+const { t } = useI18n()
+
 const {
   hosts,
   versionComparisons,
@@ -640,9 +643,12 @@ const bannerItems = computed<BannerItem[]>(() => {
   const critical = cveSummary.value?.critical_count || 0
   const hostsWithCritical = cveSummary.value?.hosts_with_critical || 0
   if (critical > 0 || hostsWithCritical > 0) {
+    const cvePart = t('dashboard.cveCritical', critical)
     list.push({
       key: 'cve',
-      label: `${critical} CVE critique${pluralize(critical)}${hostsWithCritical > 0 ? ` sur ${hostsWithCritical} hôte${pluralize(hostsWithCritical)}` : ''}`,
+      label: hostsWithCritical > 0
+        ? t('dashboard.cveCriticalAcrossHosts', { cve: cvePart, hosts: t('dashboard.hostCount', hostsWithCritical) })
+        : cvePart,
       to: '/apt',
       severity: 'danger',
       count: critical || undefined,
@@ -655,10 +661,10 @@ const bannerItems = computed<BannerItem[]>(() => {
   const failedTasks = proxmoxSummary.value?.recent_failed_tasks ?? 0
   if (nodesDown > 0 || storageNearFull > 0 || storageOffline > 0 || failedTasks > 0) {
     const parts: string[] = []
-    if (nodesDown > 0) parts.push(`${nodesDown} nœud${pluralize(nodesDown)} hors ligne`)
-    if (storageNearFull > 0) parts.push(`${storageNearFull} stockage${pluralize(storageNearFull)} presque plein${pluralize(storageNearFull)}`)
-    if (storageOffline > 0) parts.push(`${storageOffline} stockage${pluralize(storageOffline)} hors ligne`)
-    if (failedTasks > 0) parts.push(`${failedTasks} tâche${pluralize(failedTasks)} échouée${pluralize(failedTasks)} (24h)`)
+    if (nodesDown > 0) parts.push(t('dashboard.nodesDownCount', nodesDown))
+    if (storageNearFull > 0) parts.push(t('dashboard.storageNearFullCount', storageNearFull))
+    if (storageOffline > 0) parts.push(t('dashboard.storageOfflineCount', storageOffline))
+    if (failedTasks > 0) parts.push(t('dashboard.failedTasksCount', failedTasks))
     list.push({
       key: 'proxmox-health',
       label: parts.join(' · '),
