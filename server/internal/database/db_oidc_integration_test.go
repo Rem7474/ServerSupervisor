@@ -49,9 +49,13 @@ func TestOIDC_DatabaseOperations(t *testing.T) {
 	}
 
 	// 5. Link local user to OIDC
-	uLocal, err := db.CreateUser(ctx, "local_user_to_link", "password_hash_123", models.RoleViewer)
+	err = db.CreateUser(ctx, "local_user_to_link", "password_hash_123", models.RoleViewer)
 	if err != nil {
 		t.Fatalf("CreateUser failed: %v", err)
+	}
+	uLocal, err := db.GetUserByUsername(ctx, "local_user_to_link")
+	if err != nil {
+		t.Fatalf("GetUserByUsername failed: %v", err)
 	}
 	err = db.LinkOIDCUser(ctx, uLocal.ID, "sub-linked-999", "linked@example.com")
 	if err != nil {
