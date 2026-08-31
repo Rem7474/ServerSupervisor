@@ -1,5 +1,6 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { parseTagsInput } from '../utils/tags'
@@ -21,6 +22,7 @@ const AGENT_POLL_TIMEOUT_MS = 120_000
 
 export function useAddHost() {
   const router = useRouter()
+  const { t } = useI18n()
 
   const form = ref({ name: '', ip_address: '', tags: '' })
   const error = ref('')
@@ -75,7 +77,7 @@ export function useAddHost() {
       guests.value = res.data?.proxmox_guests ?? []
       guestsLoaded = true
     } catch (e: unknown) {
-      guestsError.value = getApiErrorMessage(e, 'Erreur lors du chargement des hôtes Proxmox')
+      guestsError.value = getApiErrorMessage(e, t('host.loadPveHostsError'))
     } finally {
       guestsLoading.value = false
     }

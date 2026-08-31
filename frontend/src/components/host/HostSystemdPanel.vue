@@ -5,7 +5,7 @@
   >
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        Services système (systemd)
+        {{ t('host.systemdTitle') }}
       </h3>
       <div class="d-flex align-items-center gap-2">
         <div class="btn-group btn-group-sm">
@@ -14,14 +14,14 @@
             :class="filter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
             @click="filter = 'active'"
           >
-            Actifs
+            {{ t('host.filterActive') }}
           </button>
           <button
             type="button"
             :class="filter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
             @click="filter = 'all'"
           >
-            Tous
+            {{ t('host.filterAllServices') }}
           </button>
         </div>
         <button
@@ -34,7 +34,7 @@
             v-if="loading"
             class="spinner-border spinner-border-sm me-1"
           />
-          {{ loading ? 'Chargement...' : 'Charger les services' }}
+          {{ loading ? t('host.loadingLabel') : t('host.loadServicesLabel') }}
         </button>
       </div>
     </div>
@@ -60,7 +60,7 @@
       class="card-body"
     >
       <div class="text-secondary small">
-        Cliquez sur "Charger les services" pour afficher les services systemd de cet hôte.
+        {{ t('host.clickToLoadServices') }}
       </div>
     </div>
     <div
@@ -78,6 +78,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import SystemdTable from './SystemdTable.vue'
 import type { SystemdService } from './SystemdTable.vue'
@@ -99,6 +100,7 @@ const emit = defineEmits<{
   (e: 'history-changed'): void
 }>()
 
+const { t } = useI18n()
 const dialog = useConfirmDialog()
 const services = ref<SystemdService[]>([])
 const loading = ref(false)
@@ -125,13 +127,13 @@ async function loadServices(): Promise<void> {
       try {
         services.value = JSON.parse(output)
       } catch {
-        error.value = 'Impossible de parser la liste des services'
+        error.value = t('host.parseServicesError')
       }
     }).catch((e: unknown) => {
-      error.value = getApiErrorMessage(e, 'Erreur lors du chargement des services')
+      error.value = getApiErrorMessage(e, t('host.loadServicesError'))
     }).finally(() => { emit('history-changed') })
   } catch (e) {
-    error.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")
+    error.value = getApiErrorMessage(e, t('host.sendCommandError'))
   } finally {
     loading.value = false
   }
@@ -141,8 +143,8 @@ async function runAction(serviceName: string, action: string): Promise<void> {
   error.value = ''
   if (action === 'stop' || action === 'restart') {
     const ok = await dialog.confirm({
-      title: `${action === 'stop' ? 'Arrêter' : 'Redémarrer'} le service`,
-      message: `Confirmer : systemctl ${action} ${serviceName}`,
+      title: action === 'stop' ? t('host.stopServiceAriaLabel') : t('host.restartServiceAriaLabel'),
+      message: t('host.confirmSystemctlAction', { action, service: serviceName }),
       variant: action === 'stop' ? 'danger' : 'warning',
     })
     if (!ok) return
@@ -159,7 +161,7 @@ async function runAction(serviceName: string, action: string): Promise<void> {
     })
     await pendingCommand.track(res.data.command_id)
   } catch (e) {
-    error.value = getApiErrorMessage(e, `Impossible d'exécuter systemctl ${action}`)
+    error.value = getApiErrorMessage(e, t('host.runSystemctlError', { action }))
   } finally {
     actionPending.value[serviceName] = null
   }

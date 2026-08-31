@@ -41,19 +41,13 @@ src/components/host/CommandLogPanel.vue
 src/components/host/HostAptTab.vue
 src/components/host/HostBackupTab.vue
 src/components/host/HostCustomTasksTab.vue
-src/components/host/HostDiagnosticsBanner.vue
 src/components/host/HostDockerTab.vue
-src/components/host/HostEditForm.vue
-src/components/host/HostExposureTab.vue
 src/components/host/HostMetricsPanel.vue
 src/components/host/HostProcessesPanel.vue
-src/components/host/HostSystemdPanel.vue
 src/components/host/HostTasksTab.vue
 src/components/host/HostTimelineTab.vue
 src/components/host/NetworkDiscoveryPanel.vue
-src/components/host/ProcessesTable.vue
 src/components/host/ResticBackupSummaryCard.vue
-src/components/host/SystemdTable.vue
 src/components/monitoring/MonitoringOverviewPanel.vue
 src/components/monitoring/SslDetailSection.vue
 src/components/monitoring/UptimeDetailSection.vue
@@ -106,7 +100,6 @@ src/components/webhooks/WebhookTrackerFields.vue
 src/components/webhooks/WebhookUrlCard.vue
 src/views/AccountSecurityView.vue
 src/views/AccountView.vue
-src/views/AddHostView.vue
 src/views/AlertsView.vue
 src/views/AptView.vue
 src/views/AuditLogsView.vue
@@ -114,9 +107,7 @@ src/views/DashboardView.vue
 src/views/GitWebhookDetailView.vue
 src/views/GitWebhooksView.vue
 src/views/GlobalScheduledTasksView.vue
-src/views/HostDetailView.vue
 src/views/LoginView.vue
-src/views/MonitoringHostDetailView.vue
 src/views/MonitoringView.vue
 src/views/NPMView.vue
 src/views/NetworkView.vue
