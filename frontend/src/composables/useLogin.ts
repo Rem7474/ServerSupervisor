@@ -1,4 +1,5 @@
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
@@ -12,6 +13,7 @@ import { getWebAuthnAssertion, isConditionalMediationAvailable, isWebAuthnSuppor
 // needsMFA from here.
 export function useLogin() {
   const router = useRouter()
+  const { t } = useI18n()
   const auth = useAuthStore()
 
   const username = ref('')
@@ -42,7 +44,7 @@ export function useLogin() {
         router.push('/')
       }
     } else {
-      error.value = 'Réponse de connexion invalide.'
+      error.value = t('auth.invalidLoginResponse')
     }
   }
 
@@ -71,9 +73,9 @@ export function useLogin() {
       if (needsMFA.value) {
         totpCode.value = ''
         totpFocusRequest.value++
-        error.value = getApiErrorMessage(e, 'Code invalide ou expiré — générez un nouveau code.')
+        error.value = getApiErrorMessage(e, t('auth.invalidOrExpiredCode'))
       } else {
-        error.value = getApiErrorMessage(e, 'Erreur de connexion')
+        error.value = getApiErrorMessage(e, t('auth.loginError'))
       }
     } finally {
       loading.value = false
@@ -96,7 +98,7 @@ export function useLogin() {
       const { data } = await api.finishWebAuthnLogin(username.value, begin.data.session_token, credential)
       completeLogin(data)
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Échec de la vérification de la clé de sécurité')
+      error.value = getApiErrorMessage(e, t('auth.securityKeyVerificationFailed'))
     } finally {
       webauthnLoading.value = false
     }
