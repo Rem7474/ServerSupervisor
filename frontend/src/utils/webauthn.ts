@@ -1,3 +1,5 @@
+import { i18n } from '../i18n'
+
 // Minimal WebAuthn browser-API glue. The server (go-webauthn) speaks the
 // spec's JSON dialect directly — challenge/id fields as base64url strings —
 // but navigator.credentials.create()/get() require real ArrayBuffers for
@@ -136,7 +138,7 @@ export async function isConditionalMediationAvailable(): Promise<boolean> {
 export async function createWebAuthnCredential(serverOptions: unknown): Promise<Record<string, unknown>> {
   const options = decodeCreationOptions(serverOptions as ServerCreationOptions)
   const credential = await navigator.credentials.create(options) as PublicKeyCredential | null
-  if (!credential) throw new Error('La création de la clé de sécurité a été annulée.')
+  if (!credential) throw new Error(i18n.global.t('auth.webauthnCreateCancelled'))
   return encodeCredential(credential)
 }
 
@@ -159,6 +161,6 @@ export async function getWebAuthnAssertion(
   if (opts.mediation) options.mediation = opts.mediation
   if (opts.signal) options.signal = opts.signal
   const credential = await navigator.credentials.get(options) as PublicKeyCredential | null
-  if (!credential) throw new Error('La vérification de la clé de sécurité a été annulée.')
+  if (!credential) throw new Error(i18n.global.t('auth.webauthnVerifyCancelled'))
   return encodeCredential(credential)
 }

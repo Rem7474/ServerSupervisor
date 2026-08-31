@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest'
-import { base64urlToBuffer, bufferToBase64url, isWebAuthnSupported } from './webauthn'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import {
+  base64urlToBuffer, bufferToBase64url, isWebAuthnSupported,
+  createWebAuthnCredential, getWebAuthnAssertion,
+} from './webauthn'
+import { setLocale } from '../i18n'
 
 function toBuffer(bytes: number[]): ArrayBuffer {
   return new Uint8Array(bytes).buffer
@@ -38,5 +42,40 @@ describe('base64url <-> ArrayBuffer round-trip', () => {
 describe('isWebAuthnSupported', () => {
   it('reflects window.PublicKeyCredential presence', () => {
     expect(isWebAuthnSupported()).toBe(typeof window !== 'undefined' && !!window.PublicKeyCredential)
+  })
+})
+
+describe('WebAuthn ceremonies cancelled by the user (navigator.credentials returns null)', () => {
+  afterEach(() => {
+    setLocale('fr')
+    vi.unstubAllGlobals()
+  })
+
+  it('createWebAuthnCredential throws a translated error when creation is cancelled', async () => {
+    vi.stubGlobal('navigator', { credentials: { create: vi.fn().mockResolvedValue(null) } })
+    setLocale('fr')
+
+    await expect(createWebAuthnCredential({
+      publicKey: { challenge: 'YWJj', user: { id: 'YWJj' } },
+    })).rejects.toThrow('La création de la clé de sécurité a été annulée.')
+
+    setLocale('en')
+    await expect(createWebAuthnCredential({
+      publicKey: { challenge: 'YWJj', user: { id: 'YWJj' } },
+    })).rejects.toThrow('Security key creation was cancelled.')
+  })
+
+  it('getWebAuthnAssertion throws a translated error when verification is cancelled', async () => {
+    vi.stubGlobal('navigator', { credentials: { get: vi.fn().mockResolvedValue(null) } })
+    setLocale('fr')
+
+    await expect(getWebAuthnAssertion({
+      publicKey: { challenge: 'YWJj' },
+    })).rejects.toThrow('La vérification de la clé de sécurité a été annulée.')
+
+    setLocale('en')
+    await expect(getWebAuthnAssertion({
+      publicKey: { challenge: 'YWJj' },
+    })).rejects.toThrow('Security key verification was cancelled.')
   })
 })
