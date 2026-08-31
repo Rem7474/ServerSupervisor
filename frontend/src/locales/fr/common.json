@@ -37,5 +37,15 @@
   "success": "Succès",
   "failure": "Échec",
   "save": "Enregistrer",
-  "saving": "Enregistrement..."
+  "saving": "Enregistrement...",
+  "all": "Tous",
+  "error": "Erreur",
+  "noData": "Aucune donnée",
+  "statusOnline": "En ligne",
+  "statusOffline": "Hors ligne",
+  "statusUnknown": "Inconnu",
+  "bulkConfirmTitle": "{action} sur {count} élément ? | {action} sur {count} éléments ?",
+  "cannotBeUndone": "Cette action ne peut pas être annulée",
+  "yesAction": "Oui, {action}",
+  "cancel": "Annuler"
 }

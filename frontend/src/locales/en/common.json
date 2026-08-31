@@ -37,5 +37,15 @@
   "success": "Success",
   "failure": "Failure",
   "save": "Save",
-  "saving": "Saving..."
+  "saving": "Saving...",
+  "all": "All",
+  "error": "Error",
+  "noData": "No data",
+  "statusOnline": "Online",
+  "statusOffline": "Offline",
+  "statusUnknown": "Unknown",
+  "bulkConfirmTitle": "{action} on {count} item? | {action} on {count} items?",
+  "cannotBeUndone": "This action cannot be undone",
+  "yesAction": "Yes, {action}",
+  "cancel": "Cancel"
 }

@@ -30,8 +30,6 @@ src/components/apt/AptPendingPackagesList.vue
 src/components/apt/AptScheduleModal.vue
 src/components/apt/AptToolbar.vue
 src/components/apt/CVEList.vue
-src/components/dashboard/DashboardDockerVersions.vue
-src/components/dashboard/DashboardKPIs.vue
 src/components/disk/DiskHealthCard.vue
 src/components/disk/DiskHistoryChart.vue
 src/components/disk/DiskMetricsCard.vue
@@ -105,12 +103,10 @@ src/views/AddHostView.vue
 src/views/AlertsView.vue
 src/views/AptView.vue
 src/views/AuditLogsView.vue
-src/views/DashboardView.vue
 src/views/GitWebhookDetailView.vue
 src/views/GitWebhooksView.vue
 src/views/GlobalScheduledTasksView.vue
 src/views/HostDetailView.vue
-src/views/LoginView.vue
 src/views/MonitoringHostDetailView.vue
 src/views/MonitoringView.vue
 src/views/NPMView.vue
