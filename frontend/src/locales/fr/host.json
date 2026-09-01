@@ -153,5 +153,7 @@
   "customTasksTabLabel": "Tâches personnalisées",
   "scheduledTasksTabLabel": "Tâches planifiées",
   "consoleLive": "Console Live",
-  "noActiveConsole": "Aucune console active"
+  "noActiveConsole": "Aucune console active",
+  "invalidIpv4": "Adresse IPv4 invalide (ex: 192.168.1.100)",
+  "registerError": "Erreur lors de l'enregistrement"
 }

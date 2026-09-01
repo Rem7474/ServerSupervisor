@@ -38,7 +38,7 @@ export function useAddHost() {
   })
   const ipFeedback = computed(() => {
     if (!touched.value.ip_address || isValidIp.value === null) return ''
-    return isValidIp.value ? '' : 'Adresse IPv4 invalide (ex: 192.168.1.100)'
+    return isValidIp.value ? '' : t('host.invalidIpv4')
   })
   const showGuestPicker = ref(false)
   const guestsLoading = ref(false)
@@ -153,7 +153,7 @@ export function useAddHost() {
       result.value = res.data
       if (res.data?.id) startAgentPolling(res.data.id)
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Erreur lors de l\'enregistrement')
+      error.value = getApiErrorMessage(e, t('host.registerError'))
     } finally {
       loading.value = false
     }
