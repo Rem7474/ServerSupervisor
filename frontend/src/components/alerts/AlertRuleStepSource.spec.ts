@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import AlertRuleStepSource from './AlertRuleStepSource.vue'
 import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 function formFor(metric: string, overrides: Partial<AlertRuleFormData> = {}): AlertRuleFormData {
   const base = useAlertRuleForm().defaultForm()
@@ -93,6 +98,35 @@ describe('AlertRuleStepSource (characterization, per source-type branches)', () 
       }),
     })
     expect(wrapper.find('#alert-source-docker-project').exists()).toBe(true)
+  })
+
+  it('renders translated source-type buttons and the default "all hosts" option', () => {
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps() })
+    expect(wrapper.text()).toContain('Synthétique')
+    expect(wrapper.text()).toContain('🐳 Docker')
+    expect(wrapper.find('#alert-source-host-id option').text()).toBe('Tous les hôtes')
+  })
+
+  it('pluralizes the compose project service count', () => {
+    const form = formFor('docker_compose_degraded_services', {
+      docker_scope: { ...formFor('cpu').docker_scope, host_id: 'host-1' },
+    })
+    const wrapper = mount(AlertRuleStepSource, {
+      props: baseProps({
+        form,
+        dockerHosts: [{
+          host_id: 'host-1',
+          host_name: 'srv-web',
+          containers: [],
+          projects: [
+            { name: 'solo', services: ['web'] },
+            { name: 'multi', services: ['web', 'db'] },
+          ],
+        }],
+      }),
+    })
+    expect(wrapper.text()).toContain('solo (1 service)')
+    expect(wrapper.text()).toContain('multi (2 services)')
   })
 })
 
