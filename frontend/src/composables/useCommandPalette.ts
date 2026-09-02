@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, watch, type Component } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { IconServer, IconBrandDocker, IconBell, IconWorld } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
@@ -46,6 +47,7 @@ let globalListenerReady = false
 
 export function useCommandPalette() {
   const router = useRouter()
+  const { t } = useI18n()
   const auth = useAuthStore()
   const hostsStore = useHostsStore()
   const alertRulesStore = useAlertRulesStore()
@@ -114,7 +116,7 @@ export function useCommandPalette() {
   const navResults = computed<PaletteResult[]>(() => {
     const q = query.value.trim().toLowerCase()
     const results: PaletteResult[] = []
-    for (const section of visibleNavSections(auth)) {
+    for (const section of visibleNavSections(auth, t)) {
       for (const item of section.items) {
         if (!q || item.label.toLowerCase().includes(q) || section.label.toLowerCase().includes(q)) {
           results.push({

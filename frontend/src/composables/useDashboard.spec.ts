@@ -34,6 +34,9 @@ vi.mock('./useWebSocket', () => ({
 }))
 
 import { useDashboard } from './useDashboard'
+import { useConfirmDialog } from './useConfirmDialog'
+import { useHostsStore } from '../stores/hosts'
+import { setLocale } from '../i18n'
 
 function mountUseDashboard() {
   let api!: ReturnType<typeof useDashboard>
@@ -139,5 +142,108 @@ describe('useDashboard — summary chart series/options', () => {
     expect(api.summaryChartOptions.value.xaxis?.max).toBe(now - 1 * 60_000)
 
     vi.useRealTimers()
+  })
+})
+
+describe('useDashboard — chartSources / cveTimestampText locale', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setActivePinia(createPinia())
+    setLocale('fr')
+    getAptCVESummary.mockResolvedValue({ data: null })
+    getProxmoxSummary.mockResolvedValue({ data: {} })
+    getSettings.mockResolvedValue({ data: { settings: {} } })
+    getMetricsSummary.mockResolvedValue({ data: [] })
+    getProxmoxNodeMetrics.mockResolvedValue({ data: [] })
+  })
+
+  afterEach(() => {
+    setLocale('fr')
+  })
+
+  it('translates the chart source labels through the active locale', () => {
+    const { api } = mountUseDashboard()
+    expect(api.chartSources.value).toEqual([
+      { key: 'agents', label: 'Agents hôtes' },
+      { key: 'proxmox', label: 'Nœuds Proxmox' },
+    ])
+
+    setLocale('en')
+    expect(api.chartSources.value).toEqual([
+      { key: 'agents', label: 'Host agents' },
+      { key: 'proxmox', label: 'Proxmox nodes' },
+    ])
+  })
+
+  it('falls back to a translated "never updated" text', () => {
+    const { api } = mountUseDashboard()
+    expect(api.cveTimestampText.value).toBe('Jamais mis à jour')
+    setLocale('en')
+    expect(api.cveTimestampText.value).toBe('Never updated')
+  })
+})
+
+describe('useDashboard — sendBulkApt', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setActivePinia(createPinia())
+    setLocale('fr')
+    getAptCVESummary.mockResolvedValue({ data: null })
+    getProxmoxSummary.mockResolvedValue({ data: {} })
+    getSettings.mockResolvedValue({ data: { settings: {} } })
+    getMetricsSummary.mockResolvedValue({ data: [] })
+    getProxmoxNodeMetrics.mockResolvedValue({ data: [] })
+  })
+
+  afterEach(() => {
+    setLocale('fr')
+  })
+
+  it('shows a pluralized, translated confirmation listing the selected hostnames before an upgrade', async () => {
+    useHostsStore().setHosts([
+      { id: 'h1', hostname: 'web-01', status: 'online' } as never,
+      { id: 'h2', hostname: 'web-02', status: 'online' } as never,
+    ])
+    const { api } = mountUseDashboard()
+    await flushPromises()
+    api.selectedHostIds.value = ['h1', 'h2']
+
+    const applyPromise = api.sendBulkApt('upgrade')
+    await flushPromises()
+
+    const confirmDialog = useConfirmDialog()
+    expect(confirmDialog.message.value).toContain('Exécuter sur 2 hôtes :')
+    expect(confirmDialog.message.value).toContain('web-01, web-02')
+    confirmDialog.onCancel()
+    await applyPromise
+  })
+
+  it('does not prompt for confirmation before a plain "update" (index refresh, non-destructive)', async () => {
+    useHostsStore().setHosts([{ id: 'h1', hostname: 'web-01', status: 'online' } as never])
+    sendAptCommand.mockResolvedValue({ data: {} })
+    const { api } = mountUseDashboard()
+    await flushPromises()
+    api.selectedHostIds.value = ['h1']
+
+    await api.sendBulkApt('update')
+
+    expect(sendAptCommand).toHaveBeenCalledWith(['h1'], 'update')
+  })
+
+  it('shows a translated error dialog when the apt command fails', async () => {
+    useHostsStore().setHosts([{ id: 'h1', hostname: 'web-01', status: 'online' } as never])
+    sendAptCommand.mockRejectedValue({ response: { data: { error: 'boom' } } })
+    const { api } = mountUseDashboard()
+    await flushPromises()
+    api.selectedHostIds.value = ['h1']
+
+    const applyPromise = api.sendBulkApt('update')
+    await flushPromises()
+
+    const confirmDialog = useConfirmDialog()
+    expect(confirmDialog.title.value).toBe('Erreur')
+    expect(confirmDialog.message.value).toBe('Boom')
+    confirmDialog.onConfirm()
+    await applyPromise
   })
 })

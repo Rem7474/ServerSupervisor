@@ -1,4 +1,5 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import type { ApexOptions } from 'apexcharts'
 import apiClient from '../api'
@@ -72,6 +73,7 @@ interface ChartPoint { x: number; y: number }
 type SummaryChartSeries = { name: string; data: ChartPoint[]; color: string }[]
 
 export function useDashboard() {
+  const { t } = useI18n()
   const dashboardStore = useDashboardStore()
   const hostsStore = useHostsStore()
   const {
@@ -86,7 +88,7 @@ export function useDashboard() {
   const latestAgentVersion = ref('')
   const cveSummary = ref<DashboardCveSummary | null>(null)
   const cveLastUpdated = ref<Date | null>(null)
-  const cveTimestampText = computed(() => formatRelativeTime(cveLastUpdated.value, 'Jamais mis à jour', true))
+  const cveTimestampText = computed(() => formatRelativeTime(cveLastUpdated.value, t('dashboard.neverUpdated'), true))
   const proxmoxNodes = ref<DashboardProxmoxNode[]>([])
   const proxmoxLinks = ref<DashboardProxmoxLinkRecord[]>([])
 
@@ -111,10 +113,10 @@ export function useDashboard() {
   const summaryChartSeries = ref<SummaryChartSeries | null>(null)
   const summaryLoading = ref(false)
   const chartSource = ref('agents')
-  const chartSources = [
-    { key: 'agents', label: 'Agents hôtes' },
-    { key: 'proxmox', label: 'Nœuds Proxmox' },
-  ]
+  const chartSources = computed(() => [
+    { key: 'agents', label: t('dashboard.sourceAgents') },
+    { key: 'proxmox', label: t('dashboard.sourceProxmox') },
+  ])
 
   const auth = useAuthStore()
   const dialog = useConfirmDialog()
@@ -418,15 +420,15 @@ export function useDashboard() {
       .filter((h: DashboardHostRecord) => selectedHostIds.value.includes(h.id))
       .map((h: DashboardHostRecord) => h.hostname || h.name)
       .join(', ')
-    // `apt update` ne fait que rafraîchir l'index des paquets — non destructif,
-    // contrairement à upgrade/dist-upgrade qui restent confirmés.
+    // `apt update` only refreshes the package index — non-destructive, unlike
+    // upgrade/dist-upgrade which stay confirmed.
     if (command !== 'update') {
       const confirmed = await confirmBulkAction(
         `apt ${command}`,
         selectedHostIds.value.length,
         hostnames
-          ? `Exécuter sur ${selectedHostIds.value.length} hôte${selectedHostIds.value.length > 1 ? 's' : ''} :\n${hostnames}\n\nCela peut affecter la stabilité de plusieurs serveurs.`
-          : 'Cette action peut affecter la stabilité de plusieurs serveurs.'
+          ? t('dashboard.bulkAptWarningWithHosts', { hostnames }, selectedHostIds.value.length)
+          : t('dashboard.bulkAptWarning')
       )
       if (!confirmed) return
     }
@@ -434,7 +436,7 @@ export function useDashboard() {
     try {
       await apiClient.sendAptCommand(selectedHostIds.value, command)
     } catch (e: unknown) {
-      await dialog.confirm({ title: 'Erreur', message: translateError(e), variant: 'danger' })
+      await dialog.confirm({ title: t('common.error'), message: translateError(e), variant: 'danger' })
     } finally {
       aptLoading.value = ''
     }

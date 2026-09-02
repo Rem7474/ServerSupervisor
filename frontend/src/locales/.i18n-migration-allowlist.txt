@@ -2,7 +2,6 @@
 # French text. Remove a file's line here once its strings move to
 # src/locales/{fr,en}/*.json; scripts/check-i18n-strings.sh fails the build
 # on any hardcoded French text found outside this list.
-src/App.vue
 src/components/AppFooter.vue
 src/components/BulkActionBar.vue
 src/components/CommandPalette.vue
@@ -31,11 +30,6 @@ src/components/apt/AptPendingPackagesList.vue
 src/components/apt/AptScheduleModal.vue
 src/components/apt/AptToolbar.vue
 src/components/apt/CVEList.vue
-src/components/common/ConnectionsTable.vue
-src/components/common/ErrorBoundary.vue
-src/components/common/TimeRangePicker.vue
-src/components/dashboard/DashboardDockerVersions.vue
-src/components/dashboard/DashboardKPIs.vue
 src/components/disk/DiskHealthCard.vue
 src/components/disk/DiskHistoryChart.vue
 src/components/disk/DiskMetricsCard.vue
@@ -114,12 +108,10 @@ src/views/AddHostView.vue
 src/views/AlertsView.vue
 src/views/AptView.vue
 src/views/AuditLogsView.vue
-src/views/DashboardView.vue
 src/views/GitWebhookDetailView.vue
 src/views/GitWebhooksView.vue
 src/views/GlobalScheduledTasksView.vue
 src/views/HostDetailView.vue
-src/views/LoginView.vue
 src/views/MonitoringHostDetailView.vue
 src/views/MonitoringView.vue
 src/views/NPMView.vue

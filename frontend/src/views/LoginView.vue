@@ -4,7 +4,7 @@
       <div class="text-center mb-4">
         <span class="h1">ServerSupervisor</span>
         <div class="text-secondary">
-          Connexion au dashboard
+          {{ t('auth.subtitle') }}
         </div>
       </div>
 
@@ -14,7 +14,7 @@
       >
         <div class="card-body">
           <h2 class="card-title text-center mb-4">
-            Se connecter
+            {{ t('auth.signIn') }}
           </h2>
 
           <!-- OIDC / SSO Button -->
@@ -28,7 +28,7 @@
               @click="loginWithOIDC"
             >
               <IconKey :size="18" />
-              <span>{{ `Se connecter avec ${oidcStatus.display_name || 'SSO / OpenID Connect'}` }}</span>
+              <span>{{ t('auth.signInWithProvider', { provider: oidcStatus.display_name || 'SSO / OpenID Connect' }) }}</span>
             </button>
           </div>
 
@@ -36,12 +36,12 @@
             v-if="oidcStatus?.enabled && oidcStatus?.allow_local_login"
             class="hr-text my-3"
           >
-            ou identifiants locaux
+            {{ t('auth.orLocalCredentials') }}
           </div>
 
           <div v-if="!oidcStatus?.enabled || oidcStatus?.allow_local_login">
             <div class="mb-3">
-              <label class="form-label">Utilisateur</label>
+              <label class="form-label">{{ t('common.user') }}</label>
               <input
                 ref="usernameInput"
                 v-model="username"
@@ -55,7 +55,7 @@
               >
             </div>
             <div class="mb-3">
-              <label class="form-label">Mot de passe</label>
+              <label class="form-label">{{ t('auth.password') }}</label>
               <input
                 v-model="password"
                 type="password"
@@ -77,7 +77,7 @@
               <label
                 v-if="mfaMethods?.totp"
                 class="form-label"
-              >Code TOTP</label>
+              >{{ t('auth.totpCode') }}</label>
               <input
                 v-if="mfaMethods?.totp"
                 ref="totpInput"
@@ -94,14 +94,14 @@
                 v-if="mfaMethods?.totp"
                 class="text-secondary small mt-1"
               >
-                Entrez le code de votre application d'authentification.
+                {{ t('auth.totpHint') }}
               </div>
 
               <div
                 v-if="mfaMethods?.totp && mfaMethods?.webauthn"
                 class="text-secondary small text-center my-2"
               >
-                ou
+                {{ t('auth.or') }}
               </div>
 
               <button
@@ -111,7 +111,7 @@
                 :disabled="webauthnLoading"
                 @click="loginWithWebAuthn"
               >
-                {{ webauthnLoading ? 'Vérification...' : 'Utiliser une clé de sécurité / passkey' }}
+                {{ webauthnLoading ? t('auth.verifying') : t('auth.useSecurityKey') }}
               </button>
             </div>
           </Transition>
@@ -133,7 +133,7 @@
               class="btn btn-primary w-100"
               :disabled="loading"
             >
-              {{ loading ? 'Connexion...' : (needsMFA ? 'Vérifier le code' : 'Se connecter') }}
+              {{ loading ? t('auth.signingIn') : (needsMFA ? t('auth.verifyCode') : t('auth.signIn')) }}
             </button>
           </div>
         </div>
@@ -144,8 +144,11 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconKey } from '@tabler/icons-vue'
 import { useLogin } from '../composables/useLogin'
+
+const { t } = useI18n()
 
 const {
   username,
