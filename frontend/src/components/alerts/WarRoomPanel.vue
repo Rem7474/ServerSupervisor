@@ -103,8 +103,8 @@ const activeAlertIncidents = computed(() =>
 
 // A correlated child (host-down cascade, see server's alert_incidents.correlated_with)
 // doesn't get its own row — it's not independently actionable, its parent
-// host-down incident is. It's still counted so the parent shows "+N alertes
-// corrélées" instead of silently hiding the cascade.
+// host-down incident is. It's still counted so the parent shows a "+N
+// correlated" badge instead of silently hiding the cascade.
 const correlatedCounts = computed(() => {
   const counts = new Map<number, number>()
   for (const item of activeAlertIncidents.value) {
