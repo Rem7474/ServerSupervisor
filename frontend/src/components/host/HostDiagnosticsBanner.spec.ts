@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import HostDiagnosticsBanner from './HostDiagnosticsBanner.vue'
 import type { DiagnosticIssue } from '../../types/host'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 describe('HostDiagnosticsBanner', () => {
   it('renders nothing when there are no issues', () => {

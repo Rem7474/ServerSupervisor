@@ -1,5 +1,5 @@
-import { i18n } from '../i18n'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { i18n } from '../i18n'
 
 export async function confirmBulkAction(
   action: string,

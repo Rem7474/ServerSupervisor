@@ -2,17 +2,17 @@
   <div class="card">
     <div class="card-header">
       <h3 class="card-title">
-        Maintenance
+        {{ t('settings.tabs.maintenance') }}
       </h3>
     </div>
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-6">
           <h4 class="text-sm mb-2">
-            Nettoyage des métriques
+            {{ t('settings.metricsCleanupTitle') }}
           </h4>
           <p class="text-secondary small mb-3">
-            Met à jour la politique de rétention TimescaleDB à {{ settings.metricsRetentionDays }} jours (system_metrics, disk_metrics)
+            {{ t('settings.metricsCleanupDesc', { days: settings.metricsRetentionDays }) }}
           </p>
           <button
             type="button"
@@ -20,7 +20,7 @@
             :disabled="cleaningMetrics"
             @click="confirmCleanMetrics"
           >
-            {{ cleaningMetrics ? 'Nettoyage en cours...' : 'Lancer le nettoyage' }}
+            {{ cleaningMetrics ? t('settings.cleanupInProgress') : t('settings.launchCleanup') }}
           </button>
           <div
             v-if="cleanMessage"
@@ -32,10 +32,10 @@
 
         <div class="col-md-6">
           <h4 class="text-sm mb-2">
-            Nettoyage des logs audit
+            {{ t('settings.auditCleanupTitle') }}
           </h4>
           <p class="text-secondary small mb-3">
-            Supprime les entrées audit plus anciennes que {{ settings.auditRetentionDays }} jours
+            {{ t('settings.auditCleanupDesc', { days: settings.auditRetentionDays }) }}
           </p>
           <button
             type="button"
@@ -43,7 +43,7 @@
             :disabled="cleaningAuditLogs"
             @click="confirmCleanAudit"
           >
-            {{ cleaningAuditLogs ? 'Nettoyage en cours...' : 'Lancer le nettoyage' }}
+            {{ cleaningAuditLogs ? t('settings.cleanupInProgress') : t('settings.launchCleanup') }}
           </button>
           <div
             v-if="auditCleanMessage"
@@ -58,7 +58,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+
+const { t } = useI18n()
 
 interface Settings {
   metricsRetentionDays: number
@@ -91,10 +94,10 @@ const dialog = useConfirmDialog()
 
 async function confirmCleanMetrics(): Promise<void> {
   const confirmed = await dialog.confirm({
-    title: 'Confirmer le nettoyage',
-    message: `La politique de rétention TimescaleDB sera mise à jour à ${props.settings.metricsRetentionDays} jours. Le nettoyage sera appliqué automatiquement par TimescaleDB.`,
+    title: t('settings.confirmCleanupTitle'),
+    message: t('settings.metricsCleanupConfirmMsg', { days: props.settings.metricsRetentionDays }),
     variant: 'warning',
-    okLabel: 'Continuer',
+    okLabel: t('settings.continueLabel'),
   })
   if (!confirmed) return
   emit('clean-metrics')
@@ -102,10 +105,10 @@ async function confirmCleanMetrics(): Promise<void> {
 
 async function confirmCleanAudit(): Promise<void> {
   const confirmed = await dialog.confirm({
-    title: 'Confirmer le nettoyage',
-    message: `Les entrées audit plus anciennes que ${props.settings.auditRetentionDays} jours seront supprimées. Cette action est irréversible.`,
+    title: t('settings.confirmCleanupTitle'),
+    message: t('settings.auditCleanupConfirmMsg', { days: props.settings.auditRetentionDays }),
     variant: 'warning',
-    okLabel: 'Continuer',
+    okLabel: t('settings.continueLabel'),
   })
   if (!confirmed) return
   emit('clean-audit')

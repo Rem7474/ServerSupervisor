@@ -1,4 +1,5 @@
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { i18n } from '../i18n'
 
 // `apt update` only refreshes the package index — non-destructive, unlike
 // upgrade/dist-upgrade which stay confirmed. Centralized here so the
@@ -9,10 +10,11 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 export async function confirmAptCommand(command: string, targetLabel: string, count = 1): Promise<boolean> {
   if (command === 'update') return true
   const { confirm } = useConfirmDialog()
-  const title = count > 1 ? `apt ${command} sur ${count} hôtes ?` : `apt ${command}`
+  const { t } = i18n.global
+  const title = count > 1 ? t('apt.confirmTitleWithCount', { command, count }) : t('apt.confirmTitleSingle', { command })
   const message = command === 'dist-upgrade'
-    ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${targetLabel} ?`
-    : `Exécuter sur : ${targetLabel} ?`
+    ? t('apt.distUpgradeWarning', { target: targetLabel })
+    : t('apt.confirmExecuteOn', { target: targetLabel })
   return confirm({
     title,
     message,
