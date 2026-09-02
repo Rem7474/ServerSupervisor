@@ -56,7 +56,6 @@ src/components/monitoring/MonitoringOverviewPanel.vue
 src/components/monitoring/SslDetailSection.vue
 src/components/monitoring/UptimeDetailSection.vue
 src/components/network/NetworkGraph.vue
-src/components/network/NetworkNodeDetail.vue
 src/components/network/NetworkPortList.vue
 src/components/network/NetworkTopologyConfig.vue
 src/components/proxmox/GuestExposureCard.vue
