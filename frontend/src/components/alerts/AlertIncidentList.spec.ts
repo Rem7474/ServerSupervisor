@@ -83,7 +83,7 @@ describe('AlertIncidentList', () => {
 
   it('shows the correlated-incident icon title', () => {
     const wrapper = mount(AlertIncidentList, {
-      props: { incidents: [incident({ correlated_with: 'other-id' })] },
+      props: { incidents: [incident({ correlated_with: 42 })] },
       ...mountOpts,
     })
     expect(wrapper.find('[title="Corrélé avec l\'incident « hôte hors ligne » — pas de notification séparée"]').exists()).toBe(true)
