@@ -8,7 +8,7 @@
         <label
           class="form-label"
           for="scan-cidr"
-        >Sous-réseau (CIDR)</label>
+        >{{ t('host.discoverySubnetLabel') }}</label>
         <div class="input-group">
           <input
             id="scan-cidr"
@@ -23,12 +23,11 @@
             class="btn btn-primary"
             :disabled="scanning"
           >
-            {{ scanning ? 'Scan en cours…' : 'Scanner' }}
+            {{ scanning ? t('host.discoveryScanningLabel') : t('host.discoveryScanButton') }}
           </button>
         </div>
         <div class="form-hint">
-          IPv4 uniquement, de /24 (254 adresses) à /30 (2 adresses) — ping ICMP de chaque
-          adresse. Nécessite CAP_NET_RAW côté serveur (voir server/Dockerfile).
+          {{ t('host.discoveryHint') }}
         </div>
       </form>
 
@@ -45,20 +44,19 @@
         class="text-secondary small py-3"
       >
         <span class="spinner-border spinner-border-sm me-2" />
-        Ping de chaque adresse en cours…
+        {{ t('host.discoveryPinging') }}
       </div>
 
       <template v-else-if="hasScanned">
         <EmptyState
           v-if="!results.length"
-          title="Aucune adresse trouvée"
-          subtitle="Vérifiez le sous-réseau saisi."
+          :title="t('host.discoveryNoAddressesTitle')"
+          :subtitle="t('host.discoveryNoAddressesSubtitle')"
         />
         <template v-else>
           <div class="d-flex align-items-center justify-content-between mb-2">
             <div class="text-secondary small">
-              {{ results.length }} adresse(s) scannée(s), {{ candidates.length }} nouvelle(s)
-              disponible(s)
+              {{ t('host.discoveryScanSummary', { scanned: results.length, candidates: candidates.length }) }}
             </div>
             <button
               v-if="candidates.length"
@@ -66,7 +64,7 @@
               class="btn btn-sm btn-ghost-secondary"
               @click="toggleSelectAll"
             >
-              {{ allSelected ? 'Tout désélectionner' : 'Tout sélectionner' }}
+              {{ allSelected ? t('host.discoveryDeselectAll') : t('host.discoverySelectAll') }}
             </button>
           </div>
 
@@ -75,9 +73,9 @@
               <thead>
                 <tr>
                   <th style="width: 32px" />
-                  <th>Adresse IP</th>
-                  <th>Statut</th>
-                  <th>Nom de l'hôte</th>
+                  <th>{{ t('host.discoveryIpColumn') }}</th>
+                  <th>{{ t('host.statusColumn') }}</th>
+                  <th>{{ t('host.discoveryHostnameColumn') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -91,7 +89,7 @@
                       type="checkbox"
                       class="form-check-input"
                       :checked="selected.has(r.ip_address)"
-                      :aria-label="`Sélectionner ${r.ip_address}`"
+                      :aria-label="t('host.discoverySelectAriaLabel', { ip: r.ip_address })"
                       @change="toggleSelected(r.ip_address)"
                     >
                   </td>
@@ -103,19 +101,19 @@
                       v-if="r.already_registered"
                       class="badge bg-azure-lt"
                     >
-                      Déjà enregistré{{ r.existing_host_name ? ` — ${r.existing_host_name}` : '' }}
+                      {{ r.existing_host_name ? t('host.discoveryAlreadyRegisteredWithName', { name: r.existing_host_name }) : t('host.discoveryAlreadyRegistered') }}
                     </span>
                     <span
                       v-else-if="r.responded"
                       class="badge bg-success-lt"
                     >
-                      Répond{{ r.latency_ms ? ` (${r.latency_ms} ms)` : '' }}
+                      {{ r.latency_ms ? t('host.discoveryRespondsWithLatency', { ms: r.latency_ms }) : t('host.discoveryResponds') }}
                     </span>
                     <span
                       v-else
                       class="badge bg-secondary-lt"
                     >
-                      Ne répond pas
+                      {{ t('host.discoveryNoResponse') }}
                     </span>
                   </td>
                   <td>
@@ -124,7 +122,7 @@
                       v-model="names[r.ip_address]"
                       type="text"
                       class="form-control form-control-sm"
-                      :aria-label="`Nom de l'hôte pour ${r.ip_address}`"
+                      :aria-label="t('host.discoveryHostnameAriaLabel', { ip: r.ip_address })"
                     >
                   </td>
                 </tr>
@@ -147,7 +145,7 @@
             :disabled="!selected.size || adding"
             @click="addSelected"
           >
-            {{ adding ? 'Ajout…' : `Ajouter ${selected.size} hôte(s) sélectionné(s)` }}
+            {{ adding ? t('host.discoveryAdding') : t('host.discoveryAddButton', { count: selected.size }) }}
           </button>
         </template>
       </template>
@@ -160,18 +158,18 @@
     >
       <div class="host-success-header">
         <div class="fw-semibold">
-          {{ createdCount }} hôte(s) ajouté(s)
+          {{ t('host.discoveryHostsAddedCount', { count: createdCount }) }}
         </div>
         <button
           type="button"
           class="btn btn-success"
           @click="finish"
         >
-          Terminé
+          {{ t('host.discoveryDone') }}
         </button>
       </div>
       <div class="text-secondary small mb-3">
-        Les clés API ne seront plus affichées. Copiez-les maintenant.
+        {{ t('host.discoveryKeysWarning') }}
       </div>
 
       <div class="d-flex flex-column gap-2">
@@ -194,7 +192,7 @@
                 class="btn btn-outline-secondary btn-sm"
                 @click="copyKey(item)"
               >
-                {{ copiedKeys[item.ip_address] ? 'Copié' : 'Copier' }}
+                {{ copiedKeys[item.ip_address] ? t('host.discoveryCopied') : t('host.discoveryCopy') }}
               </button>
             </div>
           </template>
@@ -212,9 +210,11 @@
 
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import EmptyState from '../EmptyState.vue'
 import { useNetworkDiscovery } from '../../composables/useNetworkDiscovery'
 
+const { t } = useI18n()
 const emit = defineEmits<{ done: [] }>()
 
 const {

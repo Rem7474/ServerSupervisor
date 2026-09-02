@@ -17,7 +17,7 @@
         class="btn btn-primary"
         @click="openCreateTask"
       >
-        Nouvelle tâche
+        {{ t('host.tasksNewButton') }}
       </button>
     </div>
     <div class="card">
@@ -33,9 +33,9 @@
       >
         <EmptyState
           :icon="IconClock"
-          title="Aucune tâche planifiée"
-          subtitle="Automatisez vos opérations en créant une tâche planifiée."
-          :cta-label="canRunApt ? 'Nouvelle tâche' : ''"
+          :title="t('host.tasksEmptyTitle')"
+          :subtitle="t('host.tasksEmptySubtitle')"
+          :cta-label="canRunApt ? t('host.tasksNewButton') : ''"
           @cta="openCreateTask"
         />
       </div>
@@ -48,24 +48,24 @@
             <tr>
               <th>
                 <SortableHeader
-                  label="Nom"
+                  :label="t('host.nameColumn')"
                   :active="sortKey === 'name'"
                   :direction="sortDir"
                   @toggle="toggleSort('name')"
                 />
               </th>
-              <th>Module / Action</th>
-              <th>Planification</th>
+              <th>{{ t('host.tasksModuleActionColumn') }}</th>
+              <th>{{ t('host.tasksScheduleColumn') }}</th>
               <th>
                 <SortableHeader
-                  label="Prochaine exécution"
+                  :label="t('host.tasksNextRunColumn')"
                   :active="sortKey === 'next_run_at'"
                   :direction="sortDir"
                   @toggle="toggleSort('next_run_at')"
                 />
               </th>
-              <th>Dernier résultat</th>
-              <th>Activée</th>
+              <th>{{ t('host.tasksLastResultColumn') }}</th>
+              <th>{{ t('host.tasksEnabledColumn') }}</th>
               <th />
             </tr>
           </thead>
@@ -88,7 +88,7 @@
                 <span
                   v-if="isManualOnly(task)"
                   class="badge bg-secondary-lt text-secondary"
-                >Manuel</span>
+                >{{ t('host.tasksManualBadge') }}</span>
                 <template v-else>
                   <code class="small">{{ task.cron_expression }}</code>
                   <span
@@ -118,7 +118,7 @@
                 <span
                   v-else
                   class="text-muted"
-                >jamais</span>
+                >{{ t('host.tasksNeverLabel') }}</span>
               </td>
               <td>
                 <input
@@ -132,7 +132,7 @@
                   v-else-if="isManualOnly(task)"
                   class="text-muted small"
                 >-</span>
-                <span v-else>{{ task.enabled ? 'Oui' : 'Non' }}</span>
+                <span v-else>{{ task.enabled ? t('host.tasksEnabledYes') : t('host.tasksEnabledNo') }}</span>
               </td>
               <td class="text-end">
                 <div class="d-flex gap-1 justify-content-end">
@@ -140,7 +140,7 @@
                     v-if="task.last_command_id"
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Voir les logs"
+                    :title="t('host.viewLogsTooltip')"
                     @click="openTaskLogs(task)"
                   >
                     <IconList
@@ -153,8 +153,8 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="taskRunningId === task.id"
-                    title="Exécuter"
-                    aria-label="Exécuter la tâche maintenant"
+                    :title="t('host.executeTooltip')"
+                    :aria-label="t('host.executeTaskAriaLabel')"
                     @click="runTaskNow(task)"
                   >
                     <span
@@ -171,8 +171,8 @@
                     v-if="canRunApt"
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Modifier"
-                    aria-label="Modifier la tâche"
+                    :title="t('host.tasksEditTooltip')"
+                    :aria-label="t('host.tasksEditAriaLabel')"
                     @click="openEditTask(task)"
                   >
                     <IconPencil
@@ -184,8 +184,8 @@
                     v-if="canRunApt"
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-danger"
-                    title="Supprimer"
-                    aria-label="Supprimer la tâche"
+                    :title="t('host.tasksDeleteTooltip')"
+                    :aria-label="t('host.tasksDeleteAriaLabel')"
                     @click="confirmDeleteTask(task)"
                   >
                     <IconTrash
@@ -215,7 +215,7 @@
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">
-                {{ editingTask ? 'Modifier la tâche' : 'Nouvelle tâche planifiée' }}
+                {{ editingTask ? t('host.tasksEditModalTitle') : t('host.tasksCreateModalTitle') }}
               </h5>
               <button
                 type="button"
@@ -231,12 +231,12 @@
                 {{ taskModalError }}
               </div>
               <div class="mb-3">
-                <label class="form-label">Nom</label>
+                <label class="form-label">{{ t('host.nameColumn') }}</label>
                 <input
                   v-model="taskForm.name"
                   type="text"
                   class="form-control"
-                  placeholder="Mise a jour APT hebdomadaire"
+                  :placeholder="t('host.tasksNamePlaceholder')"
                 >
               </div>
               <div class="mb-3">
@@ -258,7 +258,7 @@
                     type="checkbox"
                     class="form-check-input"
                   >
-                  <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
+                  <span class="form-check-label">{{ t('host.tasksManualOnlyLabel') }}</span>
                 </label>
               </div>
               <div
@@ -280,7 +280,7 @@
                 <label
                   class="form-check-label"
                   for="taskEnabled"
-                >Activee</label>
+                >{{ t('host.tasksEnabledCheckboxLabel') }}</label>
               </div>
             </div>
             <div class="modal-footer">
@@ -289,7 +289,7 @@
                 class="btn btn-outline-secondary"
                 @click="closeTaskModal"
               >
-                Annuler
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="button"
@@ -301,7 +301,7 @@
                   v-if="taskSaving"
                   class="spinner-border spinner-border-sm me-1"
                 />
-                {{ editingTask ? 'Enregistrer' : 'Créer' }}
+                {{ editingTask ? t('host.tasksSaveButton') : t('host.tasksCreateButton') }}
               </button>
             </div>
           </div>
@@ -318,7 +318,7 @@
       <div class="toast show align-items-center text-bg-success border-0">
         <div class="d-flex">
           <div class="toast-body">
-            <strong>{{ taskRunResult.name }}</strong> déclenchée — commande <code>{{ taskRunResult.id }}</code>
+            <strong>{{ taskRunResult.name }}</strong> {{ t('host.taskTriggeredPrefix') }} <code>{{ taskRunResult.id }}</code>
           </div>
           <button
             type="button"
@@ -333,6 +333,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconClock, IconList, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
 import DispatchStepEditor from '../DispatchStepEditor.vue'
@@ -396,6 +397,7 @@ const props = withDefaults(defineProps<{
   collectors: undefined,
 })
 
+const { t } = useI18n()
 const dialog = useConfirmDialog()
 const pendingCommand = usePendingCommand()
 const { formatExactDate: formatTaskDate } = useDateFormatter()
@@ -486,7 +488,7 @@ async function loadTasks(): Promise<void> {
     const { data } = await apiClient.getScheduledTasks(String(props.hostId))
     tasks.value = data
   } catch (e: unknown) {
-    tasksError.value = getApiErrorMessage(e, 'Erreur de chargement')
+    tasksError.value = getApiErrorMessage(e, t('host.loadError'))
   } finally {
     tasksLoading.value = false
   }
@@ -518,11 +520,11 @@ function closeTaskModal(): void {
 
 async function saveTask(): Promise<void> {
   if (!taskForm.value.name || (!taskForm.value.action && taskForm.value.module !== 'custom')) {
-    taskModalError.value = 'Nom et action sont obligatoires.'
+    taskModalError.value = t('host.tasksNameActionRequired')
     return
   }
   if (!taskManualOnly.value && !taskForm.value.cron_expression) {
-    taskModalError.value = 'Expression cron obligatoire.'
+    taskModalError.value = t('host.tasksCronRequired')
     return
   }
   taskSaving.value = true
@@ -537,7 +539,7 @@ async function saveTask(): Promise<void> {
     await loadTasks()
   } catch (e: unknown) {
     const data = (e as { response?: { data?: { error?: string; warning?: string } } }).response?.data
-    taskModalError.value = data?.error || data?.warning || 'Erreur lors de la sauvegarde'
+    taskModalError.value = data?.error || data?.warning || t('host.tasksSaveError')
   } finally {
     taskSaving.value = false
   }
@@ -548,7 +550,7 @@ async function toggleTask(task: Task): Promise<void> {
     await apiClient.updateScheduledTask(String(task.id), { ...task, enabled: !task.enabled })
     await loadTasks()
   } catch (e: unknown) {
-    tasksError.value = getApiErrorMessage(e, 'Erreur')
+    tasksError.value = getApiErrorMessage(e, t('common.error'))
   }
 }
 
@@ -570,7 +572,7 @@ async function runTaskNow(task: Task): Promise<void> {
     await pendingCommand.track(data.command_id)
     await loadTasks()
   } catch (e: unknown) {
-    tasksError.value = getApiErrorMessage(e, 'Erreur')
+    tasksError.value = getApiErrorMessage(e, t('common.error'))
   } finally {
     taskRunningId.value = null
   }
@@ -590,8 +592,8 @@ function openTaskLogs(task: Task): void {
 
 async function confirmDeleteTask(task: Task): Promise<void> {
   const confirmed = await dialog.confirm({
-    title: 'Supprimer la tâche',
-    message: `Supprimer la tâche "${task.name}" ?\nCette action est irréversible.`,
+    title: t('host.tasksDeleteConfirmTitle'),
+    message: t('host.tasksDeleteConfirmMessage', { name: task.name }),
     variant: 'danger',
   })
   if (!confirmed) return
@@ -599,7 +601,7 @@ async function confirmDeleteTask(task: Task): Promise<void> {
     await apiClient.deleteScheduledTask(String(task.id))
     await loadTasks()
   } catch (e: unknown) {
-    tasksError.value = getApiErrorMessage(e, 'Erreur de suppression')
+    tasksError.value = getApiErrorMessage(e, t('host.tasksDeleteError'))
   }
 }
 </script>

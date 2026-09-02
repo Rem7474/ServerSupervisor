@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const { openMock, closeMock, resizeMock, sendInputMock } = vi.hoisted(() => ({
   openMock: vi.fn(),
@@ -72,6 +73,7 @@ class FakeResizeObserver {
 describe('ProxmoxConsole', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     statusRef.value = 'idle'
     errorRef.value = ''
     vi.stubGlobal('ResizeObserver', FakeResizeObserver)
