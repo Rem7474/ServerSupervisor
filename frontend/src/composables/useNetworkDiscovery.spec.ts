@@ -113,4 +113,40 @@ describe('useNetworkDiscovery', () => {
     await disco.addSelected()
     expect(registerHostsBulk).not.toHaveBeenCalled()
   })
+
+  it('surfaces the API error message on a failed bulk add', async () => {
+    discoverHosts.mockResolvedValue({ data: { results: RESULTS } })
+    registerHostsBulk.mockRejectedValue(new Error('bulk add failed'))
+    const disco = useNetworkDiscovery()
+    disco.cidr.value = '10.0.0.0/29'
+    await disco.scan()
+    await flushPromises()
+    disco.toggleSelected('10.0.0.1')
+
+    await disco.addSelected()
+    await flushPromises()
+
+    expect(disco.addError.value).toBe('bulk add failed')
+    expect(disco.adding.value).toBe(false)
+  })
+
+  it('resets all state back to its initial values', async () => {
+    discoverHosts.mockResolvedValue({ data: { results: RESULTS } })
+    const disco = useNetworkDiscovery()
+    disco.cidr.value = '10.0.0.0/29'
+    await disco.scan()
+    await flushPromises()
+    disco.toggleSelected('10.0.0.1')
+
+    disco.reset()
+
+    expect(disco.cidr.value).toBe('')
+    expect(disco.results.value).toEqual([])
+    expect(disco.hasScanned.value).toBe(false)
+    expect(disco.selected.value.size).toBe(0)
+    expect(disco.names).toEqual({})
+    expect(disco.bulkResults.value).toBeNull()
+    expect(disco.addError.value).toBe('')
+    expect(disco.scanError.value).toBe('')
+  })
 })

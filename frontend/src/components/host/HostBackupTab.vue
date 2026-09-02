@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
       <h3 class="card-title mb-0">
-        Sauvegardes Restic
+        {{ t('host.backupTitle') }}
       </h3>
       <div class="d-flex flex-wrap align-items-center gap-2">
         <span
@@ -14,11 +14,11 @@
           v-if="canRun"
           v-model="runProfile"
           :options="resticOptionGroups"
-          empty-label="Profil (défaut)"
-          placeholder="Profil (défaut)"
+          :empty-label="t('host.backupProfileDefaultLabel')"
+          :placeholder="t('host.backupProfileDefaultLabel')"
           style="min-width: 160px; width: auto"
           :disabled="backupLoading === 'run' || liveStatus === 'running'"
-          :title="resticGroups.length ? 'Un groupe lance plusieurs profils en une seule exécution.' : undefined"
+          :title="resticGroups.length ? t('host.backupGroupHint') : undefined"
         />
         <button
           v-if="canRun"
@@ -31,7 +31,7 @@
             v-if="backupLoading === 'run' || liveStatus === 'running'"
             class="spinner-border spinner-border-sm me-1"
           />
-          Lancer un backup
+          {{ t('host.backupRunButton') }}
         </button>
       </div>
     </div>
@@ -46,7 +46,7 @@
           <div class="card card-sm">
             <div class="card-body text-center">
               <div class="text-secondary small">
-                Dernier backup
+                {{ t('host.backupLastRunLabel') }}
               </div>
               <div class="fw-semibold">
                 {{ formatDate(latestRun?.finished_at || latestRun?.started_at || passiveState?.last_run_at) }}
@@ -58,7 +58,7 @@
           <div class="card card-sm">
             <div class="card-body text-center">
               <div class="text-secondary small">
-                Durée
+                {{ t('host.durationLabel') }}
               </div>
               <div class="fw-semibold">
                 {{ latestRun?.duration_sec != null ? formatDuration(latestRun.duration_sec) : '—' }}
@@ -85,10 +85,10 @@
           <div class="card card-sm">
             <div class="card-body text-center">
               <div class="text-secondary small">
-                Profil
+                {{ t('host.backupProfileLabel') }}
               </div>
               <div class="fw-semibold">
-                {{ latestRun?.profile || 'défaut' }}
+                {{ latestRun?.profile || t('host.defaultProfileLabel') }}
               </div>
             </div>
           </div>
@@ -97,8 +97,8 @@
 
       <EmptyState
         v-else-if="!liveStatus || liveStatus === 'idle'"
-        title="Aucune donnée de sauvegarde"
-        message="Lancez un backup manuellement ou attendez le prochain rapport de l'agent."
+        :title="t('host.backupNoDataTitle')"
+        :message="t('host.backupNoDataMessage')"
       />
 
       <!-- Progression live -->
@@ -108,12 +108,12 @@
       >
         <div class="d-flex align-items-center justify-content-between mb-1">
           <span class="text-secondary small">
-            {{ liveStatus === 'running' ? 'Backup en cours…' : liveStatus === 'completed' ? 'Backup terminé' : 'Backup en échec' }}
+            {{ liveStatus === 'running' ? t('host.backupRunningLabel') : liveStatus === 'completed' ? t('host.backupCompletedLabel') : t('host.backupFailedLabel') }}
           </span>
           <span
             v-if="liveProgress?.eta_seconds"
             class="text-secondary small"
-          >ETA : {{ formatDuration(liveProgress.eta_seconds) }}</span>
+          >{{ t('host.backupEtaLabel', { duration: formatDuration(liveProgress.eta_seconds) }) }}</span>
         </div>
         <div
           v-if="liveProgress?.percent_done != null"
@@ -134,13 +134,13 @@
             v-if="liveStatus === 'running'"
             class="spinner-border spinner-border-sm"
           />
-          En attente de progression…
+          {{ t('host.backupWaitingProgress') }}
         </div>
         <div
           v-if="liveProgress"
           class="text-secondary small mb-2"
         >
-          {{ liveProgress.files_done ?? 0 }}<span v-if="liveProgress.files_total">/{{ liveProgress.files_total }}</span> fichiers
+          {{ liveProgress.files_done ?? 0 }}<span v-if="liveProgress.files_total">/{{ liveProgress.files_total }}</span> {{ t('host.backupFilesLabel') }}
           — {{ formatBytes(liveProgress.bytes_done) }}<span v-if="liveProgress.bytes_total"> / {{ formatBytes(liveProgress.bytes_total) }}</span>
         </div>
         <pre
@@ -149,7 +149,7 @@
         >{{ liveLogLines.join('\n') }}</pre>
       </div>
 
-      <!-- Aide à la configuration -->
+      <!-- Configuration help -->
       <div class="mt-3">
         <a
           :href="configDocURL"
@@ -158,14 +158,14 @@
           class="btn btn-sm btn-ghost-secondary"
         >
           <IconExternalLink :size="14" />
-          Aide à la configuration
+          {{ t('host.backupConfigHelpLink') }}
         </a>
       </div>
 
       <!-- Historique -->
       <div class="mt-4">
         <div class="fw-semibold small mb-2">
-          Historique
+          {{ t('host.backupHistoryTitle') }}
         </div>
         <div
           v-if="backupRuns.length"
@@ -174,13 +174,13 @@
           <table class="table table-sm table-vcenter card-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Cible</th>
-                <th>Statut</th>
-                <th>Durée</th>
-                <th>Volume</th>
-                <th>Déclencheur</th>
-                <th>Erreur</th>
+                <th>{{ t('host.dateColumn') }}</th>
+                <th>{{ t('host.backupTargetColumn') }}</th>
+                <th>{{ t('host.statusColumn') }}</th>
+                <th>{{ t('host.durationLabel') }}</th>
+                <th>{{ t('host.backupVolumeColumn') }}</th>
+                <th>{{ t('host.backupTriggerColumn') }}</th>
+                <th>{{ t('common.error') }}</th>
                 <th class="text-end" />
               </tr>
             </thead>
@@ -193,7 +193,7 @@
                   {{ formatDate(run.started_at) }}
                 </td>
                 <td class="small">
-                  {{ run.profile || 'défaut' }}
+                  {{ run.profile || t('host.defaultProfileLabel') }}
                 </td>
                 <td>
                   <span
@@ -208,7 +208,7 @@
                   {{ formatBytes(run.bytes_done) }}
                 </td>
                 <td class="small">
-                  {{ run.triggered_by === 'scheduled_task' ? 'Planifié' : (run.triggered_by || 'Manuel') }}
+                  {{ run.triggered_by === 'scheduled_task' ? t('host.backupScheduledLabel') : (run.triggered_by || t('host.backupManualLabel')) }}
                 </td>
                 <td
                   class="small text-truncate"
@@ -222,8 +222,8 @@
                     v-if="run.command_id"
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Voir les logs"
-                    aria-label="Voir les logs"
+                    :title="t('host.viewLogsTooltip')"
+                    :aria-label="t('host.viewLogsTooltip')"
                     @click="emit('watch-run', run)"
                   >
                     <IconList
@@ -240,7 +240,7 @@
           v-else
           class="text-secondary small"
         >
-          Aucun backup enregistré pour le moment.
+          {{ t('host.backupNoneRegistered') }}
         </div>
       </div>
     </div>
@@ -249,6 +249,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconExternalLink, IconList } from '@tabler/icons-vue'
 import dayjs from '../../utils/dayjs'
 import EmptyState from '../EmptyState.vue'
@@ -283,12 +284,13 @@ const {
   stopWatchingLiveBackup,
 } = useBackup(props.hostId)
 
+const { t } = useI18n()
 const runProfile = ref('')
 
 const resticOptionGroups = computed<OptionGroup[]>(() => {
   const groups: OptionGroup[] = []
-  if (resticProfiles.value.length) groups.push({ label: 'Profils', options: resticProfiles.value })
-  if (resticGroups.value.length) groups.push({ label: 'Groupes', options: resticGroups.value })
+  if (resticProfiles.value.length) groups.push({ label: t('host.backupProfilesGroupLabel'), options: resticProfiles.value })
+  if (resticGroups.value.length) groups.push({ label: t('host.backupGroupsGroupLabel'), options: resticGroups.value })
   return groups
 })
 
@@ -321,7 +323,7 @@ function onRunBackup(): void {
 }
 
 function formatDate(date: string | null | undefined): string {
-  if (!date) return 'Jamais'
+  if (!date) return t('common.never')
   return dayjs.utc(date).local().fromNow()
 }
 
@@ -335,7 +337,7 @@ function formatDuration(seconds: number): string {
 
 function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null) return '—'
-  const units = ['o', 'Ko', 'Mo', 'Go', 'To']
+  const units = [t('host.unitByte'), t('host.unitKB'), t('host.unitMB'), t('host.unitGB'), t('host.unitTB')]
   let value = bytes
   let unitIndex = 0
   while (value >= 1024 && unitIndex < units.length - 1) {

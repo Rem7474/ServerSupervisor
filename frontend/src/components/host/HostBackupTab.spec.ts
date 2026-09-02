@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const { getBackupStatus, getBackupRuns, getBackupProfiles, getBackupGroups, runBackup, openCommandStream, closeStream, getLastStreamOptions } = vi.hoisted(() => {
   let lastStreamOptions: {
@@ -42,6 +43,7 @@ function mockEmptyBackend() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setLocale('fr')
   getBackupProfiles.mockResolvedValue({ data: { profiles: [] } })
   getBackupGroups.mockResolvedValue({ data: { groups: [] } })
 })
@@ -209,5 +211,42 @@ describe('HostBackupTab', () => {
     await flushPromises()
 
     expect(runBackup).toHaveBeenCalledWith('h1', 'full-backup')
+  })
+
+  it('emits watch-run when a history row\'s log button is clicked', async () => {
+    const run = { id: 'run-1', host_id: 'h1', status: 'ok', profile: 'files', started_at: new Date().toISOString(), command_id: 'cmd-9' }
+    getBackupStatus.mockResolvedValue({ data: {} })
+    getBackupRuns.mockResolvedValue({ data: { runs: [run] } })
+
+    const wrapper = mount(HostBackupTab, { props: { hostId: 'h1', canRun: true } })
+    await flushPromises()
+
+    await wrapper.find('button[title="Voir les logs"]').trigger('click')
+    expect(wrapper.emitted('watch-run')?.[0]?.[0]).toMatchObject({ id: 'run-1' })
+  })
+
+  it('shows a warning badge for a "warning" status and formats an hours-long duration and large byte counts', async () => {
+    getBackupStatus.mockResolvedValue({
+      data: {
+        latest_run: {
+          id: 'run-1', host_id: 'h1', status: 'warning', profile: 'files',
+          started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
+          duration_sec: 7384, snapshot_id: 'abc123',
+        },
+      },
+    })
+    getBackupRuns.mockResolvedValue({
+      data: { runs: [{ id: 'run-1', host_id: 'h1', status: 'unknown_status', profile: 'files', started_at: new Date().toISOString(), bytes_done: 5 * 1024 * 1024 }] },
+    })
+
+    const wrapper = mount(HostBackupTab, { props: { hostId: 'h1', canRun: true } })
+    await flushPromises()
+
+    expect(wrapper.find('.badge.bg-warning-lt').exists()).toBe(true)
+    expect(wrapper.text()).toContain('2h3min')
+    expect(wrapper.text()).toContain('5.0 Mo')
+    // An unrecognized run status falls back to the default secondary badge class.
+    const statusBadges = wrapper.findAll('tbody .badge')
+    expect(statusBadges[0].classes()).toContain('bg-secondary-lt')
   })
 })

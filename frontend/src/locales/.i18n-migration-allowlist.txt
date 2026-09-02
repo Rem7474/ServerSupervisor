@@ -25,17 +25,6 @@ src/components/alerts/AlertRuleTemplateModal.vue
 src/components/alerts/MaintenanceWindowsPanel.vue
 src/components/alerts/WarRoomPanel.vue
 src/components/alerts/WarRoomSeverityColumn.vue
-src/components/host/CommandLogPanel.vue
-src/components/host/HostAptTab.vue
-src/components/host/HostBackupTab.vue
-src/components/host/HostCustomTasksTab.vue
-src/components/host/HostDockerTab.vue
-src/components/host/HostMetricsPanel.vue
-src/components/host/HostProcessesPanel.vue
-src/components/host/HostTasksTab.vue
-src/components/host/HostTimelineTab.vue
-src/components/host/NetworkDiscoveryPanel.vue
-src/components/host/ResticBackupSummaryCard.vue
 src/components/monitoring/MonitoringOverviewPanel.vue
 src/components/monitoring/SslDetailSection.vue
 src/components/monitoring/UptimeDetailSection.vue
