@@ -45,5 +45,14 @@
   "bulkConfirmTitle": "{action} on {count} item? | {action} on {count} items?",
   "cannotBeUndone": "This action cannot be undone",
   "yesAction": "Yes, {action}",
-  "cancel": "Cancel"
+  "cancel": "Cancel",
+  "commandLogCopiedTooltip": "Copied!",
+  "commandLogCopyTooltip": "Copy the output",
+  "commandLogDownloadTooltip": "Download (.txt)",
+  "commandLogClearTooltip": "Clear the console",
+  "commandLogTitle": "Logs",
+  "commandLogEmptyText": "No log selected",
+  "commandLogEmptyHint": "Click \"Logs\" to show a command's output",
+  "commandLogExecutedPrefix": "Executed",
+  "commandLogNoOutput": "No output available."
 }

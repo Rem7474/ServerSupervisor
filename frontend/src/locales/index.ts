@@ -5,6 +5,7 @@ import frCommon from './fr/common.json'
 import frDashboard from './fr/dashboard.json'
 import frDocker from './fr/docker.json'
 import frErrors from './fr/errors.json'
+import frHost from './fr/host.json'
 import frMonitoring from './fr/monitoring.json'
 import frNav from './fr/nav.json'
 import frNetwork from './fr/network.json'
@@ -20,6 +21,7 @@ import enCommon from './en/common.json'
 import enDashboard from './en/dashboard.json'
 import enDocker from './en/docker.json'
 import enErrors from './en/errors.json'
+import enHost from './en/host.json'
 import enMonitoring from './en/monitoring.json'
 import enNav from './en/nav.json'
 import enNetwork from './en/network.json'
@@ -39,6 +41,7 @@ export const fr = {
   alerts: frAlerts,
   settings: frSettings,
   apt: frApt,
+  host: frHost,
   monitoring: frMonitoring,
   security: frSecurity,
   webhooks: frWebhooks,
@@ -56,6 +59,7 @@ export const en = {
   alerts: enAlerts,
   settings: enSettings,
   apt: enApt,
+  host: enHost,
   monitoring: enMonitoring,
   security: enSecurity,
   webhooks: enWebhooks,

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import HostTimelineTab from './HostTimelineTab.vue'
 
 const { getHostTimeline } = vi.hoisted(() => ({ getHostTimeline: vi.fn() }))
@@ -12,6 +13,7 @@ vi.mock('../../api', () => ({
 describe('HostTimelineTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
   })
 
   it('shows the triggering user for an event that has one', async () => {

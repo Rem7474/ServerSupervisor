@@ -45,5 +45,14 @@
   "bulkConfirmTitle": "{action} sur {count} élément ? | {action} sur {count} éléments ?",
   "cannotBeUndone": "Cette action ne peut pas être annulée",
   "yesAction": "Oui, {action}",
-  "cancel": "Annuler"
+  "cancel": "Annuler",
+  "commandLogCopiedTooltip": "Copié !",
+  "commandLogCopyTooltip": "Copier la sortie",
+  "commandLogDownloadTooltip": "Télécharger (.txt)",
+  "commandLogClearTooltip": "Vider la console",
+  "commandLogTitle": "Logs",
+  "commandLogEmptyText": "Aucun log sélectionné",
+  "commandLogEmptyHint": "Cliquez sur \"Logs\" pour afficher la sortie d'une commande",
+  "commandLogExecutedPrefix": "Exécutée",
+  "commandLogNoOutput": "Aucune sortie disponible."
 }

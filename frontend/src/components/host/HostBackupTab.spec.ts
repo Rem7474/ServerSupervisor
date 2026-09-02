@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const { getBackupStatus, getBackupRuns, getBackupProfiles, getBackupGroups, runBackup, openCommandStream, closeStream, getLastStreamOptions } = vi.hoisted(() => {
   let lastStreamOptions: {
@@ -42,6 +43,7 @@ function mockEmptyBackend() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setLocale('fr')
   getBackupProfiles.mockResolvedValue({ data: { profiles: [] } })
   getBackupGroups.mockResolvedValue({ data: { groups: [] } })
 })
