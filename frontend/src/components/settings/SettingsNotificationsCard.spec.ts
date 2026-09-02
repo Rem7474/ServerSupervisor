@@ -35,7 +35,7 @@ describe('SettingsNotificationsCard', () => {
     expect(testButton.attributes('disabled')).toBeDefined()
 
     await wrapper.setProps({ form: { ...baseForm(), ntfyUrl: 'https://ntfy.sh/x' }, testingNtfy: true })
-    expect(testButton.text()).toBe('Test...')
+    expect(testButton.text()).toBe('Test…')
   })
 
   it('translates in English', () => {
