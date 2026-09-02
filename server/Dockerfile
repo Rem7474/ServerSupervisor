@@ -10,7 +10,7 @@
 # JS/CSS/HTML, so building it under QEMU emulation for a second target arch
 # would be pure waste — same output, ~5-10x slower. BuildKit also shares this
 # stage's cached layer across every target platform in the same build.
-FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:26-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
