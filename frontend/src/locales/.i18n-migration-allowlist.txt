@@ -73,7 +73,6 @@ src/components/webhooks/WebhookTrackerFields.vue
 src/components/webhooks/WebhookUrlCard.vue
 src/views/AccountSecurityView.vue
 src/views/AccountView.vue
-src/views/AlertsView.vue
 src/views/AuditLogsView.vue
 src/views/GitWebhookDetailView.vue
 src/views/GitWebhooksView.vue
