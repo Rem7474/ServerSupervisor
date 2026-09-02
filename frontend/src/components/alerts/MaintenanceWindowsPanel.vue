@@ -3,10 +3,10 @@
     <div class="card-header d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
       <div>
         <h3 class="card-title mb-1">
-          Fenêtres de maintenance
+          {{ t('alerts.maintenanceTitle') }}
         </h3>
         <div class="text-muted small">
-          Les alertes sont silencieuses pour un hôte (ou tous les hôtes) tant qu'une fenêtre couvre l'instant présent.
+          {{ t('alerts.maintenanceSubtitle') }}
         </div>
       </div>
       <button
@@ -19,7 +19,7 @@
           :size="14"
           class="icon me-1"
         />
-        Nouvelle fenêtre
+        {{ t('alerts.newWindowButton') }}
       </button>
     </div>
 
@@ -30,13 +30,13 @@
       <form @submit.prevent="onSubmit">
         <div class="row g-3">
           <div class="col-12 col-lg-4">
-            <label class="form-label">Hôte</label>
+            <label class="form-label">{{ t('alerts.hostLabel') }}</label>
             <select
               v-model="form.hostId"
               class="form-select"
             >
               <option value="">
-                Tous les hôtes (admin)
+                {{ t('alerts.allHostsAdminOption') }}
               </option>
               <option
                 v-for="h in hosts"
@@ -47,11 +47,11 @@
               </option>
             </select>
             <div class="form-hint">
-              « Tous les hôtes » silence toutes les alertes du système — usage exceptionnel.
+              {{ t('alerts.allHostsHint') }}
             </div>
           </div>
           <div class="col-12 col-lg-4">
-            <label class="form-label required">Début</label>
+            <label class="form-label required">{{ t('alerts.startsAtLabel') }}</label>
             <input
               v-model="form.startsAt"
               type="datetime-local"
@@ -60,7 +60,7 @@
             >
           </div>
           <div class="col-12 col-lg-4">
-            <label class="form-label required">Fin</label>
+            <label class="form-label required">{{ t('alerts.endsAtLabel') }}</label>
             <input
               v-model="form.endsAt"
               type="datetime-local"
@@ -69,12 +69,12 @@
             >
           </div>
           <div class="col-12">
-            <label class="form-label required">Raison</label>
+            <label class="form-label required">{{ t('alerts.reasonLabel') }}</label>
             <input
               v-model="form.reason"
               type="text"
               class="form-control"
-              placeholder="Mise à jour noyau, migration Proxmox…"
+              :placeholder="t('alerts.reasonPlaceholder')"
               required
             >
           </div>
@@ -97,14 +97,14 @@
               v-if="saving"
               class="spinner-border spinner-border-sm me-2"
             />
-            Créer
+            {{ t('alerts.createButton') }}
           </button>
           <button
             type="button"
             class="btn btn-outline-secondary"
             @click="showForm = false"
           >
-            Annuler
+            {{ t('alerts.cancelButton') }}
           </button>
         </div>
       </form>
@@ -131,13 +131,13 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Portée</th>
-            <th>Raison</th>
-            <th>Début</th>
-            <th>Fin</th>
-            <th>Créée par</th>
+            <th>{{ t('alerts.scopeColumn') }}</th>
+            <th>{{ t('alerts.reasonLabel') }}</th>
+            <th>{{ t('alerts.startsAtLabel') }}</th>
+            <th>{{ t('alerts.endsAtLabel') }}</th>
+            <th>{{ t('alerts.createdByColumn') }}</th>
             <th class="text-end">
-              Actions
+              {{ t('alerts.actionsColumn') }}
             </th>
           </tr>
         </thead>
@@ -145,8 +145,8 @@
           <tr v-if="windows.length === 0">
             <td colspan="6">
               <EmptyState
-                title="Aucune fenêtre de maintenance"
-                subtitle="Créez-en une avant une intervention planifiée pour éviter le bruit d'alerte."
+                :title="t('alerts.noWindowsTitle')"
+                :subtitle="t('alerts.noWindowsSubtitle')"
               />
             </td>
           </tr>
@@ -158,7 +158,7 @@
               <span
                 v-if="!w.host_id"
                 class="badge bg-orange-lt text-orange"
-              >Tous les hôtes</span>
+              >{{ t('alerts.allHostsBadge') }}</span>
               <span v-else>{{ w.host_name || w.host_id }}</span>
             </td>
             <td>{{ w.reason }}</td>
@@ -171,8 +171,8 @@
               <button
                 type="button"
                 class="btn btn-icon btn-sm btn-ghost-danger"
-                title="Supprimer"
-                aria-label="Supprimer la fenêtre de maintenance"
+                :title="t('alerts.deleteTooltip')"
+                :aria-label="t('alerts.deleteWindowAriaLabel')"
                 @click="remove(w)"
               >
                 <IconTrash :size="16" />
@@ -187,6 +187,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
@@ -197,6 +198,7 @@ import { storeToRefs } from 'pinia'
 
 defineProps<{ isAdmin: boolean }>()
 
+const { t } = useI18n()
 const { formatLocaleDateTime } = useDateFormatter()
 const hostsStore = useHostsStore()
 const { hosts } = storeToRefs(hostsStore)

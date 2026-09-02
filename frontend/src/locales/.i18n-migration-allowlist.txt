@@ -18,7 +18,6 @@ src/components/alerts/AlertRuleModal.vue
 src/components/alerts/AlertRuleStepConditions.vue
 src/components/alerts/AlertRuleStepSource.vue
 src/components/alerts/AlertRuleTemplateModal.vue
-src/components/alerts/MaintenanceWindowsPanel.vue
 src/components/host/CommandLogPanel.vue
 src/components/host/HostAptTab.vue
 src/components/host/HostBackupTab.vue
