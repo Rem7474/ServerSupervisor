@@ -1,6 +1,6 @@
 <template>
   <div class="card">
-    <!-- Header : identité + statut + actions par hôte -->
+    <!-- Header: identity + status + per-host actions -->
     <div class="card-header">
       <div class="d-flex align-items-center gap-3 flex-wrap w-100">
         <label class="form-check m-0">
@@ -31,7 +31,7 @@
         </div>
         <span :class="host.status === 'online' ? 'status status-success' : 'status status-danger'">
           <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
-          <span>{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
+          <span>{{ host.status === 'online' ? t('apt.online') : t('apt.offline') }}</span>
         </span>
         <span
           v-if="activeCommand"
@@ -46,41 +46,41 @@
         <span
           v-else-if="enriching"
           class="badge bg-secondary-lt text-secondary d-inline-flex align-items-center gap-1 flex-shrink-0"
-          title="La commande est terminée — l'agent recalcule les paquets/CVE en arrière-plan, ça peut prendre quelques minutes sur un hôte avec un gros historique"
+          :title="t('apt.refreshingDataTooltip')"
         >
           <span
             class="spinner-border spinner-border-sm"
             role="status"
           />
-          Actualisation des données…
+          {{ t('apt.refreshingData') }}
         </span>
         <span
           v-if="uuStatus?.installed"
           class="badge flex-shrink-0"
           :class="uuStatus.enabled ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
-          title="Mises à jour automatiques (unattended-upgrades)"
+          :title="t('apt.autoUpdatesTooltip')"
         >
-          MAJ auto {{ uuStatus.enabled ? 'activées' : 'désactivées' }}
+          {{ uuStatus.enabled ? t('apt.autoUpdatesEnabledBadge') : t('apt.autoUpdatesDisabledBadge') }}
         </span>
         <span
           v-if="uuStatus?.reboot_required"
           class="badge bg-warning-lt text-warning flex-shrink-0"
-          title="Redémarrage requis après une mise à jour automatique (unattended-upgrades)"
+          :title="t('apt.rebootRequiredTooltip')"
         >
-          Redémarrage requis
+          {{ t('apt.rebootRequired') }}
         </span>
         <span
           v-if="agentOutdated"
           class="badge bg-primary-lt text-primary flex-shrink-0"
-          :title="`Agent ${host.agent_version || '?'} — version ${latestAgentVersion} disponible`"
+          :title="t('apt.agentOutdatedTooltip', { version: host.agent_version || '?', latest: latestAgentVersion })"
         >
-          Agent obsolète
+          {{ t('apt.filterOutdatedAgent') }}
         </span>
         <button
           v-if="activeCommand"
           type="button"
           class="btn btn-icon btn-sm btn-ghost-secondary flex-shrink-0"
-          title="Voir les logs en direct"
+          :title="t('apt.viewLiveLogs')"
           @click="$emit('watch-command', activeCommand)"
         >
           <IconList
@@ -136,7 +136,7 @@
           <button
             type="button"
             class="btn btn-icon btn-sm btn-outline-secondary"
-            title="Planifier une commande APT"
+            :title="t('apt.scheduleModalTitle')"
             @click="$emit('schedule')"
           >
             <IconCalendar
@@ -148,11 +148,11 @@
         <span
           v-else
           class="text-secondary small flex-shrink-0"
-        >Mode lecture seule</span>
+        >{{ t('apt.readOnlyMode') }}</span>
         <button
           type="button"
           class="btn btn-icon btn-sm btn-ghost-secondary flex-shrink-0"
-          :title="expanded ? 'Réduire' : 'Développer'"
+          :title="expanded ? t('apt.collapse') : t('apt.expandTooltip')"
           @click="$emit('update:expanded', !expanded)"
         >
           <IconChevronDown :size="16" />
@@ -160,18 +160,18 @@
       </div>
     </div>
 
-    <!-- Corps : KPI + CVE + paquets + historique -->
+    <!-- Body: KPI + CVE + packages + history -->
     <div class="card-body">
-      <!-- Pas de données -->
+      <!-- No data -->
       <div
         v-if="!aptStatus"
         class="text-secondary small"
       >
-        Données APT non disponibles — lancez <strong>apt update</strong> pour initialiser.
+        {{ t('apt.noAptDataIntro') }} <strong>apt update</strong> {{ t('apt.noAptDataOutro') }}
       </div>
 
       <template v-else>
-        <!-- KPI stats (toujours visibles) -->
+        <!-- KPI stats (always visible) -->
         <div class="row g-2 mb-1">
           <div class="col-3">
             <div
@@ -185,7 +185,7 @@
                 {{ aptStatus.pending_packages ?? 0 }}
               </div>
               <div class="text-secondary small">
-                en attente
+                {{ t('apt.pendingLabel') }}
               </div>
             </div>
           </div>
@@ -201,7 +201,7 @@
                 {{ aptStatus.security_updates ?? 0 }}
               </div>
               <div class="text-secondary small">
-                sécurité
+                {{ t('apt.securityLabel') }}
               </div>
             </div>
           </div>
@@ -221,49 +221,49 @@
                 {{ cveList.length }}
               </div>
               <div class="text-secondary small">
-                CVE
+                {{ t('apt.cveLabel') }}
               </div>
             </div>
           </div>
           <div class="col-3">
             <div class="text-center p-2 rounded bg-secondary-lt">
               <div class="text-secondary small">
-                Dernier apt update
+                {{ t('apt.lastAptUpdate') }}
               </div>
               <div class="fw-semibold small lh-1 mb-2 text-truncate">
-                {{ aptStatus.last_update ? formatDate(aptStatus.last_update) : 'Jamais' }}
+                {{ aptStatus.last_update ? formatDate(aptStatus.last_update) : t('common.never') }}
               </div>
               <div class="text-secondary small">
-                Dernier upgrade
+                {{ t('apt.lastUpgrade') }}
               </div>
               <div class="fw-semibold small lh-1 text-truncate">
-                {{ aptStatus.last_upgrade ? formatDate(aptStatus.last_upgrade) : 'Jamais' }}
+                {{ aptStatus.last_upgrade ? formatDate(aptStatus.last_upgrade) : t('common.never') }}
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Détail extensible -->
+        <!-- Expandable detail -->
         <template v-if="expanded">
-          <!-- Mises à jour automatiques (résumé) -->
+          <!-- Automatic updates (summary) -->
           <div
             v-if="uuStatus"
             class="mt-3 d-flex align-items-center gap-2 flex-wrap small"
           >
-            <span class="fw-semibold text-secondary">Mises à jour automatiques :</span>
+            <span class="fw-semibold text-secondary">{{ t('apt.autoUpdatesSummaryLabel') }}</span>
             <span
               v-if="!uuStatus.installed"
               class="badge bg-secondary-lt text-secondary"
-            >Non installé</span>
+            >{{ t('apt.notInstalled') }}</span>
             <template v-else>
               <span
                 class="badge"
                 :class="uuStatus.enabled ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
-              >{{ uuStatus.enabled ? 'Activé' : 'Désactivé' }}</span>
+              >{{ uuStatus.enabled ? t('apt.enabledBadge') : t('apt.disabledBadge') }}</span>
               <span
                 v-if="uuStatus.last_run_at"
                 class="text-secondary"
-              >Dernière exécution {{ formatDate(uuStatus.last_run_at) }}</span>
+              >{{ t('apt.lastRunAt', { date: formatDate(uuStatus.last_run_at) }) }}</span>
             </template>
           </div>
 
@@ -284,18 +284,18 @@
           <!-- Paquets en attente -->
           <AptPendingPackagesList :packages="packages" />
 
-          <!-- Historique (2 dernières commandes) -->
+          <!-- History (last 2 commands) -->
           <div
             v-if="history?.length"
             class="border-top pt-2"
           >
             <div class="d-flex align-items-center justify-content-between mb-1">
-              <span class="small fw-semibold text-secondary">Dernières commandes</span>
+              <span class="small fw-semibold text-secondary">{{ t('apt.lastCommands') }}</span>
               <router-link
                 to="/audit?module=apt"
                 class="small text-secondary text-decoration-none"
               >
-                Historique complet →
+                {{ t('apt.fullHistory') }}
               </router-link>
             </div>
             <div
@@ -313,7 +313,7 @@
               <button
                 type="button"
                 class="btn btn-icon btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
-                title="Voir les logs"
+                :title="t('apt.viewLogs')"
                 @click="$emit('watch-command', cmd)"
               >
                 <IconList
@@ -331,6 +331,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconChevronDown, IconList, IconCalendar } from '@tabler/icons-vue'
 import CVEList from './CVEList.vue'
 import { useDateFormatter } from '../../composables/useDateFormatter'
@@ -380,6 +381,7 @@ defineEmits<{
   (e: 'watch-command', cmd: AptCommandRow): void
 }>()
 
+const { t } = useI18n()
 const { formatRelativeDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
 
@@ -405,15 +407,16 @@ function formatDate(date: string | undefined): string {
   return formatRelativeDate(date)
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'En attente',
-  running: 'En cours',
-  completed: 'Terminé',
-  failed: 'Échoué',
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  pending: 'apt.statusPending',
+  running: 'apt.statusRunning',
+  completed: 'apt.statusCompleted',
+  failed: 'apt.statusFailed',
 }
 
 function statusLabel(status?: string): string {
-  return (status && STATUS_LABELS[status]) ?? status ?? ''
+  const key = status && STATUS_LABEL_KEYS[status]
+  return key ? t(key) : status ?? ''
 }
 
 function statusClass(status: string | undefined): string {

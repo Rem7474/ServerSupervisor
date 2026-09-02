@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useWebSocket } from './useWebSocket'
 import type { WSDockerSnapshot } from '../types/ws'
 import { useAuthStore } from '../stores/auth'
@@ -22,6 +23,7 @@ interface DockerLiveCmd {
 }
 
 export function useDocker() {
+  const { t } = useI18n()
   const auth = useAuthStore()
   const dialog = useConfirmDialog()
 
@@ -54,8 +56,8 @@ export function useDocker() {
 
     if (action === 'stop' || action === 'restart') {
       const ok = await dialog.confirm({
-        title: `${action === 'stop' ? 'Arrêter' : 'Redémarrer'} le conteneur`,
-        message: `Confirmer : ${action} du conteneur « ${name} » ?`,
+        title: action === 'stop' ? t('docker.stopContainerTitle') : t('docker.restartContainerTitle'),
+        message: t('docker.confirmContainerAction', { action, name }),
         variant: 'warning',
       })
       if (!ok) return
@@ -83,7 +85,7 @@ export function useDocker() {
           c.name === name && c.host_id === hostId ? { ...c, state: prevState } : c
         )
       }
-      addToast(getApiErrorMessage(err, 'Erreur Docker'), 'error', 6000)
+      addToast(getApiErrorMessage(err, t('docker.dockerError')), 'error', 6000)
     } finally {
       dockerActionLoading.value = { ...dockerActionLoading.value, [name]: null }
     }
@@ -97,12 +99,12 @@ export function useDocker() {
   // changes on its own, same as it already does for every other command.
   async function handleBulkContainerAction(containers: DockerContainer[], action: string): Promise<void> {
     if (!containers.length || bulkActionLoading.value) return
-    const verb = action === 'start' ? 'Démarrer' : action === 'stop' ? 'Arrêter' : 'Redémarrer'
+    const verb = action === 'start' ? t('docker.verbStart') : action === 'stop' ? t('docker.verbStop') : t('docker.verbRestart')
     const names = containers.map((c) => c.name).join(', ')
     const ok = await confirmBulkAction(
       verb,
       containers.length,
-      `${verb} ${containers.length} conteneur${containers.length > 1 ? 's' : ''} :\n${names}`
+      t('docker.bulkConfirmMessage', { verb, count: containers.length, names }, containers.length)
     )
     if (!ok) return
 
@@ -114,10 +116,10 @@ export function useDocker() {
       const succeeded = results.filter((r) => r.status === 'fulfilled').length
       const failed = results.length - succeeded
       if (failed === 0) {
-        addToast(`${succeeded} commande${succeeded > 1 ? 's' : ''} envoyée${succeeded > 1 ? 's' : ''}`, 'success')
+        addToast(t('docker.commandsSentSuccess', { count: succeeded }, succeeded), 'success')
       } else {
         addToast(
-          `${succeeded} envoyée(s), ${failed} échec(s)`,
+          t('docker.bulkSummary', { succeeded, failed }),
           failed === results.length ? 'error' : 'warning',
           6000
         )
@@ -139,8 +141,8 @@ export function useDocker() {
 
     if (action === 'compose_down' || action === 'compose_restart') {
       const ok = await dialog.confirm({
-        title: `${action === 'compose_down' ? 'Arrêter' : 'Redémarrer'} le projet`,
-        message: `Confirmer : ${action.replace('compose_', '')} du projet « ${name} » ?`,
+        title: action === 'compose_down' ? t('docker.stopProjectTitle') : t('docker.restartProjectTitle'),
+        message: t('docker.confirmComposeAction', { action: action.replace('compose_', ''), name }),
         variant: 'warning',
       })
       if (!ok) return
@@ -153,7 +155,7 @@ export function useDocker() {
       connectDockerStream(res.data.command_id, hostId, name, action)
       await pendingCommand.track(res.data.command_id)
     } catch (err: unknown) {
-      addToast(getApiErrorMessage(err, 'Erreur Docker'), 'error', 6000)
+      addToast(getApiErrorMessage(err, t('docker.dockerError')), 'error', 6000)
     } finally {
       composeActionLoading.value = { ...composeActionLoading.value, [name]: null }
     }
