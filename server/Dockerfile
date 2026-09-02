@@ -50,7 +50,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /seed-demo ./cmd/seed-demo
 
 # ==== Stage 3: Final Image ====
-FROM alpine:3.21
+FROM alpine:3.24
 RUN apk add --no-cache --upgrade ca-certificates tzdata libcap && \
     addgroup -g 1000 supervisor && \
     adduser -D -u 1000 -G supervisor supervisor
