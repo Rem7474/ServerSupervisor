@@ -88,6 +88,47 @@ describe('AlertRuleList', () => {
     expect(wrapper.text()).toContain('Proxmox › Nœud pve1')
   })
 
+  it('formats every other proxmox scope mode (global/connection/guest/storage/disk/unknown)', () => {
+    const cases: Array<{ scope: Record<string, unknown> | undefined, expected: string }> = [
+      { scope: undefined, expected: 'Proxmox › Cluster' },
+      { scope: { scope_mode: 'global' }, expected: 'Proxmox › Cluster' },
+      { scope: { scope_mode: 'connection', connection_id: 'c1' }, expected: 'Proxmox › Connexion c1' },
+      { scope: { scope_mode: 'guest', guest_id: 'g1' }, expected: 'Proxmox › VM/LXC g1' },
+      { scope: { scope_mode: 'storage', storage_id: 's1' }, expected: 'Proxmox › Stockage s1' },
+      { scope: { scope_mode: 'disk', disk_id: 'd1' }, expected: 'Proxmox › Disque d1' },
+      { scope: { scope_mode: 'weird-future-mode' }, expected: 'Proxmox › Scope inconnu' },
+    ]
+    for (const { scope, expected } of cases) {
+      const wrapper = mountList({
+        rules: [{ id: 1, name: 'r', metric: 'proxmox_node_cpu_percent', operator: '>', proxmox_scope: scope }],
+        fetched: true,
+      })
+      expect(wrapper.text(), JSON.stringify(scope)).toContain(expected)
+    }
+  })
+
+  it('falls back to "Docker" with no docker_scope and to "all containers" for an unrecognized scope mode', () => {
+    const noScope = mountList({
+      rules: [{ id: 1, name: 'r', metric: 'docker_container_state', operator: '==', source_type: 'docker' }],
+      fetched: true,
+    })
+    expect(noScope.text()).toContain('Docker')
+
+    const unknownScopeMode = mountList({
+      rules: [{ id: 2, name: 'r2', metric: 'docker_container_state', operator: '==', source_type: 'docker', docker_scope: { scope_mode: 'host' } }],
+      fetched: true,
+    })
+    expect(unknownScopeMode.text()).toContain('Docker › Tous les conteneurs')
+  })
+
+  it('falls back to the raw channel string for an unrecognized channel', () => {
+    const wrapper = mountList({
+      rules: [{ id: 1, name: 'r', metric: 'cpu', operator: '>', actions: { channels: ['some_future_channel'] } }],
+      fetched: true,
+    })
+    expect(wrapper.text()).toContain('some_future_channel')
+  })
+
   it('shows the auto-resolve hysteresis hints when no clear threshold is set', () => {
     const wrapper = mountList({
       rules: [{ id: 1, name: 'r', metric: 'cpu', operator: '>', threshold_warn: 70, threshold_crit: 90 }],
