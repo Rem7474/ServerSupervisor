@@ -84,4 +84,56 @@ describe('HostTimelineTab', () => {
 
     expect(wrapper.emitted('watch-command')?.[0]?.[0]).toMatchObject(ev)
   })
+
+  it('surfaces a load failure as an alert', async () => {
+    getHostTimeline.mockRejectedValue(new Error('boom'))
+
+    const wrapper = mount(HostTimelineTab, { props: { hostId: 'h1' } })
+    await flushPromises()
+
+    expect(wrapper.find('.alert-danger').text()).toBe('boom')
+  })
+
+  it('uses the default badge color for an audit event', async () => {
+    getHostTimeline.mockResolvedValue({
+      data: {
+        events: [{ id: 'audit-1', type: 'audit', timestamp: new Date().toISOString(), title: 'user login' }],
+      },
+    })
+
+    const wrapper = mount(HostTimelineTab, { props: { hostId: 'h1' } })
+    await flushPromises()
+
+    expect(wrapper.find('.avatar').classes()).toContain('bg-secondary')
+  })
+
+  it('auto-refreshes on the timer while autoRefresh is on, and stops when toggled off', async () => {
+    vi.useFakeTimers()
+    getHostTimeline.mockResolvedValue({ data: { events: [] } })
+
+    const wrapper = mount(HostTimelineTab, { props: { hostId: 'h1' } })
+    await flushPromises()
+    expect(getHostTimeline).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(getHostTimeline).toHaveBeenCalledTimes(2)
+
+    await wrapper.find('.page-refresh-bar button').trigger('click')
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(getHostTimeline).toHaveBeenCalledTimes(2)
+
+    vi.useRealTimers()
+  })
+
+  it('exposes filterCommands() to jump straight to the command-type filter', async () => {
+    getHostTimeline.mockResolvedValue({ data: { events: [] } })
+    const wrapper = mount(HostTimelineTab, { props: { hostId: 'h1' } })
+    await flushPromises()
+
+    ;(wrapper.vm as unknown as { filterCommands: () => void }).filterCommands()
+    await flushPromises()
+
+    const commandButton = wrapper.findAll('button').find((b) => b.text() === 'Commandes')
+    expect(commandButton?.classes()).toContain('btn-primary')
+  })
 })
