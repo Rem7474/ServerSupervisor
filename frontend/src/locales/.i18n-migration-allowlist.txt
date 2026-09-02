@@ -12,7 +12,6 @@ src/components/PageRefreshBar.vue
 src/components/RelativeTime.vue
 src/components/WsStatusBar.vue
 src/components/alerts/AlertIncidentList.vue
-src/components/alerts/AlertRuleList.vue
 src/components/alerts/AlertRuleModal.vue
 src/components/alerts/AlertRuleStepConditions.vue
 src/components/alerts/AlertRuleStepSource.vue

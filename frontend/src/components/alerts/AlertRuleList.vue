@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header">
       <h3 class="card-title">
-        Règles actives
+        {{ t('alerts.activeRulesTitle') }}
       </h3>
     </div>
 
@@ -25,9 +25,9 @@
       class="card-body"
     >
       <EmptyState
-        title="Aucune règle d'alerte configurée"
-        :subtitle="isAdmin ? 'Créez votre première règle pour commencer à surveiller votre infrastructure.' : 'Aucune règle visible sur les hôtes qui vous sont accessibles.'"
-        :cta-label="isAdmin ? 'Créer ma première alerte' : ''"
+        :title="t('alerts.noRulesTitle')"
+        :subtitle="isAdmin ? t('alerts.noRulesSubtitleAdmin') : t('alerts.noRulesSubtitleViewer')"
+        :cta-label="isAdmin ? t('alerts.createFirstAlertCta') : ''"
         @cta="$emit('add')"
       />
     </div>
@@ -39,36 +39,36 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>État</th>
+            <th>{{ t('alerts.stateColumn') }}</th>
             <th>
               <SortableHeader
-                label="Nom"
+                :label="t('alerts.nameColumn')"
                 :active="sortKey === 'name'"
                 :direction="sortDir"
                 @toggle="toggleSort('name')"
               />
             </th>
-            <th>Source / Hôte</th>
+            <th>{{ t('alerts.sourceHostColumn') }}</th>
             <th>
               <SortableHeader
-                label="Métrique"
+                :label="t('alerts.metricColumn')"
                 :active="sortKey === 'metric'"
                 :direction="sortDir"
                 @toggle="toggleSort('metric')"
               />
             </th>
-            <th>Condition</th>
+            <th>{{ t('alerts.conditionColumn') }}</th>
             <th>
               <SortableHeader
-                label="Durée"
+                :label="t('alerts.durationColumn')"
                 :active="sortKey === 'duration_seconds'"
                 :direction="sortDir"
                 @toggle="toggleSort('duration_seconds')"
               />
             </th>
-            <th>Canaux</th>
+            <th>{{ t('alerts.channelsColumn') }}</th>
             <th class="w-1">
-              Actions
+              {{ t('alerts.actionsColumn') }}
             </th>
           </tr>
         </thead>
@@ -81,7 +81,7 @@
             <td>
               <label
                 class="form-check form-switch m-0"
-                :title="isAdmin ? '' : 'Réservé aux administrateurs'"
+                :title="isAdmin ? '' : t('alerts.adminOnlyTitle')"
               >
                 <input
                   class="form-check-input"
@@ -94,25 +94,25 @@
             </td>
             <td>
               <div class="d-flex align-items-center gap-2">
-                <span class="fw-bold">{{ rule.name || 'Sans nom' }}</span>
+                <span class="fw-bold">{{ rule.name || t('alerts.unnamedRule') }}</span>
                 <span
                   v-if="(rule.active_incident_count ?? 0) > 0"
                   class="badge bg-danger-lt text-danger"
-                  :title="`${rule.active_incident_count} incident${(rule.active_incident_count ?? 0) > 1 ? 's' : ''} actif${(rule.active_incident_count ?? 0) > 1 ? 's' : ''}`"
-                >{{ rule.active_incident_count }} actif{{ (rule.active_incident_count ?? 0) > 1 ? 's' : '' }}</span>
+                  :title="t('alerts.activeIncidentsBadge', { count: rule.active_incident_count ?? 0 }, rule.active_incident_count ?? 0)"
+                >{{ t('alerts.activeIncidentsBadge', { count: rule.active_incident_count ?? 0 }, rule.active_incident_count ?? 0) }}</span>
               </div>
               <div
                 v-if="rule.last_fired"
                 class="text-muted small"
               >
-                Dernière alerte: {{ formatDate(rule.last_fired) }}
+                {{ t('alerts.lastFiredLabel', { date: formatDate(rule.last_fired) }) }}
               </div>
             </td>
             <td>
               <span
                 v-if="ruleSourceType(rule) === 'agent'"
                 class="badge bg-secondary-lt text-secondary"
-              >Agent › {{ getHostName(rule.host_id) || 'Tous les hôtes' }}</span>
+              >{{ t('alerts.agentSourceLabel', { host: getHostName(rule.host_id) || t('alerts.allHostsBadge') }) }}</span>
               <span
                 v-else-if="ruleSourceType(rule) === 'docker'"
                 class="badge bg-teal-lt text-teal"
@@ -120,7 +120,7 @@
               <span
                 v-else-if="ruleSourceType(rule) === 'synthetic'"
                 class="badge bg-purple-lt text-purple"
-              >Synthétique</span>
+              >{{ t('alerts.syntheticLabel') }}</span>
               <span
                 v-else
                 class="badge bg-cyan-lt text-cyan"
@@ -146,12 +146,12 @@
                 <div><code>{{ rule.operator }} {{ rule.threshold_warn }}{{ getMetricUnit(rule.metric) }} (warn)</code></div>
                 <div><code>{{ rule.operator }} {{ rule.threshold_crit }}{{ getMetricUnit(rule.metric) }} (crit)</code></div>
                 <div class="text-muted small mt-1">
-                  clear warn:
+                  {{ t('alerts.clearWarnLabel') }}
                   <code v-if="rule.threshold_clear_warn != null">{{ formatClearThreshold(rule, rule.threshold_clear_warn) }}</code>
                   <span v-else>{{ autoHysteresisHint(rule, 'warn') }}</span>
                 </div>
                 <div class="text-muted small">
-                  clear crit:
+                  {{ t('alerts.clearCritLabel') }}
                   <code v-if="rule.threshold_clear_crit != null">{{ formatClearThreshold(rule, rule.threshold_clear_crit) }}</code>
                   <span v-else>{{ autoHysteresisHint(rule, 'crit') }}</span>
                 </div>
@@ -183,8 +183,8 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Modifier"
-                  aria-label="Modifier la règle"
+                  :title="t('alerts.editTooltip')"
+                  :aria-label="t('alerts.editRuleAriaLabel')"
                   @click="$emit('edit', rule)"
                 >
                   <IconPencil
@@ -195,8 +195,8 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-danger"
-                  title="Supprimer"
-                  aria-label="Supprimer la règle"
+                  :title="t('alerts.deleteTooltip')"
+                  :aria-label="t('alerts.deleteRuleAriaLabel')"
                   @click="$emit('delete', rule)"
                 >
                   <IconTrash
@@ -215,12 +215,15 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import { formatDurationSecs } from '../../utils/formatters'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
+
+const { t } = useI18n()
 
 interface Host {
   id: string
@@ -274,7 +277,6 @@ interface AlertRule {
   docker_scope?: DockerScope
 }
 
-const CHANNEL_LABELS: Record<string, string> = { browser: 'Navigateur', smtp: 'Email', ntfy: 'Ntfy', notify: 'Système' }
 const CHANNEL_BADGE_CLASSES: Record<string, string> = {
   browser: 'bg-green-lt text-green',
   smtp: 'bg-azure-lt text-azure',
@@ -283,7 +285,11 @@ const CHANNEL_BADGE_CLASSES: Record<string, string> = {
 }
 
 function channelLabel(channel: string): string {
-  return CHANNEL_LABELS[channel] || channel
+  if (channel === 'browser') return t('alerts.channelBrowserLabel')
+  if (channel === 'smtp') return t('alerts.channelEmail')
+  if (channel === 'ntfy') return t('alerts.channelNtfyShort')
+  if (channel === 'notify') return t('alerts.channelNotify')
+  return channel
 }
 
 function channelBadgeClass(channel: string): string {
@@ -363,9 +369,9 @@ function formatClearThreshold(rule: AlertRule, value: number): string {
 
 function autoHysteresisHint(_rule: AlertRule, level: 'warn' | 'crit'): string {
   if (level === 'crit') {
-    return 'auto : résolution quand la condition crit n\'est plus vraie'
+    return t('alerts.autoResolveCrit')
   }
-  return 'auto : résolution quand aucune condition n\'est vraie'
+  return t('alerts.autoResolveOther')
 }
 
 function ruleSourceType(rule: AlertRule): string {
@@ -375,21 +381,21 @@ function ruleSourceType(rule: AlertRule): string {
 
 function proxmoxScopeLabel(rule: AlertRule): string {
   const scope = rule?.proxmox_scope
-  if (!scope || !scope.scope_mode || scope.scope_mode === 'global') return 'Proxmox › Cluster'
-  if (scope.scope_mode === 'connection') return `Proxmox › Connexion ${scope.connection_id || ''}`.trim()
-  if (scope.scope_mode === 'node') return `Proxmox › Nœud ${scope.node_id || ''}`.trim()
-  if (scope.scope_mode === 'guest') return `Proxmox › VM/LXC ${scope.guest_id || ''}`.trim()
-  if (scope.scope_mode === 'storage') return `Proxmox › Stockage ${scope.storage_id || ''}`.trim()
-  if (scope.scope_mode === 'disk') return `Proxmox › Disque ${scope.disk_id || ''}`.trim()
-  return 'Proxmox › Scope inconnu'
+  if (!scope || !scope.scope_mode || scope.scope_mode === 'global') return t('alerts.proxmoxCluster')
+  if (scope.scope_mode === 'connection') return t('alerts.proxmoxConnection', { id: scope.connection_id || '' }).trim()
+  if (scope.scope_mode === 'node') return t('alerts.proxmoxNode', { id: scope.node_id || '' }).trim()
+  if (scope.scope_mode === 'guest') return t('alerts.proxmoxGuest', { id: scope.guest_id || '' }).trim()
+  if (scope.scope_mode === 'storage') return t('alerts.proxmoxStorage', { id: scope.storage_id || '' }).trim()
+  if (scope.scope_mode === 'disk') return t('alerts.proxmoxDisk', { id: scope.disk_id || '' }).trim()
+  return t('alerts.proxmoxUnknownScope')
 }
 
 function dockerScopeLabel(rule: AlertRule): string {
   const scope = rule?.docker_scope
-  if (!scope) return 'Docker'
-  if (scope.scope_mode === 'compose_project') return `Compose › ${scope.project_name || 'Projet inconnu'}`
-  if (scope.scope_mode === 'container') return `Docker › Conteneur`
-  return `Docker › Tous les conteneurs`
+  if (!scope) return t('alerts.dockerLabel')
+  if (scope.scope_mode === 'compose_project') return t('alerts.dockerComposeLabel', { project: scope.project_name || t('alerts.dockerUnknownProject') })
+  if (scope.scope_mode === 'container') return t('alerts.dockerContainerLabel')
+  return t('alerts.dockerAllContainersLabel')
 }
 </script>
 
