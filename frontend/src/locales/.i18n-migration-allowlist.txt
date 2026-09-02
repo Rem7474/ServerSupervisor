@@ -55,7 +55,6 @@ src/components/host/SystemdTable.vue
 src/components/monitoring/MonitoringOverviewPanel.vue
 src/components/monitoring/SslDetailSection.vue
 src/components/monitoring/UptimeDetailSection.vue
-src/components/network/NetworkTopologyConfig.vue
 src/components/proxmox/GuestExposureCard.vue
 src/components/proxmox/GuestLinkCell.vue
 src/components/proxmox/ProxmoxClusterCard.vue
