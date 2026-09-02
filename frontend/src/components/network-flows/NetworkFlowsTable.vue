@@ -168,71 +168,71 @@
             </thead>
             <tbody>
               <tr
-                v-for="t in sortedTalkers"
-                :key="`${t.is_others}-${t.remote_ip}-${t.remote_port}-${t.protocol}-${t.direction}`"
-                :class="t.is_others ? 'text-muted fst-italic' : 'clickable-row'"
-                :role="t.is_others ? undefined : 'button'"
-                :tabindex="t.is_others ? undefined : 0"
-                @click="!t.is_others && openDrilldown(t)"
-                @keydown.enter="!t.is_others && openDrilldown(t)"
-                @keydown.space.prevent="!t.is_others && openDrilldown(t)"
+                v-for="talker in sortedTalkers"
+                :key="`${talker.is_others}-${talker.remote_ip}-${talker.remote_port}-${talker.protocol}-${talker.direction}`"
+                :class="talker.is_others ? 'text-muted fst-italic' : 'clickable-row'"
+                :role="talker.is_others ? undefined : 'button'"
+                :tabindex="talker.is_others ? undefined : 0"
+                @click="!talker.is_others && openDrilldown(talker)"
+                @keydown.enter="!talker.is_others && openDrilldown(talker)"
+                @keydown.space.prevent="!talker.is_others && openDrilldown(talker)"
               >
-                <template v-if="t.is_others">
+                <template v-if="talker.is_others">
                   <td colspan="4">
-                    {{ i18n.t('network.flowsOthersLabel', { count: t.connections }, t.connections) }}
+                    {{ t('network.flowsOthersLabel', { count: talker.connections }, talker.connections) }}
                   </td>
                 </template>
                 <template v-else>
                   <td>
-                    <span v-if="t.process_name">{{ t.process_name }}<span
-                      v-if="t.pid"
+                    <span v-if="talker.process_name">{{ talker.process_name }}<span
+                      v-if="talker.pid"
                       class="text-muted small"
-                    > (PID {{ t.pid }})</span></span>
+                    > (PID {{ talker.pid }})</span></span>
                     <span
                       v-else
                       class="text-muted small"
-                    >{{ i18n.t('network.flowsUnknownProcess') }}</span>
+                    >{{ t('network.flowsUnknownProcess') }}</span>
                   </td>
                   <td class="fw-medium">
-                    {{ t.remote_ip }}
+                    {{ talker.remote_ip }}
                   </td>
-                  <td>{{ t.remote_port }}</td>
+                  <td>{{ talker.remote_port }}</td>
                   <td>
                     <div class="d-flex align-items-center gap-1 flex-wrap">
-                      <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ t.protocol }}</span>
+                      <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ talker.protocol }}</span>
                       <!-- A real SNI hostname is presented plainly; a port-based
                            guess is muted + marked so it never reads as a fact. -->
                       <span
-                        v-if="labelFor(t).source === 'sni'"
+                        v-if="labelFor(talker).source === 'sni'"
                         class="badge bg-purple-lt text-purple"
-                        :title="i18n.t('network.flowsSniTitle')"
-                      >{{ labelFor(t).text }}</span>
+                        :title="t('network.flowsSniTitle')"
+                      >{{ labelFor(talker).text }}</span>
                       <span
-                        v-else-if="labelFor(t).source === 'port'"
+                        v-else-if="labelFor(talker).source === 'port'"
                         class="text-muted small heuristic-label"
                         :title="PORT_GUESS_HINT"
-                      >≈ {{ labelFor(t).text }}</span>
+                      >≈ {{ labelFor(talker).text }}</span>
                     </div>
                   </td>
                   <td>
                     <span
-                      v-if="t.direction === 'inbound'"
+                      v-if="talker.direction === 'inbound'"
                       class="badge bg-azure-lt text-azure"
-                    >{{ i18n.t('network.flowsInboundBadge') }}</span>
+                    >{{ t('network.flowsInboundBadge') }}</span>
                     <span
                       v-else
                       class="badge bg-teal-lt text-teal"
-                    >{{ i18n.t('network.flowsOutboundBadge') }}</span>
+                    >{{ t('network.flowsOutboundBadge') }}</span>
                   </td>
                 </template>
                 <td class="text-end">
-                  {{ formatBytes(t.rx_bytes) }}
+                  {{ formatBytes(talker.rx_bytes) }}
                 </td>
                 <td class="text-end">
-                  {{ formatBytes(t.tx_bytes) }}
+                  {{ formatBytes(talker.tx_bytes) }}
                 </td>
                 <td class="text-end">
-                  {{ t.connections }}
+                  {{ talker.connections }}
                 </td>
               </tr>
             </tbody>
