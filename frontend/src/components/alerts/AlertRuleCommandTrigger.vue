@@ -7,7 +7,7 @@
         type="checkbox"
         @change="emit('update:enabled', ($event.target as HTMLInputElement).checked)"
       >
-      <span class="form-check-label fw-medium">Déclencher une commande à l'alerte</span>
+      <span class="form-check-label fw-medium">{{ t('alerts.triggerCommandLabel') }}</span>
     </label>
 
     <div
@@ -22,7 +22,7 @@
         class="row g-2 align-items-end"
       >
         <div class="col-md-6">
-          <label class="form-label form-label-sm">Action</label>
+          <label class="form-label form-label-sm">{{ t('alerts.actionLabel') }}</label>
           <select
             :value="modelValue.action"
             class="form-select form-select-sm"
@@ -60,13 +60,14 @@
       <small
         id="command-target-hint"
         class="form-hint mt-1"
-      >La commande sera créée automatiquement sur l'hôte concerné dès le déclenchement de l'alerte.</small>
+      >{{ t('alerts.commandTriggerHint') }}</small>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import DispatchStepEditor from '../DispatchStepEditor.vue'
 import type { DispatchOption } from '../../utils/dispatchStep'
 
@@ -98,6 +99,8 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: CommandTrigger): void
 }>()
 
+const { t, te } = useI18n()
+
 const isDockerRule = computed(() => !!props.dockerScope)
 
 // When a docker rule enables the trigger, lock module to 'docker'.
@@ -117,18 +120,11 @@ interface ActionOption {
 }
 
 // Labels are deliberately incomplete — some actions (status/read/list) never
-// got a French label and fall back to the raw value below, matching the
+// got a translated label and fall back to the raw value below, matching the
 // original behavior rather than "fixing" copy nobody asked to change.
-const ACTION_LABELS: Record<string, string> = {
-  logs: 'Voir les logs',
-  restart: 'Redémarrer',
-  start: 'Démarrer',
-  stop: 'Arrêter',
-  compose_up: 'Compose up',
-  compose_down: 'Compose down',
-  compose_pull: 'Mettre à jour les images',
-  compose_logs: 'Voir les logs Compose',
-  compose_restart: 'Redémarrer (Compose)',
+function actionLabel(action: string): string {
+  const key = `alerts.actionLabels.${action}`
+  return te(key) ? t(key) : action
 }
 
 const commandActions = computed((): ActionOption[] => {
@@ -136,15 +132,15 @@ const commandActions = computed((): ActionOption[] => {
   const actions = isCompose
     ? ['compose_up', 'compose_down', 'compose_pull', 'compose_logs', 'compose_restart', 'logs', 'restart', 'start', 'stop']
     : ['logs', 'restart', 'start', 'stop']
-  return actions.map(v => ({ value: v, label: ACTION_LABELS[v] || v }))
+  return actions.map(v => ({ value: v, label: actionLabel(v) }))
 })
 
 const dockerTargetHint = computed((): string => {
   const scope = props.dockerScope
   if (!scope) return ''
-  if (scope.scope_mode === 'compose_project') return `Projet « ${scope.project_name || '—'} » (résolu au déclenchement)`
-  if (scope.scope_mode === 'container') return 'Conteneur ciblé par la règle (résolu au déclenchement)'
-  return 'Conteneur concerné par l\'incident (résolu au déclenchement)'
+  if (scope.scope_mode === 'compose_project') return t('alerts.dockerTargetComposeProject', { name: scope.project_name || '—' })
+  if (scope.scope_mode === 'container') return t('alerts.dockerTargetContainer')
+  return t('alerts.dockerTargetIncident')
 })
 
 function onActionChange(action: string): void {
@@ -155,12 +151,12 @@ function onActionChange(action: string): void {
 // shared DispatchStepEditor. This module list is narrower than
 // DISPATCH_MODULES (no apt, no custom) — a pre-existing product scoping this
 // migration preserves rather than silently widens.
-const ALERT_TRIGGER_MODULES: DispatchOption[] = [
-  { value: 'processes', label: 'Processus (top)' },
-  { value: 'journal', label: 'Journal systemd' },
-  { value: 'systemd', label: 'Service systemd' },
-  { value: 'docker', label: 'Conteneur Docker' },
-]
+const ALERT_TRIGGER_MODULES = computed((): DispatchOption[] => [
+  { value: 'processes', label: t('alerts.moduleProcesses') },
+  { value: 'journal', label: t('alerts.moduleJournal') },
+  { value: 'systemd', label: t('alerts.moduleSystemd') },
+  { value: 'docker', label: t('alerts.moduleDocker') },
+])
 
 const ALERT_MODULE_ACTIONS: Record<string, string[]> = {
   processes: ['list'],
@@ -171,12 +167,12 @@ const ALERT_MODULE_ACTIONS: Record<string, string[]> = {
 
 function alertActionsForModule(mod: string): DispatchOption[] {
   const actions = ALERT_MODULE_ACTIONS[mod] || ['list']
-  return actions.map(v => ({ value: v, label: ACTION_LABELS[v] || v }))
+  return actions.map(v => ({ value: v, label: actionLabel(v) }))
 }
 
 function alertTargetConfig(mod: string): { label: string; placeholder?: string } | null {
   if (mod !== 'journal' && mod !== 'systemd' && mod !== 'docker') return null
-  return { label: 'Cible', placeholder: mod === 'docker' ? 'nom du conteneur' : 'nom du service (ex: nginx)' }
+  return { label: t('alerts.targetLabel'), placeholder: mod === 'docker' ? t('alerts.targetPlaceholderContainer') : t('alerts.targetPlaceholderService') }
 }
 
 // DispatchStepEditor expects real v-models bound to a locally-owned reactive
