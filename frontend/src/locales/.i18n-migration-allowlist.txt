@@ -55,8 +55,6 @@ src/components/host/SystemdTable.vue
 src/components/monitoring/MonitoringOverviewPanel.vue
 src/components/monitoring/SslDetailSection.vue
 src/components/monitoring/UptimeDetailSection.vue
-src/components/network-flows/NetworkFlowsHistoryChart.vue
-src/components/network-flows/NetworkFlowsTable.vue
 src/components/network/NetworkGraph.vue
 src/components/network/NetworkNodeDetail.vue
 src/components/network/NetworkPortList.vue

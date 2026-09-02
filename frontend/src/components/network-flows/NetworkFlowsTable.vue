@@ -7,8 +7,8 @@
       <div class="card-body">
         <EmptyState
           :icon="IconWifiOff"
-          title="Trafic réseau indisponible sur cet hôte"
-          subtitle="Voir le bandeau de diagnostics de l'hôte pour la raison exacte (module conntrack absent ou comptage désactivé)."
+          :title="t('network.flowsUnavailableTitle')"
+          :subtitle="t('network.flowsUnavailableSubtitle')"
         />
       </div>
     </div>
@@ -24,15 +24,15 @@
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
           <h3 class="card-title mb-0">
-            Top talkers
+            {{ t('network.flowsTopTalkersTitle') }}
             <span
               v-if="totalFlows > talkers.length"
               class="text-muted small ms-1"
-            >({{ talkers.length }} affichés sur {{ totalFlows }} flux actifs)</span>
+            >{{ t('network.flowsDisplayedCount', { shown: talkers.length, total: totalFlows }) }}</span>
             <span
               class="text-muted small ms-1"
-              title="Ce tableau reflète le dernier cycle de rapport de l'agent — il n'est pas recalculé sur la plage sélectionnée dans le graphique ci-dessus."
-            >— instantané du dernier cycle</span>
+              :title="t('network.flowsSnapshotHint')"
+            >{{ t('network.flowsSnapshotLabel') }}</span>
           </h3>
           <div class="d-flex align-items-center gap-2">
             <select
@@ -41,9 +41,9 @@
               style="width: auto;"
             >
               <option value="">
-                Tous protocoles
+                {{ t('network.flowsAllProtocols') }}
               </option>
-              <optgroup label="Transport">
+              <optgroup :label="t('network.flowsTransportGroup')">
                 <option value="tcp">
                   TCP
                 </option>
@@ -53,7 +53,7 @@
               </optgroup>
               <optgroup
                 v-if="serviceOptions.length > 0"
-                label="Service (déduit du port)"
+                :label="t('network.flowsServiceGroup')"
               >
                 <option
                   v-for="svc in serviceOptions"
@@ -69,7 +69,7 @@
               type="text"
               class="form-control form-control-sm"
               style="width: auto;"
-              placeholder="IP, processus ou service…"
+              :placeholder="t('network.flowsSearchPlaceholder')"
             >
           </div>
         </div>
@@ -89,8 +89,8 @@
         >
           <EmptyState
             :icon="IconNetwork"
-            title="Aucun flux réseau observé"
-            subtitle="Aucune connexion active n'a été trackée lors du dernier cycle de rapport."
+            :title="t('network.flowsEmptyTitle')"
+            :subtitle="t('network.flowsEmptySubtitle')"
           />
         </div>
         <div
@@ -102,7 +102,7 @@
               <tr>
                 <th>
                   <SortableHeader
-                    label="Processus"
+                    :label="t('network.flowsProcessColumn')"
                     :active="sortKey === 'process_name'"
                     :direction="sortDir"
                     @toggle="toggleSort('process_name')"
@@ -110,7 +110,7 @@
                 </th>
                 <th>
                   <SortableHeader
-                    label="IP distante"
+                    :label="t('network.flowsRemoteIpColumn')"
                     :active="sortKey === 'remote_ip'"
                     :direction="sortDir"
                     @toggle="toggleSort('remote_ip')"
@@ -118,7 +118,7 @@
                 </th>
                 <th>
                   <SortableHeader
-                    label="Port"
+                    :label="t('network.flowsPortColumn')"
                     :active="sortKey === 'remote_port'"
                     :direction="sortDir"
                     @toggle="toggleSort('remote_port')"
@@ -126,7 +126,7 @@
                 </th>
                 <th>
                   <SortableHeader
-                    label="Protocole"
+                    :label="t('network.flowsProtocolColumn')"
                     :active="sortKey === 'protocol'"
                     :direction="sortDir"
                     @toggle="toggleSort('protocol')"
@@ -134,7 +134,7 @@
                 </th>
                 <th>
                   <SortableHeader
-                    label="Direction"
+                    :label="t('network.flowsDirectionColumn')"
                     :active="sortKey === 'direction'"
                     :direction="sortDir"
                     @toggle="toggleSort('direction')"
@@ -142,7 +142,7 @@
                 </th>
                 <th class="text-end">
                   <SortableHeader
-                    label="Rx"
+                    :label="t('network.flowsRxColumn')"
                     :active="sortKey === 'rx_bytes'"
                     :direction="sortDir"
                     @toggle="toggleSort('rx_bytes')"
@@ -150,7 +150,7 @@
                 </th>
                 <th class="text-end">
                   <SortableHeader
-                    label="Tx"
+                    :label="t('network.flowsTxColumn')"
                     :active="sortKey === 'tx_bytes'"
                     :direction="sortDir"
                     @toggle="toggleSort('tx_bytes')"
@@ -158,7 +158,7 @@
                 </th>
                 <th class="text-end">
                   <SortableHeader
-                    label="Connexions"
+                    :label="t('network.flowsConnectionsColumn')"
                     :active="sortKey === 'connections'"
                     :direction="sortDir"
                     @toggle="toggleSort('connections')"
@@ -179,7 +179,7 @@
               >
                 <template v-if="t.is_others">
                   <td colspan="4">
-                    Autres ({{ t.connections }} connexion{{ t.connections > 1 ? 's' : '' }})
+                    {{ i18n.t('network.flowsOthersLabel', { count: t.connections }, t.connections) }}
                   </td>
                 </template>
                 <template v-else>
@@ -191,7 +191,7 @@
                     <span
                       v-else
                       class="text-muted small"
-                    >inconnu</span>
+                    >{{ i18n.t('network.flowsUnknownProcess') }}</span>
                   </td>
                   <td class="fw-medium">
                     {{ t.remote_ip }}
@@ -205,7 +205,7 @@
                       <span
                         v-if="labelFor(t).source === 'sni'"
                         class="badge bg-purple-lt text-purple"
-                        title="Nom de serveur TLS (SNI) observé sur le trafic"
+                        :title="i18n.t('network.flowsSniTitle')"
                       >{{ labelFor(t).text }}</span>
                       <span
                         v-else-if="labelFor(t).source === 'port'"
@@ -218,11 +218,11 @@
                     <span
                       v-if="t.direction === 'inbound'"
                       class="badge bg-azure-lt text-azure"
-                    >Entrant</span>
+                    >{{ i18n.t('network.flowsInboundBadge') }}</span>
                     <span
                       v-else
                       class="badge bg-teal-lt text-teal"
-                    >Sortant</span>
+                    >{{ i18n.t('network.flowsOutboundBadge') }}</span>
                   </td>
                 </template>
                 <td class="text-end">
@@ -259,7 +259,7 @@
             <button
               type="button"
               class="btn-close"
-              aria-label="Fermer"
+              :aria-label="t('common.close')"
               @click="drilldownTalker = null"
             />
           </div>
@@ -280,6 +280,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconNetwork, IconWifiOff } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
@@ -316,6 +317,8 @@ const props = withDefaults(defineProps<{
   refreshTick: 0,
 })
 
+const i18n = useI18n()
+const { t } = i18n
 const { talkers, loading, load } = useNetworkFlows(props.hostId, props.initialData)
 
 const protocolFilter = ref<NetworkFlowFilterValue>('')
@@ -348,7 +351,7 @@ const serviceOptions = computed(() => {
     const label = labelFor(t)
     if (label.source !== 'none') seen.add(label.text)
   }
-  return [...seen].sort((a, b) => a.localeCompare(b, 'fr'))
+  return [...seen].sort((a, b) => a.localeCompare(b, i18n.locale.value))
 })
 
 const filteredTalkers = computed(() => {
