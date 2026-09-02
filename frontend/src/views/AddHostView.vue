@@ -8,23 +8,23 @@
               to="/"
               class="text-decoration-none"
             >
-              Dashboard
+              {{ t('nav.sections.control.items.dashboard') }}
             </router-link>
             <span class="text-muted mx-1">/</span>
-            <span>Ajouter un hôte</span>
+            <span>{{ t('host.addHostTitle') }}</span>
           </div>
           <h2 class="page-title">
-            Ajouter un hôte
+            {{ t('host.addHostTitle') }}
           </h2>
           <div class="text-secondary">
-            Enregistrer un nouvel hôte
+            {{ t('host.registerNewHostDesc') }}
           </div>
         </div>
         <router-link
           to="/"
           class="btn btn-outline-secondary"
         >
-          Retour au dashboard
+          {{ t('host.backToDashboard') }}
         </router-link>
       </div>
     </div>
@@ -42,7 +42,7 @@
               :class="{ active: mode === 'manual' }"
               @click="mode = 'manual'"
             >
-              Ajout manuel
+              {{ t('host.manualAddTab') }}
             </button>
           </li>
           <li class="nav-item">
@@ -52,7 +52,7 @@
               :class="{ active: mode === 'scan' }"
               @click="mode = 'scan'"
             >
-              Scanner un sous-réseau
+              {{ t('host.scanSubnetTab') }}
             </button>
           </li>
         </ul>
@@ -79,28 +79,28 @@
                 <label
                   class="form-label"
                   for="host-name"
-                >Nom (alias personnel)</label>
+                >{{ t('host.nameAliasLabel') }}</label>
                 <input
                   id="host-name"
                   v-model="form.name"
                   type="text"
                   :class="['form-control', touched.name && !form.name.trim() ? 'is-invalid' : '']"
                   required
-                  placeholder="Ex: Prod Web Server"
+                  :placeholder="t('host.namePlaceholder')"
                   @blur="touched.name = true"
                 >
                 <div
                   v-if="touched.name && !form.name.trim()"
                   class="invalid-feedback"
                 >
-                  Ce champ est requis
+                  {{ t('host.fieldRequired') }}
                 </div>
               </div>
               <div class="mb-3">
                 <label
                   class="form-label"
                   for="host-ip"
-                >Adresse IP</label>
+                >{{ t('host.ipAddressLabel') }}</label>
                 <div class="input-group">
                   <input
                     id="host-ip"
@@ -115,7 +115,7 @@
                     type="button"
                     class="btn btn-outline-secondary"
                     :class="{ active: showGuestPicker }"
-                    title="Choisir depuis un hôte Proxmox"
+                    :title="t('host.choosePveHostTooltip')"
                     @click="toggleGuestPicker"
                   >
                     <IconServer2 :size="16" />
@@ -136,14 +136,14 @@
                     v-model="guestSearch"
                     type="text"
                     class="form-control form-control-sm mb-2"
-                    placeholder="Rechercher un hôte Proxmox (nom, nœud, IP)…"
+                    :placeholder="t('host.searchPveHostPlaceholder')"
                     autofocus
                   >
                   <div
                     v-if="guestsLoading"
                     class="text-secondary small py-2"
                   >
-                    Chargement des hôtes Proxmox…
+                    {{ t('host.loadingPveHosts') }}
                   </div>
                   <div
                     v-else-if="guestsError"
@@ -155,7 +155,7 @@
                     v-else-if="!filteredGuestIPOptions.length"
                     class="text-secondary small py-2"
                   >
-                    Aucun hôte Proxmox disponible avec une IP connue.
+                    {{ t('host.noPveHostsAvailable') }}
                   </div>
                   <div
                     v-else
@@ -181,7 +181,7 @@
                 <label
                   class="form-label"
                   for="host-tags"
-                >Tags (optionnel)</label>
+                >{{ t('host.tagsOptionalLabel') }}</label>
                 <input
                   id="host-tags"
                   v-model="form.tags"
@@ -190,7 +190,7 @@
                   placeholder="prod, site-lyon"
                 >
                 <div class="form-hint">
-                  Séparés par des virgules — utile pour filtrer et grouper vos hôtes.
+                  {{ t('host.tagsHintFilter') }}
                 </div>
               </div>
 
@@ -203,7 +203,7 @@
               </div>
 
               <div class="text-secondary small mb-3">
-                OS et Hostname seront récupérés automatiquement lors de la première connexion de l'agent.
+                {{ t('host.osHostnameAutoNote') }}
               </div>
 
               <button
@@ -211,7 +211,7 @@
                 class="btn btn-primary w-100"
                 :disabled="loading"
               >
-                {{ loading ? 'Enregistrement...' : 'Enregistrer l\'hôte' }}
+                {{ loading ? t('host.savingLabel') : t('host.registerHostButton') }}
               </button>
             </form>
 
@@ -223,10 +223,10 @@
               <div class="host-success-header">
                 <div>
                   <div class="fw-semibold">
-                    Hôte enregistré avec succès
+                    {{ t('host.hostRegisteredSuccess') }}
                   </div>
                   <div class="text-secondary small">
-                    La clé ne sera plus affichée. Copiez-la maintenant.
+                    {{ t('host.keyNotShownAgain') }}
                   </div>
                 </div>
                 <button
@@ -234,7 +234,7 @@
                   class="btn btn-success"
                   @click="finishAdd"
                 >
-                  Terminé
+                  {{ t('host.doneLabel') }}
                 </button>
               </div>
 
@@ -248,28 +248,28 @@
                     :size="16"
                     :stroke-width="2.5"
                   />
-                  Agent connecté — premier rapport reçu !
+                  {{ t('host.agentConnectedMsg') }}
                 </template>
                 <template v-else>
                   <span
                     class="spinner-border spinner-border-sm"
                     style="width:.8rem;height:.8rem;border-width:2px"
                   />
-                  En attente du premier rapport agent…
+                  {{ t('host.waitingFirstReportMsg') }}
                 </template>
               </div>
 
               <div class="host-success-card mb-3">
                 <div class="d-flex align-items-center justify-content-between mb-2">
                   <div class="text-secondary small">
-                    Installation en une commande
+                    {{ t('host.oneCommandInstallLabel') }}
                   </div>
                   <button
                     type="button"
                     class="btn btn-outline-secondary btn-sm"
                     @click="copyInstallCmd"
                   >
-                    {{ copiedInstall ? 'Copié' : 'Copier' }}
+                    {{ copiedInstall ? t('host.copiedLabel') : t('host.copyLabel') }}
                   </button>
                 </div>
                 <pre class="host-success-config host-success-install">{{ installCmd }}</pre>
@@ -278,7 +278,7 @@
               <div class="host-success-grid">
                 <div class="host-success-card">
                   <div class="text-secondary small mb-2">
-                    Clé API agent
+                    {{ t('host.agentApiKeyLabel') }}
                   </div>
                   <div class="host-success-key">
                     <code>{{ result.api_key }}</code>
@@ -287,21 +287,21 @@
                       class="btn btn-outline-secondary btn-sm"
                       @click="copyApiKey"
                     >
-                      {{ copiedApiKey ? 'Copié' : 'Copier' }}
+                      {{ copiedApiKey ? t('host.copiedLabel') : t('host.copyLabel') }}
                     </button>
                   </div>
                 </div>
                 <div class="host-success-card">
                   <div class="d-flex align-items-center justify-content-between mb-2">
                     <div class="text-secondary small">
-                      Configuration agent (YAML)
+                      {{ t('host.agentConfigYamlLabel') }}
                     </div>
                     <button
                       type="button"
                       class="btn btn-outline-secondary btn-sm"
                       @click="copyAgentConfig"
                     >
-                      {{ copiedConfig ? 'Copié' : 'Copier' }}
+                      {{ copiedConfig ? t('host.copiedLabel') : t('host.copyLabel') }}
                     </button>
                   </div>
                   <pre class="host-success-config">{{ agentConfig }}</pre>
@@ -317,9 +317,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconCircleCheck, IconServer2 } from '@tabler/icons-vue'
 import { useAddHost } from '../composables/useAddHost'
 import NetworkDiscoveryPanel from '../components/host/NetworkDiscoveryPanel.vue'
+
+const { t } = useI18n()
 
 const mode = ref<'manual' | 'scan'>('manual')
 

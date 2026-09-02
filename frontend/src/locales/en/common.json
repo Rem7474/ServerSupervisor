@@ -36,6 +36,8 @@
   "noConnectionsRecorded": "No connections recorded",
   "success": "Success",
   "failure": "Failure",
+  "save": "Save",
+  "saving": "Saving...",
   "all": "All",
   "error": "Error",
   "noData": "No data",

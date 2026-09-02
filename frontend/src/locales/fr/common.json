@@ -36,6 +36,8 @@
   "noConnectionsRecorded": "Aucune connexion enregistrée",
   "success": "Succès",
   "failure": "Échec",
+  "save": "Enregistrer",
+  "saving": "Enregistrement...",
   "all": "Tous",
   "error": "Erreur",
   "noData": "Aucune donnée",

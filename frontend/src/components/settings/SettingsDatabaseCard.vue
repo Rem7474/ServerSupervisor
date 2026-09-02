@@ -2,33 +2,33 @@
   <div class="card">
     <div class="card-header">
       <h3 class="card-title">
-        Base de données
+        {{ t('settings.databaseTitle') }}
       </h3>
     </div>
     <div class="card-body">
       <div class="mb-3 pb-3 border-bottom">
         <div class="text-secondary small">
-          Connexion
+          {{ t('settings.connection') }}
         </div>
         <span :class="dbStatus.connected ? 'badge bg-success-lt text-success' : 'badge bg-danger-lt text-danger'">
-          {{ dbStatus.connected ? 'Connectee' : 'Deconnectee' }}
+          {{ dbStatus.connected ? t('settings.connected') : t('settings.disconnected') }}
         </span>
       </div>
       <div class="mb-3 pb-3 border-bottom">
         <div class="text-secondary small">
-          Logs audit
+          {{ t('settings.auditLogs') }}
         </div>
-        <div>{{ formatNumber(dbStatus.auditLogCount) }} entrées</div>
+        <div>{{ t('settings.entriesCount', { count: formatNumber(dbStatus.auditLogCount) }) }}</div>
       </div>
       <div class="mb-3 pb-3 border-bottom">
         <div class="text-secondary small">
-          Métriques stockées
+          {{ t('settings.storedMetrics') }}
         </div>
-        <div>{{ formatNumber(dbStatus.metricsCount) }} points</div>
+        <div>{{ t('settings.pointsCount', { count: formatNumber(dbStatus.metricsCount) }) }}</div>
       </div>
       <div>
         <div class="text-secondary small">
-          Hôtes enregistrés
+          {{ t('settings.registeredHosts') }}
         </div>
         <div>{{ dbStatus.hostsCount }}</div>
       </div>
@@ -37,6 +37,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 interface DBStatus {
   connected: boolean
   auditLogCount: number
@@ -49,4 +53,3 @@ defineProps<{
   formatNumber: (n: number) => string
 }>()
 </script>
-

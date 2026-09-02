@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import SystemdTable from './SystemdTable.vue'
 import type { SystemdService } from './SystemdTable.vue'
 
@@ -7,6 +8,10 @@ const services: SystemdService[] = [
   { name: 'nginx.service', active_state: 'active', sub_state: 'running', description: 'A high performance web server' },
   { name: 'cron.service', active_state: 'failed', sub_state: 'dead', description: 'Regular background program processing daemon' },
 ]
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 describe('SystemdTable', () => {
   it('renders a row per service with name/state/description', () => {

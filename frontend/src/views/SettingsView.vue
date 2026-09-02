@@ -9,10 +9,10 @@
           Dashboard
         </router-link>
         <span class="text-muted mx-1">/</span>
-        <span>Paramètres</span>
+        <span>{{ t('settings.pageTitle') }}</span>
       </div>
       <h2 class="page-title">
-        Paramètres
+        {{ t('settings.pageTitle') }}
       </h2>
     </div>
 
@@ -21,26 +21,26 @@
       <div class="col-12 col-md-3 mb-4 mb-md-0">
         <div class="list-group mb-3">
           <button
-            v-for="t in SETTINGS_TABS"
-            :key="t.key"
+            v-for="tabItem in SETTINGS_TABS"
+            :key="tabItem.key"
             type="button"
             class="list-group-item list-group-item-action d-flex align-items-center gap-2"
-            :class="{ active: tab === t.key }"
-            @click="tab = t.key"
+            :class="{ active: tab === tabItem.key }"
+            @click="tab = tabItem.key"
           >
             <component
-              :is="t.icon"
+              :is="tabItem.icon"
               :size="16"
               class="icon"
             />
-            {{ t.label }}
+            {{ tabItem.label }}
           </button>
         </div>
 
         <!-- Danger zone: visually isolated so destructive maintenance actions
              aren't one indistinguishable tab among six equally-weighted ones. -->
         <div class="text-danger small fw-medium mb-1 px-1">
-          Zone sensible
+          {{ t('settings.dangerZone') }}
         </div>
         <div class="list-group border-danger">
           <button
@@ -53,14 +53,14 @@
               :size="16"
               class="icon"
             />
-            Maintenance
+            {{ t('settings.tabs.maintenance') }}
           </button>
         </div>
       </div>
 
       <!-- Content -->
       <div class="col-12 col-md-9">
-        <!-- Général -->
+        <!-- General -->
         <div
           v-show="tab === 'general'"
           class="row row-cards"
@@ -110,14 +110,14 @@
           </div>
         </div>
 
-        <!-- Intégrations -->
+        <!-- Integrations -->
         <div v-show="tab === 'integrations'">
           <SettingsProxmoxCard :auth-is-admin="auth.isAdmin" />
           <SettingsNPMCard :auth-is-admin="auth.isAdmin" />
           <SettingsRegistryCredentialsCard :auth-is-admin="auth.isAdmin" />
         </div>
 
-        <!-- Rétention -->
+        <!-- Retention -->
         <div v-show="tab === 'retention'">
           <SettingsRetentionCard
             :form="form"
@@ -130,7 +130,7 @@
           />
         </div>
 
-        <!-- Détection de menaces -->
+        <!-- Threat detection -->
         <div v-show="tab === 'threats'">
           <SettingsThreatDetectionCard
             v-model:form="form"
@@ -162,6 +162,8 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   IconAdjustments, IconAlertTriangle, IconBell, IconDatabase, IconPlugConnected, IconShieldSearch,
 } from '@tabler/icons-vue'
@@ -177,13 +179,15 @@ import SettingsNPMCard from '../components/settings/SettingsNPMCard.vue'
 import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegistryCredentialsCard.vue'
 import { useSettings } from '../composables/useSettings'
 
-const SETTINGS_TABS = [
-  { key: 'general', label: 'Général', icon: IconAdjustments },
-  { key: 'notifications', label: 'Notifications', icon: IconBell },
-  { key: 'integrations', label: 'Intégrations', icon: IconPlugConnected },
-  { key: 'retention', label: 'Rétention', icon: IconDatabase },
-  { key: 'threats', label: 'Détection de menaces', icon: IconShieldSearch },
-]
+const { t } = useI18n()
+
+const SETTINGS_TABS = computed(() => [
+  { key: 'general', label: t('settings.tabs.general'), icon: IconAdjustments },
+  { key: 'notifications', label: t('settings.tabs.notifications'), icon: IconBell },
+  { key: 'integrations', label: t('settings.tabs.integrations'), icon: IconPlugConnected },
+  { key: 'retention', label: t('settings.tabs.retention'), icon: IconDatabase },
+  { key: 'threats', label: t('settings.tabs.threats'), icon: IconShieldSearch },
+])
 
 const {
   auth,

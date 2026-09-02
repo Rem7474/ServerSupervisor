@@ -9,7 +9,7 @@
           NPM
         </router-link>
         <span class="text-muted mx-1">/</span>
-        <span>{{ host?.domain_names?.[0] || 'Monitoring' }}</span>
+        <span>{{ host?.domain_names?.[0] || t('host.monitoringFallback') }}</span>
       </div>
       <h2 class="page-title">
         {{ host?.domain_names?.[0] || '...' }}
@@ -23,7 +23,7 @@
           to="/npm"
           class="badge bg-azure-lt text-azure text-decoration-none ms-2"
         >
-          Voir dans NPM
+          {{ t('host.viewInNpm') }}
         </router-link>
       </div>
     </div>
@@ -52,7 +52,7 @@
         v-if="!host.uptime_probe_id && !host.ssl_certificate_id"
         class="alert alert-info"
       >
-        Aucun suivi actif pour ce proxy host. Activez le suivi uptime et/ou SSL depuis
+        {{ t('host.noActiveTrackingIntro') }}
         <router-link to="/npm">
           NPM
         </router-link>.
@@ -60,13 +60,13 @@
 
       <!-- Merged refresh bar — when both a probe and a cert are configured,
            UptimeDetailSection/SslDetailSection each hide their own
-           PageRefreshBar (which used to duplicate the "dernière MAJ" text +
+           PageRefreshBar (which used to duplicate the "last updated" text +
            status dot side by side) in favor of this single one, showing the
            most recent of the two updates and pausing both together. -->
       <PageRefreshBar
         v-if="host.uptime_probe_id && host.ssl_certificate_id"
         v-model="autoRefresh"
-        label="Monitoring"
+        :label="t('host.monitoringFallback')"
         :interval-sec="PROBE_REFRESH_SEC"
         :last-updated-at="lastUpdatedAt"
       />
@@ -83,7 +83,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Sonde uptime
+                {{ t('host.uptimeProbeLabel') }}
               </div>
               <div
                 class="h2 mb-0 mt-1"
@@ -98,7 +98,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Certificat SSL
+                {{ t('host.sslCertLabel') }}
               </div>
               <div
                 class="h2 mb-0 mt-1"
@@ -117,7 +117,7 @@
           :class="host.ssl_certificate_id ? 'col-lg-6' : 'col-12'"
         >
           <h3 class="mb-2">
-            Disponibilité
+            {{ t('host.availabilityHeading') }}
           </h3>
           <UptimeDetailSection
             ref="uptimeSectionRef"
@@ -134,7 +134,7 @@
           :class="host.uptime_probe_id ? 'col-lg-6' : 'col-12'"
         >
           <h3 class="mb-2">
-            Certificat SSL
+            {{ t('host.sslCertLabel') }}
           </h3>
           <SslDetailSection
             ref="sslSectionRef"
@@ -152,6 +152,7 @@
 
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import UptimeDetailSection from '../components/monitoring/UptimeDetailSection.vue'
@@ -161,9 +162,10 @@ import { PROBE_REFRESH_SEC } from '../composables/useUptimeProbeDetail'
 import type { UptimeProbe } from '../types/uptime'
 import type { SSLCertificate } from '../types/ssl'
 
+const { t } = useI18n()
 const { host, loading, error } = useMonitoringHostDetail()
 
-// Shared pause/resume + "dernière MAJ" state for the merged PageRefreshBar,
+// Shared pause/resume + "last updated" state for the merged PageRefreshBar,
 // only used when both a probe and a cert are configured (see the template's
 // v-if) — otherwise the single configured section keeps its own independent
 // bar exactly as on the standalone /monitoring/probes|ssl/:id routes.
@@ -191,7 +193,7 @@ const probeStatusLabel = computed(() => {
   const status = probeLoaded.value?.last_status
   if (status === 'up') return 'UP'
   if (status === 'down') return 'DOWN'
-  return 'Inconnue'
+  return t('host.unknownStatus')
 })
 const probeStatusColor = computed(() => {
   const status = probeLoaded.value?.last_status
@@ -202,9 +204,9 @@ const probeStatusColor = computed(() => {
 
 const certDaysLabel = computed(() => {
   const d = certLoaded.value?.days_remaining
-  if (d == null) return 'Inconnu'
-  if (d < 0) return `Expiré (${Math.abs(d)}j)`
-  return `${d} jour${d > 1 ? 's' : ''}`
+  if (d == null) return t('host.unknownCert')
+  if (d < 0) return t('host.expiredDays', { days: Math.abs(d) })
+  return t('host.daysRemaining', { days: d }, d)
 })
 const certDaysColor = computed(() => {
   const d = certLoaded.value?.days_remaining

@@ -7,18 +7,18 @@
       v-if="showMaxSeverity"
       class="d-flex align-items-center mb-2"
     >
-      <span class="fw-semibold me-2">Criticité max:</span>
+      <span class="fw-semibold me-2">{{ t('apt.maxSeverityLabel') }}</span>
       <span
         :class="maxSeverityClass"
         class="badge"
       >
         {{ maxSeverity }}
       </span>
-      <span class="text-secondary small ms-2">({{ cves.length }} CVE{{ cves.length > 1 ? 's' : '' }})</span>
+      <span class="text-secondary small ms-2">{{ t('apt.cveCountParenWithPlural', { count: cves.length }, cves.length) }}</span>
     </div>
 
     <div class="text-secondary small mb-2">
-      {{ cveGroups.length }} CVE • {{ impactedPackageCount }} paquet{{ impactedPackageCount > 1 ? 's' : '' }} impacté{{ impactedPackageCount > 1 ? 's' : '' }}
+      {{ t('apt.cveCountLabel', { count: cveGroups.length }) }} • {{ t('apt.impactedPackagesLabel', { count: impactedPackageCount }, impactedPackageCount) }}
     </div>
     
     <div class="cve-groups">
@@ -32,7 +32,7 @@
             {{ group.id }}
           </div>
           <div class="text-secondary small">
-            {{ group.packages.length }} paquet{{ group.packages.length > 1 ? 's' : '' }} impacté{{ group.packages.length > 1 ? 's' : '' }}
+            {{ t('apt.impactedPackagesLabel', { count: group.packages.length }, group.packages.length) }}
           </div>
         </div>
         <div class="cve-group-items">
@@ -51,7 +51,7 @@
             >CVSS {{ group.cvss_score.toFixed(1) }}</span>
           </div>
           <div class="cve-group-packages text-secondary small">
-            <span>Paquets:</span>
+            <span>{{ t('apt.packagesLabel') }}</span>
             <div class="cve-package-chips">
               <span
                 v-for="pkg in group.packages"
@@ -70,19 +70,20 @@
       class="btn btn-link btn-sm p-0 small text-secondary mt-1"
       @click="showAll = !showAll"
     >
-      {{ showAll ? 'Réduire' : `Voir tout (${cveGroups.length})` }}
+      {{ showAll ? t('apt.collapse') : t('apt.seeAllWithCount', { count: cveGroups.length }) }}
     </button>
   </div>
   <div
     v-else
     class="text-secondary small"
   >
-    Aucune CVE détectée
+    {{ t('apt.noCveDetected') }}
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import CVEBadge from './CVEBadge.vue'
 import { cveSeverityClass, cveSeverityOrder, normalizeCveSeverity } from '../../utils/cveSeverity'
 
@@ -113,6 +114,8 @@ const props = withDefaults(defineProps<{
   initiallyCollapsed: null,
 })
 
+const { t } = useI18n()
+
 const showAll = ref(false)
 
 const cves = computed<CVE[]>(() => {
@@ -142,7 +145,7 @@ const cveGroups = computed<CVEGroup[]>(() => {
 
   for (const cve of cves.value) {
     const cveId = String(cve?.id || '').trim() || 'CVE-UNKNOWN'
-    const packageName = String(cve?.package || '').trim() || 'Paquet non specifie'
+    const packageName = String(cve?.package || '').trim() || t('apt.unspecifiedPackage')
     if (!grouped.has(cveId)) {
       grouped.set(cveId, {
         id: cveId,
