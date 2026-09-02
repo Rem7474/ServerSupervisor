@@ -7,8 +7,8 @@
       <thead>
         <tr>
           <th>Service</th>
-          <th>État</th>
-          <th>Mode</th>
+          <th>{{ t('host.stateColumn') }}</th>
+          <th>{{ t('host.modeColumn') }}</th>
           <th>Description</th>
           <th v-if="!readonly">
             Actions
@@ -46,8 +46,8 @@
                 type="button"
                 :disabled="!!actionPending[svc.name]"
                 class="btn btn-icon btn-sm btn-ghost-success"
-                title="Démarrer"
-                aria-label="Démarrer le service"
+                :title="t('host.startTooltip')"
+                :aria-label="t('host.startServiceAriaLabel')"
                 @click="$emit('action', svc.name, 'start')"
               >
                 <span
@@ -65,8 +65,8 @@
                 type="button"
                 :disabled="!!actionPending[svc.name]"
                 class="btn btn-icon btn-sm btn-ghost-danger"
-                title="Arrêter"
-                aria-label="Arrêter le service"
+                :title="t('host.stopTooltip')"
+                :aria-label="t('host.stopServiceAriaLabel')"
                 @click="$emit('action', svc.name, 'stop')"
               >
                 <span
@@ -83,8 +83,8 @@
                 type="button"
                 :disabled="!!actionPending[svc.name]"
                 class="btn btn-icon btn-sm btn-ghost-warning"
-                title="Redémarrer"
-                aria-label="Redémarrer le service"
+                :title="t('host.restartTooltip')"
+                :aria-label="t('host.restartServiceAriaLabel')"
                 @click="$emit('action', svc.name, 'restart')"
               >
                 <span
@@ -101,8 +101,8 @@
                 type="button"
                 :disabled="!!actionPending[svc.name]"
                 class="btn btn-icon btn-sm btn-ghost-secondary"
-                title="Statut"
-                aria-label="Voir le statut du service"
+                :title="t('host.statusTooltip')"
+                :aria-label="t('host.viewServiceStatusAriaLabel')"
                 @click="$emit('action', svc.name, 'status')"
               >
                 <span
@@ -125,12 +125,15 @@
     v-else
     class="text-secondary small"
   >
-    Aucun service.
+    {{ t('host.noServices') }}
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
+
+const { t } = useI18n()
 
 export interface SystemdService {
   name: string

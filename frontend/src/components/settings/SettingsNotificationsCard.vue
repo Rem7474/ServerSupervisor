@@ -20,7 +20,7 @@
           class="form-hint"
           style="display:none;"
         >
-          URL ntfy.sh pour les notifications
+          {{ t('settings.ntfyHint') }}
         </div>
       </div>
       <div class="mb-0">
@@ -39,14 +39,14 @@
             type="button"
             @click="$emit('update:show-github-token', !showGitHubToken)"
           >
-            {{ showGitHubToken ? 'Masquer' : 'Afficher' }}
+            {{ showGitHubToken ? t('settings.hide') : t('settings.show') }}
           </button>
         </div>
         <div
           id="github-token-hint"
           class="form-hint"
         >
-          Pour le suivi des releases GitHub
+          {{ t('settings.githubTokenHint') }}
         </div>
       </div>
     </div>
@@ -58,7 +58,7 @@
         :disabled="savingNotif"
         @click="$emit('save')"
       >
-        {{ savingNotif ? 'Enregistrement...' : 'Enregistrer' }}
+        {{ savingNotif ? t('common.saving') : t('common.save') }}
       </button>
       <button
         type="button"
@@ -66,7 +66,7 @@
         :disabled="testingNtfy || !form.ntfyUrl"
         @click="$emit('test')"
       >
-        {{ testingNtfy ? 'Test...' : 'Tester ntfy' }}
+        {{ testingNtfy ? t('settings.testingShort') : t('settings.testNtfy') }}
       </button>
       <span
         v-if="notifSaveMsg"
@@ -85,6 +85,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 interface NotifForm {
   ntfyUrl: string
   githubToken: string

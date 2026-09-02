@@ -2,7 +2,7 @@
   <div class="card mb-4">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title mb-0">
-        Registres privés
+        {{ t('settings.registryTitle') }}
       </h3>
       <button
         v-if="authIsAdmin && !showForm"
@@ -10,15 +10,13 @@
         class="btn btn-sm btn-primary"
         @click="openAddForm"
       >
-        + Ajouter un identifiant
+        {{ t('settings.addCredential') }}
       </button>
     </div>
 
     <div class="card-body border-bottom py-2">
       <p class="text-muted small mb-0">
-        Identifiants utilisés par les trackers Docker pour interroger des images sur des
-        registres privés (GHCR, Harbor, registres d'entreprise…). Le mot de passe n'est
-        jamais réaffiché.
+        {{ t('settings.registryDesc') }}
       </p>
     </div>
 
@@ -29,7 +27,7 @@
     >
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">Nom *</label>
+          <label class="form-label">{{ t('settings.name') }} *</label>
           <input
             v-model="form.name"
             type="text"
@@ -38,7 +36,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Hôte du registre *</label>
+          <label class="form-label">{{ t('settings.registryHostLabel') }} *</label>
           <input
             v-model="form.registry_host"
             type="text"
@@ -47,7 +45,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Utilisateur *</label>
+          <label class="form-label">{{ t('common.user') }} *</label>
           <input
             v-model="form.username"
             type="text"
@@ -56,7 +54,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Mot de passe / token {{ editingId ? '(vide = inchangé)' : '*' }}</label>
+          <label class="form-label">{{ t('settings.passwordToken') }} {{ editingId ? t('settings.unchangedIfEmpty') : '*' }}</label>
           <input
             v-model="form.password"
             type="password"
@@ -72,14 +70,14 @@
           :disabled="saving"
           @click="save"
         >
-          {{ saving ? 'Enregistrement...' : (editingId ? 'Mettre à jour' : 'Créer') }}
+          {{ saving ? t('common.saving') : (editingId ? t('settings.update') : t('settings.create')) }}
         </button>
         <button
           type="button"
           class="btn btn-outline-secondary"
           @click="cancelForm"
         >
-          Annuler
+          {{ t('settings.cancel') }}
         </button>
         <span
           v-if="formMsg"
@@ -93,9 +91,9 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Nom</th>
-            <th>Hôte</th>
-            <th>Utilisateur</th>
+            <th>{{ t('settings.name') }}</th>
+            <th>{{ t('settings.host') }}</th>
+            <th>{{ t('common.user') }}</th>
             <th v-if="authIsAdmin" />
           </tr>
         </thead>
@@ -107,7 +105,7 @@
           </tr>
           <tr v-else-if="credentials.length === 0">
             <td colspan="4">
-              <EmptyState title="Aucun identifiant de registre configuré." />
+              <EmptyState :title="t('settings.noCredentialsConfigured')" />
             </td>
           </tr>
           <tr
@@ -131,8 +129,8 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Modifier"
-                  aria-label="Modifier l'identifiant"
+                  :title="t('settings.edit')"
+                  :aria-label="t('settings.editCredentialAriaLabel')"
                   @click="openEditForm(cred)"
                 >
                   <IconPencil
@@ -143,8 +141,8 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-danger"
-                  title="Supprimer"
-                  aria-label="Supprimer l'identifiant"
+                  :title="t('settings.delete')"
+                  :aria-label="t('settings.deleteCredentialAriaLabel')"
                   @click="remove(cred)"
                 >
                   <IconTrash
@@ -170,6 +168,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
 import { getApiErrorMessage } from '../../api/client'
@@ -177,6 +176,7 @@ import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 
+const { t } = useI18n()
 const { confirm } = useConfirmDialog()
 
 interface Credential {
@@ -257,12 +257,12 @@ function cancelForm(): void {
 
 async function save(): Promise<void> {
   if (!form.value.name || !form.value.registry_host || !form.value.username) {
-    formMsg.value = 'Nom, hôte et utilisateur sont obligatoires.'
+    formMsg.value = t('settings.nameHostUserRequired')
     formOk.value = false
     return
   }
   if (!editingId.value && !form.value.password) {
-    formMsg.value = 'Le mot de passe est obligatoire à la création.'
+    formMsg.value = t('settings.passwordRequiredOnCreate')
     formOk.value = false
     return
   }
@@ -274,13 +274,13 @@ async function save(): Promise<void> {
     } else {
       await api.createRegistryCredential(form.value)
     }
-    formMsg.value = editingId.value ? 'Identifiant mis à jour.' : 'Identifiant créé.'
+    formMsg.value = editingId.value ? t('settings.credentialUpdated') : t('settings.credentialCreated')
     formOk.value = true
     await load()
     showForm.value = false
     editingId.value = null
   } catch (e: unknown) {
-    formMsg.value = getApiErrorMessage(e, "Erreur lors de l'enregistrement.")
+    formMsg.value = getApiErrorMessage(e, t('settings.saveError'))
     formOk.value = false
   } finally {
     saving.value = false
@@ -289,18 +289,18 @@ async function save(): Promise<void> {
 
 async function remove(cred: Credential): Promise<void> {
   const confirmed = await confirm({
-    title: "Supprimer l'identifiant ?",
-    message: `Supprimer l'identifiant « ${cred.name} » ? Les trackers qui l'utilisent repasseront en accès public.`,
+    title: t('settings.deleteCredentialTitle'),
+    message: t('settings.deleteCredentialMsg', { name: cred.name }),
     variant: 'danger',
   })
   if (!confirmed) return
   try {
     await api.deleteRegistryCredential(cred.id)
     await load()
-    listMsg.value = 'Identifiant supprimé.'
+    listMsg.value = t('settings.credentialDeleted')
     listOk.value = true
   } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, 'Erreur lors de la suppression.')
+    listMsg.value = getApiErrorMessage(e, t('settings.deleteError'))
     listOk.value = false
   }
 }

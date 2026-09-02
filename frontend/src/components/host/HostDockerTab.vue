@@ -2,22 +2,22 @@
   <div class="card mb-4">
     <div class="card-header">
       <h3 class="card-title">
-        Conteneurs Docker <span v-if="containers.length">({{ containers.length }})</span>
+        {{ t('host.dockerContainersTitle') }} <span v-if="containers.length">({{ containers.length }})</span>
       </h3>
     </div>
     <div class="table-responsive scroll-table">
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Nom</th>
-            <th>Compose</th>
-            <th>Image</th>
-            <th>Tag</th>
-            <th>Version réelle</th>
-            <th>État</th>
-            <th>Status</th>
-            <th>Port interne</th>
-            <th>Port hôte exposé</th>
+            <th>{{ t('host.nameColumn') }}</th>
+            <th>{{ t('host.dockerComposeColumn') }}</th>
+            <th>{{ t('host.dockerImageColumn') }}</th>
+            <th>{{ t('host.dockerTagColumn') }}</th>
+            <th>{{ t('host.dockerRunningVersionColumn') }}</th>
+            <th>{{ t('host.dockerStateColumn') }}</th>
+            <th>{{ t('host.dockerRawStatusColumn') }}</th>
+            <th>{{ t('host.dockerInternalPortColumn') }}</th>
+            <th>{{ t('host.dockerExposedPortColumn') }}</th>
             <th v-if="canRun" />
           </tr>
         </thead>
@@ -42,17 +42,17 @@
                 <span
                   v-if="containerVersion(c)?.status === 'up_to_date'"
                   class="badge bg-success-lt text-success mt-1"
-                >À jour</span>
+                >{{ t('host.dockerUpToDate') }}</span>
                 <span
                   v-else-if="containerVersion(c)?.status === 'update_available'"
                   class="badge bg-warning-lt text-warning mt-1"
-                  :title="`Dernière version : ${containerVersion(c)?.latest_version}`"
-                >Mise à jour disponible</span>
+                  :title="t('host.dockerLatestVersionTitle', { version: containerVersion(c)?.latest_version })"
+                >{{ t('host.dockerUpdateAvailable') }}</span>
                 <span
                   v-else
                   class="badge bg-secondary-lt text-secondary mt-1"
                   :title="unknownVersionTitle(containerVersion(c))"
-                >Version inconnue</span>
+                >{{ t('host.dockerVersionUnknown') }}</span>
               </template>
             </td>
             <td>
@@ -64,7 +64,7 @@
             </td>
             <td>
               <span :class="c.state === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
-                {{ ({ running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' } as Record<string, string>)[c.state || ''] || c.state }}
+                {{ stateLabels[c.state || ''] || c.state }}
               </span>
             </td>
             <td class="text-secondary small">
@@ -92,8 +92,8 @@
                   type="button"
                   :disabled="!!actionLoading[containerKey(c)]"
                   class="btn btn-icon btn-sm btn-ghost-success"
-                  title="Démarrer"
-                  aria-label="Démarrer le conteneur"
+                  :title="t('host.dockerStartTooltip')"
+                  :aria-label="t('host.dockerStartAriaLabel')"
                   @click="runAction(c, 'start')"
                 >
                   <span
@@ -111,8 +111,8 @@
                   type="button"
                   :disabled="!!actionLoading[containerKey(c)]"
                   class="btn btn-icon btn-sm btn-ghost-danger"
-                  title="Arrêter"
-                  aria-label="Arrêter le conteneur"
+                  :title="t('host.dockerStopTooltip')"
+                  :aria-label="t('host.dockerStopAriaLabel')"
                   @click="runAction(c, 'stop')"
                 >
                   <span
@@ -130,8 +130,8 @@
                   type="button"
                   :disabled="!!actionLoading[containerKey(c)]"
                   class="btn btn-icon btn-sm btn-ghost-warning"
-                  title="Redémarrer"
-                  aria-label="Redémarrer le conteneur"
+                  :title="t('host.dockerRestartTooltip')"
+                  :aria-label="t('host.dockerRestartAriaLabel')"
                   @click="runAction(c, 'restart')"
                 >
                   <span
@@ -148,8 +148,8 @@
                   type="button"
                   :disabled="!!actionLoading[containerKey(c)]"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Voir les logs"
-                  aria-label="Voir les logs du conteneur"
+                  :title="t('host.viewLogsTooltip')"
+                  :aria-label="t('host.dockerViewLogsAriaLabel')"
                   @click="runAction(c, 'logs')"
                 >
                   <span
@@ -167,7 +167,7 @@
           </tr>
           <tr v-if="!containers.length">
             <td :colspan="canRun ? 10 : 9">
-              <EmptyState title="Aucun conteneur Docker actif sur cet hôte." />
+              <EmptyState :title="t('host.dockerNoContainersTitle')" />
             </td>
           </tr>
         </tbody>
@@ -178,6 +178,7 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconList } from '@tabler/icons-vue'
 import DockerPortBadges from '../common/DockerPortBadges.vue'
 import DockerComposeBadge from '../docker/DockerComposeBadge.vue'
@@ -228,10 +229,20 @@ const emit = defineEmits<{
   (e: 'history-changed'): void
 }>()
 
+const { t } = useI18n()
 const dialog = useConfirmDialog()
 const actionLoading = ref<Record<string, string | null>>({})
 
 const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
+
+const stateLabels = computed<Record<string, string>>(() => ({
+  running: t('host.dockerStateRunning'),
+  exited: t('host.dockerStateExited'),
+  paused: t('host.dockerStatePaused'),
+  created: t('host.dockerStateCreated'),
+  restarting: t('host.dockerStateRestarting'),
+  dead: t('host.dockerStateDead'),
+}))
 
 // This tab is already host-scoped, so rows are keyed by image[+tag] only.
 // Ambient rows (one per image+tag group) carry image_tag and win over the
@@ -255,7 +266,7 @@ function containerVersion(container: Container): VersionComparison | null {
 // The ambient engine records why it couldn't classify an image — surface it
 // instead of leaving "Version inconnue" unexplained.
 function unknownVersionTitle(vc: VersionComparison | null | undefined): string {
-  return vc?.last_error || "Aucune information de version disponible pour cette image (registre non interrogeable ou pas encore vérifié)."
+  return vc?.last_error || t('host.dockerNoVersionInfo')
 }
 
 function containerKey(container: Container): string {
@@ -268,8 +279,11 @@ async function runAction(container: Container, action: string): Promise<void> {
 
   if (action === 'stop' || action === 'restart') {
     const ok = await dialog.confirm({
-      title: `${action === 'stop' ? 'Arrêter' : 'Redémarrer'} le conteneur`,
-      message: `Confirmer : ${action} du conteneur « ${name} » ?`,
+      title: action === 'stop' ? t('host.dockerStopConfirmTitle') : t('host.dockerRestartConfirmTitle'),
+      message: t('host.dockerConfirmMessage', {
+        action: action === 'stop' ? t('host.dockerStopActionVerb') : t('host.dockerRestartActionVerb'),
+        name,
+      }),
       variant: 'warning',
     })
     if (!ok) return
@@ -288,7 +302,7 @@ async function runAction(container: Container, action: string): Promise<void> {
     })
     emit('history-changed')
   } catch (e: unknown) {
-    addToast(getApiErrorMessage(e, 'Erreur Docker'), 'error', 6000)
+    addToast(getApiErrorMessage(e, t('host.dockerErrorToast')), 'error', 6000)
   } finally {
     actionLoading.value = { ...actionLoading.value, [name]: null }
   }

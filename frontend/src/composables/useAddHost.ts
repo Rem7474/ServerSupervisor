@@ -1,5 +1,6 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { parseTagsInput } from '../utils/tags'
@@ -21,6 +22,7 @@ const AGENT_POLL_TIMEOUT_MS = 120_000
 
 export function useAddHost() {
   const router = useRouter()
+  const { t } = useI18n()
 
   const form = ref({ name: '', ip_address: '', tags: '' })
   const error = ref('')
@@ -36,7 +38,7 @@ export function useAddHost() {
   })
   const ipFeedback = computed(() => {
     if (!touched.value.ip_address || isValidIp.value === null) return ''
-    return isValidIp.value ? '' : 'Adresse IPv4 invalide (ex: 192.168.1.100)'
+    return isValidIp.value ? '' : t('host.invalidIpv4')
   })
   const showGuestPicker = ref(false)
   const guestsLoading = ref(false)
@@ -75,7 +77,7 @@ export function useAddHost() {
       guests.value = res.data?.proxmox_guests ?? []
       guestsLoaded = true
     } catch (e: unknown) {
-      guestsError.value = getApiErrorMessage(e, 'Erreur lors du chargement des hôtes Proxmox')
+      guestsError.value = getApiErrorMessage(e, t('host.loadPveHostsError'))
     } finally {
       guestsLoading.value = false
     }
@@ -151,7 +153,7 @@ export function useAddHost() {
       result.value = res.data
       if (res.data?.id) startAgentPolling(res.data.id)
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Erreur lors de l\'enregistrement')
+      error.value = getApiErrorMessage(e, t('host.registerError'))
     } finally {
       loading.value = false
     }

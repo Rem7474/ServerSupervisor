@@ -1,6 +1,7 @@
 import { ref, computed, reactive } from 'vue'
 import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
+import { i18n } from '../i18n'
 import type { DiscoveredHost } from '../types/discovery'
 
 interface BulkResultItem {
@@ -16,6 +17,7 @@ interface BulkResultItem {
 // confirm a batch of the discovered-but-unregistered ones as new hosts in
 // one call — the bulk counterpart to useAddHost's single-host flow.
 export function useNetworkDiscovery() {
+  const { t } = i18n.global
   const cidr = ref('')
   const scanning = ref(false)
   const scanError = ref('')
@@ -50,7 +52,7 @@ export function useNetworkDiscovery() {
         }
       }
     } catch (e: unknown) {
-      scanError.value = getApiErrorMessage(e, 'Erreur lors du scan réseau')
+      scanError.value = getApiErrorMessage(e, t('host.discoveryScanError'))
     } finally {
       scanning.value = false
     }
@@ -87,7 +89,7 @@ export function useNetworkDiscovery() {
       const res = await apiClient.registerHostsBulk(hosts)
       bulkResults.value = res.data?.results ?? []
     } catch (e: unknown) {
-      addError.value = getApiErrorMessage(e, "Erreur lors de l'ajout des hôtes")
+      addError.value = getApiErrorMessage(e, t('host.discoveryAddError'))
     } finally {
       adding.value = false
     }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const { getHostCustomTasks, runCustomTask } = vi.hoisted(() => ({
   getHostCustomTasks: vi.fn(),
@@ -31,6 +32,7 @@ describe('HostCustomTasksTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     track.mockResolvedValue(undefined)
+    setLocale('fr')
   })
 
   afterEach(() => {

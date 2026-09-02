@@ -11,7 +11,7 @@
             :size="24"
             class="icon icon-tabler me-1"
           />
-          {{ title }}
+          {{ displayTitle }}
           <slot name="title-suffix" />
         </h3>
         <div class="d-flex gap-1">
@@ -20,7 +20,7 @@
             <button
               type="button"
               class="btn btn-sm btn-ghost-secondary"
-              :title="copied ? 'Copié !' : 'Copier la sortie'"
+              :title="copied ? t('common.commandLogCopiedTooltip') : t('common.commandLogCopyTooltip')"
               :disabled="!command"
               @click="copy"
             >
@@ -39,7 +39,7 @@
             <button
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
-              title="Télécharger (.txt)"
+              :title="t('common.commandLogDownloadTooltip')"
               :disabled="!command"
               @click="download"
             >
@@ -53,7 +53,7 @@
               v-if="clearable"
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
-              title="Vider la console"
+              :title="t('common.commandLogClearTooltip')"
               :disabled="!command"
               @click="$emit('clear')"
             >
@@ -68,7 +68,7 @@
           <button
             type="button"
             class="btn btn-icon btn-sm btn-ghost-secondary"
-            title="Fermer"
+            :title="t('common.close')"
             @click="$emit('close')"
           >
             <IconX
@@ -94,10 +94,10 @@
                 :stroke-width="1.5"
               />
               <div class="opacity-75">
-                {{ emptyText }}
+                {{ displayEmptyText }}
               </div>
               <div class="small mt-1 opacity-50">
-                Cliquez sur "Logs" pour afficher la sortie d'une commande
+                {{ t('common.commandLogEmptyHint') }}
               </div>
             </div>
           </div>
@@ -129,7 +129,7 @@
                     v-if="command.created_at"
                     class="text-secondary small mt-1"
                   >
-                    Exécutée {{ formatRelativeTime(command.created_at || '', '—', true) }}
+                    {{ t('common.commandLogExecutedPrefix') }} {{ formatRelativeTime(command.created_at || '', '—', true) }}
                   </div>
                 </div>
                 <span
@@ -181,12 +181,13 @@
       :size="24"
       class="icon me-1"
     />
-    {{ title }}
+    {{ displayTitle }}
   </button>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconCheck, IconChevronRight, IconCopy, IconDownload, IconTrash, IconX } from '@tabler/icons-vue'
 import { copyConsoleOutput, downloadConsoleOutput } from '../../utils/consoleOutput'
 import { moduleLabel, moduleClass } from '../../utils/moduleMeta'
@@ -226,8 +227,6 @@ const props = withDefaults(defineProps<{
 }>(), {
   command: null,
   show: false,
-  title: 'Logs',
-  emptyText: 'Aucun log sélectionné',
   wrapperClass: '',
   clearable: false,
   mode: 'log',
@@ -239,8 +238,12 @@ defineEmits<{
   (e: 'clear'): void
 }>()
 
+const { t } = useI18n()
 const { getStatusBadgeClass } = useStatusBadge()
 const { formatRelativeTime } = useDateFormatter()
+
+const displayTitle = computed(() => props.title || t('common.commandLogTitle'))
+const displayEmptyText = computed(() => props.emptyText || t('common.commandLogEmptyText'))
 
 const outputEl = ref<HTMLElement | null>(null)
 const copied = ref(false)
@@ -280,7 +283,7 @@ function processCarriageReturns(text: string): string {
 
 const outputText = computed(() => {
   const raw = props.command?.output
-  if (!raw) return 'Aucune sortie disponible.'
+  if (!raw) return t('common.commandLogNoOutput')
   return processCarriageReturns(raw)
 })
 
