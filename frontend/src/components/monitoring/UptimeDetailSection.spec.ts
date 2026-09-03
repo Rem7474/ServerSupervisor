@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, shallowMount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const { getUptimeProbe, getUptimeHistory, getUptimeStats, getUptimeHistoryBuckets } = vi.hoisted(() => ({
   getUptimeProbe: vi.fn(),
@@ -23,6 +24,7 @@ import UptimeDetailSection from './UptimeDetailSection.vue'
 describe('UptimeDetailSection — autoRefresh when mounted without override props', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    setLocale('fr')
     getUptimeProbe.mockResolvedValue({ data: { id: 'probe-1', last_status: 'up', consecutive_failures: 0 } })
     getUptimeHistory.mockResolvedValue({ data: { results: [] } })
     getUptimeStats.mockResolvedValue({ data: { uptime_percent: 100, successful_checks: 1, total_checks: 1, avg_latency_ms: 10, p95_latency_ms: 10 } })
@@ -62,6 +64,7 @@ describe('UptimeDetailSection — autoRefresh when mounted without override prop
 
 describe('UptimeDetailSection — heartbeat bar and latency chart', () => {
   beforeEach(() => {
+    setLocale('fr')
     getUptimeProbe.mockResolvedValue({ data: { id: 'probe-1', last_status: 'down', consecutive_failures: 3 } })
     getUptimeHistory.mockResolvedValue({ data: { results: [] } })
     getUptimeStats.mockResolvedValue({ data: { uptime_percent: 98.5, successful_checks: 9, total_checks: 10, avg_latency_ms: 42, p95_latency_ms: 80 } })
@@ -139,6 +142,10 @@ describe('UptimeDetailSection — heartbeat bar and latency chart', () => {
 })
 
 describe('UptimeDetailSection — error state', () => {
+  beforeEach(() => {
+    setLocale('fr')
+  })
+
   it('shows the error alert instead of the KPI cards when the fetch fails', async () => {
     getUptimeProbe.mockRejectedValue(new Error('boom'))
     getUptimeHistory.mockResolvedValue({ data: { results: [] } })

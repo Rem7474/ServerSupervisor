@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
@@ -15,6 +16,7 @@ type SSLCert = SSLCertificate
 // drive pause/resume from one shared control — standalone routes never pass
 // it, so their behavior is unchanged.
 export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOverride?: Ref<boolean>) {
+  const { t } = useI18n()
   const route = useRoute()
   const certId = certIdOverride ?? (route.params.id as string)
   const signal = useAbortSignal()
@@ -41,18 +43,18 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
   function certDuration(from: string | undefined, to: string | undefined): string {
     if (!from || !to) return '—'
     const days = dayjs(to).diff(dayjs(from), 'day')
-    if (days >= 365) return `${Math.round(days / 365 * 10) / 10} ans`
+    if (days >= 365) return t('monitoring.sslCertDurationYears', { n: Math.round(days / 365 * 10) / 10 })
     return `${days}j`
   }
 
   const statusLabel = computed(() => {
     if (!cert.value) return ''
     const d = cert.value.days_remaining
-    if (d == null) return 'Inconnu'
-    if (d < 0) return 'Expiré'
-    if (d <= 7) return 'Critique'
-    if (d <= 30) return 'Attention'
-    return 'Valide'
+    if (d == null) return t('monitoring.sslCertStatusUnknown')
+    if (d < 0) return t('monitoring.sslCertStatusExpired')
+    if (d <= 7) return t('monitoring.sslCertStatusCritical')
+    if (d <= 30) return t('monitoring.sslCertStatusWarning')
+    return t('monitoring.sslCertStatusValid')
   })
 
   const statusColor = computed(() => {
@@ -70,9 +72,9 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
   const daysLabel = computed(() => {
     if (!cert.value) return ''
     const d = cert.value.days_remaining
-    if (d == null) return 'Inconnu'
-    if (d < 0) return `Expiré (${Math.abs(d)}j)`
-    return `${d} jour${d > 1 ? 's' : ''}`
+    if (d == null) return t('monitoring.sslCertStatusUnknown')
+    if (d < 0) return t('monitoring.sslDaysExpiredWithCount', { days: Math.abs(d) })
+    return t('monitoring.sslDaysRemaining', { d }, d)
   })
 
   async function fetchCert(): Promise<void> {
@@ -84,7 +86,7 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       if (isApiAbort(e)) return
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Impossible de charger le certificat'
+      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.sslLoadCertError')
     } finally {
       loading.value = false
     }

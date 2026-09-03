@@ -3,7 +3,7 @@
     <PageRefreshBar
       v-if="!hideRefreshBar"
       v-model="autoRefresh"
-      label="Sonde uptime"
+      :label="t('monitoring.probeTypeToggle')"
       :interval-sec="PROBE_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />
@@ -26,7 +26,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Statut
+                {{ t('monitoring.statusColumn') }}
               </div>
               <div
                 class="h2 mb-0 mt-1"
@@ -41,7 +41,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Uptime ({{ STATS_WINDOWS.find((w) => w.hours === statsWindow)?.label }})
+                {{ t('monitoring.uptimeChartTitle', { window: currentWindowLabel }) }}
               </div>
               <div class="h2 mb-0 mt-1">
                 <span
@@ -62,7 +62,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Latence moy.
+                {{ t('monitoring.avgLatencyLabel') }}
               </div>
               <div class="h2 mb-0 mt-1">
                 {{ stats ? Math.round(stats.avg_latency_ms) + ' ms' : '—' }}
@@ -77,7 +77,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Échecs consécutifs
+                {{ t('monitoring.consecutiveFailuresLabel') }}
               </div>
               <div
                 class="h2 mb-0 mt-1"
@@ -93,7 +93,7 @@
       <div class="card mb-3">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h3 class="card-title mb-0">
-            Disponibilité
+            {{ t('monitoring.availabilityTitle') }}
           </h3>
           <div class="d-flex align-items-center gap-2">
             <span
@@ -109,7 +109,7 @@
                 :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
                 @click="setStatsWindow(w.hours)"
               >
-                {{ w.label }}
+                {{ t(w.labelKey) }}
               </button>
             </div>
           </div>
@@ -141,11 +141,11 @@
             v-else
             class="text-secondary small"
           >
-            Aucun check encore enregistré.
+            {{ t('monitoring.noChecksYet') }}
           </div>
           <div class="d-flex justify-content-between text-secondary small mt-1">
             <span>{{ heartbeatBar.length ? formatDateTime(heartbeatBar[0].bucket_start) : '' }}</span>
-            <span>maintenant</span>
+            <span>{{ t('monitoring.nowLabel') }}</span>
           </div>
         </div>
       </div>
@@ -153,7 +153,7 @@
       <div class="card mb-3">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h3 class="card-title mb-0">
-            Latence ({{ STATS_WINDOWS.find((w) => w.hours === statsWindow)?.label }})
+            {{ t('monitoring.latencyChartTitle', { window: currentWindowLabel }) }}
           </h3>
           <div class="d-flex align-items-center gap-2">
             <span
@@ -169,7 +169,7 @@
                 :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
                 @click="setStatsWindow(w.hours)"
               >
-                {{ w.label }}
+                {{ t(w.labelKey) }}
               </button>
             </div>
           </div>
@@ -197,22 +197,22 @@
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h3 class="card-title mb-0">
-            Historique récent
+            {{ t('monitoring.recentHistoryTitle') }}
           </h3>
           <small class="text-secondary">
-            {{ groupedResults.length }} séquence(s) sur {{ results.length }} check(s)
+            {{ t('monitoring.sequencesOfChecksCount', { seq: groupedResults.length, total: results.length }, groupedResults.length) }}
           </small>
         </div>
         <div class="table-responsive scroll-table">
           <table class="table table-vcenter card-table">
             <thead>
               <tr>
-                <th>Période</th>
-                <th>Résultat</th>
-                <th>Statut HTTP</th>
-                <th>Latence</th>
-                <th>Checks</th>
-                <th>Erreur</th>
+                <th>{{ t('monitoring.periodColumn') }}</th>
+                <th>{{ t('monitoring.resultColumn') }}</th>
+                <th>{{ t('monitoring.httpStatusColumn') }}</th>
+                <th>{{ t('monitoring.latencyColumn') }}</th>
+                <th>{{ t('monitoring.checksColumn') }}</th>
+                <th>{{ t('monitoring.errorColumn') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -231,7 +231,7 @@
                 </td>
                 <td>
                   <span :class="['badge', g.success ? 'bg-success-lt text-success' : 'bg-danger-lt text-danger']">
-                    {{ g.success ? 'OK' : 'KO' }}
+                    {{ g.success ? t('monitoring.tickOkLabel') : t('monitoring.tickKoLabel') }}
                   </span>
                 </td>
                 <td>{{ g.statusCode ?? '—' }}</td>
@@ -254,7 +254,7 @@
               </tr>
               <tr v-if="!results.length">
                 <td colspan="6">
-                  <EmptyState :title="`Aucun résultat encore. La première vérification arrive sous ${probe.interval_sec}s.`" />
+                  <EmptyState :title="t('monitoring.noResultsYet', { sec: probe.interval_sec })" />
                 </td>
               </tr>
             </tbody>
@@ -274,6 +274,7 @@
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
@@ -285,9 +286,11 @@ import type { UptimeProbe, UptimeHistoryBucket } from '../../types/generated'
 
 // hideRefreshBar/autoRefresh: set together by MonitoringHostDetailView when
 // both a probe and a cert are configured, so the two sections share one
-// PageRefreshBar instead of each rendering its own "dernière MAJ" + dot.
+// PageRefreshBar instead of each rendering its own "last updated" + dot.
 // Neither is passed by the standalone /monitoring/probes/:id route, which
 // keeps its own independent bar exactly as before.
+const { t } = useI18n()
+
 const props = defineProps<{
   probeId: string
   hideRefreshBar?: boolean
@@ -316,11 +319,18 @@ function bucketColorClass(b: UptimeHistoryBucket): string {
 
 function bucketTitle(b: UptimeHistoryBucket): string {
   const when = formatDateTime(b.bucket_start)
-  if (b.total_checks === 0) return `${when} — aucun check`
-  const outcome = b.down_checks > 0 ? `${b.down_checks} KO / ${b.total_checks}` : `${b.up_checks} OK`
-  const latency = b.up_checks > 0 ? ` — ${Math.round(b.avg_latency_ms)} ms moy.` : ''
+  if (b.total_checks === 0) return `${when} — ${t('monitoring.noCheckYetTitle')}`
+  const outcome = b.down_checks > 0
+    ? `${b.down_checks} ${t('monitoring.tickKoLabel')} / ${b.total_checks}`
+    : `${b.up_checks} ${t('monitoring.tickOkLabel')}`
+  const latency = b.up_checks > 0 ? ` — ${Math.round(b.avg_latency_ms)} ms ${t('monitoring.avgSuffix')}` : ''
   return `${when} — ${outcome}${latency}`
 }
+
+const currentWindowLabel = computed(() => {
+  const win = STATS_WINDOWS.find((w) => w.hours === statsWindow.value)
+  return win ? t(win.labelKey) : ''
+})
 
 const chartRef = ref<ApexChartInstance | null>(null)
 
