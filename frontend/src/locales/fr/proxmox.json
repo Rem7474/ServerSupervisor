@@ -65,5 +65,12 @@
   "modelColumn": "Modèle",
   "smartHealthColumn": "Santé SMART",
   "ssdWearColumn": "Usure SSD",
-  "noDisksTitle": "Aucun disque détecté sur ce nœud."
+  "noDisksTitle": "Aucun disque détecté sur ce nœud.",
+  "objectColumn": "Objet",
+  "userColumn": "Utilisateur",
+  "startColumn": "Début",
+  "durationColumn": "Durée",
+  "noTasksTitle": "Aucune tâche récente pour ce nœud.",
+  "viewLogsTooltip": "Voir les logs",
+  "runningStatusLabel": "En cours"
 }

@@ -65,5 +65,12 @@
   "modelColumn": "Model",
   "smartHealthColumn": "SMART health",
   "ssdWearColumn": "SSD wear",
-  "noDisksTitle": "No disk detected on this node."
+  "noDisksTitle": "No disk detected on this node.",
+  "objectColumn": "Object",
+  "userColumn": "User",
+  "startColumn": "Start",
+  "durationColumn": "Duration",
+  "noTasksTitle": "No recent task for this node.",
+  "viewLogsTooltip": "View logs",
+  "runningStatusLabel": "Running"
 }
