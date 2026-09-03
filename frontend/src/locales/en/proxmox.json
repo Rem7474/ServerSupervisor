@@ -24,5 +24,13 @@
   "byteUnitMega": "MB",
   "byteUnitGiga": "GB",
   "byteUnitTera": "TB",
-  "byteUnitPeta": "PB"
+  "byteUnitPeta": "PB",
+  "clusterTitle": "Proxmox cluster",
+  "detailsButton": "Details",
+  "nodesLabel": "Nodes",
+  "nodesDownText": "{n} offline",
+  "vmsLxcLabel": "VMs / LXC",
+  "cpuClusterLabel": "Cluster CPU",
+  "coresLabel": "{n} cores",
+  "ramClusterLabel": "Cluster RAM"
 }

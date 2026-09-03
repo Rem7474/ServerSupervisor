@@ -11,7 +11,6 @@ src/components/NotificationBell.vue
 src/components/PageRefreshBar.vue
 src/components/RelativeTime.vue
 src/components/WsStatusBar.vue
-src/components/proxmox/ProxmoxClusterCard.vue
 src/components/proxmox/ProxmoxConsole.vue
 src/components/proxmox/ProxmoxNodeBackupsTab.vue
 src/components/proxmox/ProxmoxNodeChartsPanel.vue

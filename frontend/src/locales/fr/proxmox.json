@@ -24,5 +24,13 @@
   "byteUnitMega": "Mo",
   "byteUnitGiga": "Go",
   "byteUnitTera": "To",
-  "byteUnitPeta": "Po"
+  "byteUnitPeta": "Po",
+  "clusterTitle": "Cluster Proxmox",
+  "detailsButton": "Détails",
+  "nodesLabel": "Nœuds",
+  "nodesDownText": "{n} hors ligne",
+  "vmsLxcLabel": "VMs / LXC",
+  "cpuClusterLabel": "CPU cluster",
+  "coresLabel": "{n} cœurs",
+  "ramClusterLabel": "RAM cluster"
 }
