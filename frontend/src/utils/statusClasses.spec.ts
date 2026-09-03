@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { setLocale } from '../i18n'
 import { getEntityStateClass, getEntityStateLabel, getExecutionStateClass, getExecutionStateLabel } from './statusClasses'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 describe('getEntityStateLabel', () => {
   it('translates every known entity state to French', () => {
@@ -41,5 +46,16 @@ describe('getExecutionStateLabel / getExecutionStateClass — "ok" alias', () =>
   it('is case-insensitive and falls back to the raw status for an unknown value', () => {
     expect(getExecutionStateLabel('ok')).toBe('OK')
     expect(getExecutionStateLabel('weird-status')).toBe('weird-status')
+  })
+})
+
+describe('locale reactivity', () => {
+  it('re-translates labels when the active locale changes, instead of freezing at import time', () => {
+    expect(getEntityStateLabel('running')).toBe('En cours')
+    expect(getExecutionStateLabel('completed')).toBe('Terminé')
+
+    setLocale('en')
+    expect(getEntityStateLabel('running')).toBe('Running')
+    expect(getExecutionStateLabel('completed')).toBe('Completed')
   })
 })

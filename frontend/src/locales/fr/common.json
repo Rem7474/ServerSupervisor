@@ -56,5 +56,19 @@
   "commandLogEmptyText": "Aucun log sélectionné",
   "commandLogEmptyHint": "Cliquez sur \"Logs\" pour afficher la sortie d'une commande",
   "commandLogExecutedPrefix": "Exécutée",
-  "commandLogNoOutput": "Aucune sortie disponible."
+  "commandLogNoOutput": "Aucune sortie disponible.",
+  "stateRunning": "En cours",
+  "stateRestarting": "Redémarrage",
+  "statePaused": "En pause",
+  "stateCreated": "Créé",
+  "stateExited": "Arrêté",
+  "stateDead": "Mort",
+  "stateRemoving": "Suppression",
+  "statePending": "En attente",
+  "stateCompleted": "Terminé",
+  "stateSuccess": "Réussi",
+  "stateOk": "OK",
+  "stateFailed": "Échoué",
+  "stateSkipped": "Ignoré",
+  "stateCancelled": "Annulé"
 }

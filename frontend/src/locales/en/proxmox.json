@@ -72,5 +72,18 @@
   "durationColumn": "Duration",
   "noTasksTitle": "No recent task for this node.",
   "viewLogsTooltip": "View logs",
-  "runningStatusLabel": "Running"
+  "runningStatusLabel": "Running",
+  "configuredJobsLabel": "Configured jobs",
+  "noBackupJobsText": "No backup job configured on this Proxmox cluster.",
+  "jobColumn": "Job",
+  "scheduleColumn": "Schedule",
+  "modeColumn": "Mode",
+  "targetsColumn": "Targets",
+  "allLabel": "All",
+  "enabledBadge": "Enabled",
+  "disabledBadge": "Disabled",
+  "lastResultPerVmLabel": "Last result per VM",
+  "noBackupRunsTitle": "No backup result for this node.",
+  "vmColumn": "VM",
+  "endColumn": "End"
 }

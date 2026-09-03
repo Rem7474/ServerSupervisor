@@ -72,5 +72,18 @@
   "durationColumn": "Durée",
   "noTasksTitle": "Aucune tâche récente pour ce nœud.",
   "viewLogsTooltip": "Voir les logs",
-  "runningStatusLabel": "En cours"
+  "runningStatusLabel": "En cours",
+  "configuredJobsLabel": "Jobs configurés",
+  "noBackupJobsText": "Aucun job de sauvegarde configuré sur ce cluster Proxmox.",
+  "jobColumn": "Job",
+  "scheduleColumn": "Planification",
+  "modeColumn": "Mode",
+  "targetsColumn": "Cibles",
+  "allLabel": "Tous",
+  "enabledBadge": "Activé",
+  "disabledBadge": "Désactivé",
+  "lastResultPerVmLabel": "Dernier résultat par VM",
+  "noBackupRunsTitle": "Aucun résultat de sauvegarde pour ce nœud.",
+  "vmColumn": "VM",
+  "endColumn": "Fin"
 }
