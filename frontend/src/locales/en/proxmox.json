@@ -43,5 +43,12 @@
   "noTempDataText": "No temperature data available",
   "noFanDataText": "No fan data available",
   "timeRange1h": "1h",
-  "timeRangeYear": "1 year"
+  "timeRangeYear": "1 year",
+  "noPendingUpdatesTitle": "No pending update detected.",
+  "lastCheckSubtitle": "Last check: {date}",
+  "noUpdateDataYetSubtitle": "No data available yet (next polling cycle).",
+  "pendingPackagesLabel": "package(s) pending update",
+  "detectedOnLabel": "Detected on {date}",
+  "aptCacheReadOnlyHint": "This information comes from the Proxmox node's apt cache (read-only).",
+  "applyUpdatesHint": "To apply updates, connect directly to the node."
 }
