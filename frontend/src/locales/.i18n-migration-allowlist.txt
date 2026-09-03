@@ -14,7 +14,6 @@ src/components/WsStatusBar.vue
 src/components/proxmox/ProxmoxConsole.vue
 src/components/proxmox/ProxmoxNodeGuestsTab.vue
 src/components/proxmox/ProxmoxNodeSecurityTab.vue
-src/components/proxmox/ProxmoxNodeServicesTab.vue
 src/components/security/AuditSecurityPanel.vue
 src/components/security/DomainDetailsModal.vue
 src/components/security/ExposureDomainsPanel.vue
