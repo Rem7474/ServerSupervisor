@@ -9,5 +9,20 @@
   "timeRange30d": "30d",
   "noIpDetectedTitle": "No IP address detected for this guest (no PVE guest agent, or the guest is stopped).",
   "thisGuestSubjectLabel": "this guest",
-  "loadErrorGeneric": "Loading error"
+  "loadErrorGeneric": "Loading error",
+  "diskSmartStatusTitle": "Disk SMART status",
+  "nodeSuffixLabel": "· Proxmox node {name}",
+  "noDiskDataTitle": "No disk data from the Proxmox node",
+  "noDiskDataSubtitle": "The Proxmox poller hasn't reported any disk for this node yet (PVEAuditor role required).",
+  "cantReadSmartLocallyHint": "This host can't read SMART locally (container/VM). Health is reported by the Proxmox node hosting it.",
+  "deviceColumn": "Device",
+  "statusColumn": "Status",
+  "sizeColumn": "Size",
+  "remainingLifeColumn": "Remaining life",
+  "byteUnitBytes": "B",
+  "byteUnitKilo": "KB",
+  "byteUnitMega": "MB",
+  "byteUnitGiga": "GB",
+  "byteUnitTera": "TB",
+  "byteUnitPeta": "PB"
 }

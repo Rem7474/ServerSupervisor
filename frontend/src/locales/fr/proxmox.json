@@ -9,5 +9,20 @@
   "timeRange30d": "30j",
   "noIpDetectedTitle": "Aucune adresse IP détectée pour ce guest (agent invité PVE absent ou guest arrêté).",
   "thisGuestSubjectLabel": "ce guest",
-  "loadErrorGeneric": "Erreur de chargement"
+  "loadErrorGeneric": "Erreur de chargement",
+  "diskSmartStatusTitle": "État SMART des disques",
+  "nodeSuffixLabel": "· nœud Proxmox {name}",
+  "noDiskDataTitle": "Aucune donnée disque côté nœud Proxmox",
+  "noDiskDataSubtitle": "Le poller Proxmox n'a pas encore remonté de disque pour ce nœud (rôle PVEAuditor requis).",
+  "cantReadSmartLocallyHint": "Cet hôte ne peut pas lire le SMART localement (conteneur/VM). Santé remontée par le nœud Proxmox qui l'héberge.",
+  "deviceColumn": "Périphérique",
+  "statusColumn": "Statut",
+  "sizeColumn": "Taille",
+  "remainingLifeColumn": "Durée de vie restante",
+  "byteUnitBytes": "o",
+  "byteUnitKilo": "Ko",
+  "byteUnitMega": "Mo",
+  "byteUnitGiga": "Go",
+  "byteUnitTera": "To",
+  "byteUnitPeta": "Po"
 }
