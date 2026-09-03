@@ -61,5 +61,9 @@
   "noStorageTitle": "No storage on this node.",
   "yesLabel": "Yes",
   "activeBadge": "Active",
-  "inactiveBadge": "Inactive"
+  "inactiveBadge": "Inactive",
+  "modelColumn": "Model",
+  "smartHealthColumn": "SMART health",
+  "ssdWearColumn": "SSD wear",
+  "noDisksTitle": "No disk detected on this node."
 }

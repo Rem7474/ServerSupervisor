@@ -61,5 +61,9 @@
   "noStorageTitle": "Aucun stockage sur ce nœud.",
   "yesLabel": "Oui",
   "activeBadge": "Actif",
-  "inactiveBadge": "Inactif"
+  "inactiveBadge": "Inactif",
+  "modelColumn": "Modèle",
+  "smartHealthColumn": "Santé SMART",
+  "ssdWearColumn": "Usure SSD",
+  "noDisksTitle": "Aucun disque détecté sur ce nœud."
 }
