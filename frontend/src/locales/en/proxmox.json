@@ -115,5 +115,15 @@
   "messageColumn": "Message",
   "noSecurityEventsTitle": "No security event found for this filter.",
   "noSyslogServiceAccessibleError": "No syslog service accessible (pveproxy, sshd, pvedaemon).",
-  "loadSecurityEventsError": "Failed to load security events."
+  "loadSecurityEventsError": "Failed to load security events.",
+  "nameColumn": "Name",
+  "ipColumn": "IP",
+  "domainsColumn": "Domains",
+  "cpuColumn": "CPU",
+  "ramColumn": "RAM",
+  "diskColumn": "Disk",
+  "migrateTooltip": "Migrate to another node",
+  "migrateButton": "Migrate",
+  "noVmsText": "No VM on this node.",
+  "noLxcText": "No LXC container on this node."
 }

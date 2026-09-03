@@ -115,5 +115,15 @@
   "messageColumn": "Message",
   "noSecurityEventsTitle": "Aucun événement de sécurité trouvé pour ce filtre.",
   "noSyslogServiceAccessibleError": "Aucun service syslog accessible (pveproxy, sshd, pvedaemon).",
-  "loadSecurityEventsError": "Erreur lors du chargement des événements de sécurité."
+  "loadSecurityEventsError": "Erreur lors du chargement des événements de sécurité.",
+  "nameColumn": "Nom",
+  "ipColumn": "IP",
+  "domainsColumn": "Domaines",
+  "cpuColumn": "CPU",
+  "ramColumn": "RAM",
+  "diskColumn": "Disque",
+  "migrateTooltip": "Migrer vers un autre nœud",
+  "migrateButton": "Migrer",
+  "noVmsText": "Aucune VM sur ce nœud.",
+  "noLxcText": "Aucun conteneur LXC sur ce nœud."
 }
