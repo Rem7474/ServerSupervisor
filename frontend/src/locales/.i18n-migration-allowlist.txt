@@ -17,7 +17,6 @@ src/components/proxmox/ProxmoxNodeDisksTab.vue
 src/components/proxmox/ProxmoxNodeGuestsTab.vue
 src/components/proxmox/ProxmoxNodeSecurityTab.vue
 src/components/proxmox/ProxmoxNodeServicesTab.vue
-src/components/proxmox/ProxmoxNodeStorageTab.vue
 src/components/proxmox/ProxmoxNodeTasksTab.vue
 src/components/security/AuditSecurityPanel.vue
 src/components/security/DomainDetailsModal.vue

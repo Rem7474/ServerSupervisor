@@ -50,5 +50,16 @@
   "pendingPackagesLabel": "package(s) pending update",
   "detectedOnLabel": "Detected on {date}",
   "aptCacheReadOnlyHint": "This information comes from the Proxmox node's apt cache (read-only).",
-  "applyUpdatesHint": "To apply updates, connect directly to the node."
+  "applyUpdatesHint": "To apply updates, connect directly to the node.",
+  "storageColumn": "Storage",
+  "typeColumn": "Type",
+  "totalColumn": "Total",
+  "usedColumn": "Used",
+  "availableColumn": "Available",
+  "usageColumn": "Usage",
+  "sharedColumn": "Shared",
+  "noStorageTitle": "No storage on this node.",
+  "yesLabel": "Yes",
+  "activeBadge": "Active",
+  "inactiveBadge": "Inactive"
 }

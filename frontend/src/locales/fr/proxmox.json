@@ -50,5 +50,16 @@
   "pendingPackagesLabel": "paquet(s) en attente de mise à jour",
   "detectedOnLabel": "Détecté le {date}",
   "aptCacheReadOnlyHint": "Ces informations proviennent du cache apt du nœud Proxmox (lecture seule).",
-  "applyUpdatesHint": "Pour appliquer les mises à jour, connectez-vous directement au nœud."
+  "applyUpdatesHint": "Pour appliquer les mises à jour, connectez-vous directement au nœud.",
+  "storageColumn": "Stockage",
+  "typeColumn": "Type",
+  "totalColumn": "Total",
+  "usedColumn": "Utilisé",
+  "availableColumn": "Disponible",
+  "usageColumn": "Utilisation",
+  "sharedColumn": "Partagé",
+  "noStorageTitle": "Aucun stockage sur ce nœud.",
+  "yesLabel": "Oui",
+  "activeBadge": "Actif",
+  "inactiveBadge": "Inactif"
 }
