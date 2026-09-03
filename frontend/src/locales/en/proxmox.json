@@ -32,5 +32,16 @@
   "vmsLxcLabel": "VMs / LXC",
   "cpuClusterLabel": "Cluster CPU",
   "coresLabel": "{n} cores",
-  "ramClusterLabel": "Cluster RAM"
+  "ramClusterLabel": "Cluster RAM",
+  "rrdHistoryTitle": "RRD history",
+  "cpuChartTitle": "CPU",
+  "ramChartTitle": "RAM",
+  "iowaitChartTitle": "IO Wait",
+  "networkChartTitle": "Network",
+  "cpuTempChartTitle": "CPU temperature",
+  "fanRpmChartTitle": "Fan RPM",
+  "noTempDataText": "No temperature data available",
+  "noFanDataText": "No fan data available",
+  "timeRange1h": "1h",
+  "timeRangeYear": "1 year"
 }
