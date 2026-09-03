@@ -2,5 +2,12 @@
   "noDataLabel": "Aucune donnée",
   "suggestedBadge": "Suggéré",
   "linkedBadge": "Lié",
-  "viewHostTooltip": "Voir la fiche hôte"
+  "viewHostTooltip": "Voir la fiche hôte",
+  "domainsExposureTitle": "Domaines & exposition",
+  "timeRange24h": "24h",
+  "timeRange7d": "7j",
+  "timeRange30d": "30j",
+  "noIpDetectedTitle": "Aucune adresse IP détectée pour ce guest (agent invité PVE absent ou guest arrêté).",
+  "thisGuestSubjectLabel": "ce guest",
+  "loadErrorGeneric": "Erreur de chargement"
 }
