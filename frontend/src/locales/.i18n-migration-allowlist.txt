@@ -25,7 +25,6 @@ src/components/proxmox/ProxmoxNodeServicesTab.vue
 src/components/proxmox/ProxmoxNodeStorageTab.vue
 src/components/proxmox/ProxmoxNodeTasksTab.vue
 src/components/proxmox/ProxmoxNodeUpdatesTab.vue
-src/components/proxmox/RRDChartCard.vue
 src/components/security/AuditSecurityPanel.vue
 src/components/security/DomainDetailsModal.vue
 src/components/security/ExposureDomainsPanel.vue
