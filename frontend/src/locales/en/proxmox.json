@@ -1,3 +1,6 @@
 {
-  "noDataLabel": "No data"
+  "noDataLabel": "No data",
+  "suggestedBadge": "Suggested",
+  "linkedBadge": "Linked",
+  "viewHostTooltip": "View the host page"
 }

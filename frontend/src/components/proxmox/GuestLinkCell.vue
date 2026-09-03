@@ -7,7 +7,7 @@
     v-else-if="link.status === 'suggested'"
     class="d-flex align-items-center gap-1"
   >
-    <span class="badge bg-warning-lt text-warning">Suggéré</span>
+    <span class="badge bg-warning-lt text-warning">{{ t('proxmox.suggestedBadge') }}</span>
     <span class="text-muted small">{{ link.host_hostname || link.host_name }}</span>
     <button
       type="button"
@@ -28,11 +28,11 @@
     v-else-if="link.status === 'confirmed'"
     class="d-flex align-items-center gap-1"
   >
-    <span class="badge bg-success-lt text-success">Lié</span>
+    <span class="badge bg-success-lt text-success">{{ t('proxmox.linkedBadge') }}</span>
     <button
       type="button"
       class="btn btn-sm btn-outline-primary ms-1"
-      title="Voir la fiche hôte"
+      :title="t('proxmox.viewHostTooltip')"
       @click="emit('go')"
     >
       {{ link.host_hostname || link.host_name }}
@@ -45,11 +45,15 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 interface GuestLink {
   status?: string
   host_hostname?: string
   host_name?: string
 }
+
+const { t } = useI18n()
 
 defineProps<{ link?: GuestLink | null }>()
 

@@ -1,3 +1,6 @@
 {
-  "noDataLabel": "Aucune donnée"
+  "noDataLabel": "Aucune donnée",
+  "suggestedBadge": "Suggéré",
+  "linkedBadge": "Lié",
+  "viewHostTooltip": "Voir la fiche hôte"
 }
