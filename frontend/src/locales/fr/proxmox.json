@@ -104,5 +104,16 @@
   "restartAriaLabel": "Redémarrer le service",
   "reloadTooltip": "Recharger",
   "reloadAriaLabel": "Recharger le service",
-  "servicesPermissionsHint": "Lecture : Sys.Audit requis · Actions (start/stop/restart/reload) : Sys.Modify requis sur le token API."
+  "servicesPermissionsHint": "Lecture : Sys.Audit requis · Actions (start/stop/restart/reload) : Sys.Modify requis sur le token API.",
+  "rotationOptionLabel": "Rotation (3 services)",
+  "allServicesOption": "Tous les services",
+  "syslogFilterPlaceholder": "Filtre syslog (ex: failed, denied, apparmor)",
+  "searchButton": "Rechercher",
+  "dateColumn": "Date",
+  "levelColumn": "Niveau",
+  "tagColumn": "Tag",
+  "messageColumn": "Message",
+  "noSecurityEventsTitle": "Aucun événement de sécurité trouvé pour ce filtre.",
+  "noSyslogServiceAccessibleError": "Aucun service syslog accessible (pveproxy, sshd, pvedaemon).",
+  "loadSecurityEventsError": "Erreur lors du chargement des événements de sécurité."
 }

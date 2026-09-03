@@ -6,7 +6,7 @@
         class="form-select proxmox-security-service-select"
       >
         <option value="rotate">
-          Rotation (3 services)
+          {{ t('proxmox.rotationOptionLabel') }}
         </option>
         <option value="pveproxy">
           pveproxy
@@ -18,14 +18,14 @@
           pvedaemon
         </option>
         <option value="">
-          Tous les services
+          {{ t('proxmox.allServicesOption') }}
         </option>
       </select>
       <input
         v-model="securitySearch"
         type="text"
         class="form-control proxmox-security-search"
-        placeholder="Filtre syslog (ex: failed, denied, apparmor)"
+        :placeholder="t('proxmox.syslogFilterPlaceholder')"
       >
       <button
         type="button"
@@ -37,7 +37,7 @@
           v-if="loading"
           class="spinner-border spinner-border-sm me-1"
         />
-        Rechercher
+        {{ t('proxmox.searchButton') }}
       </button>
     </div>
     <div
@@ -61,10 +61,10 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Niveau</th>
-            <th>Tag</th>
-            <th>Message</th>
+            <th>{{ t('proxmox.dateColumn') }}</th>
+            <th>{{ t('proxmox.levelColumn') }}</th>
+            <th>{{ t('proxmox.tagColumn') }}</th>
+            <th>{{ t('proxmox.messageColumn') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -97,7 +97,7 @@
     >
       <EmptyState
         :icon="IconShieldCheck"
-        title="Aucun événement de sécurité trouvé pour ce filtre."
+        :title="t('proxmox.noSecurityEventsTitle')"
       />
     </div>
   </div>
@@ -105,6 +105,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../../api'
 import { getApiErrorMessage } from '../../api/client'
 import EmptyState from '../EmptyState.vue'
@@ -112,6 +113,8 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { IconShieldCheck } from '@tabler/icons-vue'
 
 type SyslogItem = Record<string, any>
+
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   nodeId: string
@@ -228,7 +231,7 @@ function formatSyslogTime(item: SyslogItem): string {
   if (!raw) return '—'
   const ms = typeof raw === 'number' ? (raw < 1_000_000_000_000 ? raw * 1000 : raw) : Date.parse(raw)
   if (!Number.isFinite(ms)) return '—'
-  return new Date(ms).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
+  return new Date(ms).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'medium' })
 }
 
 function syslogLevelBadgeClass(item: SyslogItem): string {
@@ -260,7 +263,7 @@ async function loadEvents() {
         .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
         .map(r => Array.isArray(r.value?.data) ? r.value.data : [])
       if (!groups.length) {
-        throw new Error('Aucun service syslog accessible (pveproxy, sshd, pvedaemon).')
+        throw new Error(t('proxmox.noSyslogServiceAccessibleError'))
       }
       events.value = mergeAndRankSyslogLines(groups, 200)
     } else {
@@ -272,7 +275,7 @@ async function loadEvents() {
       events.value = mergeAndRankSyslogLines([Array.isArray(res.data) ? res.data : []], 200)
     }
   } catch (e: unknown) {
-    error.value = getApiErrorMessage(e, 'Erreur lors du chargement des événements de sécurité.')
+    error.value = getApiErrorMessage(e, t('proxmox.loadSecurityEventsError'))
     events.value = []
   } finally {
     loading.value = false
