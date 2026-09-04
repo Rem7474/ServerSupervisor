@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { setLocale } from '../i18n'
 
 enableAutoUnmount(afterEach)
 
@@ -75,6 +76,7 @@ function mountView() {
 describe('ProxmoxGuestView — console entry point', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     routeParamId.value = 'g1'
     guestsResponse.data = [baseGuest]
   })

@@ -36,7 +36,6 @@ src/views/GitWebhooksView.vue
 src/views/GlobalScheduledTasksView.vue
 src/views/NPMView.vue
 src/views/NetworkView.vue
-src/views/ProxmoxGuestView.vue
 src/views/ProxmoxNodeView.vue
 src/views/ProxmoxView.vue
 src/views/ReleaseTrackerDetailView.vue

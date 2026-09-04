@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../i18n'
 
 const {
   getProxmoxGuests, getProxmoxGuestLink, getProxmoxGuestMetrics,
@@ -60,6 +61,7 @@ function mountUseProxmoxGuest() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setLocale('fr')
   routeQuery = {}
   getProxmoxGuests.mockResolvedValue({ data: [guest] })
   getProxmoxGuestLink.mockResolvedValue({ data: null })
