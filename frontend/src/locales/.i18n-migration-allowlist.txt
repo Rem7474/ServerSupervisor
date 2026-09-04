@@ -36,7 +36,6 @@ src/views/GitWebhooksView.vue
 src/views/GlobalScheduledTasksView.vue
 src/views/NPMView.vue
 src/views/NetworkView.vue
-src/views/ProxmoxNodeView.vue
 src/views/ReleaseTrackerDetailView.vue
 src/views/RunbooksView.vue
 src/views/TrafficThreatsShell.vue

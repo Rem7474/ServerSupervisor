@@ -5,6 +5,7 @@
  * this domain gets its own typed models in a follow-up. */
 import { ref, computed, shallowRef, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
@@ -15,6 +16,7 @@ import type { RRDChartSeries } from '../components/proxmox/RRDChartCard.vue'
 interface RRDPoint { x: number; y: number }
 
 export function useProxmoxNode() {
+  const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const guestActions = useProxmoxGuestActions()
@@ -22,8 +24,8 @@ export function useProxmoxNode() {
   const loading = ref(true)
   const error = ref('')
   const tab = ref('vms')
-  watch(tab, (t) => {
-    router.replace({ query: { ...route.query, tab: t } })
+  watch(tab, (newTab) => {
+    router.replace({ query: { ...route.query, tab: newTab } })
   })
 
   const sensorSourceCandidates = ref<any[]>([])
@@ -162,7 +164,7 @@ export function useProxmoxNode() {
     await guestActions.performGuestAction(guest, action, refreshGuests)
   }
   const failedTaskCount = computed(() =>
-    (node.value?.tasks ?? []).filter((t: any) => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
+    (node.value?.tasks ?? []).filter((task: any) => task.status === 'stopped' && task.exit_status && task.exit_status !== 'OK').length
   )
   async function load(): Promise<void> {
     loading.value = true
@@ -192,7 +194,7 @@ export function useProxmoxNode() {
       else if (tab.value === 'services') loadServices()
       else if (tab.value === 'backups') loadBackups()
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Erreur lors du chargement.')
+      error.value = getApiErrorMessage(e, t('proxmox.genericLoadError'))
     } finally {
       loading.value = false
     }
@@ -218,9 +220,9 @@ export function useProxmoxNode() {
 
       const data: RRDPoint[] = points.map((p: any) => ({ x: new Date(p.timestamp).getTime(), y: Number(p.cpu_temperature) }))
       nodeCpuTempCurrent.value = data[data.length - 1]?.y || 0
-      nodeTempChart.value = [{ name: 'Température', data, color: cssVar('--tblr-red') }]
+      nodeTempChart.value = [{ name: t('proxmox.temperatureSeriesLabel'), data, color: cssVar('--tblr-red') }]
     } catch (e: unknown) {
-      nodeTempError.value = getApiErrorMessage(e, 'Erreur lors du chargement de la température CPU.')
+      nodeTempError.value = getApiErrorMessage(e, t('proxmox.loadCpuTempError'))
     } finally {
       nodeTempLoading.value = false
     }
@@ -248,7 +250,7 @@ export function useProxmoxNode() {
       nodeFanRPMCurrent.value = data[data.length - 1]?.y || 0
       nodeFanChart.value = [{ name: 'RPM', data, color: cssVar('--tblr-azure') }]
     } catch (e: unknown) {
-      nodeFanError.value = getApiErrorMessage(e, 'Erreur lors du chargement des RPM ventilateurs.')
+      nodeFanError.value = getApiErrorMessage(e, t('proxmox.loadFanRpmError'))
     } finally {
       nodeFanLoading.value = false
     }
@@ -282,10 +284,10 @@ export function useProxmoxNode() {
       await loadSensorSourceCandidates()
       await loadNodeCpuTempHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
       await loadNodeFanRPMHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
-      sensorSourceMsg.value = 'Source capteurs mise à jour (CPU + ventilateurs).'
+      sensorSourceMsg.value = t('proxmox.sensorSourceUpdatedMessage')
       sensorSourceOk.value = true
     } catch (e: unknown) {
-      sensorSourceMsg.value = getApiErrorMessage(e, 'Erreur lors de la mise à jour.')
+      sensorSourceMsg.value = getApiErrorMessage(e, t('proxmox.genericUpdateError'))
       sensorSourceOk.value = false
     } finally {
       sensorSourceSaving.value = false
@@ -303,7 +305,7 @@ export function useProxmoxNode() {
       const res = await api.getProxmoxNodeRRD(String(route.params.id), timeframe)
       buildRRDCharts(res.data ?? [])
     } catch (e: unknown) {
-      rrdError.value = getApiErrorMessage(e, 'Erreur lors du chargement des métriques.')
+      rrdError.value = getApiErrorMessage(e, t('proxmox.loadMetricsError'))
       rrdCpuChart.value = null
       rrdRamChart.value = null
       rrdIowaitChart.value = null
@@ -343,8 +345,8 @@ export function useProxmoxNode() {
       .filter((p: any) => p.netout != null)
       .map((p: any) => ({ x: p.time * 1000, y: p.netout }))
     rrdNetChart.value = (rxData.length || txData.length) ? [
-      { name: 'Entrante', data: rxData, color: cssVar('--tblr-indigo') },
-      { name: 'Sortante', data: txData, color: cssVar('--tblr-pink') },
+      { name: t('proxmox.netInLabel'), data: rxData, color: cssVar('--tblr-indigo') },
+      { name: t('proxmox.netOutLabel'), data: txData, color: cssVar('--tblr-pink') },
     ] : null
   }
 
@@ -357,7 +359,7 @@ export function useProxmoxNode() {
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { error?: string }; status?: number } }
-      liveStatusError.value = ax.response?.data?.error || `Erreur ${ax.response?.status ?? ''} — vérifiez la connectivité au nœud.`
+      liveStatusError.value = ax.response?.data?.error || t('proxmox.liveStatusErrorTemplate', { status: ax.response?.status ?? '' })
     } finally {
       liveStatusLoading.value = false
     }
@@ -436,11 +438,11 @@ export function useProxmoxNode() {
     try {
       const res = await api.refreshProxmoxNodeApt(String(route.params.id))
       const upid = res.data?.upid
-      aptRefreshMsg.value = upid ? 'Tâche lancée — logs en cours…' : (res.data?.message || 'Tâche lancée.')
+      aptRefreshMsg.value = upid ? t('proxmox.taskLaunchedLogsMessage') : (res.data?.message || t('proxmox.taskLaunchedMessage'))
       aptRefreshOk.value = true
       if (upid) startPollingTask(upid, { action: 'apt update' })
     } catch (e: unknown) {
-      aptRefreshMsg.value = getApiErrorMessage(e, 'Erreur lors du lancement de apt update.')
+      aptRefreshMsg.value = getApiErrorMessage(e, t('proxmox.aptUpdateLaunchError'))
       aptRefreshOk.value = false
     } finally {
       aptRefreshing.value = false
@@ -456,7 +458,7 @@ export function useProxmoxNode() {
       const res = await api.getProxmoxNodeServices(String(route.params.id))
       services.value = res.data ?? []
     } catch (e: unknown) {
-      servicesError.value = getApiErrorMessage(e, 'Erreur lors du chargement des services.')
+      servicesError.value = getApiErrorMessage(e, t('proxmox.loadServicesError'))
     } finally {
       servicesLoading.value = false
     }
@@ -475,7 +477,7 @@ export function useProxmoxNode() {
       backupJobs.value = jobsRes.data ?? []
       backupRuns.value = runsRes.data ?? []
     } catch (e: unknown) {
-      backupsError.value = getApiErrorMessage(e, 'Erreur lors du chargement des sauvegardes.')
+      backupsError.value = getApiErrorMessage(e, t('proxmox.loadBackupsError'))
     } finally {
       backupsLoading.value = false
     }
@@ -487,12 +489,14 @@ export function useProxmoxNode() {
     try {
       const res = await api.proxmoxNodeServiceAction(String(route.params.id), name, action)
       const upid = res.data?.upid
-      svcActionMsg.value = upid ? `${action} ${name} lancé — logs en cours…` : `${action} ${name} lancé.`
+      svcActionMsg.value = upid
+        ? t('proxmox.serviceActionLaunchedLogsMessage', { action, name })
+        : t('proxmox.serviceActionLaunchedMessage', { action, name })
       svcActionOk.value = true
       if (upid) await startPollingTask(upid, { action: `service ${action}`, label: name })
       else setTimeout(() => loadServices(), 2000)
     } catch (e: unknown) {
-      svcActionMsg.value = getApiErrorMessage(e, `Erreur lors de ${action} ${name}.`)
+      svcActionMsg.value = getApiErrorMessage(e, t('proxmox.serviceActionError', { action, name }))
       svcActionOk.value = false
     } finally {
       svcActionLoading.value[name] = null
@@ -539,7 +543,7 @@ export function useProxmoxNode() {
         startPollingTask(upid, { action: 'migrate', label: `${m.guest.name || m.guest.vmid} → ${m.target}` })
       }
     } catch (e: unknown) {
-      m.error = getApiErrorMessage(e, 'Erreur lors du lancement de la migration.')
+      m.error = getApiErrorMessage(e, t('proxmox.migrationLaunchError'))
     } finally {
       m.loading = false
     }

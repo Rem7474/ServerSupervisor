@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../i18n'
 
 const {
   getProxmoxNode, getProxmoxNodeSensorSourceCandidates, getProxmoxNodeStatus,
@@ -66,6 +67,7 @@ const node = {
 describe('useProxmoxNode — RRD/temperature/fan chart building', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     routeQuery = {}
     getProxmoxNode.mockResolvedValue({ data: node })
     getProxmoxNodeSensorSourceCandidates.mockResolvedValue({ data: [] })

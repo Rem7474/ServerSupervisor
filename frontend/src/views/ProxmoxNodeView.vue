@@ -20,7 +20,7 @@
     <div v-else-if="node">
       <PageRefreshBar
         v-model="autoRefresh"
-        label="Nœud Proxmox"
+        :label="t('proxmox.nodeRefreshLabel')"
         :interval-sec="LIVE_STATUS_REFRESH_SEC"
         :last-updated-at="lastUpdatedAt"
       />
@@ -32,14 +32,14 @@
             to="/"
             class="text-decoration-none"
           >
-            Dashboard
+            {{ t('nav.sections.control.items.dashboard') }}
           </router-link>
           <span class="text-muted mx-1">/</span>
           <router-link
             to="/proxmox"
             class="text-decoration-none"
           >
-            Proxmox VE
+            {{ t('proxmox.breadcrumbTitle') }}
           </router-link>
           <span class="text-muted mx-1">/</span>
           <span>{{ node.node_name }}</span>
@@ -53,18 +53,18 @@
             class="status status-success"
           >
             <span class="status-dot status-dot-animated" />
-            <span data-translation-id="online">En ligne</span>
+            <span data-translation-id="online">{{ t('common.statusOnline') }}</span>
           </span>
           <span
             v-else
             class="status status-danger"
           >
             <span class="status-dot status-dot-animated" />
-            <span data-translation-id="offline">Hors ligne</span>
+            <span data-translation-id="offline">{{ t('common.statusOffline') }}</span>
           </span>
         </div>
         <div class="text-secondary">
-          {{ node.cluster_name || 'Nœud standalone' }} · PVE {{ node.pve_version || 'N/A' }} · {{ node.ip_address }}
+          {{ node.cluster_name || t('proxmox.standaloneNodeLabel') }} · PVE {{ node.pve_version || 'N/A' }} · {{ node.ip_address }}
         </div>
       </div>
 
@@ -72,14 +72,14 @@
       <div class="card mb-3">
         <div class="card-body d-flex flex-wrap align-items-center gap-2">
           <div class="subheader mb-0 me-2">
-            Source capteurs nœud (CPU + ventilateurs)
+            {{ t('proxmox.sensorSourceTitle') }}
           </div>
           <select
             v-model="sensorSourceHostId"
             class="form-select form-select-sm proxmox-source-select"
           >
             <option value="">
-              Aucune (capteurs locaux du nœud)
+              {{ t('proxmox.noSensorSourceOption') }}
             </option>
             <option
               v-for="candidate in sensorSourceCandidates"
@@ -99,7 +99,7 @@
               v-if="sensorSourceSaving"
               class="spinner-border spinner-border-sm me-1"
             />
-            Enregistrer
+            {{ t('common.save') }}
           </button>
           <span
             v-if="sensorSourceMsg"
@@ -108,7 +108,7 @@
           <span
             v-else-if="sensorSourceHostName"
             class="small text-muted"
-          >Actuel: {{ sensorSourceHostName }}</span>
+          >{{ t('proxmox.currentSensorSourceLabel', { name: sensorSourceHostName }) }}</span>
         </div>
       </div>
 
@@ -119,7 +119,7 @@
             <!-- CPU -->
             <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">
-                CPU
+                {{ t('proxmox.cpuColumn') }}
               </div>
               <div class="h3 mb-1">
                 {{ (node.cpu_usage * 100).toFixed(1) }}%
@@ -132,14 +132,14 @@
                 />
               </div>
               <div class="text-muted small">
-                {{ node.cpu_count }} cœurs
+                {{ t('proxmox.coresLabel', { n: node.cpu_count }) }}
               </div>
             </div>
 
             <!-- CPU Temp (from mapped source host) -->
             <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">
-                CPU TEMP
+                {{ t('proxmox.cpuTempLabel') }}
               </div>
               <div
                 class="h3 mb-1"
@@ -148,27 +148,27 @@
                 {{ nodeCpuTempCurrent > 0 ? `${nodeCpuTempCurrent.toFixed(1)}°C` : '—' }}
               </div>
               <div class="text-muted small">
-                <span v-if="!sensorSourceHostName">Source non configurée</span>
+                <span v-if="!sensorSourceHostName">{{ t('proxmox.sensorSourceNotConfigured') }}</span>
               </div>
             </div>
 
             <!-- Fan RPM (from mapped source host) -->
             <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">
-                FAN RPM
+                {{ t('proxmox.fanRpmLabel') }}
               </div>
               <div class="h3 mb-1 text-blue">
                 {{ nodeFanRPMCurrent > 0 ? `${nodeFanRPMCurrent.toFixed(0)} RPM` : '—' }}
               </div>
               <div class="text-muted small">
-                <span v-if="!sensorSourceHostName">Source non configurée</span>
+                <span v-if="!sensorSourceHostName">{{ t('proxmox.sensorSourceNotConfigured') }}</span>
               </div>
             </div>
 
             <!-- RAM -->
             <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">
-                RAM
+                {{ t('proxmox.ramColumn') }}
               </div>
               <div class="h3 mb-1">
                 {{ formatBytes(node.mem_used) }}
@@ -188,7 +188,7 @@
             <!-- Uptime -->
             <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">
-                Uptime
+                {{ t('proxmox.uptimeLabel') }}
               </div>
               <div class="h3 mb-0">
                 {{ formatUptime(node.uptime) }}
@@ -198,7 +198,7 @@
             <!-- Guests -->
             <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">
-                Guests
+                {{ t('proxmox.guestsLabel') }}
               </div>
               <div class="h3 mb-0">
                 <span class="text-primary">{{ node.vm_count }}</span><span class="text-muted fs-5 ms-1">VM</span>
@@ -215,7 +215,7 @@
               <!-- IO Wait -->
               <div class="col-6 col-sm-4 col-lg">
                 <div class="subheader mb-1">
-                  IO Wait
+                  {{ t('proxmox.iowaitChartTitle') }}
                 </div>
                 <div
                   class="h3 mb-0"
@@ -224,14 +224,14 @@
                   {{ (liveStatus.wait * 100).toFixed(2) }}%
                 </div>
                 <div class="text-muted small">
-                  disque
+                  {{ t('proxmox.diskSubLabel') }}
                 </div>
               </div>
 
               <!-- Swap -->
               <div class="col-6 col-sm-4 col-lg">
                 <div class="subheader mb-1">
-                  Swap
+                  {{ t('proxmox.swapLabel') }}
                 </div>
                 <div class="h3 mb-1">
                   {{ formatBytes(liveStatus.swap.used) }}
@@ -254,7 +254,7 @@
               <!-- Rootfs -->
               <div class="col-6 col-sm-4 col-lg">
                 <div class="subheader mb-1">
-                  Rootfs
+                  {{ t('proxmox.rootfsLabel') }}
                 </div>
                 <div class="h3 mb-1">
                   {{ formatBytes(liveStatus.rootfs.used) }}
@@ -277,7 +277,7 @@
               v-else-if="liveStatusLoading"
               class="col align-self-center text-muted small"
             >
-              <span class="spinner-border spinner-border-sm me-1" />Chargement…
+              <span class="spinner-border spinner-border-sm me-1" />{{ t('proxmox.loadingLabel') }}
             </div>
           </div>
 
@@ -293,7 +293,7 @@
               class="text-muted node-live-meta-text"
             >
               <span class="spinner-border me-1 node-live-meta-spinner" />
-              Actualisation…
+              {{ t('proxmox.refreshingLabel') }}
             </span>
           </div>
         </div>
@@ -310,8 +310,8 @@
         :timeframe="rrdTimeframe"
         :loading="rrdLoading"
         :error="rrdError"
-        :temp-empty-text="nodeTempLoading ? 'Chargement…' : (nodeTempError || (sensorSourceHostId ? 'Aucune donnée température disponible' : 'Configurez une source capteurs pour ce nœud'))"
-        :fan-empty-text="nodeFanLoading ? 'Chargement…' : (nodeFanError || (sensorSourceHostId ? 'Aucune donnée ventilateur disponible' : 'Configurez une source capteurs pour ce nœud'))"
+        :temp-empty-text="nodeTempLoading ? t('proxmox.loadingLabel') : (nodeTempError || (sensorSourceHostId ? t('proxmox.noTempDataText') : t('proxmox.configureSensorSourceHint')))"
+        :fan-empty-text="nodeFanLoading ? t('proxmox.loadingLabel') : (nodeFanError || (sensorSourceHostId ? t('proxmox.noFanDataText') : t('proxmox.configureSensorSourceHint')))"
         @timeframe-changed="loadRRD"
       />
 
@@ -322,14 +322,14 @@
       >
         <div class="d-flex align-items-center gap-3">
           <div>
-            <strong>Mises à jour disponibles sur ce nœud :</strong>
-            {{ node.pending_updates }} paquet(s) en attente
+            <strong>{{ t('proxmox.updatesAvailableTitle') }}</strong>
+            {{ node.pending_updates }} {{ t('proxmox.pendingPackagesShortLabel') }}
           </div>
           <div
             v-if="node.last_update_check_at"
             class="ms-auto text-muted small"
           >
-            Dernière vérification : {{ formatDate(node.last_update_check_at) }}
+            {{ t('proxmox.lastCheckSubtitle', { date: formatDate(node.last_update_check_at) }) }}
           </div>
         </div>
       </div>
@@ -440,8 +440,8 @@
         <CommandLogPanel
           :command="liveTask"
           :show="showConsole"
-          title="Logs tâche PVE"
-          empty-text="Cliquez sur 'Logs' dans une tâche pour suivre l'exécution"
+          :title="t('proxmox.taskLogsTitle')"
+          :empty-text="t('proxmox.taskLogsEmptyText')"
           wrapper-class="side-panel"
           @open="showConsole = true"
           @close="closeConsole"
@@ -461,7 +461,7 @@
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">
-                Migrer {{ migrateModal.guest?.name || `VMID ${migrateModal.guest?.vmid}` }}
+                {{ t('proxmox.migrateModalTitle', { name: migrateModal.guest?.name || `VMID ${migrateModal.guest?.vmid}` }) }}
               </h5>
               <button
                 type="button"
@@ -471,7 +471,7 @@
             </div>
             <div class="modal-body">
               <div class="mb-3">
-                <label class="form-label">Nœud cible</label>
+                <label class="form-label">{{ t('proxmox.targetNodeLabel') }}</label>
                 <select
                   v-model="migrateModal.target"
                   class="form-select"
@@ -492,7 +492,7 @@
                     type="checkbox"
                     class="form-check-input"
                   >
-                  <span class="form-check-label">Migration à chaud (sans arrêt)</span>
+                  <span class="form-check-label">{{ t('proxmox.liveMigrationLabel') }}</span>
                 </label>
               </div>
               <div
@@ -508,7 +508,7 @@
                 class="btn btn-secondary"
                 @click="migrateModal.open = false"
               >
-                Annuler
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="button"
@@ -520,7 +520,7 @@
                   v-if="migrateModal.loading"
                   class="spinner-border spinner-border-sm me-1"
                 />
-                Migrer
+                {{ t('proxmox.migrateButton') }}
               </button>
             </div>
           </div>
@@ -534,6 +534,7 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
@@ -553,6 +554,7 @@ import { useModalChrome } from '../composables/useModalChrome'
 import { getMetricColorClass } from '../utils/metricColor'
 
 const route = useRoute()
+const { t, locale } = useI18n()
 
 const {
   node,
@@ -642,13 +644,13 @@ const failedBackupCount = computed(() =>
 )
 
 const proxmoxTabs = computed<EntityTab[]>(() => [
-  { key: 'vms', label: 'VMs', badges: [{ value: vms.value.length, badgeClass: azureBadge }], lazy: true },
-  { key: 'lxc', label: 'LXC', badges: [{ value: lxcs.value.length, badgeClass: azureBadge }], lazy: true },
-  { key: 'storage', label: 'Stockage', badges: [{ value: node.value?.storages?.length ?? 0, badgeClass: azureBadge }], lazy: true },
-  { key: 'disks', label: 'Disques', badges: [{ value: node.value?.disks?.length ?? 0, badgeClass: azureBadge }], lazy: true },
+  { key: 'vms', label: t('proxmox.vmsTabLabel'), badges: [{ value: vms.value.length, badgeClass: azureBadge }], lazy: true },
+  { key: 'lxc', label: t('proxmox.lxcTabLabel'), badges: [{ value: lxcs.value.length, badgeClass: azureBadge }], lazy: true },
+  { key: 'storage', label: t('proxmox.storageTabLabel'), badges: [{ value: node.value?.storages?.length ?? 0, badgeClass: azureBadge }], lazy: true },
+  { key: 'disks', label: t('proxmox.disksTabLabel'), badges: [{ value: node.value?.disks?.length ?? 0, badgeClass: azureBadge }], lazy: true },
   {
     key: 'tasks',
-    label: 'Tâches',
+    label: t('proxmox.tasksTabLabel'),
     badges: [
       { value: node.value?.tasks?.length ?? 0, badgeClass: azureBadge },
       ...(failedTaskCount.value > 0 ? [{ value: failedTaskCount.value, badgeClass: 'badge bg-danger text-white ms-1' }] : []),
@@ -657,21 +659,21 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
   },
   {
     key: 'backups',
-    label: 'Sauvegardes',
+    label: t('proxmox.backupsTabLabel'),
     badges: failedBackupCount.value > 0 ? [{ value: failedBackupCount.value, badgeClass: 'badge bg-danger text-white ms-1' }] : [],
     lazy: true,
   },
   {
     key: 'updates',
-    label: 'Mises à jour',
+    label: t('proxmox.updatesTabLabel'),
     badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-warning-lt text-warning' }] : [],
     lazy: true,
   },
-  { key: 'services', label: 'Services', lazy: true },
-  // Labeled "Journaux sécurité" (not "Sécurité") to avoid colliding with
+  { key: 'services', label: t('proxmox.servicesTabLabel'), lazy: true },
+  // Labeled "Security logs" (not "Security") to avoid colliding with
   // HostDetailView's "Permissions" tab — same word previously used on both,
   // unrelated content (PVE syslog auth-failure search here vs. per-host RBAC there).
-  { key: 'security', label: 'Journaux sécurité', badges: [{ value: securityEventsCount.value, badgeClass: azureBadge }], lazy: true },
+  { key: 'security', label: t('proxmox.securityLogsTabLabel'), badges: [{ value: securityEventsCount.value, badgeClass: azureBadge }], lazy: true },
 ])
 
 // VMs/LXC and Services fetch their own supporting data lazily — on a real
@@ -715,10 +717,11 @@ function storageColor(used: number, total: number): string {
 
 function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
-  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
+  const unitKeys = ['proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
   let i = 0, v = bytes
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+  while (v >= 1024 && i < unitKeys.length) { v /= 1024; i++ }
+  const unit = i === 0 ? 'B' : t(unitKeys[i - 1])
+  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
 }
 
 function formatUptime(seconds: number | undefined): string {
@@ -726,14 +729,14 @@ function formatUptime(seconds: number | undefined): string {
   const d = Math.floor(seconds / 86400)
   const h = Math.floor((seconds % 86400) / 3600)
   const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}j ${h}h`
+  if (d > 0) return `${d}${t('proxmox.daySuffix')} ${h}h`
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
 }
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 </script>
 

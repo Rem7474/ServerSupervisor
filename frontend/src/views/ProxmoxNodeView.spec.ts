@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { setLocale } from '../i18n'
 
 // Auto-unmount after each test so the view's onUnmounted clears its polling
 // timers and no late-resolving async touches a torn-down component.
@@ -75,6 +76,7 @@ const mountOpts = {
 describe('ProxmoxNodeView (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     routeQuery.current = {}
     // ProxmoxNodeGuestsTab (mounted for the vms/lxc tabs) calls useAuthStore()
     // for its admin-only guest power-action buttons.
