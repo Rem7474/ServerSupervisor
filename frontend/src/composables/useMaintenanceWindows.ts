@@ -1,4 +1,5 @@
 import { Ref, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useConfirmDialog } from './useConfirmDialog'
 import apiClient, { getApiErrorMessage } from '../api'
 import type { MaintenanceWindow, MaintenanceWindowRequest } from '../types/maintenance'
@@ -21,6 +22,7 @@ interface UseMaintenanceWindowsApi {
 // list client-side, since a host-scoped read is already its own endpoint.
 export function useMaintenanceWindows(): UseMaintenanceWindowsApi {
   const { confirm } = useConfirmDialog()
+  const { t } = useI18n()
 
   const windows: Ref<MaintenanceWindow[]> = ref([])
   const loading: Ref<boolean> = ref(false)
@@ -37,7 +39,7 @@ export function useMaintenanceWindows(): UseMaintenanceWindowsApi {
       windows.value = res.data || []
       fetched.value = true
     } catch (e) {
-      error.value = getApiErrorMessage(e, 'Impossible de charger les fenêtres de maintenance')
+      error.value = getApiErrorMessage(e, t('alerts.loadWindowsError'))
     } finally {
       loading.value = false
     }
@@ -56,7 +58,7 @@ export function useMaintenanceWindows(): UseMaintenanceWindowsApi {
       await load()
       return true
     } catch (e) {
-      saveError.value = getApiErrorMessage(e, 'Impossible de créer la fenêtre de maintenance')
+      saveError.value = getApiErrorMessage(e, t('alerts.createWindowError'))
       return false
     } finally {
       saving.value = false
@@ -64,20 +66,20 @@ export function useMaintenanceWindows(): UseMaintenanceWindowsApi {
   }
 
   async function remove(window: MaintenanceWindow): Promise<void> {
-    const label = window.host_name || (window.host_id ? window.host_id : 'tous les hôtes')
+    const label = window.host_name || (window.host_id ? window.host_id : t('alerts.allHostsLower'))
     const ok = await confirm({
-      title: 'Supprimer la fenêtre de maintenance',
-      message: `Supprimer la fenêtre de maintenance "${window.reason}" (${label}) ?`,
+      title: t('alerts.deleteWindowAriaLabel'),
+      message: t('alerts.deleteWindowConfirmMessage', { reason: window.reason, label }),
       variant: 'danger',
       destructive: true,
-      okLabel: 'Supprimer',
+      okLabel: t('alerts.deleteTooltip'),
     })
     if (!ok) return
     try {
       await apiClient.deleteMaintenanceWindow(window.id)
       windows.value = windows.value.filter((w) => w.id !== window.id)
     } catch (e) {
-      error.value = getApiErrorMessage(e, 'Impossible de supprimer la fenêtre de maintenance')
+      error.value = getApiErrorMessage(e, t('alerts.deleteWindowError'))
     }
   }
 

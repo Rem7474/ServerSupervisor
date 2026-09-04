@@ -5,8 +5,8 @@
       class="alert py-2 small mb-3"
       :class="testResults.any_fires ? 'alert-warning' : 'alert-success'"
     >
-      <strong>Dernier test :</strong>
-      {{ testResults.any_fires ? ' la règle déclencherait une alerte.' : ' la règle ne déclencherait pas d\'alerte.' }}
+      <strong>{{ t('alerts.lastTestLabel') }}</strong>
+      {{ testResults.any_fires ? ' ' + t('alerts.testWouldFire') : ' ' + t('alerts.testWouldNotFire') }}
       <span class="text-secondary ms-1">({{ formatDate(testResults.evaluated_at) }})</span>
     </div>
 
@@ -22,7 +22,7 @@
       v-if="commandTriggerEnabled"
       class="mb-3"
     >
-      <label class="form-label">Période de silence (secondes)</label>
+      <label class="form-label">{{ t('alerts.cooldownLabel') }}</label>
       <input
         v-model.number="form.actions.cooldown"
         type="number"
@@ -33,11 +33,11 @@
       <small
         :id="`cooldown-hint-${rule?.id || 'new'}`"
         class="form-hint"
-      >Temps minimum entre deux alertes successives pour cette règle</small>
+      >{{ t('alerts.cooldownHint') }}</small>
     </div>
 
     <div class="mb-3">
-      <label class="form-label">Escalade si non acquittée (minutes)</label>
+      <label class="form-label">{{ t('alerts.escalateLabel') }}</label>
       <input
         v-model.number="form.actions.escalate_after_minutes"
         type="number"
@@ -49,11 +49,11 @@
       <small
         id="escalate-hint"
         class="form-hint"
-      >0 = désactivée. Sinon, renvoie la notification toutes les N minutes tant que l'incident reste ouvert et n'a pas été acquitté depuis /alerts.</small>
+      >{{ t('alerts.escalateHint') }}</small>
     </div>
 
     <div class="mb-3">
-      <label class="form-label">Canaux de notification</label>
+      <label class="form-label">{{ t('alerts.channelsLabel') }}</label>
       <div>
         <label class="form-check form-check-inline">
           <input
@@ -61,7 +61,7 @@
             class="form-check-input"
             type="checkbox"
           >
-          <span class="form-check-label">SMTP (Email)</span>
+          <span class="form-check-label">{{ t('alerts.channelSmtpLabel') }}</span>
         </label>
         <label class="form-check form-check-inline">
           <input
@@ -69,7 +69,7 @@
             class="form-check-input"
             type="checkbox"
           >
-          <span class="form-check-label">Ntfy (Push)</span>
+          <span class="form-check-label">{{ t('alerts.channelNtfyLabel') }}</span>
         </label>
         <label class="form-check form-check-inline">
           <input
@@ -77,7 +77,7 @@
             class="form-check-input"
             type="checkbox"
           >
-          <span class="form-check-label">Navigateur</span>
+          <span class="form-check-label">{{ t('alerts.channelBrowserLabel') }}</span>
         </label>
       </div>
       <div
@@ -88,25 +88,25 @@
           v-if="browserPermission === 'denied'"
           class="alert alert-warning py-2 small mb-0"
         >
-          Notifications bloquées par le navigateur.
+          {{ t('alerts.browserBlockedMsg') }}
         </div>
         <div
           v-else-if="browserPermission === 'granted'"
           class="alert alert-success py-2 small mb-0"
         >
-          Notifications navigateur autorisées.
+          {{ t('alerts.browserAllowedMsg') }}
         </div>
         <div
           v-else-if="browserPermission === 'unsupported'"
           class="alert alert-warning py-2 small mb-0"
         >
-          Ce navigateur ne supporte pas les notifications.
+          {{ t('alerts.browserUnsupportedMsg') }}
         </div>
         <div
           v-else
           class="text-secondary small mt-1"
         >
-          La permission sera demandée à l'enregistrement.
+          {{ t('alerts.browserPermissionPendingMsg') }}
         </div>
       </div>
     </div>
@@ -115,7 +115,7 @@
       v-if="channelSmtp"
       class="mb-3"
     >
-      <label class="form-label">Destinataire(s) email</label>
+      <label class="form-label">{{ t('alerts.smtpRecipientsLabel') }}</label>
       <input
         v-model="form.actions.smtp_to"
         type="text"
@@ -126,14 +126,14 @@
       <small
         id="smtp-hint"
         class="form-hint"
-      >Séparez plusieurs emails par des virgules. Laisser vide pour utiliser le destinataire global (Réglages > SMTP).</small>
+      >{{ t('alerts.smtpRecipientsHint') }}</small>
     </div>
 
     <div
       v-if="channelNtfy"
       class="mb-3"
     >
-      <label class="form-label">Topic ntfy</label>
+      <label class="form-label">{{ t('alerts.ntfyTopicLabel') }}</label>
       <input
         v-model="form.actions.ntfy_topic"
         type="text"
@@ -156,13 +156,14 @@
           class="form-check-input"
           type="checkbox"
         >
-        <span class="form-check-label">Activer immédiatement</span>
+        <span class="form-check-label">{{ t('alerts.enableImmediatelyLabel') }}</span>
       </label>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import AlertRuleCommandTrigger from './AlertRuleCommandTrigger.vue'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
 
@@ -179,6 +180,8 @@ defineProps<{
   browserPermission?: string
 }>()
 
+const { t, locale } = useI18n()
+
 const channelSmtp = defineModel<boolean>('channelSmtp', { default: false })
 const channelNtfy = defineModel<boolean>('channelNtfy', { default: false })
 const channelBrowser = defineModel<boolean>('channelBrowser', { default: false })
@@ -186,6 +189,6 @@ const commandTriggerEnabled = defineModel<boolean>('commandTriggerEnabled', { de
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('fr-FR')
+  return new Date(dateStr).toLocaleString(locale.value)
 }
 </script>

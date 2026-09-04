@@ -5,7 +5,7 @@
       <div class="row">
         <div class="col-md-6 mb-3">
           <div class="form-label">
-            États déclenchant une alerte <span class="badge bg-warning-lt text-warning ms-1">warn</span>
+            {{ t('alerts.conditionsDockerStatesLabel') }} <span class="badge bg-warning-lt text-warning ms-1">warn</span>
           </div>
           <div class="border rounded p-2 d-flex flex-wrap gap-2">
             <label
@@ -25,7 +25,7 @@
         </div>
         <div class="col-md-6 mb-3">
           <div class="form-label">
-            États déclenchant une alerte <span class="badge bg-danger-lt text-danger ms-1">crit</span>
+            {{ t('alerts.conditionsDockerStatesLabel') }} <span class="badge bg-danger-lt text-danger ms-1">crit</span>
           </div>
           <div class="border rounded p-2 d-flex flex-wrap gap-2">
             <label
@@ -48,13 +48,13 @@
         v-if="dockerStateNoSelection"
         class="alert alert-warning py-2 small mb-3"
       >
-        Sélectionnez au moins un état pour activer cette alerte.
+        {{ t('alerts.conditionsDockerNoSelectionWarning') }}
       </div>
       <div class="mb-3">
         <label
           for="alert-cond-duration"
           class="form-label"
-        >Durée (secondes)</label>
+        >{{ t('alerts.conditionsDurationSecondsLabel') }}</label>
         <input
           id="alert-cond-duration"
           v-model.number="durationModel"
@@ -68,7 +68,7 @@
           :id="`duration-hint-${rule?.id || 'new'}`"
           class="form-hint"
         >
-          Durée pendant laquelle l'état doit persister avant de déclencher l'alerte (0 = immédiat).
+          {{ t('alerts.conditionsDockerDurationHint') }}
         </small>
       </div>
     </template>
@@ -76,16 +76,16 @@
     <!-- ── docker_compose_degraded_services ────────────────────────── -->
     <template v-else-if="form.metric === 'docker_compose_degraded_services'">
       <div class="alert alert-light py-2 small mb-3 border">
-        La valeur est le <strong>nombre de services déclarés dans le compose.yml qui n'ont aucun container running</strong>.
-        Un service est dégradé si tous ses containers sont arrêtés.
-        Valeur 0 = projet en bonne santé.
+        {{ t('alerts.conditionsComposeInfoLine1') }} <strong>{{ t('alerts.conditionsComposeInfoLine1Strong') }}</strong>.
+        {{ t('alerts.conditionsComposeInfoLine2') }}
+        {{ t('alerts.conditionsComposeInfoLine3') }}
       </div>
       <div class="row">
         <div class="col-md-6 mb-3">
           <label
             for="alert-cond-threshold-warn"
             class="form-label required"
-          >Warn si ≥ N service(s) dégradé(s)</label>
+          >{{ t('alerts.conditionsComposeWarnThresholdLabel') }}</label>
           <input
             id="alert-cond-threshold-warn"
             v-model.number="thresholdWarnModel"
@@ -96,14 +96,14 @@
             placeholder="1"
           >
           <small class="form-hint">
-            Alerte warn dès {{ form.threshold_warn ?? 1 }} service{{ (form.threshold_warn ?? 1) > 1 ? 's' : '' }} dégradé{{ (form.threshold_warn ?? 1) > 1 ? 's' : '' }}.
+            {{ t('alerts.conditionsComposeWarnThresholdHint', { n: form.threshold_warn ?? 1 }, form.threshold_warn ?? 1) }}
           </small>
         </div>
         <div class="col-md-6 mb-3">
           <label
             for="alert-cond-threshold-crit"
             class="form-label required"
-          >Crit si ≥ N service(s) dégradé(s)</label>
+          >{{ t('alerts.conditionsComposeCritThresholdLabel') }}</label>
           <input
             id="alert-cond-threshold-crit"
             v-model.number="thresholdCritModel"
@@ -114,7 +114,7 @@
             placeholder="1"
           >
           <small class="form-hint">
-            Alerte critique dès {{ form.threshold_crit ?? 1 }} service{{ (form.threshold_crit ?? 1) > 1 ? 's' : '' }} dégradé{{ (form.threshold_crit ?? 1) > 1 ? 's' : '' }}.
+            {{ t('alerts.conditionsComposeCritThresholdHint', { n: form.threshold_crit ?? 1 }, form.threshold_crit ?? 1) }}
           </small>
         </div>
       </div>
@@ -122,7 +122,7 @@
         <label
           for="alert-cond-compose-duration"
           class="form-label"
-        >Durée (secondes)</label>
+        >{{ t('alerts.conditionsDurationSecondsLabel') }}</label>
         <input
           id="alert-cond-compose-duration"
           v-model.number="durationModel"
@@ -136,7 +136,7 @@
           :id="`duration-hint-${rule?.id || 'new'}`"
           class="form-hint"
         >
-          Le seuil doit être atteint pendant cette durée avant de déclencher l'alerte.
+          {{ t('alerts.conditionsComposeDurationHint') }}
         </small>
       </div>
     </template>
@@ -144,32 +144,32 @@
     <!-- ── bandwidth_vs_rolling_avg ─────────────────────────────────── -->
     <template v-else-if="form.metric === 'bandwidth_vs_rolling_avg'">
       <div class="alert alert-light py-2 small mb-3 border">
-        La valeur est la <strong>bande passante actuelle (moyenne sur 5 min) exprimée en % de sa propre moyenne glissante</strong>
-        sur la fenêtre choisie ci-dessous. 100&nbsp;% = trafic normal, 150&nbsp;% = 1,5× la moyenne habituelle.
+        {{ t('alerts.conditionsBandwidthInfoLine1') }} <strong>{{ t('alerts.conditionsBandwidthInfoLine1Strong') }}</strong>
+        {{ t('alerts.conditionsBandwidthInfoLine2') }}
       </div>
       <div class="row">
         <div class="col-md-12 mb-3">
           <label
             for="alert-cond-baseline-window"
             class="form-label required"
-          >Fenêtre de moyenne glissante</label>
+          >{{ t('alerts.baselineWindowLabel') }}</label>
           <select
             id="alert-cond-baseline-window"
             v-model.number="baselineWindowModel"
             class="form-select"
           >
             <option :value="3600">
-              1 heure
+              {{ t('alerts.oneHourOption') }}
             </option>
             <option :value="21600">
-              6 heures
+              {{ t('alerts.sixHoursOption') }}
             </option>
             <option :value="86400">
-              24 heures
+              {{ t('alerts.twentyFourHoursOption') }}
             </option>
           </select>
           <small class="form-hint">
-            Période de référence utilisée pour calculer la bande passante "normale" de l'hôte.
+            {{ t('alerts.conditionsBandwidthWindowHint') }}
           </small>
         </div>
       </div>
@@ -178,7 +178,7 @@
           <label
             for="alert-cond-bandwidth-threshold-warn"
             class="form-label required"
-          >Seuil d'avertissement (% de la moyenne glissante)</label>
+          >{{ t('alerts.conditionsBandwidthWarnThresholdLabel') }}</label>
           <input
             id="alert-cond-bandwidth-threshold-warn"
             v-model.number="thresholdWarnModel"
@@ -188,13 +188,13 @@
             class="form-control"
             placeholder="150"
           >
-          <small class="form-hint">Ex. 150 = alerte dès que le trafic dépasse 1,5× la moyenne.</small>
+          <small class="form-hint">{{ t('alerts.conditionsBandwidthWarnThresholdHint') }}</small>
         </div>
         <div class="col-md-6 mb-3">
           <label
             for="alert-cond-bandwidth-threshold-crit"
             class="form-label required"
-          >Seuil critique (% de la moyenne glissante)</label>
+          >{{ t('alerts.conditionsBandwidthCritThresholdLabel') }}</label>
           <input
             id="alert-cond-bandwidth-threshold-crit"
             v-model.number="thresholdCritModel"
@@ -204,7 +204,7 @@
             class="form-control"
             placeholder="200"
           >
-          <small class="form-hint">Ex. 200 = alerte critique dès que le trafic double par rapport à la moyenne.</small>
+          <small class="form-hint">{{ t('alerts.conditionsBandwidthCritThresholdHint') }}</small>
         </div>
       </div>
     </template>
@@ -216,7 +216,7 @@
           <label
             for="alert-cond-heartbeat-timeout"
             class="form-label required"
-          >Silence maximum (secondes)</label>
+          >{{ t('alerts.conditionsHeartbeatLabel') }}</label>
           <input
             id="alert-cond-heartbeat-timeout"
             v-model.number="thresholdCritModel"
@@ -230,7 +230,7 @@
             :id="`heartbeat-hint-${rule?.id || 'new'}`"
             class="form-hint"
           >
-            Durée en secondes sans rapport avant alerte.
+            {{ t('alerts.conditionsHeartbeatHint') }}
           </small>
         </div>
       </div>
@@ -243,23 +243,23 @@
           <label
             for="alert-cond-operator"
             class="form-label required"
-          >Opérateur</label>
+          >{{ t('alerts.conditionsOperatorLabel') }}</label>
           <select
             id="alert-cond-operator"
             v-model="operatorModel"
             class="form-select"
           >
             <option value=">">
-              Supérieur à (>)
+              {{ t('alerts.conditionsOperatorGreaterThan') }}
             </option>
             <option value=">=">
-              Supérieur ou égal (>=)
+              {{ t('alerts.conditionsOperatorGreaterEqual') }}
             </option>
             <option value="<">
-              Inférieur à (&lt;)
+              {{ t('alerts.conditionsOperatorLessThan') }}
             </option>
             <option value="<=">
-              Inférieur ou égal (&lt;=)
+              {{ t('alerts.conditionsOperatorLessEqual') }}
             </option>
           </select>
         </div>
@@ -270,7 +270,7 @@
           <label
             for="alert-cond-generic-threshold-warn"
             class="form-label required"
-          >Seuil d'avertissement (warn)</label>
+          >{{ t('alerts.conditionsGenericWarnThresholdLabel') }}</label>
           <input
             id="alert-cond-generic-threshold-warn"
             v-model.number="thresholdWarnModel"
@@ -279,13 +279,13 @@
             class="form-control"
             placeholder="70"
           >
-          <small class="form-hint">Déclenche une alerte de niveau avertissement.</small>
+          <small class="form-hint">{{ t('alerts.conditionsGenericWarnThresholdHint') }}</small>
         </div>
         <div class="col-md-6 mb-3">
           <label
             for="alert-cond-generic-threshold-crit"
             class="form-label required"
-          >Seuil critique (crit)</label>
+          >{{ t('alerts.conditionsGenericCritThresholdLabel') }}</label>
           <input
             id="alert-cond-generic-threshold-crit"
             v-model.number="thresholdCritModel"
@@ -294,7 +294,7 @@
             class="form-control"
             placeholder="85"
           >
-          <small class="form-hint">Déclenche une alerte de niveau critique.</small>
+          <small class="form-hint">{{ t('alerts.conditionsGenericCritThresholdHint') }}</small>
         </div>
       </div>
 
@@ -303,7 +303,7 @@
           <label
             for="alert-cond-threshold-clear-warn"
             class="form-label"
-          >Seuil de résolution warn (hystérésis)</label>
+          >{{ t('alerts.conditionsClearWarnThresholdLabel') }}</label>
           <input
             id="alert-cond-threshold-clear-warn"
             v-model.number="thresholdClearWarnModel"
@@ -324,14 +324,14 @@
             :id="`threshold-clear-warn-hint-${rule?.id || 'new'}`"
             class="form-hint"
           >
-            Valeur <strong>exacte</strong> à laquelle l'alerte warn se résout (ex. {{ clearExample('warn') }}). Laisser vide = se résout dès que le seuil n'est plus dépassé.
+            {{ t('alerts.conditionsClearThresholdHintBefore') }} <strong>{{ t('alerts.conditionsClearThresholdHintExact') }}</strong> {{ t('alerts.conditionsClearThresholdHintAfter', { sev: 'warn', example: clearExample('warn') }) }}
           </small>
         </div>
         <div class="col-md-6 mb-3">
           <label
             for="alert-cond-threshold-clear-crit"
             class="form-label"
-          >Seuil de résolution crit (hystérésis)</label>
+          >{{ t('alerts.conditionsClearCritThresholdLabel') }}</label>
           <input
             id="alert-cond-threshold-clear-crit"
             v-model.number="thresholdClearCritModel"
@@ -352,7 +352,7 @@
             :id="`threshold-clear-crit-hint-${rule?.id || 'new'}`"
             class="form-hint"
           >
-            Valeur <strong>exacte</strong> à laquelle l'alerte crit se résout (ex. {{ clearExample('crit') }}). Laisser vide = se résout dès que le seuil n'est plus dépassé.
+            {{ t('alerts.conditionsClearThresholdHintBefore') }} <strong>{{ t('alerts.conditionsClearThresholdHintExact') }}</strong> {{ t('alerts.conditionsClearThresholdHintAfter', { sev: 'crit', example: clearExample('crit') }) }}
           </small>
         </div>
       </div>
@@ -361,7 +361,7 @@
         <label
           for="alert-cond-generic-duration"
           class="form-label"
-        >Durée (secondes)</label>
+        >{{ t('alerts.conditionsDurationSecondsLabel') }}</label>
         <input
           id="alert-cond-generic-duration"
           v-model.number="durationModel"
@@ -373,13 +373,13 @@
         <small
           :id="`duration-hint-${rule?.id || 'new'}`"
           class="form-hint"
-        >Le seuil doit être dépassé pendant cette durée avant de déclencher l'alerte.</small>
+        >{{ t('alerts.conditionsGenericDurationHint') }}</small>
         <small
           v-if="Number.isFinite(Number(form.duration)) && form.duration > 0 && form.duration < 60"
           :id="`duration-warn-${rule?.id || 'new'}`"
           class="form-hint text-warning d-block mt-1"
         >
-          Si l'agent reporte toutes les 60s, une durée inférieure peut empêcher le déclenchement.
+          {{ t('alerts.conditionsGenericDurationLowWarning') }}
         </small>
       </div>
     </template>
@@ -393,19 +393,19 @@
         v-if="hasNoDataResults"
         class="alert alert-warning py-2 small mb-2"
       >
-        <strong>Aucune donnée disponible</strong> pour un ou plusieurs hôtes.
+        <strong>{{ t('alerts.conditionsNoDataResultsBold') }}</strong> {{ t('alerts.conditionsNoDataResultsSuffix') }}
       </div>
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div class="fw-bold">
-          Résultat du test
+          {{ t('alerts.conditionsTestResultTitle') }}
           <span
             v-if="testResults.any_fires"
             class="badge bg-danger-lt text-danger ms-2"
-          >Déclencherait une alerte</span>
+          >{{ t('alerts.conditionsTestFiresBadge') }}</span>
           <span
             v-else
             class="badge bg-success-lt text-success ms-2"
-          >Aucune alerte déclenchée</span>
+          >{{ t('alerts.conditionsTestNoFireBadge') }}</span>
         </div>
         <div class="d-flex align-items-center gap-2">
           <button
@@ -419,7 +419,7 @@
               v-if="downloadingLogs"
               class="spinner-border spinner-border-sm me-1"
             />
-            Télécharger logs
+            {{ t('alerts.conditionsDownloadLogsButton') }}
           </button>
           <span class="text-secondary small">{{ formatDate(testResults.evaluated_at) }}</span>
         </div>
@@ -429,14 +429,14 @@
           <thead>
             <tr>
               <th>{{ testResultColLabel }}</th>
-              <th>Valeur actuelle</th>
-              <th>Résultat</th>
+              <th>{{ t('alerts.conditionsCurrentValueColumn') }}</th>
+              <th>{{ t('alerts.conditionsResultColumn') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!testResults.results?.length">
               <td colspan="3">
-                <EmptyState title="Aucun hôte concerné" />
+                <EmptyState :title="t('alerts.conditionsNoHostsConcernedTitle')" />
               </td>
             </tr>
             <tr
@@ -451,17 +451,17 @@
                 <span
                   v-else
                   class="text-secondary"
-                >Pas de données</span>
+                >{{ t('alerts.conditionsNoDataLabel') }}</span>
               </td>
               <td>
                 <span
                   v-if="result.would_fire"
                   class="badge bg-danger-lt text-danger"
-                >Alerte</span>
+                >{{ t('alerts.conditionsAlertBadge') }}</span>
                 <span
                   v-else
                   class="badge bg-success-lt text-success"
-                >OK</span>
+                >{{ t('alerts.valueOk') }}</span>
               </td>
             </tr>
           </tbody>
@@ -473,6 +473,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import EmptyState from '../EmptyState.vue'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
 
@@ -503,6 +504,8 @@ const emit = defineEmits<{
   (e: 'download-logs'): void
   (e: 'update:form', value: AlertRuleFormData): void
 }>()
+
+const { t, locale } = useI18n()
 
 type Severity = 'warn' | 'crit'
 
@@ -592,34 +595,34 @@ function clearExample(sev: Severity): string {
 }
 
 function clearPlaceholder(sev: Severity): string {
-  return `ex. ${clearExample(sev)} — vide = auto`
+  return t('alerts.conditionsClearPlaceholder', { example: clearExample(sev) })
 }
 
 function incoherenceMessage(sev: Severity): string {
   const trigger = triggerThreshold(sev)
   const side = isDescending.value ? `≥ ${trigger}${unitLabel.value}` : `≤ ${trigger}${unitLabel.value}`
-  return `Incohérent : le seuil de résolution doit être ${side} (sinon l'alerte ne se résout jamais).`
+  return t('alerts.conditionsIncoherenceMessage', { side })
 }
 
 // ── Test results display ─────────────────────────────────────────────
 
 const testResultColLabel = computed(() => {
   switch (props.form.metric) {
-    case 'docker_container_state': return 'Container'
-    case 'docker_compose_degraded_services': return 'Projet Compose'
-    case 'proxmox_storage_percent': return 'Stockage'
-    default: return props.form.source_type === 'proxmox' ? 'Portée' : 'Hôte'
+    case 'docker_container_state': return t('alerts.conditionsContainerColumnLabel')
+    case 'docker_compose_degraded_services': return t('alerts.conditionsComposeProjectColumnLabel')
+    case 'proxmox_storage_percent': return t('alerts.conditionsStorageColumnLabel')
+    default: return props.form.source_type === 'proxmox' ? t('alerts.conditionsScopeColumnLabel') : t('alerts.hostLabel')
   }
 })
 
 function formatTestValue(value: number): string {
   switch (props.form.metric) {
     case 'docker_container_state':
-      if (value >= 2) return 'Crit (état critique)'
-      if (value >= 1) return 'Warn (état dégradé)'
-      return 'OK (running)'
+      if (value >= 2) return t('alerts.conditionsDockerStateCrit')
+      if (value >= 1) return t('alerts.conditionsDockerStateWarn')
+      return t('alerts.conditionsDockerStateOk')
     case 'docker_compose_degraded_services':
-      return `${Math.round(value)} service${value !== 1 ? 's' : ''} dégradé${value !== 1 ? 's' : ''}`
+      return t('alerts.degradedServicesCount', { n: Math.round(value) }, Math.round(value))
     default:
       return `${value.toFixed(1)}${unitLabel.value}`
   }
@@ -627,6 +630,6 @@ function formatTestValue(value: number): string {
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('fr-FR')
+  return new Date(dateStr).toLocaleString(locale.value)
 }
 </script>

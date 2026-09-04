@@ -12,12 +12,12 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              {{ template ? 'Modifier le modèle' : 'Nouveau modèle de règle' }}
+              {{ template ? t('alerts.editTemplateTitle') : t('alerts.newTemplateTitle') }}
             </h5>
             <button
               type="button"
               class="btn-close"
-              aria-label="Fermer"
+              :aria-label="t('common.close')"
               @click="$emit('close')"
             />
           </div>
@@ -27,13 +27,13 @@
                 <label
                   for="alert-template-name"
                   class="form-label required"
-                >Nom</label>
+                >{{ t('alerts.nameColumn') }}</label>
                 <input
                   id="alert-template-name"
                   v-model="form.name"
                   type="text"
                   class="form-control"
-                  placeholder="CPU élevé"
+                  :placeholder="t('alerts.namePlaceholder')"
                   required
                 >
               </div>
@@ -42,7 +42,7 @@
                   <label
                     for="alert-template-metric"
                     class="form-label required"
-                  >Métrique</label>
+                  >{{ t('alerts.metricColumn') }}</label>
                   <select
                     id="alert-template-metric"
                     v-model="form.metric"
@@ -58,14 +58,14 @@
                     </option>
                   </select>
                   <div class="form-hint">
-                    Uniquement les métriques agent — Docker/Proxmox ne s'appliquent pas hôte par hôte.
+                    {{ t('alerts.agentMetricsOnlyHint') }}
                   </div>
                 </div>
                 <div class="col-12 col-md-6">
                   <label
                     for="alert-template-operator"
                     class="form-label required"
-                  >Opérateur</label>
+                  >{{ t('alerts.operatorLabel') }}</label>
                   <select
                     id="alert-template-operator"
                     v-model="form.operator"
@@ -93,20 +93,20 @@
                   <label
                     for="alert-template-baseline-window"
                     class="form-label required"
-                  >Fenêtre de moyenne glissante</label>
+                  >{{ t('alerts.baselineWindowLabel') }}</label>
                   <select
                     id="alert-template-baseline-window"
                     v-model.number="form.baseline_window_seconds"
                     class="form-select"
                   >
                     <option :value="3600">
-                      1 heure
+                      {{ t('alerts.oneHourOption') }}
                     </option>
                     <option :value="21600">
-                      6 heures
+                      {{ t('alerts.sixHoursOption') }}
                     </option>
                     <option :value="86400">
-                      24 heures
+                      {{ t('alerts.twentyFourHoursOption') }}
                     </option>
                   </select>
                 </div>
@@ -115,7 +115,7 @@
                     for="alert-template-threshold-warn"
                     class="form-label required"
                   >
-                    {{ form.metric === 'bandwidth_vs_rolling_avg' ? 'Seuil avertissement (% moyenne)' : 'Seuil avertissement' }}
+                    {{ form.metric === 'bandwidth_vs_rolling_avg' ? t('alerts.thresholdWarnPercentLabel') : t('alerts.thresholdWarnLabel') }}
                   </label>
                   <input
                     id="alert-template-threshold-warn"
@@ -131,7 +131,7 @@
                     for="alert-template-threshold-crit"
                     class="form-label required"
                   >
-                    {{ form.metric === 'bandwidth_vs_rolling_avg' ? 'Seuil critique (% moyenne)' : 'Seuil critique' }}
+                    {{ form.metric === 'bandwidth_vs_rolling_avg' ? t('alerts.thresholdCritPercentLabel') : t('alerts.thresholdCritLabel') }}
                   </label>
                   <input
                     id="alert-template-threshold-crit"
@@ -149,7 +149,7 @@
                   <label
                     for="alert-template-duration"
                     class="form-label"
-                  >Durée (secondes)</label>
+                  >{{ t('alerts.durationSecondsLabel') }}</label>
                   <input
                     id="alert-template-duration"
                     v-model.number="form.duration"
@@ -162,7 +162,7 @@
                   <label
                     for="alert-template-cooldown"
                     class="form-label"
-                  >Silence (secondes)</label>
+                  >{{ t('alerts.cooldownSecondsLabel') }}</label>
                   <input
                     id="alert-template-cooldown"
                     v-model.number="form.actions.cooldown"
@@ -175,7 +175,7 @@
                   <label
                     for="alert-template-escalate-after-minutes"
                     class="form-label"
-                  >Escalade si non acquittée (minutes)</label>
+                  >{{ t('alerts.escalateLabel') }}</label>
                   <input
                     id="alert-template-escalate-after-minutes"
                     v-model.number="form.actions.escalate_after_minutes"
@@ -185,13 +185,13 @@
                     placeholder="0"
                   >
                   <div class="form-hint">
-                    0 = désactivée.
+                    {{ t('alerts.escalateDisabledHint') }}
                   </div>
                 </div>
               </div>
               <div class="mb-0 mt-3">
                 <div class="form-label">
-                  Canaux de notification
+                  {{ t('alerts.channelsLabel') }}
                 </div>
                 <div>
                   <label class="form-check form-check-inline">
@@ -200,7 +200,7 @@
                       class="form-check-input"
                       type="checkbox"
                     >
-                    <span class="form-check-label">SMTP (Email)</span>
+                    <span class="form-check-label">{{ t('alerts.channelSmtpLabel') }}</span>
                   </label>
                   <label class="form-check form-check-inline">
                     <input
@@ -208,7 +208,7 @@
                       class="form-check-input"
                       type="checkbox"
                     >
-                    <span class="form-check-label">Ntfy (Push)</span>
+                    <span class="form-check-label">{{ t('alerts.channelNtfyLabel') }}</span>
                   </label>
                   <label class="form-check form-check-inline">
                     <input
@@ -216,7 +216,7 @@
                       class="form-check-input"
                       type="checkbox"
                     >
-                    <span class="form-check-label">Navigateur</span>
+                    <span class="form-check-label">{{ t('alerts.channelBrowserLabel') }}</span>
                   </label>
                 </div>
               </div>
@@ -233,7 +233,7 @@
                 class="btn btn-outline-secondary"
                 @click="$emit('close')"
               >
-                Annuler
+                {{ t('alerts.cancelButton') }}
               </button>
               <button
                 type="submit"
@@ -244,7 +244,7 @@
                   v-if="saving"
                   class="spinner-border spinner-border-sm me-2"
                 />
-                {{ template ? 'Enregistrer' : 'Créer' }}
+                {{ template ? t('alerts.saveButton') : t('alerts.createButton') }}
               </button>
             </div>
           </form>
@@ -260,6 +260,7 @@
 
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { AlertRuleTemplate, AlertRuleTemplateRequest, AlertMetricCapability } from '../../types/generated'
 
@@ -282,6 +283,7 @@ const emit = defineEmits<{
   (e: 'submit', payload: AlertRuleTemplateRequest): void
 }>()
 
+const { t } = useI18n()
 const modalRef = ref<HTMLElement | null>(null)
 useModalChrome(modalRef, () => props.visible, { onClose: () => emit('close') })
 
@@ -299,15 +301,15 @@ function defaultForm(): AlertRuleTemplateRequest {
 
 const form = reactive<AlertRuleTemplateRequest>(defaultForm())
 
-watch(() => props.template, (t) => {
-  if (t) {
+watch(() => props.template, (tpl) => {
+  if (tpl) {
     Object.assign(form, {
-      name: t.name, metric: t.metric, operator: t.operator,
-      threshold_warn: t.threshold_warn, threshold_crit: t.threshold_crit,
-      threshold_clear_warn: t.threshold_clear_warn, threshold_clear_crit: t.threshold_clear_crit,
-      duration: t.duration_seconds,
-      baseline_window_seconds: t.baseline_window_seconds ?? (t.metric === 'bandwidth_vs_rolling_avg' ? 3600 : undefined),
-      actions: { ...t.actions, channels: [...(t.actions.channels || [])] },
+      name: tpl.name, metric: tpl.metric, operator: tpl.operator,
+      threshold_warn: tpl.threshold_warn, threshold_crit: tpl.threshold_crit,
+      threshold_clear_warn: tpl.threshold_clear_warn, threshold_clear_crit: tpl.threshold_clear_crit,
+      duration: tpl.duration_seconds,
+      baseline_window_seconds: tpl.baseline_window_seconds ?? (tpl.metric === 'bandwidth_vs_rolling_avg' ? 3600 : undefined),
+      actions: { ...tpl.actions, channels: [...(tpl.actions.channels || [])] },
     })
   } else {
     Object.assign(form, defaultForm())

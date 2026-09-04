@@ -23,8 +23,8 @@
       <div class="card-body">
         <EmptyState
           :icon="IconShieldCheck"
-          title="Aucun incident actif"
-          subtitle="Tout est calme — les incidents corrélés à un hôte hors ligne restent regroupés sous celui-ci."
+          :title="t('alerts.warRoomNoActiveIncidentsTitle')"
+          :subtitle="t('alerts.warRoomNoActiveIncidentsSubtitle')"
         />
       </div>
     </div>
@@ -34,7 +34,7 @@
     >
       <div class="col-12 col-xl-6">
         <WarRoomSeverityColumn
-          title="Critique"
+          :title="t('alerts.warRoomCriticalColumn')"
           tone="danger"
           :items="critIncidents"
           :correlated-counts="correlatedCounts"
@@ -47,7 +47,7 @@
       </div>
       <div class="col-12 col-xl-6">
         <WarRoomSeverityColumn
-          title="Avertissement"
+          :title="t('alerts.warRoomWarningColumn')"
           tone="warning"
           :items="warnIncidents"
           :correlated-counts="correlatedCounts"
@@ -64,12 +64,15 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconShieldCheck } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import WarRoomSeverityColumn from './WarRoomSeverityColumn.vue'
 import { isTrackerType, notificationResolved } from '../../utils/incidentFormat'
 import type { NotificationItem } from '../../types/generated'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   incidents?: NotificationItem[]
@@ -100,8 +103,8 @@ const activeAlertIncidents = computed(() =>
 
 // A correlated child (host-down cascade, see server's alert_incidents.correlated_with)
 // doesn't get its own row — it's not independently actionable, its parent
-// host-down incident is. It's still counted so the parent shows "+N alertes
-// corrélées" instead of silently hiding the cascade.
+// host-down incident is. It's still counted so the parent shows a "+N
+// correlated" badge instead of silently hiding the cascade.
 const correlatedCounts = computed(() => {
   const counts = new Map<number, number>()
   for (const item of activeAlertIncidents.value) {

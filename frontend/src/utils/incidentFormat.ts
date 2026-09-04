@@ -1,6 +1,9 @@
 import type { NotificationItem } from '../types/generated'
 import { getAlertMetricMeta } from './alertMetrics'
 import { resolveIncidentHostRoute } from './incidentRouting'
+import { i18n } from '../i18n'
+
+const { t } = i18n.global
 
 type TrackerFields = Pick<NotificationItem, 'type'>
 type TitleFields = Pick<NotificationItem, 'type' | 'rule_name' | 'metric'>
@@ -33,10 +36,10 @@ export function notificationAcknowledged(item: Pick<NotificationItem, 'type' | '
 }
 
 export function trackerStatusLabel(status?: string): string {
-  if (status === 'pending' || status === 'running') return 'Détection en cours'
-  if (status === 'completed' || status === 'success') return 'Exécution réussie'
-  if (status === 'failed' || status === 'error') return 'Exécution échouée'
-  return status || 'État inconnu'
+  if (status === 'pending' || status === 'running') return t('alerts.trackerStatusDetecting')
+  if (status === 'completed' || status === 'success') return t('alerts.trackerStatusSuccess')
+  if (status === 'failed' || status === 'error') return t('alerts.trackerStatusFailed')
+  return status || t('alerts.trackerStatusUnknown')
 }
 
 export function metricLabel(metric?: string): string {
@@ -56,9 +59,9 @@ export function metricUnit(metric?: string): string {
 
 export function notificationTitle(item: TitleFields): string {
   if (item.rule_name) return item.rule_name
-  if (item.type === 'release_tracker_detected') return 'Nouvelle version détectée'
-  if (item.type === 'release_tracker_execution') return 'Exécution de tracker'
-  return item.metric ? metricLabel(item.metric) : 'Notification'
+  if (item.type === 'release_tracker_detected') return t('alerts.newVersionDetected')
+  if (item.type === 'release_tracker_execution') return t('alerts.trackerExecution')
+  return item.metric ? metricLabel(item.metric) : t('alerts.notification')
 }
 
 export function notificationRoute(item: RouteFields): string {
@@ -77,18 +80,18 @@ export function notificationRoute(item: RouteFields): string {
 export function formatIncidentValue(item: ValueFields): string {
   const { metric, value, value_label: valueLabel } = item
   if (value == null) return '-'
-  if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
-  if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
+  if (metric === 'status_offline') return value === 1 ? t('alerts.valueOffline') : t('alerts.valueOnline')
+  if (metric === 'disk_smart_status') return Number(value) >= 1 ? t('alerts.valueFailed') : t('alerts.valueOk')
   if (metric === 'docker_container_state') {
     if (valueLabel) return valueLabel
     const n = Number(value)
-    if (n < 0.5) return 'running'
-    if (n < 1.5) return 'dégradé'
-    return 'critique'
+    if (n < 0.5) return t('alerts.dockerStateRunning')
+    if (n < 1.5) return t('alerts.dockerStateDegraded')
+    return t('alerts.dockerStateCritical')
   }
   if (metric === 'docker_compose_degraded_services') {
     const n = Number(value)
-    return n === 1 ? '1 service dégradé' : `${n} services dégradés`
+    return t('alerts.degradedServicesCount', { n }, n)
   }
   return `${Number(value).toFixed(2)}${metricUnit(metric)}`
 }
@@ -100,9 +103,9 @@ export function resolveHint(item: HintFields): string {
   if (clearThreshold == null) return ''
   const formatted = formatIncidentValue({ metric: item.metric, value: clearThreshold })
   const op = item.operator || ''
-  if (op === '>' || op === '>=') return `repasse OK ≤ ${formatted}`
-  if (op === '<' || op === '<=') return `repasse OK ≥ ${formatted}`
-  return `seuil de résolution ${formatted}`
+  if (op === '>' || op === '>=') return t('alerts.resolveHintLessEqual', { value: formatted })
+  if (op === '<' || op === '<=') return t('alerts.resolveHintGreaterEqual', { value: formatted })
+  return t('alerts.resolveThreshold', { value: formatted })
 }
 
 // Elapsed time between trigger and resolution (or "now" for a still-active

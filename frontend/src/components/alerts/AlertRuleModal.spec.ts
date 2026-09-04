@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { setLocale } from '../../i18n'
 
 // Mock the API barrel so the component never hits the network on mount/watchers.
 vi.mock('../../api', () => ({
@@ -41,6 +42,7 @@ function mountModal(props: Record<string, unknown> = {}) {
 describe('AlertRuleModal (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
   })
 
   it('mounts when visible and renders step 1 (name field + metric cards)', async () => {
@@ -123,5 +125,25 @@ describe('AlertRuleModal (characterization)', () => {
     const submits = wrapper.emitted('submit')
     expect(submits).toBeTruthy()
     expect(typeof submits![0][0]).toBe('object')
+  })
+
+  it('shows the translated modal title for create vs. edit', () => {
+    const created = mountModal()
+    expect(created.text()).toContain('Nouvelle alerte')
+
+    const edited = mountModal({ rule: { id: 1, name: 'x', metric: 'cpu', operator: '>', threshold_warn: 1, threshold_crit: 2, duration: 0, actions: { channels: [] } } })
+    expect(edited.text()).toContain('Modifier l\'alerte')
+  })
+
+  it('applying a preset pre-fills the (translated) rule name', async () => {
+    const wrapper = mountModal()
+    await nextTick()
+
+    const presetBtn = wrapper.findAll('button').find((b) => b.text().includes('CPU élevé'))
+    expect(presetBtn).toBeTruthy()
+    await presetBtn!.trigger('click')
+    await nextTick()
+
+    expect((wrapper.find('input[placeholder="Ex: CPU élevé sur serveur web"]').element as HTMLInputElement).value).toBe('CPU élevé')
   })
 })

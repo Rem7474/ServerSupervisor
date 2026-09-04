@@ -2,13 +2,13 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        Suivi de versions
+        {{ t('alerts.versionTrackingTitle') }}
       </h3>
       <router-link
         to="/git-webhooks"
         class="btn btn-sm btn-ghost-secondary"
       >
-        Gérer
+        {{ t('alerts.manageButton') }}
         <IconCopy
           :size="14"
           class="icon icon-sm ms-1"
@@ -36,8 +36,8 @@
     >
       <EmptyState
         :icon="IconActivity"
-        title="Aucun tracker configuré"
-        cta-label="Créer un tracker"
+        :title="t('alerts.noTrackersTitle')"
+        :cta-label="t('alerts.createTrackerCta')"
         cta-to="/git-webhooks"
       />
     </div>
@@ -49,11 +49,11 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Tracker</th>
-            <th>Type</th>
-            <th>Dernière version</th>
-            <th>Dernière exécution</th>
-            <th>Vérifié</th>
+            <th>{{ t('alerts.trackerColumn') }}</th>
+            <th>{{ t('alerts.typeColumn') }}</th>
+            <th>{{ t('alerts.lastVersionColumn') }}</th>
+            <th>{{ t('alerts.lastExecutionColumn') }}</th>
+            <th>{{ t('alerts.checkedColumn') }}</th>
             <th class="w-1" />
           </tr>
         </thead>
@@ -67,7 +67,7 @@
                 <span
                   v-if="!tracker.enabled"
                   class="badge bg-secondary-lt text-secondary"
-                >Désactivé</span>
+                >{{ t('alerts.disabledBadge') }}</span>
                 <span class="fw-bold">{{ tracker.name }}</span>
               </div>
               <div
@@ -85,7 +85,7 @@
                   :size="14"
                   class="icon icon-sm me-1"
                 />
-                Erreur lors de la vérification
+                {{ t('alerts.checkErrorLabel') }}
               </div>
             </td>
             <td>
@@ -124,7 +124,7 @@
               <span
                 v-else-if="!tracker.host_id"
                 class="text-muted small"
-              >Surveillance seule</span>
+              >{{ t('alerts.monitoringOnlyLabel') }}</span>
               <span
                 v-else
                 class="text-muted"
@@ -132,9 +132,9 @@
               <div
                 v-if="tracker.drift_detected"
                 class="badge bg-orange-lt text-orange mt-1"
-                title="Le conteneur réellement déployé ne correspond plus à la version suivie."
+                :title="t('alerts.driftDetectedTitle')"
               >
-                Dérive détectée
+                {{ t('alerts.driftDetectedBadge') }}
               </div>
             </td>
             <td>
@@ -145,13 +145,13 @@
               <span
                 v-else
                 class="text-muted"
-              >Jamais</span>
+              >{{ t('common.never') }}</span>
             </td>
             <td>
               <router-link
                 :to="`/release-trackers/${tracker.id}`"
                 class="btn btn-sm btn-ghost-secondary"
-                title="Voir le détail"
+                :title="t('alerts.viewDetailTooltip')"
               >
                 <IconChevronRight
                   :size="16"
@@ -167,6 +167,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { IconActivity, IconAlertTriangle, IconChevronRight, IconCopy } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
@@ -202,6 +203,7 @@ withDefaults(defineProps<{
   error: '',
 })
 
+const { t, te } = useI18n()
 const { formatLocaleDateTime } = useDateFormatter()
 
 function formatDate(dateStr: string | undefined): string {
@@ -215,18 +217,12 @@ const EXECUTION_BADGE: Record<string, string> = {
   pending: 'bg-warning-lt text-warning',
 }
 
-const EXECUTION_LABEL: Record<string, string> = {
-  succeeded: 'Succès',
-  failed: 'Échec',
-  running: 'En cours',
-  pending: 'En attente',
-}
-
 function executionBadgeClass(status: string): string {
   return EXECUTION_BADGE[status] || 'bg-secondary-lt text-secondary'
 }
 
 function executionLabel(status: string): string {
-  return EXECUTION_LABEL[status] || status
+  const key = `alerts.execution${status.charAt(0).toUpperCase()}${status.slice(1)}`
+  return te(key) ? t(key) : status
 }
 </script>
