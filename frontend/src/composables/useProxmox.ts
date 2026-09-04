@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
@@ -7,6 +8,7 @@ import type { ProxmoxSummary, ProxmoxNode, ProxmoxConnection } from '../types/pr
 const PROXMOX_REFRESH_SEC = 30
 
 export function useProxmox() {
+  const { t } = useI18n()
   const signal = useAbortSignal()
   const summary = ref<Partial<ProxmoxSummary>>({})
   const nodes = ref<ProxmoxNode[]>([])
@@ -127,13 +129,13 @@ export function useProxmox() {
       if (instRes.status === 'fulfilled') {
         instances.value = instRes.value.data
       } else if (instRes.reason?.response?.status !== 403) {
-        error.value = instRes.reason?.response?.data?.error || 'Erreur lors du chargement.'
+        error.value = instRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
       }
       if (sumRes.status === 'rejected' && sumRes.reason?.response?.status !== 403) {
-        error.value = sumRes.reason?.response?.data?.error || 'Erreur lors du chargement.'
+        error.value = sumRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
       }
       if (nodesRes.status === 'rejected' && nodesRes.reason?.response?.status !== 403) {
-        error.value = nodesRes.reason?.response?.data?.error || 'Erreur lors du chargement.'
+        error.value = nodesRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
       }
     } finally {
       loading.value = false

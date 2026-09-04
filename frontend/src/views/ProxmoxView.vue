@@ -2,7 +2,7 @@
   <div>
     <PageRefreshBar
       v-model="autoRefresh"
-      label="Proxmox VE"
+      :label="t('proxmox.breadcrumbTitle')"
       :interval-sec="PROXMOX_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />
@@ -12,16 +12,16 @@
           to="/"
           class="text-decoration-none"
         >
-          Dashboard
+          {{ t('nav.sections.control.items.dashboard') }}
         </router-link>
         <span class="text-muted mx-1">/</span>
-        <span>Proxmox VE</span>
+        <span>{{ t('proxmox.breadcrumbTitle') }}</span>
       </div>
       <h2 class="page-title">
-        Proxmox VE
+        {{ t('proxmox.breadcrumbTitle') }}
       </h2>
       <div class="text-secondary">
-        Supervision de l'infrastructure de virtualisation
+        {{ t('proxmox.overviewPageDescription') }}
       </div>
     </div>
 
@@ -32,7 +32,7 @@
           <div class="card-body">
             <div class="d-flex align-items-center">
               <div class="subheader">
-                Connexions
+                {{ t('proxmox.connectionsLabel') }}
               </div>
             </div>
             <div class="h1 mt-2 mb-0">
@@ -45,7 +45,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Nœuds
+              {{ t('proxmox.nodesLabel') }}
             </div>
             <div class="h1 mt-2 mb-0">
               {{ summary.node_count ?? '—' }}
@@ -57,7 +57,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              VMs / LXC
+              {{ t('proxmox.vmsLxcLabel') }}
             </div>
             <div class="h1 mt-2 mb-0">
               <span class="text-primary">{{ summary.vm_count ?? '—' }}</span>
@@ -70,13 +70,13 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Stockage utilisé
+              {{ t('proxmox.storageUsedLabel') }}
             </div>
             <div class="h1 mt-2 mb-0">
               {{ formatBytes(summary.storage_used) }}
             </div>
             <div class="text-muted small">
-              sur {{ formatBytes(summary.storage_total) }}
+              {{ t('proxmox.ofTotalLabel', { total: formatBytes(summary.storage_total) }) }}
             </div>
           </div>
         </div>
@@ -85,7 +85,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              CPU cluster (moy.)
+              {{ t('proxmox.cpuClusterAvgLabel') }}
             </div>
             <div
               class="h1 mt-2 mb-0"
@@ -94,7 +94,7 @@
               {{ (clusterResources.avgCpu * 100).toFixed(1) }}%
             </div>
             <div class="text-muted small">
-              sur {{ clusterResources.onlineCount }} nœud{{ clusterResources.onlineCount > 1 ? 's' : '' }} en ligne
+              {{ t('proxmox.onlineNodesSummary', { n: clusterResources.onlineCount }, clusterResources.onlineCount) }}
             </div>
           </div>
         </div>
@@ -103,7 +103,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              RAM cluster
+              {{ t('proxmox.ramClusterTitle') }}
             </div>
             <div
               class="h1 mt-2 mb-0"
@@ -112,7 +112,7 @@
               {{ formatBytes(clusterResources.memUsed) }}
             </div>
             <div class="text-muted small">
-              sur {{ formatBytes(clusterResources.memTotal) }}
+              {{ t('proxmox.ofTotalLabel', { total: formatBytes(clusterResources.memTotal) }) }}
             </div>
           </div>
         </div>
@@ -133,13 +133,13 @@
           class="card card-sm h-100 border-danger cursor-pointer"
           role="button"
           tabindex="0"
-          :class="{ 'health-card-active': healthFilterLabel === 'Nœuds hors ligne' }"
-          @click="toggleHealthFilter(summary.nodes_down_ids, 'Nœuds hors ligne')"
-          @keydown.enter.prevent="toggleHealthFilter(summary.nodes_down_ids, 'Nœuds hors ligne')"
+          :class="{ 'health-card-active': healthFilterLabel === t('proxmox.nodesDownLabel') }"
+          @click="toggleHealthFilter(summary.nodes_down_ids, t('proxmox.nodesDownLabel'))"
+          @keydown.enter.prevent="toggleHealthFilter(summary.nodes_down_ids, t('proxmox.nodesDownLabel'))"
         >
           <div class="card-body">
             <div class="subheader text-danger">
-              Nœuds hors ligne
+              {{ t('proxmox.nodesDownLabel') }}
             </div>
             <div class="h1 mt-2 mb-0 text-danger">
               {{ summary.nodes_down }}
@@ -155,13 +155,13 @@
           class="card card-sm h-100 border-warning cursor-pointer"
           role="button"
           tabindex="0"
-          :class="{ 'health-card-active': healthFilterLabel === 'Stockages > 80 %' }"
-          @click="toggleHealthFilter(summary.storage_near_full_node_ids, 'Stockages > 80 %')"
-          @keydown.enter.prevent="toggleHealthFilter(summary.storage_near_full_node_ids, 'Stockages > 80 %')"
+          :class="{ 'health-card-active': healthFilterLabel === t('proxmox.storageOver80Label') }"
+          @click="toggleHealthFilter(summary.storage_near_full_node_ids, t('proxmox.storageOver80Label'))"
+          @keydown.enter.prevent="toggleHealthFilter(summary.storage_near_full_node_ids, t('proxmox.storageOver80Label'))"
         >
           <div class="card-body">
             <div class="subheader text-warning">
-              Stockages &gt; 80 %
+              {{ t('proxmox.storageOver80Label') }}
             </div>
             <div class="h1 mt-2 mb-0 text-warning">
               {{ summary.storage_near_full }}
@@ -177,13 +177,13 @@
           class="card card-sm h-100 border-danger cursor-pointer"
           role="button"
           tabindex="0"
-          :class="{ 'health-card-active': healthFilterLabel === 'Stockages inactifs' }"
-          @click="toggleHealthFilter(summary.storage_offline_node_ids, 'Stockages inactifs')"
-          @keydown.enter.prevent="toggleHealthFilter(summary.storage_offline_node_ids, 'Stockages inactifs')"
+          :class="{ 'health-card-active': healthFilterLabel === t('proxmox.storageOfflineLabel') }"
+          @click="toggleHealthFilter(summary.storage_offline_node_ids, t('proxmox.storageOfflineLabel'))"
+          @keydown.enter.prevent="toggleHealthFilter(summary.storage_offline_node_ids, t('proxmox.storageOfflineLabel'))"
         >
           <div class="card-body">
             <div class="subheader text-danger">
-              Stockages inactifs
+              {{ t('proxmox.storageOfflineLabel') }}
             </div>
             <div class="h1 mt-2 mb-0 text-danger">
               {{ summary.storage_offline }}
@@ -199,13 +199,13 @@
           class="card card-sm h-100 border-warning cursor-pointer"
           role="button"
           tabindex="0"
-          :class="{ 'health-card-active': healthFilterLabel === 'Tâches échouées (24 h)' }"
-          @click="toggleHealthFilter(summary.failed_task_node_ids, 'Tâches échouées (24 h)')"
-          @keydown.enter.prevent="toggleHealthFilter(summary.failed_task_node_ids, 'Tâches échouées (24 h)')"
+          :class="{ 'health-card-active': healthFilterLabel === t('proxmox.failedTasks24hLabel') }"
+          @click="toggleHealthFilter(summary.failed_task_node_ids, t('proxmox.failedTasks24hLabel'))"
+          @keydown.enter.prevent="toggleHealthFilter(summary.failed_task_node_ids, t('proxmox.failedTasks24hLabel'))"
         >
           <div class="card-body">
             <div class="subheader text-warning">
-              Tâches échouées (24 h)
+              {{ t('proxmox.failedTasks24hLabel') }}
             </div>
             <div class="h1 mt-2 mb-0 text-warning">
               {{ summary.recent_failed_tasks }}
@@ -230,17 +230,17 @@
       <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <h3 class="card-title mb-0">
-            Nœuds Proxmox
+            {{ t('proxmox.proxmoxNodesTitle') }}
           </h3>
           <span
             v-if="healthFilterLabel"
             class="badge bg-azure-lt text-azure d-flex align-items-center gap-1"
           >
-            Filtré : {{ healthFilterLabel }}
+            {{ t('proxmox.filteredByLabel', { label: healthFilterLabel }) }}
             <button
               type="button"
               class="btn-close ms-1"
-              aria-label="Retirer le filtre"
+              :aria-label="t('proxmox.removeFilterAriaLabel')"
               @click="clearHealthFilter"
             />
           </span>
@@ -252,7 +252,7 @@
             style="width:auto"
           >
             <option value="">
-              Toutes les connexions
+              {{ t('proxmox.allConnectionsOption') }}
             </option>
             <option
               v-for="inst in instances"
@@ -266,7 +266,7 @@
             type="button"
             class="btn btn-sm btn-outline-secondary"
             :disabled="loading"
-            title="Rafraîchir maintenant"
+            :title="t('proxmox.refreshNowTooltip')"
             @click="load"
           >
             <IconRefresh
@@ -282,7 +282,7 @@
             <tr>
               <th>
                 <SortableHeader
-                  label="Nœud"
+                  :label="t('proxmox.nodeColumn')"
                   :active="nodeSortKey === 'node_name'"
                   :direction="nodeSortDir"
                   @toggle="toggleNodeSort('node_name')"
@@ -290,7 +290,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="Instance / Cluster"
+                  :label="t('proxmox.instanceClusterColumn')"
                   :active="nodeSortKey === 'cluster_name'"
                   :direction="nodeSortDir"
                   @toggle="toggleNodeSort('cluster_name')"
@@ -298,7 +298,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="VMs"
+                  :label="t('proxmox.vmsColumn')"
                   :active="nodeSortKey === 'vm_count'"
                   :direction="nodeSortDir"
                   @toggle="toggleNodeSort('vm_count')"
@@ -306,7 +306,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="LXC"
+                  :label="t('proxmox.lxcColumn')"
                   :active="nodeSortKey === 'lxc_count'"
                   :direction="nodeSortDir"
                   @toggle="toggleNodeSort('lxc_count')"
@@ -314,7 +314,7 @@
               </th>
               <th style="width: 200px;">
                 <SortableHeader
-                  label="CPU"
+                  :label="t('proxmox.cpuColumn')"
                   :active="nodeSortKey === 'cpu_usage'"
                   :direction="nodeSortDir"
                   @toggle="toggleNodeSort('cpu_usage')"
@@ -322,7 +322,7 @@
               </th>
               <th style="width: 200px;">
                 <SortableHeader
-                  label="RAM"
+                  :label="t('proxmox.ramColumn')"
                   :active="nodeSortKey === 'mem_used'"
                   :direction="nodeSortDir"
                   @toggle="toggleNodeSort('mem_used')"
@@ -330,7 +330,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="Statut"
+                  :label="t('proxmox.statusColumn')"
                   :active="nodeSortKey === 'status'"
                   :direction="nodeSortDir"
                   @toggle="toggleNodeSort('status')"
@@ -338,7 +338,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="Dernier contact"
+                  :label="t('proxmox.lastContactColumn')"
                   :active="nodeSortKey === 'last_seen_at'"
                   :direction="nodeSortDir"
                   @toggle="toggleNodeSort('last_seen_at')"
@@ -362,9 +362,9 @@
             <tr v-else-if="sortedNodes.length === 0 && healthFilterLabel">
               <td colspan="9">
                 <EmptyState
-                  title="Aucun nœud ne correspond au filtre"
-                  :subtitle="`« ${healthFilterLabel} » (peut-être déjà résolu)`"
-                  cta-label="Retirer le filtre"
+                  :title="t('proxmox.noNodesMatchFilterTitle')"
+                  :subtitle="t('proxmox.noNodesMatchFilterSubtitle', { label: healthFilterLabel })"
+                  :cta-label="t('proxmox.removeFilterButton')"
                   @cta="clearHealthFilter"
                 />
               </td>
@@ -372,8 +372,8 @@
             <tr v-else-if="sortedNodes.length === 0">
               <td colspan="9">
                 <EmptyState
-                  title="Aucun nœud Proxmox trouvé."
-                  :cta-label="auth.isAdmin ? 'Configurer une connexion' : ''"
+                  :title="t('proxmox.noNodesFoundTitle')"
+                  :cta-label="auth.isAdmin ? t('proxmox.configureConnectionCta') : ''"
                   cta-to="/settings"
                 />
               </td>
@@ -452,14 +452,14 @@
                   class="status status-success"
                 >
                   <span class="status-dot status-dot-animated" />
-                  <span data-translation-id="online">En ligne</span>
+                  <span data-translation-id="online">{{ t('common.statusOnline') }}</span>
                 </span>
                 <span
                   v-else
                   class="status status-danger"
                 >
                   <span class="status-dot status-dot-animated" />
-                  <span data-translation-id="offline">Hors ligne</span>
+                  <span data-translation-id="offline">{{ t('common.statusOffline') }}</span>
                 </span>
               </td>
               <td class="text-muted small">
@@ -470,7 +470,7 @@
                   :to="`/proxmox/nodes/${node.id}`"
                   class="btn btn-sm btn-outline-primary"
                 >
-                  Détail
+                  {{ t('proxmox.detailButton') }}
                 </router-link>
               </td>
             </tr>
@@ -482,6 +482,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { IconRefresh } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
@@ -493,6 +494,7 @@ import { getMetricColorClass } from '../utils/metricColor'
 import type { ProxmoxNode } from '../types/proxmox'
 
 const auth = useAuthStore()
+const { t, locale } = useI18n()
 
 const {
   summary,
@@ -548,16 +550,17 @@ function ramTextColor(used: number, total: number): string {
 
 function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
-  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
+  const unitKeys = ['proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
   let i = 0
   let v = bytes
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+  while (v >= 1024 && i < unitKeys.length) { v /= 1024; i++ }
+  const unit = i === 0 ? 'B' : t(unitKeys[i - 1])
+  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
 }
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 </script>
 
