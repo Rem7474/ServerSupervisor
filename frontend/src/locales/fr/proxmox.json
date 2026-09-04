@@ -125,5 +125,19 @@
   "migrateTooltip": "Migrer vers un autre nœud",
   "migrateButton": "Migrer",
   "noVmsText": "Aucune VM sur ce nœud.",
-  "noLxcText": "Aucun conteneur LXC sur ce nœud."
+  "noLxcText": "Aucun conteneur LXC sur ce nœud.",
+  "consoleTitle": "Console — {name}",
+  "reopenButton": "Rouvrir",
+  "ctrlKeyTooltip": "Touche Ctrl — s'applique au caractère suivant",
+  "interruptTooltip": "Interrompre (Ctrl+C)",
+  "escapeLabel": "Échap",
+  "tabTooltip": "Tabulation (complétion)",
+  "upArrowTooltip": "Haut (historique)",
+  "downArrowTooltip": "Bas (historique)",
+  "leftArrowTooltip": "Gauche",
+  "rightArrowTooltip": "Droite",
+  "consoleStatusIdle": "Inactif",
+  "consoleStatusConnecting": "Connexion…",
+  "consoleStatusConnected": "Connecté",
+  "consoleStatusDisconnected": "Déconnecté"
 }

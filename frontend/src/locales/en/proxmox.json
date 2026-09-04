@@ -125,5 +125,19 @@
   "migrateTooltip": "Migrate to another node",
   "migrateButton": "Migrate",
   "noVmsText": "No VM on this node.",
-  "noLxcText": "No LXC container on this node."
+  "noLxcText": "No LXC container on this node.",
+  "consoleTitle": "Console — {name}",
+  "reopenButton": "Reopen",
+  "ctrlKeyTooltip": "Ctrl key — applies to the next character",
+  "interruptTooltip": "Interrupt (Ctrl+C)",
+  "escapeLabel": "Esc",
+  "tabTooltip": "Tab (completion)",
+  "upArrowTooltip": "Up (history)",
+  "downArrowTooltip": "Down (history)",
+  "leftArrowTooltip": "Left",
+  "rightArrowTooltip": "Right",
+  "consoleStatusIdle": "Idle",
+  "consoleStatusConnecting": "Connecting…",
+  "consoleStatusConnected": "Connected",
+  "consoleStatusDisconnected": "Disconnected"
 }
