@@ -1,10 +1,11 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
 import type { MFAMethods } from '../types/webauthn'
+import type { OIDCStatusResponse } from '../types/generated'
 import { getWebAuthnAssertion, isConditionalMediationAvailable, isWebAuthnSupported } from '../utils/webauthn'
 
 // Deliberately does not own the username/TOTP template refs or their focus
@@ -13,6 +14,7 @@ import { getWebAuthnAssertion, isConditionalMediationAvailable, isWebAuthnSuppor
 // needsMFA from here.
 export function useLogin() {
   const router = useRouter()
+  const route = useRoute()
   const { t } = useI18n()
   const auth = useAuthStore()
 
@@ -22,6 +24,8 @@ export function useLogin() {
   const loading = ref(false)
   const needsMFA = ref(false)
   const totpCode = ref('')
+  const oidcStatus = ref<OIDCStatusResponse | null>(null)
+  const oidcLoading = ref(false)
   // Increments whenever the TOTP field should regain focus (prompt just
   // appeared, or a submitted code was rejected) — the view watches this and
   // owns the actual DOM focus() call on its own template ref.
@@ -137,7 +141,26 @@ export function useLogin() {
     }
   }
 
-  onMounted(() => {
+  function loginWithOIDC(): void {
+    abortConditionalWebAuthn()
+    const redirect = route.query.redirect ? `?return_to=${encodeURIComponent(String(route.query.redirect))}` : ''
+    window.location.href = `/api/auth/oidc/login${redirect}`
+  }
+
+  onMounted(async () => {
+    if (route.query.error) {
+      const errParam = String(route.query.error)
+      const errDesc = route.query.error_description ? `: ${String(route.query.error_description)}` : ''
+      error.value = `${errParam}${errDesc}`
+    }
+
+    try {
+      const { data } = await api.getOIDCStatus()
+      oidcStatus.value = data
+    } catch {
+      // Ignored if OIDC status endpoint is unreachable
+    }
+
     void startConditionalWebAuthn()
   })
 
@@ -154,7 +177,10 @@ export function useLogin() {
     mfaMethods,
     webauthnAvailable,
     webauthnLoading,
+    oidcStatus,
+    oidcLoading,
     handleLogin,
     loginWithWebAuthn,
+    loginWithOIDC,
   }
 }

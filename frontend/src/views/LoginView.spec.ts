@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { ref } from 'vue'
 
-const { login, beginWebAuthnLogin, finishWebAuthnLogin } = vi.hoisted(() => ({
+const { login, beginWebAuthnLogin, finishWebAuthnLogin, beginDiscoverableWebAuthnLogin, getOIDCStatus } = vi.hoisted(() => ({
   login: vi.fn(),
   beginWebAuthnLogin: vi.fn(),
   finishWebAuthnLogin: vi.fn(),
+  beginDiscoverableWebAuthnLogin: vi.fn().mockRejectedValue(new DOMException('no credential', 'AbortError')),
+  getOIDCStatus: vi.fn().mockResolvedValue({ data: { enabled: false, display_name: '', allow_local_login: true } }),
 }))
 
 vi.mock('../api', () => ({
@@ -13,13 +16,18 @@ vi.mock('../api', () => ({
     login,
     beginWebAuthnLogin,
     finishWebAuthnLogin,
-    beginDiscoverableWebAuthnLogin: vi.fn().mockRejectedValue(new DOMException('no credential', 'AbortError')),
+    beginDiscoverableWebAuthnLogin,
     finishDiscoverableWebAuthnLogin: vi.fn(),
+    getOIDCStatus,
   },
 }))
 
+const mockPush = vi.fn()
+const mockQuery = ref<Record<string, string>>({})
+
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush }),
+  useRoute: () => ({ query: mockQuery.value }),
 }))
 
 vi.mock('../utils/webauthn', () => ({
@@ -35,6 +43,9 @@ beforeEach(() => {
   setLocale('fr')
   setActivePinia(createPinia())
   vi.clearAllMocks()
+  mockQuery.value = {}
+  getOIDCStatus.mockResolvedValue({ data: { enabled: false, display_name: '', allow_local_login: true } })
+  beginDiscoverableWebAuthnLogin.mockRejectedValue(new DOMException('no credential', 'AbortError'))
 })
 
 describe('LoginView', () => {
@@ -125,5 +136,51 @@ describe('LoginView', () => {
     const wrapper = mount(LoginView)
     expect(wrapper.text()).toContain('Sign in to the dashboard')
     expect(wrapper.text()).toContain('Sign in')
+  })
+
+  it('renders standard username and password fields when OIDC is disabled', async () => {
+    const wrapper = mount(LoginView)
+    await flushPromises()
+
+    expect(wrapper.find('input[name="username"]').exists()).toBe(true)
+    expect(wrapper.find('input[name="password"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('Se connecter avec')
+  })
+
+  it('renders SSO button when OIDC is enabled', async () => {
+    getOIDCStatus.mockResolvedValueOnce({
+      data: { enabled: true, display_name: 'Authentik SSO', allow_local_login: true },
+    })
+
+    const wrapper = mount(LoginView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Se connecter avec Authentik SSO')
+    expect(wrapper.text()).toContain('ou identifiants locaux')
+    expect(wrapper.find('input[name="username"]').exists()).toBe(true)
+  })
+
+  it('hides local form when OIDC is enabled and allow_local_login is false', async () => {
+    getOIDCStatus.mockResolvedValueOnce({
+      data: { enabled: true, display_name: 'Enterprise SSO', allow_local_login: false },
+    })
+
+    const wrapper = mount(LoginView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Se connecter avec Enterprise SSO')
+    expect(wrapper.text()).not.toContain('ou identifiants locaux')
+    expect(wrapper.find('input[name="username"]').exists()).toBe(false)
+    expect(wrapper.find('input[name="password"]').exists()).toBe(false)
+  })
+
+  it('displays error alert when query error is present', async () => {
+    mockQuery.value = { error: 'invalid_token' }
+
+    const wrapper = mount(LoginView)
+    await flushPromises()
+
+    expect(wrapper.find('.alert-danger').exists()).toBe(true)
+    expect(wrapper.find('.alert-danger').text()).toContain('invalid_token')
   })
 })

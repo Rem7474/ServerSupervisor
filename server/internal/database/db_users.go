@@ -47,10 +47,10 @@ func (db *DB) SetUserMustChangePassword(ctx context.Context, username string, va
 func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	var u models.User
 	err := db.conn.QueryRowContext(ctx, 
-		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, must_change_password, created_at
+		`SELECT id, username, COALESCE(password_hash, ''), role, auth_provider, oidc_sub, email, totp_secret, backup_codes, mfa_enabled, must_change_password, created_at
 		 FROM users WHERE username = $1`,
 		username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.MustChangePassword, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.AuthProvider, &u.OIDCSub, &u.Email, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.MustChangePassword, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -60,10 +60,10 @@ func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.U
 func (db *DB) GetUserByID(ctx context.Context, id int64) (*models.User, error) {
 	var u models.User
 	err := db.conn.QueryRowContext(ctx, 
-		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, must_change_password, created_at
+		`SELECT id, username, COALESCE(password_hash, ''), role, auth_provider, oidc_sub, email, totp_secret, backup_codes, mfa_enabled, must_change_password, created_at
 		 FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.MustChangePassword, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.AuthProvider, &u.OIDCSub, &u.Email, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.MustChangePassword, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (db *DB) GetUserByID(ctx context.Context, id int64) (*models.User, error) {
 
 func (db *DB) GetUsers(ctx context.Context) ([]models.User, error) {
 	rows, err := db.conn.QueryContext(ctx, 
-		`SELECT id, username, role, created_at FROM users ORDER BY username`,
+		`SELECT id, username, role, auth_provider, oidc_sub, email, created_at FROM users ORDER BY username`,
 	)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (db *DB) GetUsers(ctx context.Context) ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var u models.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.AuthProvider, &u.OIDCSub, &u.Email, &u.CreatedAt); err != nil {
 			continue
 		}
 		users = append(users, u)
