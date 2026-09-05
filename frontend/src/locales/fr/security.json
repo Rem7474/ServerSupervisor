@@ -30,5 +30,20 @@
   "unblockButton": "Débloquer",
   "topFailedIpsTitle": "Top IPs — échecs de connexion ({period})",
   "noFailuresRecordedTitle": "Aucun échec enregistré sur cette période",
-  "failuresCountBadge": "{count} échec | {count} échecs"
+  "failuresCountBadge": "{count} échec | {count} échecs",
+  "ipAddressLabel": "Adresse IP",
+  "requestsPeriodLabel": "Requêtes ({period})",
+  "suspiciousShortLabel": "Suspectes",
+  "blockedShortLabel": "Bloquées",
+  "noNpmDomainsTitle": "Aucun domaine NPM ne route vers {subject}.",
+  "domainColumn": "Domaine",
+  "npmConnectionColumn": "Connexion NPM",
+  "targetColumn": "Cible",
+  "availabilityColumn": "Disponibilité",
+  "requestsColumn": "Requêtes",
+  "volumeColumn": "Volume",
+  "errors4xx5xxColumn": "Erreurs 4xx/5xx",
+  "viewDomainDetailTooltip": "Voir le détail des requêtes/menaces pour ce domaine",
+  "disabledBadge": "Désactivé",
+  "viewMonitoringDetailTooltip": "Voir le détail monitoring de ce domaine"
 }

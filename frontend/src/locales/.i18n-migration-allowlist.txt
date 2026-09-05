@@ -12,7 +12,6 @@ src/components/PageRefreshBar.vue
 src/components/RelativeTime.vue
 src/components/WsStatusBar.vue
 src/components/security/DomainDetailsModal.vue
-src/components/security/ExposureDomainsPanel.vue
 src/components/security/IPTimelineModal.vue
 src/components/security/ThreatsPanel.vue
 src/components/security/TrafficOverviewPanel.vue

@@ -30,5 +30,20 @@
   "unblockButton": "Unblock",
   "topFailedIpsTitle": "Top IPs — connection failures ({period})",
   "noFailuresRecordedTitle": "No failure recorded over this period",
-  "failuresCountBadge": "{count} failure | {count} failures"
+  "failuresCountBadge": "{count} failure | {count} failures",
+  "ipAddressLabel": "IP address",
+  "requestsPeriodLabel": "Requests ({period})",
+  "suspiciousShortLabel": "Suspicious",
+  "blockedShortLabel": "Blocked",
+  "noNpmDomainsTitle": "No NPM domain routes to {subject}.",
+  "domainColumn": "Domain",
+  "npmConnectionColumn": "NPM connection",
+  "targetColumn": "Target",
+  "availabilityColumn": "Availability",
+  "requestsColumn": "Requests",
+  "volumeColumn": "Volume",
+  "errors4xx5xxColumn": "4xx/5xx errors",
+  "viewDomainDetailTooltip": "View request/threat details for this domain",
+  "disabledBadge": "Disabled",
+  "viewMonitoringDetailTooltip": "View monitoring details for this domain"
 }
