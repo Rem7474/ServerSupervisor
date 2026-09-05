@@ -56,5 +56,18 @@
   "sslEnabledRecommended": "SSL: enabled (recommended)",
   "regenerateSecretConfirmTitle": "Regenerate the secret?",
   "regenerateSecretConfirmMessage": "The old secret will be invalidated immediately. You will need to update the configuration in your Git provider.",
-  "secretRegeneratedMessage": "Secret regenerated — copy it now."
+  "secretRegeneratedMessage": "Secret regenerated — copy it now.",
+  "enableAutoUpdateTitle": "Enable automatic update",
+  "autoUpdateExplanation": "Update detection is now automatic for every container (version badge in the Docker tab): this list is only for additionally enabling automatic update. Compose-managed containers with no tracker: a Docker tracker in Compose mode will be created for each one (automatic pull + up -d on every new image).",
+  "noContainersToTrackTitle": "No container to track",
+  "noContainersToTrackSubtitle": "Every detected compose container already has a tracker, or none has been collected.",
+  "healthcheckSecondsLabel": "Healthcheck (s)",
+  "rollbackOnFailureLabel": "Rollback on failure",
+  "cleanupOrphanImagesLabel": "Clean up orphan images",
+  "projectServiceColumn": "Project / Service",
+  "creatingLabel": "Creating...",
+  "createTrackersButton": "Create {n} tracker | Create {n} trackers",
+  "couldNotLoadContainersError": "Unable to load the detected containers.",
+  "bulkCreationFailedError": "The bulk creation failed.",
+  "trackersCreatedSummary": "{created} tracker(s) created, {failed} failed: {names}"
 }

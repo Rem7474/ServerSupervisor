@@ -56,5 +56,18 @@
   "sslEnabledRecommended": "SSL: enabled (recommandé)",
   "regenerateSecretConfirmTitle": "Régénérer le secret ?",
   "regenerateSecretConfirmMessage": "L'ancien secret sera invalidé immédiatement. Vous devrez mettre à jour la configuration dans votre provider Git.",
-  "secretRegeneratedMessage": "Secret régénéré — copiez-le maintenant."
+  "secretRegeneratedMessage": "Secret régénéré — copiez-le maintenant.",
+  "enableAutoUpdateTitle": "Activer la mise à jour automatique",
+  "autoUpdateExplanation": "La détection des mises à jour est désormais automatique pour tous les conteneurs (badge de version dans l'onglet Docker) : cette liste sert à activer en plus la mise à jour automatique. Conteneurs gérés par compose, sans tracker : un tracker Docker en mode Compose sera créé pour chacun (pull + up -d automatique à chaque nouvelle image).",
+  "noContainersToTrackTitle": "Aucun conteneur à suivre",
+  "noContainersToTrackSubtitle": "Tous les conteneurs compose détectés ont déjà un tracker, ou aucun n'a été collecté.",
+  "healthcheckSecondsLabel": "Healthcheck (s)",
+  "rollbackOnFailureLabel": "Rollback si échec",
+  "cleanupOrphanImagesLabel": "Nettoyer images orphelines",
+  "projectServiceColumn": "Projet / Service",
+  "creatingLabel": "Création...",
+  "createTrackersButton": "Créer {n} tracker | Créer {n} trackers",
+  "couldNotLoadContainersError": "Impossible de charger les conteneurs détectés.",
+  "bulkCreationFailedError": "La création groupée a échoué.",
+  "trackersCreatedSummary": "{created} tracker(s) créé(s), {failed} en échec : {names}"
 }
