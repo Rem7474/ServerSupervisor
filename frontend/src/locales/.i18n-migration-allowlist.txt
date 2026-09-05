@@ -11,7 +11,6 @@ src/components/NotificationBell.vue
 src/components/PageRefreshBar.vue
 src/components/RelativeTime.vue
 src/components/WsStatusBar.vue
-src/components/security/ThreatsPanel.vue
 src/components/security/TrafficOverviewPanel.vue
 src/components/webhooks/PayloadViewerModal.vue
 src/components/webhooks/TrackableContainersModal.vue
