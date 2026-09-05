@@ -235,5 +235,15 @@
   "deleteTrackerConfirmTitle": "Delete the tracker \"{name}\"?",
   "deleteAssociatedExecutionsWarning": "All associated executions will also be deleted.",
   "deleteError": "Error while deleting",
-  "daySuffix": "d"
+  "daySuffix": "d",
+  "latestVersionDetectedTitle": "Latest version detected",
+  "imageAndTagLabel": "Image & tag",
+  "viewOnGithubLink": "→ View on GitHub",
+  "noTaskConfiguredTitle": "No task configured",
+  "noTaskConfiguredMessage": "This Docker image is being watched, but no deployment task has been configured.",
+  "createTaskHint": "Create a task to automate updates when a new version is detected.",
+  "createTaskButton": "Create a task",
+  "monitorOnlyModeHint": "Monitor-only mode: configure a target VM and a task to allow manual execution.",
+  "manualRunUnavailableError": "Manual execution is not available in this mode.",
+  "triggerError": "Error while triggering"
 }
