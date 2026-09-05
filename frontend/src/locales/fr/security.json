@@ -5,5 +5,11 @@
   "trafficPageDescription": "Trafic HTTP, erreurs, endpoints, géographie des clients et actualisation automatique",
   "modeToggleAriaLabel": "Vue d'ensemble ou Menaces",
   "overviewModeButton": "Vue d'ensemble",
-  "threatsModeButton": "Menaces"
+  "threatsModeButton": "Menaces",
+  "totalRequestsLabel": "Requêtes totales",
+  "bandwidthLabel": "Bande passante",
+  "ratio5xxLabel": "Taux 5xx",
+  "suspiciousIpsLabel": "IPs suspectes",
+  "vsPreviousPeriodSuffix": "vs période précédente",
+  "notAvailableVsPreviousPeriod": "N/A vs période précédente"
 }
