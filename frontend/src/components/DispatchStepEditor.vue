@@ -4,13 +4,13 @@
       v-if="showHost"
       class="col-md-3"
     >
-      <label class="form-label form-label-sm">Hôte</label>
+      <label class="form-label form-label-sm">{{ t('common.dispatchHostLabel') }}</label>
       <select
         v-model="hostId"
         class="form-select form-select-sm"
       >
         <option value="">
-          Sélectionner un hôte...
+          {{ t('common.dispatchSelectHostPlaceholder') }}
         </option>
         <option
           v-for="host in hostsStore.hosts"
@@ -77,14 +77,14 @@
         v-if="module === 'restic' && resticGroups.length"
         class="form-hint"
       >
-        Un groupe lance plusieurs profils en une seule exécution.
+        {{ t('common.dispatchResticGroupHint') }}
       </div>
     </div>
     <div
       v-if="showCron"
       class="col-12"
     >
-      <label class="form-label form-label-sm">Planification</label>
+      <label class="form-label form-label-sm">{{ t('common.dispatchSchedulingLabel') }}</label>
       <CronBuilder v-model="cronExpression" />
     </div>
   </div>
@@ -92,13 +92,14 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import { useHostsStore } from '../stores/hosts'
 import CronBuilder from './CronBuilder.vue'
 import RestrictedSelect from './RestrictedSelect.vue'
 import type { SelectOption, OptionGroup } from './RestrictedSelect.vue'
 import type { CustomTaskSummary } from '../types/task'
-import { DISPATCH_MODULES } from '../utils/dispatchStep'
+import { dispatchModules } from '../utils/dispatchStep'
 import type { DispatchOption } from '../utils/dispatchStep'
 
 const props = withDefaults(defineProps<{
@@ -114,12 +115,14 @@ const props = withDefaults(defineProps<{
   // whichever host the alert fired for — there is nothing to pick).
   showHost?: boolean
   // Restrict/relabel the module list for callers whose backend or product
-  // scope doesn't cover the full DISPATCH_MODULES set.
+  // scope doesn't cover the full dispatchModules() set.
   modules?: DispatchOption[]
 }>(), {
   showHost: true,
-  modules: () => DISPATCH_MODULES,
+  modules: () => dispatchModules(),
 })
+
+const { t } = useI18n()
 
 const hostId = defineModel<string>('hostId', { default: '' })
 const module = defineModel<string>('module', { required: true })
@@ -187,20 +190,20 @@ watch([hostId, module], ([h, m]) => {
 // behavior those modules always had.
 const targetOptions = computed<SelectOption[] | OptionGroup[]>(() => {
   if (module.value === 'custom') {
-    return customTasks.value.map((t) => ({ value: t.id, label: `${t.name} (${t.id})` }))
+    return customTasks.value.map((task) => ({ value: task.id, label: `${task.name} (${task.id})` }))
   }
   if (module.value === 'restic') {
     const groups: OptionGroup[] = []
-    if (resticProfiles.value.length) groups.push({ label: 'Profils', options: resticProfiles.value })
-    if (resticGroups.value.length) groups.push({ label: 'Groupes', options: resticGroups.value })
+    if (resticProfiles.value.length) groups.push({ label: t('common.dispatchProfilesGroupLabel'), options: resticProfiles.value })
+    if (resticGroups.value.length) groups.push({ label: t('common.dispatchGroupsGroupLabel'), options: resticGroups.value })
     return groups
   }
   return []
 })
 
 const targetEmptyLabel = computed(() => {
-  if (module.value === 'custom') return 'Sélectionner une tâche...'
-  if (module.value === 'restic') return 'Profil (défaut)'
+  if (module.value === 'custom') return t('common.dispatchSelectTaskPlaceholder')
+  if (module.value === 'restic') return t('common.dispatchDefaultProfilePlaceholder')
   return ''
 })
 </script>
