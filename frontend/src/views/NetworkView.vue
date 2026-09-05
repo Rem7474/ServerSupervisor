@@ -7,16 +7,16 @@
           to="/"
           class="text-decoration-none"
         >
-          Dashboard
+          {{ t('network.dashboardBreadcrumb') }}
         </router-link>
         <span class="text-muted mx-1">/</span>
-        <span>Architecture réseau</span>
+        <span>{{ t('network.networkArchitectureBreadcrumb') }}</span>
       </div>
       <h2 class="page-title">
-        Architecture réseau logique
+        {{ t('network.networkArchitectureTitle') }}
       </h2>
       <div class="text-secondary">
-        Relations entre services, reverse proxy, Authelia et exposition Internet
+        {{ t('network.pageSubtitle') }}
       </div>
     </div>
 
@@ -33,13 +33,13 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Hôtes
+              {{ t('network.hostsLabel') }}
             </div>
             <div class="h2 mb-0">
               {{ hosts.length }}
             </div>
             <div class="text-muted small">
-              {{ hostsOnline }} en ligne
+              {{ t('network.onlineCountLabel', { n: hostsOnline }) }}
             </div>
           </div>
         </div>
@@ -48,13 +48,13 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Conteneurs
+              {{ t('network.containersLabel') }}
             </div>
             <div class="h2 mb-0">
               {{ containers.length }}
             </div>
             <div class="text-muted small">
-              {{ containersRunning }} actifs
+              {{ t('network.activeCountLabel', { n: containersRunning }) }}
             </div>
           </div>
         </div>
@@ -63,13 +63,13 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Ports visibles
+              {{ t('network.visiblePortsLabel') }}
             </div>
             <div class="h1 mb-0">
               {{ totalPorts }}
             </div>
             <div class="text-secondary small">
-              {{ combinedServices.length }} services logiques
+              {{ t('network.logicalServicesCountLabel', { n: combinedServices.length }) }}
             </div>
           </div>
         </div>
@@ -78,11 +78,11 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="d-flex align-items-center gap-1 subheader">
-              Trafic réseau
+              {{ t('network.networkTrafficLabel') }}
               <span
                 class="ms-1"
                 style="cursor:help; color:var(--ss-text-subtle-on-dark);"
-                title="Delta calculé entre les deux dernières mises à jour WebSocket. Les deltas négatifs (reset de compteur après redémarrage agent) sont ignorés."
+                :title="t('network.trafficDeltaTooltip')"
               >
                 <IconInfoCircle :size="14" />
               </span>
@@ -92,9 +92,9 @@
             </div>
             <div class="text-secondary small">
               <span v-if="trafficDelta.intervalSec > 0">
-                sur {{ trafficDelta.intervalSec }}s · ↓ {{ formatBytes(trafficDelta.rx) }} / ↑ {{ formatBytes(trafficDelta.tx) }}
+                {{ t('network.trafficIntervalLabel', { seconds: trafficDelta.intervalSec, rx: formatBytes(trafficDelta.rx), tx: formatBytes(trafficDelta.tx) }) }}
               </span>
-              <span v-else>En attente de données…</span>
+              <span v-else>{{ t('network.awaitingDataLabel') }}</span>
             </div>
           </div>
         </div>
@@ -107,10 +107,10 @@
       <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
           <h3 class="card-title mb-0">
-            {{ viewMode === 'graph' ? 'Topologie réseau' : 'Ports &amp; conteneurs' }}
+            {{ viewMode === 'graph' ? t('network.networkTopologyTitle') : t('network.portsAndContainersTitle') }}
           </h3>
           <div class="text-secondary small mt-1">
-            {{ hosts.length }} hôtes · {{ combinedServices.length }} services logiques · {{ totalPorts }} ports mappés
+            {{ t('network.topologySummaryLabel', { hosts: hosts.length, services: combinedServices.length, ports: totalPorts }) }}
           </div>
         </div>
 
@@ -127,11 +127,11 @@
             <span
               v-else-if="saveStatus === 'saved'"
               class="text-success small"
-            >✓ Enregistré</span>
+            >{{ t('network.savedLabel') }}</span>
             <span
               v-else-if="saveStatus === 'error'"
               class="text-danger small"
-            >✗ Erreur</span>
+            >{{ t('network.errorLabel') }}</span>
           </div>
 
           <!-- View mode toggle -->
@@ -149,7 +149,7 @@
                 :size="14"
                 class="me-1"
               />
-              Graphe
+              {{ t('network.graphViewButton') }}
             </button>
             <button
               type="button"
@@ -161,7 +161,7 @@
                 :size="14"
                 class="me-1"
               />
-              Cartes
+              {{ t('network.cardsViewButton') }}
             </button>
           </div>
         </div>
@@ -183,7 +183,7 @@
               :size="14"
               class="me-1"
             />
-            Topologie
+            {{ t('network.topologyTab') }}
           </button>
         </li>
         <li class="nav-item">
@@ -197,7 +197,7 @@
               :size="14"
               class="me-1"
             />
-            Configuration
+            {{ t('network.configurationTab') }}
           </button>
         </li>
       </ul>
@@ -235,7 +235,7 @@
                   type="checkbox"
                   class="form-check-input"
                 >
-                <span class="form-check-label small">Internet uniquement</span>
+                <span class="form-check-label small">{{ t('network.internetOnlyLabel') }}</span>
               </label>
               <label class="form-check form-switch mb-0 d-flex align-items-center gap-2">
                 <input
@@ -248,14 +248,14 @@
                   class="form-check-label small"
                   :class="{ 'text-muted': filterInternetOnly }"
                 >
-                  Masquer les ports internes
+                  {{ t('network.hideInternalPortsLabel') }}
                 </span>
               </label>
               <span
                 v-if="filterInternetOnly || filterHideInternal"
                 class="badge bg-primary-lt text-primary small"
               >
-                Filtre actif
+                {{ t('network.activeFilterBadge') }}
               </span>
             </div>
 
@@ -277,15 +277,15 @@
                   :stroke-width="1.5"
                 />
                 <div class="fw-semibold mb-1">
-                  Aucun nœud réseau détecté
+                  {{ t('network.noNetworkNodeDetectedTitle') }}
                 </div>
                 <div class="text-secondary small">
-                  Ajoute des hôtes ou configure ta topologie pour voir le diagramme.
+                  {{ t('network.addHostsHint') }}
                 </div>
               </div>
               <ErrorBoundary
                 v-else
-                title="Erreur lors du rendu du graphe réseau"
+                :title="t('network.graphRenderErrorTitle')"
               >
                 <NetworkGraph
                   ref="networkGraphRef"
@@ -346,6 +346,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconInfoCircle, IconChartBar, IconLayoutGrid, IconSitemap, IconSettings, IconStack2 } from '@tabler/icons-vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
@@ -355,6 +356,8 @@ import NetworkNodeDetail from '../components/network/NetworkNodeDetail.vue'
 import NetworkPortList from '../components/network/NetworkPortList.vue'
 import NetworkTopologyConfig from '../components/network/NetworkTopologyConfig.vue'
 import { useNetwork } from '../composables/useNetwork'
+
+const { t } = useI18n()
 
 const {
   hosts,
