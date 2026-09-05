@@ -17,7 +17,15 @@ export interface PaletteResult {
   sublabel: string
   icon: Component
   to: string
-  group: 'Navigation' | 'Hôtes' | 'Conteneurs' | 'Alertes' | 'Domaines'
+  group: 'navigation' | 'hosts' | 'containers' | 'alerts' | 'domains'
+}
+
+export const PALETTE_GROUP_LABEL_KEYS: Record<PaletteResult['group'], string> = {
+  navigation: 'common.commandPaletteGroupNavigation',
+  hosts: 'common.commandPaletteGroupHosts',
+  containers: 'common.commandPaletteGroupContainers',
+  alerts: 'common.commandPaletteGroupAlerts',
+  domains: 'common.commandPaletteGroupDomains',
 }
 
 const MAX_RESULTS_PER_GROUP = 6
@@ -125,7 +133,7 @@ export function useCommandPalette() {
             sublabel: section.label,
             icon: item.icon,
             to: item.to,
-            group: 'Navigation',
+            group: 'navigation',
           })
         }
       }
@@ -149,7 +157,7 @@ export function useCommandPalette() {
         sublabel: h.hostname && h.hostname !== h.name ? h.hostname : h.ip_address,
         icon: IconServer,
         to: `/hosts/${h.id}`,
-        group: 'Hôtes' as const,
+        group: 'hosts' as const,
       }))
   })
 
@@ -169,7 +177,7 @@ export function useCommandPalette() {
         sublabel: `${c.hostname} · ${c.image}`,
         icon: IconBrandDocker,
         to: `/hosts/${c.host_id}?tab=docker`,
-        group: 'Conteneurs' as const,
+        group: 'containers' as const,
       }))
   })
 
@@ -188,10 +196,10 @@ export function useCommandPalette() {
       .map((r) => ({
         key: `alert-rule:${r.id}`,
         label: r.name || getAlertMetricMeta(r.metric).label,
-        sublabel: r.enabled ? getAlertMetricMeta(r.metric).label : 'Désactivée',
+        sublabel: r.enabled ? getAlertMetricMeta(r.metric).label : t('common.commandPaletteDisabledLabel'),
         icon: IconBell,
         to: '/alerts?tab=rules',
-        group: 'Alertes' as const,
+        group: 'alerts' as const,
       }))
   })
 
@@ -220,12 +228,12 @@ export function useCommandPalette() {
         if (n.matched_type === 'host') {
           chain += ` → ${n.matched_name}`
         } else if (guest) {
-          chain += ` → VM ${guest.name} (nœud ${guest.node})`
+          chain += ` → ${t('common.commandPaletteVmNodeLabel', { name: guest.name, node: guest.node })}`
           if (guest.host_name) chain += ` → ${guest.host_name}`
         } else if (n.matched_type === 'proxmox_guest') {
           chain += ` → ${n.matched_name}`
         } else {
-          chain += ' → non résolu'
+          chain += ` → ${t('common.commandPaletteUnresolvedLabel')}`
         }
         const to = n.matched_type === 'host'
           ? `/hosts/${n.matched_id}`
@@ -238,7 +246,7 @@ export function useCommandPalette() {
           sublabel: chain,
           icon: IconWorld,
           to,
-          group: 'Domaines' as const,
+          group: 'domains' as const,
         }
       })
   })

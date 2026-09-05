@@ -2,9 +2,6 @@
 # French text. Remove a file's line here once its strings move to
 # src/locales/{fr,en}/*.json; scripts/check-i18n-strings.sh fails the build
 # on any hardcoded French text found outside this list.
-src/components/CommandPalette.vue
-src/components/CronBuilder.vue
 src/components/NotificationBell.vue
 src/components/PageRefreshBar.vue
 src/components/RelativeTime.vue
-src/components/WsStatusBar.vue

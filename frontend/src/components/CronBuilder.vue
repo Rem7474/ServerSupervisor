@@ -1,7 +1,7 @@
 <template>
   <div class="border p-3 rounded">
     <div class="d-flex align-items-center justify-content-between mb-2">
-      <label class="form-label mb-0">Expression cron</label>
+      <label class="form-label mb-0">{{ t('common.cronBuilderExpressionLabel') }}</label>
       <div class="btn-group btn-group-sm">
         <button
           type="button"
@@ -9,7 +9,7 @@
           :class="expertMode ? 'btn-outline-secondary' : 'btn-secondary'"
           @click="expertMode = false"
         >
-          Visuel
+          {{ t('common.cronBuilderVisualModeLabel') }}
         </button>
         <button
           type="button"
@@ -17,7 +17,7 @@
           :class="expertMode ? 'btn-secondary' : 'btn-outline-secondary'"
           @click="expertMode = true"
         >
-          Expert
+          {{ t('common.cronBuilderExpertModeLabel') }}
         </button>
       </div>
     </div>
@@ -36,14 +36,14 @@
         id="cron-format-hint"
         class="form-hint"
       >
-        Format : minute heure jour-du-mois mois jour-de-la-semaine — heure interprétée dans le fuseau horaire du serveur (variable <code>TZ</code>, UTC par défaut).
+        {{ t('common.cronBuilderFormatHintPrefix') }}<code>TZ</code>{{ t('common.cronBuilderTzHintSuffix') }}
       </div>
     </div>
 
     <!-- Visual builder -->
     <div v-else>
       <div class="mb-2">
-        <label class="form-label text-secondary small mb-1">Fréquence</label>
+        <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderFrequencyLabel') }}</label>
         <div class="d-flex flex-wrap gap-2">
           <button
             v-for="f in frequencies"
@@ -58,12 +58,12 @@
         </div>
       </div>
 
-      <!-- Days of week (hebdomadaire / personnalisé) -->
+      <!-- Days of week (weekly / custom) -->
       <div
         v-if="frequency === 'weekly' || frequency === 'custom'"
         class="mb-2"
       >
-        <label class="form-label text-secondary small mb-1">Jours</label>
+        <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderDaysLabel') }}</label>
         <div class="d-flex flex-wrap gap-2">
           <label
             v-for="d in daysOfWeek"
@@ -81,12 +81,12 @@
         </div>
       </div>
 
-      <!-- Day of month (mensuel) -->
+      <!-- Day of month (monthly) -->
       <div
         v-if="frequency === 'monthly'"
         class="mb-2"
       >
-        <label class="form-label text-secondary small mb-1">Jour du mois</label>
+        <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderDayOfMonthLabel') }}</label>
         <select
           v-model="dayOfMonth"
           class="form-select form-select-sm w-auto"
@@ -105,7 +105,7 @@
       <!-- Hour + Minute -->
       <div class="d-flex gap-3 mb-2">
         <div>
-          <label class="form-label text-secondary small mb-1">Heure</label>
+          <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderHourLabel') }}</label>
           <select
             v-model="hour"
             class="form-select form-select-sm"
@@ -121,7 +121,7 @@
           </select>
         </div>
         <div>
-          <label class="form-label text-secondary small mb-1">Minute</label>
+          <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderMinuteLabel') }}</label>
           <select
             v-model="minute"
             class="form-select form-select-sm"
@@ -151,7 +151,7 @@
         <code class="ms-2 text-muted small">{{ modelValue }}</code>
       </div>
       <div class="form-hint">
-        Heure interprétée dans le fuseau horaire du serveur (variable <code>TZ</code>, UTC par défaut).
+        {{ t('common.cronBuilderTzHintPrefix') }}<code>TZ</code>{{ t('common.cronBuilderTzHintSuffix') }}
       </div>
     </div>
   </div>
@@ -159,8 +159,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconClock } from '@tabler/icons-vue'
 import { describeCron } from '../utils/cron'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -179,22 +182,22 @@ const hour = ref(3)
 const minute = ref(0)
 const dayOfMonth = ref(1)
 
-const frequencies = [
-  { key: 'daily', label: 'Quotidien' },
-  { key: 'weekly', label: 'Hebdomadaire' },
-  { key: 'monthly', label: 'Mensuel' },
-  { key: 'custom', label: 'Personnalisé' }
-]
+const frequencies = computed(() => [
+  { key: 'daily', label: t('common.cronBuilderFreqDaily') },
+  { key: 'weekly', label: t('common.cronBuilderFreqWeekly') },
+  { key: 'monthly', label: t('common.cronBuilderFreqMonthly') },
+  { key: 'custom', label: t('common.cronBuilderFreqCustom') }
+])
 
-const daysOfWeek = [
-  { value: 1, label: 'Lun' },
-  { value: 2, label: 'Mar' },
-  { value: 3, label: 'Mer' },
-  { value: 4, label: 'Jeu' },
-  { value: 5, label: 'Ven' },
-  { value: 6, label: 'Sam' },
-  { value: 0, label: 'Dim' }
-]
+const daysOfWeek = computed(() => [
+  { value: 1, label: t('common.cronBuilderDayMon') },
+  { value: 2, label: t('common.cronBuilderDayTue') },
+  { value: 3, label: t('common.cronBuilderDayWed') },
+  { value: 4, label: t('common.cronBuilderDayThu') },
+  { value: 5, label: t('common.cronBuilderDayFri') },
+  { value: 6, label: t('common.cronBuilderDaySat') },
+  { value: 0, label: t('common.cronBuilderDaySun') }
+])
 
 const minuteOptions = [0, 5, 10, 15, 20, 30, 45, 59]
 

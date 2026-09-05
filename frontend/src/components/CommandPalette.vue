@@ -6,7 +6,7 @@
     tabindex="-1"
     role="dialog"
     aria-modal="true"
-    aria-label="Palette de commande"
+    :aria-label="t('common.commandPaletteAriaLabel')"
     @click.self="close"
     @keydown.tab="trapFocus"
   >
@@ -22,21 +22,21 @@
             v-model="query"
             type="text"
             class="form-control command-palette-input"
-            placeholder="Rechercher une page, un hôte, un conteneur, un domaine, une IP…"
+            :placeholder="t('common.commandPaletteSearchPlaceholder')"
             autocomplete="off"
             spellcheck="false"
           >
-          <kbd class="command-palette-esc">Échap</kbd>
+          <kbd class="command-palette-esc">{{ t('common.commandPaletteEscLabel') }}</kbd>
         </div>
         <div class="command-palette-results">
           <EmptyState
             v-if="!results.length"
-            :title="query.trim() ? 'Aucun résultat.' : 'Commencez à taper pour rechercher.'"
+            :title="query.trim() ? t('common.commandPaletteNoResultsTitle') : t('common.commandPaletteStartTypingTitle')"
           />
           <div
             v-for="group in groupedResults"
             v-else
-            :key="group.label"
+            :key="group.key"
             class="command-palette-group"
           >
             <div class="command-palette-group-label">
@@ -88,12 +88,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconSearch } from '@tabler/icons-vue'
-import { useCommandPalette, type PaletteResult } from '../composables/useCommandPalette'
+import { useCommandPalette, PALETTE_GROUP_LABEL_KEYS, type PaletteResult } from '../composables/useCommandPalette'
 import { useModalChrome } from '../composables/useModalChrome'
 import { highlightParts } from '../utils/highlightMatch'
 import EmptyState from './EmptyState.vue'
 
+const { t } = useI18n()
 const { query, activeIndex, results, isOpen, close, selectResult } = useCommandPalette()
 
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -140,11 +142,11 @@ interface DisplayResult extends PaletteResult {
 }
 
 const groupedResults = computed(() => {
-  const groups: { label: string; items: DisplayResult[] }[] = []
+  const groups: { key: string; label: string; items: DisplayResult[] }[] = []
   results.value.forEach((result, globalIndex) => {
-    let group = groups.find((g) => g.label === result.group)
+    let group = groups.find((g) => g.key === result.group)
     if (!group) {
-      group = { label: result.group, items: [] }
+      group = { key: result.group, label: t(PALETTE_GROUP_LABEL_KEYS[result.group]), items: [] }
       groups.push(group)
     }
     group.items.push({ ...result, globalIndex })
@@ -168,7 +170,7 @@ const groupedResults = computed(() => {
 .command-palette-input {
   /* Without flex-basis + min-width:0, a `width:100%` form-control inside this
      flex row keeps its full intrinsic width instead of sharing space with
-     the icon/kbd siblings, pushing "Échap" past the card's rounded corner
+     the icon/kbd siblings, pushing the Esc shortcut hint past the card's rounded corner
      (clipped by .command-palette's overflow:hidden) instead of just before it. */
   flex: 1 1 auto;
   min-width: 0;
