@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import { useWebSocket } from './useWebSocket'
 import { addToast } from './useGlobalToast'
@@ -45,6 +46,7 @@ export function onNotificationsMessage(listener: RawMessageListener): () => void
 }
 
 export function useNotifications() {
+  const { t } = useI18n()
   const resolvingId = ref<string | null>(null)
 
   const unreadCount = computed(() =>
@@ -64,9 +66,9 @@ export function useNotifications() {
       notifications.value = notifications.value.map((n) =>
         n.id === item.id ? { ...n, resolved_at: new Date().toISOString() } : n
       )
-      addToast('Incident résolu', 'success')
+      addToast(t('alerts.incidentResolvedToast'), 'success')
     } catch (err: unknown) {
-      addToast(getApiErrorMessage(err, 'Impossible de résoudre'), 'error')
+      addToast(getApiErrorMessage(err, t('alerts.incidentResolveError')), 'error')
     } finally {
       resolvingId.value = null
     }

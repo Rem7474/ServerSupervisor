@@ -7,8 +7,8 @@
     <button
       type="button"
       class="btn btn-ghost-secondary d-flex align-items-center justify-content-center position-relative notification-bell-btn"
-      :title="unreadCount > 0 ? `${unreadCount} notification(s) non lue(s)` : 'Notifications'"
-      :aria-label="unreadCount > 0 ? `${unreadCount} notification(s) non lue(s)` : 'Notifications'"
+      :title="unreadCount > 0 ? t('alerts.notificationBellUnreadTitle', { count: unreadCount }, unreadCount) : t('alerts.notificationBellTitle')"
+      :aria-label="unreadCount > 0 ? t('alerts.notificationBellUnreadTitle', { count: unreadCount }, unreadCount) : t('alerts.notificationBellTitle')"
       aria-haspopup="true"
       :aria-expanded="isOpen"
       @click.stop="toggleOpen"
@@ -28,7 +28,7 @@
       <!-- Header -->
       <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
         <div class="fw-semibold">
-          Notifications
+          {{ t('alerts.notificationBellTitle') }}
           <span
             v-if="notifications.length"
             class="badge bg-secondary-lt text-secondary ms-1"
@@ -40,7 +40,7 @@
           class="btn btn-sm btn-ghost-secondary"
           @click.stop="markAllRead"
         >
-          Tout marquer comme lu
+          {{ t('alerts.notificationBellMarkAllRead') }}
         </button>
       </div>
 
@@ -56,7 +56,7 @@
         <EmptyState
           v-else-if="!notifications.length"
           :icon="IconBell"
-          title="Aucune notification"
+          :title="t('alerts.notificationBellEmptyTitle')"
         />
 
         <!-- Items -->
@@ -103,7 +103,7 @@
                   v-if="auth.isAdmin && item.type === 'alert_incident'"
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-success py-0 px-1 notification-resolve-btn"
-                  title="Résoudre"
+                  :title="t('alerts.notificationBellResolveAction')"
                   :disabled="resolvingId === item.id"
                   @click.stop="resolveIncident(item)"
                 >
@@ -138,14 +138,14 @@
               v-if="item.type === 'release_tracker_detected' || item.type === 'release_tracker_execution'"
               class="text-secondary mt-1 notification-value-row"
             >
-              Version : <code class="notification-value">{{ item.version || '-' }}</code>
+              {{ t('alerts.versionPrefixLabel') }} <code class="notification-value">{{ item.version || '-' }}</code>
               <span class="ms-1">{{ trackerStatusLabel(item.status) }}</span>
             </div>
             <div
               v-else
               class="text-secondary mt-1 notification-value-row"
             >
-              Valeur : <code class="notification-value">{{ item.value?.toFixed(2) }}</code>
+              {{ t('alerts.notificationBellValuePrefixLabel') }} <code class="notification-value">{{ item.value?.toFixed(2) }}</code>
               <span class="ms-1">{{ metricUnit(item.metric) }}</span>
             </div>
           </div>
@@ -159,7 +159,7 @@
           class="text-secondary small"
           @click="isOpen = false"
         >
-          Voir toutes les notifications →
+          {{ t('alerts.notificationBellViewAllLink') }}
         </router-link>
       </div>
     </div>
@@ -168,6 +168,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconBell, IconCheck, IconServer } from '@tabler/icons-vue'
 import BadgePill from './common/BadgePill.vue'
 import EmptyState from './EmptyState.vue'
@@ -181,6 +182,7 @@ import {
   notificationStateTone,
 } from '../utils/notificationBadges'
 
+const { t } = useI18n()
 const auth = useAuthStore()
 const bellRef = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
