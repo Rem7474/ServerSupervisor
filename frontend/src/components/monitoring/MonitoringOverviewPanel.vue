@@ -5,7 +5,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Sondes en panne
+              {{ t('monitoring.downProbesLabel') }}
             </div>
             <div
               class="h2 mb-0 mt-1"
@@ -20,7 +20,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Certificats expirant &lt;30j
+              {{ t('monitoring.certsExpiringLabel') }}
             </div>
             <div
               class="h2 mb-0 mt-1"
@@ -35,7 +35,7 @@
         <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">
-              Total surveillé
+              {{ t('monitoring.totalMonitoredLabel') }}
             </div>
             <div class="h2 mb-0 mt-1">
               {{ totalMonitored }}
@@ -47,7 +47,7 @@
 
     <PageRefreshBar
       v-model="autoRefresh"
-      label="Monitoring"
+      :label="t('monitoring.pageTitle')"
       :interval-sec="REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />
@@ -62,7 +62,7 @@
     <DataToolbar
       searchable
       :search="search"
-      search-placeholder="Rechercher un hôte…"
+      :search-placeholder="t('monitoring.searchHostPlaceholder')"
       @update:search="search = $event"
     />
 
@@ -80,9 +80,9 @@
 
     <EmptyState
       v-else-if="!pagedRows.length"
-      :title="search ? 'Aucun résultat pour cette recherche' : 'Aucune sonde ni certificat configuré'"
-      :subtitle="search ? 'Modifiez votre recherche.' : 'Créez une sonde uptime ou un certificat SSL pour commencer à surveiller un service.'"
-      :cta-label="!search && auth.role === 'admin' ? 'Nouveau suivi' : ''"
+      :title="search ? t('monitoring.noResultsTitle') : t('monitoring.noProbesTitle')"
+      :subtitle="search ? t('monitoring.noResultsSubtitle') : t('monitoring.noProbesSubtitle')"
+      :cta-label="!search && auth.role === 'admin' ? t('monitoring.newTrackerButton') : ''"
       @cta="openCreateProbe"
     />
 
@@ -96,7 +96,7 @@
             <tr>
               <th>
                 <SortableHeader
-                  label="Nom / Cible"
+                  :label="t('monitoring.nameTargetColumn')"
                   :active="rowSort.col === 'name'"
                   :direction="rowSort.dir"
                   @toggle="toggleRowSort('name')"
@@ -104,16 +104,16 @@
               </th>
               <th>
                 <SortableHeader
-                  label="Statut"
+                  :label="t('monitoring.statusColumn')"
                   :active="rowSort.col === 'status'"
                   :direction="rowSort.dir"
                   @toggle="toggleRowSort('status')"
                 />
               </th>
-              <th>Disponibilité</th>
+              <th>{{ t('monitoring.availabilityColumn') }}</th>
               <th>
                 <SortableHeader
-                  label="Uptime 24h"
+                  :label="t('monitoring.uptime24hColumn')"
                   :active="rowSort.col === 'uptime'"
                   :direction="rowSort.dir"
                   @toggle="toggleRowSort('uptime')"
@@ -121,7 +121,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="SSL"
+                  :label="t('monitoring.sslColumn')"
                   :active="rowSort.col === 'ssl_days'"
                   :direction="rowSort.dir"
                   @toggle="toggleRowSort('ssl_days')"
@@ -129,7 +129,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="Dernière vérification"
+                  :label="t('monitoring.lastCheckedColumn')"
                   :active="rowSort.col === 'last_checked'"
                   :direction="rowSort.dir"
                   @toggle="toggleRowSort('last_checked')"
@@ -176,7 +176,7 @@
                   <span
                     v-if="!row.probe.enabled"
                     class="badge bg-secondary-lt text-secondary ms-1"
-                  >désactivée</span>
+                  >{{ t('monitoring.probeDisabledBadge') }}</span>
                 </template>
                 <span
                   v-else
@@ -195,7 +195,7 @@
                     class="flex-fill rounded-1"
                     :class="tick.success ? 'bg-success' : 'bg-danger'"
                     style="height: 100%; min-width: 2px;"
-                    :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? 'OK' : 'KO'}`"
+                    :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? t('monitoring.tickOkLabel') : t('monitoring.tickKoLabel')}`"
                   />
                 </div>
                 <span
@@ -234,7 +234,7 @@
                 <span
                   v-else
                   class="text-secondary"
-                >Jamais</span>
+                >{{ t('monitoring.neverLabel') }}</span>
               </td>
               <td class="text-end">
                 <div class="btn-list flex-nowrap justify-content-end">
@@ -245,7 +245,7 @@
                     :disabled="checkingProbeId === row.probe?.id || checkingCertId === row.cert?.id"
                     @click="checkRowNow(row)"
                   >
-                    Vérifier
+                    {{ t('monitoring.verifyButton') }}
                   </button>
                   <div
                     v-if="auth.role === 'admin' && row.probe"
@@ -254,8 +254,8 @@
                     <button
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-secondary"
-                      title="Modifier la sonde"
-                      aria-label="Modifier la sonde"
+                      :title="t('monitoring.editProbeTooltip')"
+                      :aria-label="t('monitoring.editProbeTooltip')"
                       @click="openEditProbe(row.probe)"
                     >
                       <IconActivity :size="14" />
@@ -263,8 +263,8 @@
                     <button
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-danger"
-                      title="Supprimer la sonde"
-                      aria-label="Supprimer la sonde"
+                      :title="t('monitoring.deleteProbeTooltip')"
+                      :aria-label="t('monitoring.deleteProbeTooltip')"
                       @click="confirmDeleteProbe(row.probe)"
                     >
                       <IconTrash :size="14" />
@@ -277,8 +277,8 @@
                     <button
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-secondary"
-                      title="Modifier le certificat"
-                      aria-label="Modifier le certificat"
+                      :title="t('monitoring.editCertTooltip')"
+                      :aria-label="t('monitoring.editCertTooltip')"
                       @click="openEditCert(row.cert)"
                     >
                       <IconLock :size="14" />
@@ -286,8 +286,8 @@
                     <button
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-danger"
-                      title="Supprimer le certificat"
-                      aria-label="Supprimer le certificat"
+                      :title="t('monitoring.deleteCertTooltip')"
+                      :aria-label="t('monitoring.deleteCertTooltip')"
                       @click="confirmDeleteCert(row.cert)"
                     >
                       <IconTrash :size="14" />
@@ -304,7 +304,7 @@
         class="card-footer d-flex align-items-center justify-content-between"
       >
         <div class="text-secondary small">
-          {{ (rowPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(rowPage * PAGE_SIZE, filteredCount) }} sur {{ filteredCount }}
+          {{ t('monitoring.paginationRangeLabel', { start: (rowPage - 1) * PAGE_SIZE + 1, end: Math.min(rowPage * PAGE_SIZE, filteredCount), total: filteredCount }) }}
         </div>
         <PaginationNav
           :current-page="rowPage"
@@ -332,7 +332,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              {{ isEditingCreateModal ? (createType === 'probe' ? 'Modifier la sonde' : 'Modifier le certificat') : 'Nouveau suivi' }}
+              {{ isEditingCreateModal ? (createType === 'probe' ? t('monitoring.editProbeModalTitle') : t('monitoring.editCertModalTitle')) : t('monitoring.newTrackerButton') }}
             </h5>
             <button
               type="button"
@@ -343,8 +343,8 @@
           </div>
           <!-- Editing an existing probe or cert is unambiguous (the row
                already told us which), so it keeps the original two
-               fully-independent forms. Creating is where a shared "Hôte /
-               Cible" actually helps — a probe and a cert for the same
+               fully-independent forms. Creating is where a shared "Host /
+               Target" actually helps — a probe and a cert for the same
                target would otherwise mean typing the same domain twice. -->
           <template v-if="isEditingCreateModal">
             <form
@@ -363,7 +363,7 @@
                     <label
                       for="monitoring-edit-probe-name"
                       class="form-label required"
-                    >Nom</label>
+                    >{{ t('monitoring.nameFieldLabel') }}</label>
                     <input
                       id="monitoring-edit-probe-name"
                       v-model="probeForm.name"
@@ -377,20 +377,20 @@
                     <label
                       for="monitoring-edit-probe-type"
                       class="form-label required"
-                    >Type</label>
+                    >{{ t('monitoring.typeFieldLabel') }}</label>
                     <select
                       id="monitoring-edit-probe-type"
                       v-model="probeForm.type"
                       class="form-select"
                     >
                       <option value="http">
-                        HTTP/HTTPS
+                        {{ t('monitoring.httpOption') }}
                       </option>
                       <option value="tcp">
-                        TCP
+                        {{ t('monitoring.tcpOption') }}
                       </option>
                       <option value="icmp">
-                        ICMP (ping)
+                        {{ t('monitoring.icmpOption') }}
                       </option>
                     </select>
                   </div>
@@ -411,15 +411,14 @@
                       v-if="probeForm.type === 'icmp'"
                       class="form-hint"
                     >
-                      Nécessite CAP_NET_RAW côté conteneur serveur (activé par défaut — voir server/Dockerfile).
-                      Sans elle, le check échoue explicitement plutôt que de rapporter un faux "hors ligne".
+                      {{ t('monitoring.icmpHint') }}
                     </div>
                   </div>
                   <div class="col-md-4">
                     <label
                       for="monitoring-edit-probe-interval"
                       class="form-label"
-                    >Intervalle (sec)</label>
+                    >{{ t('monitoring.intervalSecLabel') }}</label>
                     <input
                       id="monitoring-edit-probe-interval"
                       v-model.number="probeForm.interval_sec"
@@ -432,7 +431,7 @@
                     <label
                       for="monitoring-edit-probe-timeout"
                       class="form-label"
-                    >Timeout (sec)</label>
+                    >{{ t('monitoring.timeoutSecLabel') }}</label>
                     <input
                       id="monitoring-edit-probe-timeout"
                       v-model.number="probeForm.timeout_sec"
@@ -447,7 +446,7 @@
                       <label
                         for="monitoring-edit-probe-expected-status"
                         class="form-label"
-                      >Statut HTTP attendu</label>
+                      >{{ t('monitoring.expectedHttpStatusLabel') }}</label>
                       <input
                         id="monitoring-edit-probe-expected-status"
                         v-model.number="probeForm.expected_status"
@@ -461,13 +460,13 @@
                       <label
                         for="monitoring-edit-probe-expected-body-regex"
                         class="form-label"
-                      >Regex corps attendu (optionnel)</label>
+                      >{{ t('monitoring.expectedBodyRegexLabel') }}</label>
                       <input
                         id="monitoring-edit-probe-expected-body-regex"
                         v-model="probeForm.expected_body_regex"
                         type="text"
                         class="form-control"
-                        placeholder="Ex: &quot;status&quot;:\s*&quot;ok&quot;"
+                        :placeholder="t('monitoring.expectedBodyRegexPlaceholder')"
                       >
                     </div>
                     <div class="col-md-6">
@@ -477,7 +476,7 @@
                           type="checkbox"
                           class="form-check-input"
                         >
-                        <span class="form-check-label">Suivre les redirections</span>
+                        <span class="form-check-label">{{ t('monitoring.followRedirectsLabel') }}</span>
                       </label>
                     </div>
                     <div class="col-md-6">
@@ -487,7 +486,7 @@
                           type="checkbox"
                           class="form-check-input"
                         >
-                        <span class="form-check-label">Vérifier le certificat TLS</span>
+                        <span class="form-check-label">{{ t('monitoring.verifyTlsLabel') }}</span>
                       </label>
                     </div>
                   </template>
@@ -498,7 +497,7 @@
                         type="checkbox"
                         class="form-check-input"
                       >
-                      <span class="form-check-label">Activée</span>
+                      <span class="form-check-label">{{ t('monitoring.probeEnabledLabel') }}</span>
                     </label>
                   </div>
                 </div>
@@ -510,14 +509,14 @@
                   :disabled="savingProbe"
                   @click="closeCreateModal"
                 >
-                  Annuler
+                  {{ t('monitoring.cancelButton') }}
                 </button>
                 <button
                   type="submit"
                   class="btn btn-primary"
                   :disabled="savingProbe"
                 >
-                  {{ savingProbe ? 'Enregistrement...' : 'Enregistrer' }}
+                  {{ savingProbe ? t('monitoring.savingLabel') : t('monitoring.saveButton') }}
                 </button>
               </div>
             </form>
@@ -536,7 +535,7 @@
                   <label
                     for="monitoring-edit-cert-name"
                     class="form-label required"
-                  >Nom</label>
+                  >{{ t('monitoring.nameFieldLabel') }}</label>
                   <input
                     id="monitoring-edit-cert-name"
                     v-model="certForm.name"
@@ -551,7 +550,7 @@
                     <label
                       for="monitoring-edit-cert-host"
                       class="form-label required"
-                    >Hôte</label>
+                    >{{ t('monitoring.hostFieldLabel') }}</label>
                     <input
                       id="monitoring-edit-cert-host"
                       v-model="certForm.host"
@@ -565,7 +564,7 @@
                     <label
                       for="monitoring-edit-cert-port"
                       class="form-label required"
-                    >Port</label>
+                    >{{ t('monitoring.portFieldLabel') }}</label>
                     <input
                       id="monitoring-edit-cert-port"
                       v-model.number="certForm.port"
@@ -579,13 +578,13 @@
                     <label
                       for="monitoring-edit-cert-sni"
                       class="form-label"
-                    >SNI (override, optionnel)</label>
+                    >{{ t('monitoring.sniFieldLabel') }}</label>
                     <input
                       id="monitoring-edit-cert-sni"
                       v-model="certForm.server_name"
                       type="text"
                       class="form-control"
-                      placeholder="Laisser vide pour utiliser l'hôte"
+                      :placeholder="t('monitoring.sniPlaceholder')"
                     >
                   </div>
                   <div class="col-12">
@@ -595,7 +594,7 @@
                         type="checkbox"
                         class="form-check-input"
                       >
-                      <span class="form-check-label">Activé</span>
+                      <span class="form-check-label">{{ t('monitoring.certEnabledLabel') }}</span>
                     </label>
                   </div>
                 </div>
@@ -607,14 +606,14 @@
                   :disabled="savingCert"
                   @click="closeCreateModal"
                 >
-                  Annuler
+                  {{ t('monitoring.cancelButton') }}
                 </button>
                 <button
                   type="submit"
                   class="btn btn-primary"
                   :disabled="savingCert"
                 >
-                  {{ savingCert ? 'Enregistrement...' : 'Enregistrer' }}
+                  {{ savingCert ? t('monitoring.savingLabel') : t('monitoring.saveButton') }}
                 </button>
               </div>
             </form>
@@ -629,7 +628,7 @@
                   :class="createIncludeProbe ? 'btn-primary' : 'btn-outline-secondary'"
                   @click="toggleIncludeProbe"
                 >
-                  Sonde uptime
+                  {{ t('monitoring.probeTypeToggle') }}
                 </button>
                 <button
                   type="button"
@@ -637,7 +636,7 @@
                   :class="createIncludeCert ? 'btn-primary' : 'btn-outline-secondary'"
                   @click="toggleIncludeCert"
                 >
-                  Certificat SSL
+                  {{ t('monitoring.certTypeToggle') }}
                 </button>
               </div>
             </div>
@@ -653,7 +652,7 @@
                   <label
                     for="monitoring-create-name"
                     class="form-label required"
-                  >Nom</label>
+                  >{{ t('monitoring.nameFieldLabel') }}</label>
                   <input
                     id="monitoring-create-name"
                     v-model="sharedName"
@@ -670,20 +669,20 @@
                       <label
                         for="monitoring-create-probe-type"
                         class="form-label required"
-                      >Type</label>
+                      >{{ t('monitoring.typeFieldLabel') }}</label>
                       <select
                         id="monitoring-create-probe-type"
                         v-model="probeForm.type"
                         class="form-select"
                       >
                         <option value="http">
-                          HTTP/HTTPS
+                          {{ t('monitoring.httpOption') }}
                         </option>
                         <option value="tcp">
-                          TCP
+                          {{ t('monitoring.tcpOption') }}
                         </option>
                         <option value="icmp">
-                          ICMP (ping)
+                          {{ t('monitoring.icmpOption') }}
                         </option>
                       </select>
                     </div>
@@ -704,15 +703,14 @@
                         v-if="probeForm.type === 'icmp'"
                         class="form-hint"
                       >
-                        Nécessite CAP_NET_RAW côté conteneur serveur (activé par défaut — voir server/Dockerfile).
-                        Sans elle, le check échoue explicitement plutôt que de rapporter un faux "hors ligne".
+                        {{ t('monitoring.icmpHint') }}
                       </div>
                     </div>
                     <div class="col-md-4">
                       <label
                         for="monitoring-create-probe-interval"
                         class="form-label"
-                      >Intervalle (sec)</label>
+                      >{{ t('monitoring.intervalSecLabel') }}</label>
                       <input
                         id="monitoring-create-probe-interval"
                         v-model.number="probeForm.interval_sec"
@@ -725,7 +723,7 @@
                       <label
                         for="monitoring-create-probe-timeout"
                         class="form-label"
-                      >Timeout (sec)</label>
+                      >{{ t('monitoring.timeoutSecLabel') }}</label>
                       <input
                         id="monitoring-create-probe-timeout"
                         v-model.number="probeForm.timeout_sec"
@@ -740,7 +738,7 @@
                         <label
                           for="monitoring-create-probe-expected-status"
                           class="form-label"
-                        >Statut HTTP attendu</label>
+                        >{{ t('monitoring.expectedHttpStatusLabel') }}</label>
                         <input
                           id="monitoring-create-probe-expected-status"
                           v-model.number="probeForm.expected_status"
@@ -754,13 +752,13 @@
                         <label
                           for="monitoring-create-probe-expected-body-regex"
                           class="form-label"
-                        >Regex corps attendu (optionnel)</label>
+                        >{{ t('monitoring.expectedBodyRegexLabel') }}</label>
                         <input
                           id="monitoring-create-probe-expected-body-regex"
                           v-model="probeForm.expected_body_regex"
                           type="text"
                           class="form-control"
-                          placeholder="Ex: &quot;status&quot;:\s*&quot;ok&quot;"
+                          :placeholder="t('monitoring.expectedBodyRegexPlaceholder')"
                         >
                       </div>
                       <div class="col-md-6">
@@ -770,7 +768,7 @@
                             type="checkbox"
                             class="form-check-input"
                           >
-                          <span class="form-check-label">Suivre les redirections</span>
+                          <span class="form-check-label">{{ t('monitoring.followRedirectsLabel') }}</span>
                         </label>
                       </div>
                       <div class="col-md-6">
@@ -780,7 +778,7 @@
                             type="checkbox"
                             class="form-check-input"
                           >
-                          <span class="form-check-label">Vérifier le certificat TLS</span>
+                          <span class="form-check-label">{{ t('monitoring.verifyTlsLabel') }}</span>
                         </label>
                       </div>
                     </template>
@@ -791,7 +789,7 @@
                           type="checkbox"
                           class="form-check-input"
                         >
-                        <span class="form-check-label">Sonde activée</span>
+                        <span class="form-check-label">{{ t('monitoring.probeEnabledLabelExplicit') }}</span>
                       </label>
                     </div>
                   </div>
@@ -808,7 +806,7 @@
                         <label
                           for="monitoring-create-cert-host"
                           class="form-label required"
-                        >Hôte</label>
+                        >{{ t('monitoring.hostFieldLabel') }}</label>
                         <input
                           id="monitoring-create-cert-host"
                           v-model="certForm.host"
@@ -822,7 +820,7 @@
                         <label
                           for="monitoring-create-cert-port"
                           class="form-label required"
-                        >Port</label>
+                        >{{ t('monitoring.portFieldLabel') }}</label>
                         <input
                           id="monitoring-create-cert-port"
                           v-model.number="certForm.port"
@@ -837,19 +835,19 @@
                       v-else
                       class="col-12 text-secondary small"
                     >
-                      Certificat SSL vérifié sur <code>{{ certForm.host || '—' }}:{{ certForm.port }}</code> (dérivé de la cible de la sonde ci-dessus).
+                      {{ t('monitoring.derivedCertHintBefore') }} <code>{{ certForm.host || '—' }}:{{ certForm.port }}</code> {{ t('monitoring.derivedCertHintAfter') }}
                     </div>
                     <div class="col-12">
                       <label
                         for="monitoring-create-cert-sni"
                         class="form-label"
-                      >SNI (override, optionnel)</label>
+                      >{{ t('monitoring.sniFieldLabel') }}</label>
                       <input
                         id="monitoring-create-cert-sni"
                         v-model="certForm.server_name"
                         type="text"
                         class="form-control"
-                        placeholder="Laisser vide pour utiliser l'hôte"
+                        :placeholder="t('monitoring.sniPlaceholder')"
                       >
                     </div>
                     <div class="col-12">
@@ -859,7 +857,7 @@
                           type="checkbox"
                           class="form-check-input"
                         >
-                        <span class="form-check-label">Certificat activé</span>
+                        <span class="form-check-label">{{ t('monitoring.certEnabledLabelExplicit') }}</span>
                       </label>
                     </div>
                   </div>
@@ -872,14 +870,14 @@
                   :disabled="savingProbe || savingCert"
                   @click="closeCreateModal"
                 >
-                  Annuler
+                  {{ t('monitoring.cancelButton') }}
                 </button>
                 <button
                   type="submit"
                   class="btn btn-primary"
                   :disabled="savingProbe || savingCert"
                 >
-                  {{ (savingProbe || savingCert) ? 'Enregistrement...' : 'Enregistrer' }}
+                  {{ (savingProbe || savingCert) ? t('monitoring.savingLabel') : t('monitoring.saveButton') }}
                 </button>
               </div>
             </form>
@@ -896,6 +894,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconActivity, IconLock, IconTrash } from '@tabler/icons-vue'
 import { useAuthStore } from '../../stores/auth'
 import EmptyState from '../EmptyState.vue'
@@ -910,6 +909,7 @@ import { useMonitoringOverview, type MonitoringRow } from '../../composables/use
 import { useModalChrome } from '../../composables/useModalChrome'
 
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const {
   PAGE_SIZE,
@@ -959,14 +959,14 @@ const {
 } = useMonitoringOverview()
 
 const probeTargetLabel = computed(() => {
-  if (probeForm.value.type === 'http') return 'URL'
-  if (probeForm.value.type === 'icmp') return 'Hôte ou IP'
-  return 'host:port'
+  if (probeForm.value.type === 'http') return t('monitoring.probeTargetLabelUrl')
+  if (probeForm.value.type === 'icmp') return t('monitoring.probeTargetLabelHost')
+  return t('monitoring.probeTargetLabelHostPort')
 })
 const probeTargetPlaceholder = computed(() => {
-  if (probeForm.value.type === 'http') return 'https://example.com/health'
-  if (probeForm.value.type === 'icmp') return '192.168.1.1 ou switch.local'
-  return 'example.com:443'
+  if (probeForm.value.type === 'http') return t('monitoring.probeTargetPlaceholderUrl')
+  if (probeForm.value.type === 'icmp') return t('monitoring.probeTargetPlaceholderHost')
+  return t('monitoring.probeTargetPlaceholderHostPort')
 })
 
 // Probe creation/edit and cert creation/edit render through one shared
@@ -986,7 +986,7 @@ function closeCreateModal(): void {
 }
 
 // ── Create-mode only: which resource(s) to create together, and the shared
-// "Hôte / Cible" this exists for — a probe and a cert on the same target
+// "Host / Target" this exists for — a probe and a cert on the same target
 // used to mean typing the same domain twice (once as the probe's URL, once
 // as the cert's Host). Editing stays untouched (see isEditingCreateModal in
 // the template): it's always exactly one resource, unambiguous from which

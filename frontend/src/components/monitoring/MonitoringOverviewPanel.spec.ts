@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { setLocale } from '../../i18n'
 import type { UptimeProbe, SSLCertificate } from '../../types/generated'
 import { useAuthStore } from '../../stores/auth'
 
@@ -20,12 +21,26 @@ const certFixture: SSLCertificate = {
   npm_proxy_host_id: 'npm-1', npm_proxy_host_domain: 'api.example.com',
 }
 
+interface HistoryTick { id: string; checked_at: string; success: boolean }
+
+const {
+  getUptimeProbes, getUptimeStats, getUptimeHistory, getSSLCertificates,
+  createUptimeProbe, updateUptimeProbe, createSSLCertificate, updateSSLCertificate,
+} = vi.hoisted(() => ({
+  getUptimeProbes: vi.fn(async (): Promise<{ data: { probes: UptimeProbe[] } }> => ({ data: { probes: [] } })),
+  getUptimeStats: vi.fn(async () => ({ data: { uptime_percent: 99.9 } })),
+  getUptimeHistory: vi.fn(async (): Promise<{ data: { results: HistoryTick[] } }> => ({ data: { results: [] } })),
+  getSSLCertificates: vi.fn(async (): Promise<{ data: { certificates: SSLCertificate[] } }> => ({ data: { certificates: [] } })),
+  createUptimeProbe: vi.fn(async () => ({ data: {} })),
+  updateUptimeProbe: vi.fn(async () => ({ data: {} })),
+  createSSLCertificate: vi.fn(async () => ({ data: {} })),
+  updateSSLCertificate: vi.fn(async () => ({ data: {} })),
+}))
+
 vi.mock('../../api', () => ({
   default: {
-    getUptimeProbes: vi.fn(async () => ({ data: { probes: [probeFixture] } })),
-    getUptimeStats: vi.fn(async () => ({ data: { uptime_percent: 99.9 } })),
-    getUptimeHistory: vi.fn(async () => ({ data: { results: [] } })),
-    getSSLCertificates: vi.fn(async () => ({ data: { certificates: [certFixture] } })),
+    getUptimeProbes, getUptimeStats, getUptimeHistory, getSSLCertificates,
+    createUptimeProbe, updateUptimeProbe, createSSLCertificate, updateSSLCertificate,
   },
 }))
 
@@ -45,6 +60,11 @@ async function mountPanel() {
 describe('MonitoringOverviewPanel (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
+    getUptimeProbes.mockResolvedValue({ data: { probes: [probeFixture] } })
+    getUptimeStats.mockResolvedValue({ data: { uptime_percent: 99.9 } })
+    getUptimeHistory.mockResolvedValue({ data: { results: [] } })
+    getSSLCertificates.mockResolvedValue({ data: { certificates: [certFixture] } })
   })
 
   it('merges the probe and cert sharing an npm_proxy_host_id into one row', async () => {
@@ -114,5 +134,79 @@ describe('MonitoringOverviewPanel (characterization)', () => {
     for (const id of ['monitoring-create-cert-host', 'monitoring-create-cert-port', 'monitoring-create-cert-sni']) {
       expect(wrapper.find(`#${id}`).exists(), `#${id}`).toBe(true)
     }
+  })
+
+  it('shows the translated "no probe/cert configured" empty state (with an admin CTA) when nothing is monitored', async () => {
+    getUptimeProbes.mockResolvedValue({ data: { probes: [] } })
+    getSSLCertificates.mockResolvedValue({ data: { certificates: [] } })
+    const wrapper = await mountPanel()
+
+    expect(wrapper.text()).toContain('Aucune sonde ni certificat configuré')
+    expect(wrapper.text()).toContain('Créez une sonde uptime ou un certificat SSL pour commencer à surveiller un service.')
+    expect(wrapper.text()).toContain('Nouveau suivi')
+  })
+
+  it('shows the translated "no results" empty state (no CTA) when a search matches nothing', async () => {
+    const wrapper = await mountPanel()
+    const search = wrapper.find('input[placeholder="Rechercher un hôte…"]')
+    await search.setValue('no-such-host')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Aucun résultat pour cette recherche')
+    expect(wrapper.text()).toContain('Modifiez votre recherche.')
+    expect(wrapper.text()).not.toContain('Nouveau suivi')
+  })
+
+  it('shows a translated OK/KO tooltip per heartbeat tick, reflecting each tick\'s own outcome', async () => {
+    getUptimeHistory.mockResolvedValue({
+      data: { results: [{ id: 't1', checked_at: '2026-01-01T00:00:00Z', success: true }, { id: 't2', checked_at: '2026-01-01T00:01:00Z', success: false }] },
+    })
+    const wrapper = await mountPanel()
+
+    const ticks = wrapper.findAll('.tracking .flex-fill')
+    expect(ticks.length).toBeGreaterThanOrEqual(2)
+    expect(ticks.some((el) => el.attributes('title')?.includes('— OK'))).toBe(true)
+    expect(ticks.some((el) => el.attributes('title')?.includes('— KO'))).toBe(true)
+  })
+
+  it('shows the translated "saving" label while a probe save is in flight, then reverts', async () => {
+    let resolveCreate!: (v: { data: object }) => void
+    createUptimeProbe.mockReturnValue(new Promise((resolve) => { resolveCreate = resolve }))
+    const wrapper = await mountPanel()
+    await (wrapper.vm as unknown as { openCreateProbe: () => void }).openCreateProbe()
+    await flushPromises()
+
+    await wrapper.find('#monitoring-create-name').setValue('New probe')
+    await wrapper.find('#monitoring-create-probe-target').setValue('https://example.com')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const submitButton = wrapper.findAll('button[type="submit"]').find((b) => b.text().includes('Enregistrement') || b.text().includes('Enregistrer'))
+    expect(submitButton!.text()).toBe('Enregistrement…')
+
+    resolveCreate({ data: {} })
+    await flushPromises()
+    await flushPromises()
+  })
+
+  it('derives the target label/placeholder from the selected probe type (URL / host / host:port)', async () => {
+    const wrapper = await mountPanel()
+    await (wrapper.vm as unknown as { openCreateProbe: () => void }).openCreateProbe()
+    await flushPromises()
+
+    const typeSelect = wrapper.find('#monitoring-create-probe-type')
+    const targetLabel = () => wrapper.find('label[for="monitoring-create-probe-target"]').text()
+    const targetPlaceholder = () => wrapper.find('#monitoring-create-probe-target').attributes('placeholder')
+
+    expect(targetLabel()).toBe('URL')
+    expect(targetPlaceholder()).toBe('https://example.com/health')
+
+    await typeSelect.setValue('icmp')
+    expect(targetLabel()).toBe('Hôte ou IP')
+    expect(targetPlaceholder()).toBe('192.168.1.1 ou switch.local')
+
+    await typeSelect.setValue('tcp')
+    expect(targetLabel()).toBe('host:port')
+    expect(targetPlaceholder()).toBe('example.com:443')
   })
 })

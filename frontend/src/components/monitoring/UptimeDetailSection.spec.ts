@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, shallowMount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const { getUptimeProbe, getUptimeHistory, getUptimeStats, getUptimeHistoryBuckets } = vi.hoisted(() => ({
   getUptimeProbe: vi.fn(),
@@ -23,6 +24,7 @@ import UptimeDetailSection from './UptimeDetailSection.vue'
 describe('UptimeDetailSection — autoRefresh when mounted without override props', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    setLocale('fr')
     getUptimeProbe.mockResolvedValue({ data: { id: 'probe-1', last_status: 'up', consecutive_failures: 0 } })
     getUptimeHistory.mockResolvedValue({ data: { results: [] } })
     getUptimeStats.mockResolvedValue({ data: { uptime_percent: 100, successful_checks: 1, total_checks: 1, avg_latency_ms: 10, p95_latency_ms: 10 } })
@@ -62,6 +64,7 @@ describe('UptimeDetailSection — autoRefresh when mounted without override prop
 
 describe('UptimeDetailSection — heartbeat bar and latency chart', () => {
   beforeEach(() => {
+    setLocale('fr')
     getUptimeProbe.mockResolvedValue({ data: { id: 'probe-1', last_status: 'down', consecutive_failures: 3 } })
     getUptimeHistory.mockResolvedValue({ data: { results: [] } })
     getUptimeStats.mockResolvedValue({ data: { uptime_percent: 98.5, successful_checks: 9, total_checks: 10, avg_latency_ms: 42, p95_latency_ms: 80 } })
@@ -114,6 +117,45 @@ describe('UptimeDetailSection — heartbeat bar and latency chart', () => {
     expect(wrapper.find('.chart-body').html()).not.toContain('loading-skeleton')
   })
 
+  it('shows a translated OK/KO badge per result group, reflecting its own outcome', async () => {
+    getUptimeHistory.mockResolvedValue({
+      data: {
+        results: [
+          { id: 'r1', checked_at: '2026-08-24T12:00:00Z', success: true, status_code: 200, latency_ms: 30 },
+          { id: 'r2', checked_at: '2026-08-24T11:00:00Z', success: false, status_code: 500, latency_ms: 10 },
+        ],
+      },
+    })
+    const wrapper = shallowMount(UptimeDetailSection, {
+      props: { probeId: 'probe-1' },
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const badges = wrapper.findAll('tbody tr td span.badge')
+    expect(badges.some((b) => b.text() === 'OK')).toBe(true)
+    expect(badges.some((b) => b.text() === 'KO')).toBe(true)
+  })
+
+  it('omits the latency suffix from a bucket title when every check in it failed', async () => {
+    getUptimeHistoryBuckets.mockResolvedValue({
+      data: {
+        buckets: [
+          { bucket_start: '2026-08-24T13:00:00Z', total_checks: 4, up_checks: 0, down_checks: 4, avg_latency_ms: 0 },
+        ],
+      },
+    })
+    const wrapper = shallowMount(UptimeDetailSection, {
+      props: { probeId: 'probe-1' },
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const bucket = wrapper.find('.tracking > div')
+    expect(bucket.attributes('title')).toContain('4 KO / 4')
+    expect(bucket.attributes('title')).not.toContain('ms')
+  })
+
   it('re-derives chart categories (not just the initial build) when the stats window changes', async () => {
     // Custom stub exposing the imperative updateOptions() the component
     // calls on a data refresh after the first build — the default
@@ -139,6 +181,10 @@ describe('UptimeDetailSection — heartbeat bar and latency chart', () => {
 })
 
 describe('UptimeDetailSection — error state', () => {
+  beforeEach(() => {
+    setLocale('fr')
+  })
+
   it('shows the error alert instead of the KPI cards when the fetch fails', async () => {
     getUptimeProbe.mockRejectedValue(new Error('boom'))
     getUptimeHistory.mockResolvedValue({ data: { results: [] } })

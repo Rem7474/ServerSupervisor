@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { npmApi } from '../api/npm'
 import type { SSLCertificate } from '../types/ssl'
@@ -21,6 +22,7 @@ const REFRESH_SEC = 30
 const PAGE_SIZE = 25
 
 export function useSslCertificates() {
+  const { t } = useI18n()
   const dialog = useConfirmDialog()
 
   const autoRefresh = ref(true)
@@ -86,8 +88,8 @@ export function useSslCertificates() {
   }
 
   function daysLabel(d: number | null | undefined): string {
-    if (d == null) return 'Inconnu'
-    if (d < 0) return `Expiré (${Math.abs(d)}j)`
+    if (d == null) return t('monitoring.sslCertStatusUnknown')
+    if (d < 0) return t('monitoring.sslDaysExpiredWithCount', { days: Math.abs(d) })
     return `${d}j`
   }
 
@@ -107,7 +109,7 @@ export function useSslCertificates() {
       lastUpdatedAt.value = new Date()
       error.value = ''
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Impossible de charger les certificats'
+      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.sslLoadCertsError')
     } finally {
       loadingCerts.value = false
     }
@@ -119,7 +121,7 @@ export function useSslCertificates() {
       await api.checkSSLCertificateNow(c.id)
       await fetchCerts()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
+      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.checkFailedError')
     } finally {
       checkingCertId.value = ''
     }
@@ -166,7 +168,7 @@ export function useSslCertificates() {
       closeCertModal()
       await fetchCerts()
     } catch (e: unknown) {
-      certFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Erreur lors de l\'enregistrement'
+      certFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.saveErrorGeneric')
     } finally {
       savingCert.value = false
     }
@@ -178,11 +180,11 @@ export function useSslCertificates() {
     // npm_proxy_hosts, same fix: flip the NPM-side flag off as part of the
     // same action instead of leaving a second manual step in NPM.
     const ok = await dialog.confirm({
-      title: 'Supprimer le certificat ?',
+      title: t('monitoring.deleteCertConfirmTitle'),
       message: c.npm_proxy_host_id
-        ? `"${c.name}" est géré par le proxy host NPM "${c.npm_proxy_host_domain}". Le supprimer désactivera aussi le suivi SSL de ce proxy host dans NPM.`
-        : `Cette action supprimera "${c.name}" du suivi.`,
-      okLabel: 'Supprimer',
+        ? t('monitoring.deleteCertConfirmMessageNpm', { name: c.name, domain: c.npm_proxy_host_domain })
+        : t('monitoring.deleteCertConfirmMessagePlain', { name: c.name }),
+      okLabel: t('monitoring.deleteButton'),
       destructive: true,
     })
     if (!ok) return
@@ -193,7 +195,7 @@ export function useSslCertificates() {
       await api.deleteSSLCertificate(c.id)
       await fetchCerts()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
+      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.deleteFailedError')
     }
   }
 
