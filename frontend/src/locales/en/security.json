@@ -11,5 +11,14 @@
   "ratio5xxLabel": "5xx rate",
   "suspiciousIpsLabel": "Suspicious IPs",
   "vsPreviousPeriodSuffix": "vs previous period",
-  "notAvailableVsPreviousPeriod": "N/A vs previous period"
+  "notAvailableVsPreviousPeriod": "N/A vs previous period",
+  "sourceLabel": "Source",
+  "allSourcesOption": "All",
+  "noDataForSourceTooltip": "No data for this source over the selected period",
+  "hostLabel": "Host",
+  "allHostsOption": "All hosts",
+  "refreshButton": "Refresh",
+  "searchDomainOrIpLabel": "Search a domain or IP",
+  "searchPlaceholderExample": "example.com or 1.2.3.4",
+  "viewRequestsButton": "View requests"
 }

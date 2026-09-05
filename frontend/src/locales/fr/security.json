@@ -11,5 +11,14 @@
   "ratio5xxLabel": "Taux 5xx",
   "suspiciousIpsLabel": "IPs suspectes",
   "vsPreviousPeriodSuffix": "vs période précédente",
-  "notAvailableVsPreviousPeriod": "N/A vs période précédente"
+  "notAvailableVsPreviousPeriod": "N/A vs période précédente",
+  "sourceLabel": "Source",
+  "allSourcesOption": "Toutes",
+  "noDataForSourceTooltip": "Aucune donnée pour cette source sur la période sélectionnée",
+  "hostLabel": "Hôte",
+  "allHostsOption": "Tous les hôtes",
+  "refreshButton": "Rafraîchir",
+  "searchDomainOrIpLabel": "Rechercher un domaine ou une IP",
+  "searchPlaceholderExample": "exemple.com ou 1.2.3.4",
+  "viewRequestsButton": "Voir les requêtes"
 }

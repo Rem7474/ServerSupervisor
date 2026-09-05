@@ -17,7 +17,6 @@ src/components/security/ExposureDomainsPanel.vue
 src/components/security/IPTimelineModal.vue
 src/components/security/ThreatsPanel.vue
 src/components/security/TrafficOverviewPanel.vue
-src/components/security/TrafficThreatsFilterBar.vue
 src/components/webhooks/PayloadViewerModal.vue
 src/components/webhooks/TrackableContainersModal.vue
 src/components/webhooks/TrackerConfigCard.vue
