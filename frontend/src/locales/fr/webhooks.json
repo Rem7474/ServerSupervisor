@@ -235,5 +235,15 @@
   "deleteTrackerConfirmTitle": "Supprimer le tracker \"{name}\" ?",
   "deleteAssociatedExecutionsWarning": "Toutes les exécutions associées seront également supprimées.",
   "deleteError": "Erreur lors de la suppression",
-  "daySuffix": "j"
+  "daySuffix": "j",
+  "latestVersionDetectedTitle": "Dernière version détectée",
+  "imageAndTagLabel": "Image & tag",
+  "viewOnGithubLink": "→ Voir sur GitHub",
+  "noTaskConfiguredTitle": "Aucune tâche configurée",
+  "noTaskConfiguredMessage": "Cette image Docker est surveillée, mais aucune tâche de déploiement n'a été configurée.",
+  "createTaskHint": "Créer une tâche pour automatiser les mises à jour lorsqu'une nouvelle version est détectée.",
+  "createTaskButton": "Créer une tâche",
+  "monitorOnlyModeHint": "Mode surveillance seule: configurez une VM cible et une tâche pour autoriser l'exécution manuelle.",
+  "manualRunUnavailableError": "Exécution manuelle non disponible dans ce mode.",
+  "triggerError": "Erreur lors du déclenchement"
 }
