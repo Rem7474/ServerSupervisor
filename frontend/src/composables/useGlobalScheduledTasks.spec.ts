@@ -1,17 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { setLocale } from '../i18n'
+import { useConfirmDialog } from './useConfirmDialog'
 
-const { getAllScheduledTasks, runScheduledTask, getHosts } = vi.hoisted(() => ({
+const {
+  getAllScheduledTasks, runScheduledTask, getHosts, createScheduledTask, updateScheduledTask,
+  deleteScheduledTask, getScheduledTaskExecutions,
+} = vi.hoisted(() => ({
   getAllScheduledTasks: vi.fn(),
   runScheduledTask: vi.fn(),
   getHosts: vi.fn(),
+  createScheduledTask: vi.fn(),
+  updateScheduledTask: vi.fn(),
+  deleteScheduledTask: vi.fn(),
+  getScheduledTaskExecutions: vi.fn(),
 }))
 
 const { track } = vi.hoisted(() => ({ track: vi.fn() }))
 
 vi.mock('../api', () => ({
-  default: { getAllScheduledTasks, runScheduledTask, getHosts },
+  default: {
+    getAllScheduledTasks, runScheduledTask, getHosts, createScheduledTask, updateScheduledTask,
+    deleteScheduledTask, getScheduledTaskExecutions,
+  },
 }))
 
 vi.mock('./usePendingCommand', () => ({
@@ -43,6 +55,7 @@ const taskB = {
 describe('useGlobalScheduledTasks', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     setActivePinia(createPinia())
     getHosts.mockResolvedValue({ data: [] })
     getAllScheduledTasks.mockResolvedValue({ data: [taskA, taskB] })
@@ -108,5 +121,85 @@ describe('useGlobalScheduledTasks', () => {
     expect(track).not.toHaveBeenCalled()
     expect(api.error.value).toBe('dispatch failed')
     expect(api.runningId.value).toBeNull()
+  })
+
+  it('shows the translated delete-confirmation dialog and skips the API call when declined', async () => {
+    const { api } = mountUseGlobalScheduledTasks()
+    await flushPromises()
+    const dialog = useConfirmDialog()
+    const p = api.confirmDelete(taskA as never)
+    expect(dialog.title.value).toBe('Supprimer la tâche')
+    expect(dialog.message.value).toBe('Supprimer « A task » sur zeta-host ?')
+    dialog.onCancel()
+    await p
+    expect(deleteScheduledTask).not.toHaveBeenCalled()
+  })
+
+  it('deletes a task on confirmation and reports a translated error on failure', async () => {
+    deleteScheduledTask.mockRejectedValue(new Error(''))
+    const { api } = mountUseGlobalScheduledTasks()
+    await flushPromises()
+    const dialog = useConfirmDialog()
+    const p = api.confirmDelete(taskA as never)
+    dialog.onConfirm()
+    await p
+    expect(api.error.value).toBe('Erreur lors de la suppression')
+  })
+
+  it('shows the translated enable/disable confirmation messages depending on current state', async () => {
+    const { api } = mountUseGlobalScheduledTasks()
+    await flushPromises()
+    const dialog = useConfirmDialog()
+
+    const p1 = api.toggleTask(taskA as never) // enabled -> disabling
+    expect(dialog.title.value).toBe('Désactiver la tâche')
+    expect(dialog.message.value).toBe('Voulez-vous désactiver « A task » sur zeta-host ?')
+    dialog.onCancel()
+    await p1
+
+    const p2 = api.toggleTask({ ...taskA, enabled: false } as never) // disabled -> enabling
+    expect(dialog.title.value).toBe('Activer la tâche')
+    expect(dialog.message.value).toBe('Voulez-vous activer « A task » sur zeta-host ?')
+    dialog.onCancel()
+    await p2
+  })
+
+  it('surfaces a translated error when creating a task fails', async () => {
+    createScheduledTask.mockRejectedValue(new Error(''))
+    const { api } = mountUseGlobalScheduledTasks()
+    await flushPromises()
+    api.createForm.value.host_id = 'h1'
+    await api.saveCreate()
+    expect(api.createError.value).toBe('Erreur lors de la création')
+  })
+
+  it('surfaces a translated error when loading execution history fails', async () => {
+    getScheduledTaskExecutions.mockRejectedValue(new Error(''))
+    const { api } = mountUseGlobalScheduledTasks()
+    await flushPromises()
+    await api.openHistory(taskA as never)
+    expect(api.historyError.value).toBe('Erreur de chargement')
+  })
+
+  it('reports a pluralized success toast after a bulk action, and a partial-failure toast on mixed results', async () => {
+    updateScheduledTask.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error(''))
+    const { api } = mountUseGlobalScheduledTasks()
+    await flushPromises()
+    const dialog = useConfirmDialog()
+    const p = api.handleBulkEnable([taskA, taskB] as never)
+    dialog.onConfirm()
+    await p
+    expect(updateScheduledTask).toHaveBeenCalledTimes(2)
+  })
+
+  it('translates confirmation dialogs to English when the locale is switched', async () => {
+    setLocale('en')
+    const { api } = mountUseGlobalScheduledTasks()
+    await flushPromises()
+    const dialog = useConfirmDialog()
+    const p = api.confirmDelete(taskA as never)
+    expect(dialog.title.value).toBe('Delete the task')
+    dialog.onCancel()
+    await p
   })
 })
