@@ -15,7 +15,6 @@ src/components/webhooks/TrackableContainersModal.vue
 src/components/webhooks/TrackerConfigCard.vue
 src/components/webhooks/WebhookModal.vue
 src/components/webhooks/WebhookTrackerFields.vue
-src/components/webhooks/WebhookUrlCard.vue
 src/views/AccountSecurityView.vue
 src/views/AccountView.vue
 src/views/AuditLogsView.vue

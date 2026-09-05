@@ -45,5 +45,16 @@
   "newReleaseEchoPrefix": "New release",
   "exampleImagePlaceholder": "my-image",
   "exampleProjectPlaceholder": "my-project",
-  "exampleAppPlaceholder": "my-app"
+  "exampleAppPlaceholder": "my-app",
+  "webhookUrlLabel": "Webhook URL",
+  "hmacSecretLabel": "HMAC Secret",
+  "regenerateButton": "Regenerate",
+  "providerConfigPrefix": "{provider} configuration:",
+  "gitlabHeaderLabel": "Header:",
+  "contentTypeLabel": "Content type:",
+  "secretPasteInstructions": "paste the secret above",
+  "sslEnabledRecommended": "SSL: enabled (recommended)",
+  "regenerateSecretConfirmTitle": "Regenerate the secret?",
+  "regenerateSecretConfirmMessage": "The old secret will be invalidated immediately. You will need to update the configuration in your Git provider.",
+  "secretRegeneratedMessage": "Secret regenerated — copy it now."
 }
