@@ -1,1 +1,6 @@
-{}
+{
+  "payloadReceivedTitle": "Payload received",
+  "copiedTooltip": "Copied!",
+  "copyTooltip": "Copy",
+  "payloadTruncatedWarning": "Truncated or non-JSON payload — raw display."
+}
