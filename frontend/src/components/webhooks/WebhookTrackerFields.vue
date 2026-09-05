@@ -2,7 +2,7 @@
   <!-- Type selector -->
   <div class="col-12">
     <div class="form-label required">
-      Type de suivi
+      {{ t('webhooks.trackingTypeLabel') }}
     </div>
     <div class="row g-2">
       <div class="col-6">
@@ -17,8 +17,8 @@
             value="git"
           >
           <span>
-            <span class="fw-semibold d-block">Release Git</span>
-            <span class="text-muted small">Surveille les nouvelles releases/tags sur GitHub, GitLab ou Gitea</span>
+            <span class="fw-semibold d-block">{{ t('webhooks.gitReleaseBadge') }}</span>
+            <span class="text-muted small">{{ t('webhooks.gitReleaseDescription') }}</span>
           </span>
         </label>
       </div>
@@ -34,8 +34,8 @@
             value="docker"
           >
           <span>
-            <span class="fw-semibold d-block">Image Docker</span>
-            <span class="text-muted small">Detecte quand une nouvelle image est poussee sur le registre</span>
+            <span class="fw-semibold d-block">{{ t('webhooks.dockerImageBadge') }}</span>
+            <span class="text-muted small">{{ t('webhooks.dockerImageDescription') }}</span>
           </span>
         </label>
       </div>
@@ -82,7 +82,7 @@
       <label
         for="webhook-tracker-repo-name"
         class="form-label required"
-      >Depot</label>
+      >{{ t('webhooks.repositoryLabel') }}</label>
       <input
         id="webhook-tracker-repo-name"
         v-model="repoNameModel"
@@ -102,14 +102,14 @@
       <label
         for="webhook-tracker-source-host"
         class="form-label required"
-      >Hôte</label>
+      >{{ t('webhooks.hostColumn') }}</label>
       <select
         id="webhook-tracker-source-host"
         v-model="containerSourceHostId"
         class="form-select"
       >
         <option value="">
-          Sélectionner un hôte…
+          {{ t('webhooks.selectHostPlaceholder') }}
         </option>
         <option
           v-for="h in containerHosts"
@@ -120,14 +120,14 @@
         </option>
       </select>
       <div class="form-hint">
-        Hôte sur lequel tourne le conteneur à suivre.
+        {{ t('webhooks.hostRunningContainerHint') }}
       </div>
     </div>
     <div class="col-md-7">
       <label
         for="webhook-tracker-container"
         class="form-label required"
-      >Conteneur</label>
+      >{{ t('webhooks.containerLabel') }}</label>
       <select
         id="webhook-tracker-container"
         class="form-select"
@@ -137,20 +137,20 @@
         @change="onContainerChange"
       >
         <option value="">
-          {{ containerSourceHostId ? 'Sélectionner un conteneur…' : 'Choisissez d’abord un hôte' }}
+          {{ containerSourceHostId ? t('webhooks.selectContainerPlaceholder') : t('webhooks.selectHostFirstPlaceholder') }}
         </option>
         <option
           v-if="selectedContainerMissing"
           :value="selectedContainerKey"
         >
-          {{ form.docker_image }}:{{ form.docker_tag || 'latest' }} (aucun conteneur en cours)
+          {{ form.docker_image }}:{{ form.docker_tag || 'latest' }} {{ t('webhooks.noRunningContainerOption') }}
         </option>
         <option
           v-for="c in containersForHost"
           :key="containerKey(c)"
           :value="containerKey(c)"
         >
-          {{ c.container_name || c.image }} — {{ c.image }}:{{ c.image_tag || 'latest' }}{{ c.tracked ? ' (déjà suivi)' : '' }}
+          {{ c.container_name || c.image }} — {{ c.image }}:{{ c.image_tag || 'latest' }}{{ c.tracked ? ' ' + t('webhooks.alreadyTrackedSuffix') : '' }}
         </option>
       </select>
       <div
@@ -158,10 +158,10 @@
         class="form-hint"
       >
         <template v-if="form.docker_image">
-          Image surveillée : <code>{{ form.docker_image }}:{{ form.docker_tag || 'latest' }}</code>
+          {{ t('webhooks.watchedImageHintPrefix') }} <code>{{ form.docker_image }}:{{ form.docker_tag || 'latest' }}</code>
         </template>
         <template v-else>
-          L'image et le tag surveillés sont déduits du conteneur choisi.
+          {{ t('webhooks.imageTagDeducedFromContainerHint') }}
         </template>
       </div>
     </div>
@@ -170,14 +170,14 @@
       <label
         for="webhook-tracker-registry-credentials"
         class="form-label"
-      >Registre privé <span class="text-muted">(optionnel)</span></label>
+      >{{ t('webhooks.privateRegistryLabel') }} <span class="text-muted">{{ t('webhooks.optionalLabel') }}</span></label>
       <select
         id="webhook-tracker-registry-credentials"
         v-model="registryCredentialsIdModel"
         class="form-select"
       >
         <option value="">
-          Public (aucune authentification)
+          {{ t('webhooks.publicNoAuthOption') }}
         </option>
         <option
           v-for="cred in registryCredentials"
@@ -188,19 +188,17 @@
         </option>
       </select>
       <div class="form-hint">
-        Identifiants pour interroger une image sur un registre privé (GHCR, Harbor…).
+        {{ t('webhooks.registryCredentialsHint') }}
       </div>
     </div>
 
     <div class="col-12">
       <div class="border rounded p-2">
         <div class="fw-medium mb-2">
-          Dépôt Git lié <span class="text-muted">(optionnel)</span>
+          {{ t('webhooks.linkedGitRepoLabel') }} <span class="text-muted">{{ t('webhooks.optionalLabel') }}</span>
         </div>
         <div class="form-hint mb-2">
-          Purement informatif : les notes de version du dépôt sont affichées à côté
-          de l'historique des digests. La détection des mises à jour reste basée
-          sur le registre Docker.
+          {{ t('webhooks.linkedRepoInfoHint') }}
         </div>
         <div class="row g-2">
           <div class="col-md-4">
@@ -241,7 +239,7 @@
             <label
               for="webhook-tracker-linked-repo-name"
               class="form-label"
-            >Depot</label>
+            >{{ t('webhooks.repositoryLabel') }}</label>
             <input
               id="webhook-tracker-linked-repo-name"
               v-model="repoNameModel"
@@ -258,7 +256,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { WebhookFormData, RegistryCredential, PickableContainer } from '../../composables/useWebhookForm'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   form: WebhookFormData
@@ -302,8 +303,8 @@ const registryCredentialsIdModel = fieldModel('registry_credentials_id')
 
 function onContainerChange(event: Event): void {
   const key = (event.target as HTMLSelectElement).value
-  // Re-selecting the "aucun conteneur en cours" placeholder keeps the stored
-  // image as-is; only a real container selection rewrites the form.
+  // Re-selecting the "no container currently running" placeholder keeps the
+  // stored image as-is; only a real container selection rewrites the form.
   if (key && key !== props.selectedContainerKey) emit('select-container', key)
 }
 </script>

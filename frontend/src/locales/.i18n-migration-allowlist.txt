@@ -12,7 +12,6 @@ src/components/PageRefreshBar.vue
 src/components/RelativeTime.vue
 src/components/WsStatusBar.vue
 src/components/webhooks/WebhookModal.vue
-src/components/webhooks/WebhookTrackerFields.vue
 src/views/AccountSecurityView.vue
 src/views/AccountView.vue
 src/views/AuditLogsView.vue
