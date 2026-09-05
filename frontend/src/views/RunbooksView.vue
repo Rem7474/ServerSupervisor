@@ -8,7 +8,7 @@
               to="/"
               class="text-decoration-none"
             >
-              Dashboard
+              {{ t('runbooks.dashboardBreadcrumb') }}
             </router-link>
             <span class="text-muted mx-1">/</span>
             <span>Runbooks</span>
@@ -17,7 +17,7 @@
             Runbooks
           </h2>
           <div class="text-muted small mt-1">
-            Séquences d'actions réutilisables, exécutées étape par étape sur les hôtes concernés.
+            {{ t('runbooks.pageSubtitle') }}
           </div>
         </div>
         <div class="col-auto ms-auto">
@@ -30,7 +30,7 @@
               :size="14"
               class="icon me-1"
             />
-            Nouveau runbook
+            {{ t('runbooks.newRunbookButton') }}
           </button>
         </div>
       </div>
@@ -58,9 +58,9 @@
         class="card-body"
       >
         <EmptyState
-          title="Aucun runbook configuré"
-          subtitle="Créez une séquence d'actions à exécuter en un clic sur plusieurs hôtes."
-          cta-label="Créer mon premier runbook"
+          :title="t('runbooks.noRunbookConfiguredTitle')"
+          :subtitle="t('runbooks.createSequenceHint')"
+          :cta-label="t('runbooks.createFirstRunbookButton')"
           @cta="startAdd"
         />
       </div>
@@ -71,10 +71,10 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Nom</th>
-              <th>Étapes</th>
+              <th>{{ t('runbooks.nameColumn') }}</th>
+              <th>{{ t('runbooks.stepsColumn') }}</th>
               <th class="w-1">
-                Actions
+                {{ t('runbooks.actionsColumn') }}
               </th>
             </tr>
           </thead>
@@ -95,7 +95,7 @@
                 </div>
               </td>
               <td>
-                <span class="badge bg-azure-lt text-azure">{{ rb.steps.length }} étape{{ rb.steps.length > 1 ? 's' : '' }}</span>
+                <span class="badge bg-azure-lt text-azure">{{ t('runbooks.stepsCountBadge', { n: rb.steps.length }, rb.steps.length) }}</span>
                 <div class="text-muted small mt-1">
                   {{ hostNamesSummary(rb) }}
                 </div>
@@ -105,7 +105,7 @@
                   <button
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-success"
-                    title="Lancer"
+                    :title="t('runbooks.runButton')"
                     :disabled="runningIds.has(rb.id)"
                     @click="handleRun(rb)"
                   >
@@ -122,7 +122,7 @@
                   <button
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Historique"
+                    :title="t('runbooks.historyButton')"
                     @click="openHistory(rb)"
                   >
                     <IconHistory
@@ -133,7 +133,7 @@
                   <button
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Modifier"
+                    :title="t('runbooks.editButton')"
                     @click="startEdit(rb)"
                   >
                     <IconPencil
@@ -144,7 +144,7 @@
                   <button
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-danger"
-                    title="Supprimer"
+                    :title="t('runbooks.deleteButton')"
                     @click="handleDelete(rb)"
                   >
                     <IconTrash
@@ -171,7 +171,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              {{ editingRunbook ? 'Modifier le runbook' : 'Nouveau runbook' }}
+              {{ editingRunbook ? t('runbooks.editRunbookTitle') : t('runbooks.newRunbookTitle') }}
             </h5>
             <button
               type="button"
@@ -187,12 +187,12 @@
               {{ saveError }}
             </div>
             <div class="mb-3">
-              <label class="form-label">Nom</label>
+              <label class="form-label">{{ t('runbooks.nameColumn') }}</label>
               <input
                 v-model="form.name"
                 type="text"
                 class="form-control"
-                placeholder="Ex: Redémarrage complet de la stack"
+                :placeholder="t('runbooks.namePlaceholder')"
               >
             </div>
             <div class="mb-3">
@@ -201,11 +201,11 @@
                 v-model="form.description"
                 class="form-control"
                 rows="2"
-                placeholder="Optionnel"
+                :placeholder="t('runbooks.optionalPlaceholder')"
               />
             </div>
 
-            <label class="form-label">Étapes (exécutées dans l'ordre)</label>
+            <label class="form-label">{{ t('runbooks.stepsOrderedLabel') }}</label>
             <div
               v-for="(step, index) in form.steps"
               :key="index"
@@ -229,7 +229,7 @@
                   <button
                     type="button"
                     class="btn btn-sm btn-ghost-danger"
-                    title="Retirer l'étape"
+                    :title="t('runbooks.removeStepTooltip')"
                     @click="form.steps.splice(index, 1)"
                   >
                     <IconTrash
@@ -245,7 +245,7 @@
                   class="form-check-input"
                   type="checkbox"
                 >
-                <span class="form-check-label small">Continuer même si cette étape échoue</span>
+                <span class="form-check-label small">{{ t('runbooks.continueOnFailureLabel') }}</span>
               </label>
             </div>
             <button
@@ -257,7 +257,7 @@
                 :size="16"
                 class="icon me-1"
               />
-              Ajouter une étape
+              {{ t('runbooks.addStepButton') }}
             </button>
           </div>
           <div class="modal-footer">
@@ -267,7 +267,7 @@
               :disabled="saving"
               @click="closeModal"
             >
-              Annuler
+              {{ t('common.cancel') }}
             </button>
             <button
               type="button"
@@ -275,7 +275,7 @@
               :disabled="saving || !canSave"
               @click="handleSave"
             >
-              {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
+              {{ saving ? t('common.saving') : t('common.save') }}
             </button>
           </div>
         </div>
@@ -297,7 +297,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              Historique — {{ historyRunbook.name }}
+              {{ t('runbooks.historyTitle', { name: historyRunbook.name }) }}
             </h5>
             <button
               type="button"
@@ -311,7 +311,7 @@
             </div>
             <EmptyState
               v-else-if="executions.length === 0"
-              title="Aucune exécution pour ce runbook."
+              :title="t('runbooks.noExecutionForRunbookTitle')"
             />
             <div
               v-else
@@ -320,10 +320,10 @@
               <table class="table table-sm table-vcenter">
                 <thead>
                   <tr>
-                    <th>État</th>
-                    <th>Déclenché par</th>
-                    <th>Démarré</th>
-                    <th>Terminé</th>
+                    <th>{{ t('runbooks.stateColumn') }}</th>
+                    <th>{{ t('runbooks.triggeredByColumn') }}</th>
+                    <th>{{ t('runbooks.startedColumn') }}</th>
+                    <th>{{ t('runbooks.completedColumn') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -362,9 +362,9 @@
                           <thead>
                             <tr>
                               <th>#</th>
-                              <th>Hôte</th>
+                              <th>{{ t('runbooks.hostColumn') }}</th>
                               <th>Action</th>
-                              <th>État</th>
+                              <th>{{ t('runbooks.stateColumn') }}</th>
                               <th />
                             </tr>
                           </thead>
@@ -389,14 +389,14 @@
                                 <span
                                   v-else
                                   class="text-muted small"
-                                >en attente</span>
+                                >{{ t('runbooks.pendingLowerLabel') }}</span>
                               </td>
                               <td>
                                 <button
                                   v-if="s.command_id"
                                   type="button"
                                   class="btn btn-sm btn-ghost-secondary"
-                                  title="Voir les logs de cette étape"
+                                  :title="t('runbooks.viewStepLogsTooltip')"
                                   @click="openStepLogs(s)"
                                 >
                                   <IconFileText :size="16" />
@@ -420,8 +420,8 @@
               <CommandLogPanel
                 :command="selectedStepCommand"
                 :show="showStepLogPanel"
-                title="Logs de l'étape"
-                empty-text="Aucune étape sélectionnée"
+                :title="t('runbooks.stepLogsTitle')"
+                :empty-text="t('runbooks.noStepSelectedTitle')"
                 @close="closeStepLogs"
                 @open="showStepLogPanel = true"
               />
@@ -433,7 +433,7 @@
               class="btn btn-outline-secondary"
               @click="closeHistory"
             >
-              Fermer
+              {{ t('common.close') }}
             </button>
           </div>
         </div>
@@ -448,6 +448,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconFileText, IconHistory, IconPencil, IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
@@ -468,6 +469,8 @@ const {
   openHistory, closeHistory, selectExecution,
   selectedStepCommand, showStepLogPanel, openStepLogs, closeStepLogs,
 } = useRunbooks()
+
+const { t, locale } = useI18n()
 
 const editModalRef = ref<HTMLElement | null>(null)
 const historyModalRef = ref<HTMLElement | null>(null)
@@ -504,7 +507,7 @@ const canSave = computed(() =>
 
 function runbookTargetConfig(module: string): { label: string; placeholder?: string } | null {
   if (!moduleRequiresTarget(module)) return null
-  return { label: 'Cible', placeholder: module === 'custom' ? 'id de la tâche' : 'nom du service' }
+  return { label: t('runbooks.targetLabel'), placeholder: module === 'custom' ? t('runbooks.taskIdPlaceholder') : t('runbooks.serviceNamePlaceholder') }
 }
 
 async function handleSave(): Promise<void> {
@@ -513,8 +516,8 @@ async function handleSave(): Promise<void> {
 
 async function handleDelete(rb: Runbook): Promise<void> {
   const confirmed = await dialog.confirm({
-    title: 'Supprimer le runbook',
-    message: `Supprimer le runbook "${rb.name}" ? Cette action est irréversible.`,
+    title: t('runbooks.deleteRunbookConfirmTitle'),
+    message: t('runbooks.deleteRunbookConfirmMessage', { name: rb.name }),
     variant: 'danger',
   })
   if (!confirmed) return
@@ -523,8 +526,8 @@ async function handleDelete(rb: Runbook): Promise<void> {
 
 async function handleRun(rb: Runbook): Promise<void> {
   const confirmed = await dialog.confirm({
-    title: 'Lancer le runbook',
-    message: `Lancer le runbook "${rb.name}" sur ${rb.steps.length} étape(s) ?`,
+    title: t('runbooks.runRunbookConfirmTitle'),
+    message: t('runbooks.runRunbookConfirmMessage', { name: rb.name, count: rb.steps.length }, rb.steps.length),
     variant: 'warning',
   })
   if (!confirmed) return
@@ -542,11 +545,11 @@ function hostNamesSummary(rb: Runbook): string {
 }
 
 function executionStatusLabel(status: string): string {
-  if (status === 'running') return 'En cours'
-  if (status === 'completed') return 'Terminé'
-  if (status === 'failed') return 'Échoué'
-  if (status === 'pending') return 'En attente'
-  return status || 'Inconnu'
+  if (status === 'running') return t('common.stateRunning')
+  if (status === 'completed') return t('common.stateCompleted')
+  if (status === 'failed') return t('common.stateFailed')
+  if (status === 'pending') return t('common.statePending')
+  return status || t('common.statusUnknown')
 }
 
 function executionBadgeClass(status: string): string {
@@ -558,7 +561,7 @@ function executionBadgeClass(status: string): string {
 
 function formatDate(dateStr: string | undefined | null): string {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('fr-FR')
+  return new Date(dateStr).toLocaleString(locale.value)
 }
 
 onMounted(async () => {
