@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
@@ -18,6 +19,7 @@ interface TimeseriesPoint {
 }
 
 export function useTraffic() {
+  const { locale } = useI18n()
   const hostsStore = useHostsStore()
   const route = useRoute()
   const router = useRouter()
@@ -53,8 +55,8 @@ export function useTraffic() {
   // Unlike useBot.ts (Menaces), this page never had URL sync before — added
   // alongside the custom range so a from/to (or a preset/host/source) picked
   // here survives a refresh or a shared link, same as Menaces already does.
-  watch([period, source, hostId, from, to], ([p, s, h, f, t]) => {
-    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined, from: f || undefined, to: t || undefined } })
+  watch([period, source, hostId, from, to], ([p, s, h, f, toVal]) => {
+    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined, from: f || undefined, to: toVal || undefined } })
   })
 
   const loading = ref(false)
@@ -105,7 +107,7 @@ export function useTraffic() {
   })
 
   function numberFormat(v: number): string {
-    return new Intl.NumberFormat('fr-FR').format(Number(v) || 0)
+    return new Intl.NumberFormat(locale.value).format(Number(v) || 0)
   }
 
   function formatBytes(bytes: number): string {
