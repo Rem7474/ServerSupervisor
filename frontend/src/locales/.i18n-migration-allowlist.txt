@@ -11,14 +11,6 @@ src/components/NotificationBell.vue
 src/components/PageRefreshBar.vue
 src/components/RelativeTime.vue
 src/components/WsStatusBar.vue
-src/components/security/AuditSecurityPanel.vue
-src/components/security/DomainDetailsModal.vue
-src/components/security/ExposureDomainsPanel.vue
-src/components/security/IPTimelineModal.vue
-src/components/security/ThreatsPanel.vue
-src/components/security/TrafficKpiCards.vue
-src/components/security/TrafficOverviewPanel.vue
-src/components/security/TrafficThreatsFilterBar.vue
 src/components/webhooks/PayloadViewerModal.vue
 src/components/webhooks/TrackableContainersModal.vue
 src/components/webhooks/TrackerConfigCard.vue
@@ -38,5 +30,4 @@ src/views/NPMView.vue
 src/views/NetworkView.vue
 src/views/ReleaseTrackerDetailView.vue
 src/views/RunbooksView.vue
-src/views/TrafficThreatsShell.vue
 src/views/UsersView.vue
