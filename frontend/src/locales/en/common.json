@@ -120,5 +120,14 @@
   "cronDayAbbrevWed": "Wed",
   "cronDayAbbrevThu": "Thu",
   "cronDayAbbrevFri": "Fri",
-  "cronDayAbbrevSat": "Sat"
+  "cronDayAbbrevSat": "Sat",
+  "footerWsConnectedLabel": "Connected",
+  "footerWsConnectingLabel": "Connecting…",
+  "footerWsReconnectingLabel": "Reconnecting…",
+  "footerWsErrorLabel": "WS Error",
+  "footerWsDisconnectedLabel": "Disconnected",
+  "footerAllRightsReserved": "All rights reserved.",
+  "bulkActionsAriaLabel": "Bulk actions — {count} host(s) selected",
+  "bulkSelectedCountLabel": "{count} host selected | {count} hosts selected",
+  "bulkClearSelectionAriaLabel": "Cancel selection"
 }

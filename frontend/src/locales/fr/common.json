@@ -120,5 +120,14 @@
   "cronDayAbbrevWed": "mer",
   "cronDayAbbrevThu": "jeu",
   "cronDayAbbrevFri": "ven",
-  "cronDayAbbrevSat": "sam"
+  "cronDayAbbrevSat": "sam",
+  "footerWsConnectedLabel": "Connecté",
+  "footerWsConnectingLabel": "Connexion…",
+  "footerWsReconnectingLabel": "Reconnexion…",
+  "footerWsErrorLabel": "Erreur WS",
+  "footerWsDisconnectedLabel": "Déconnecté",
+  "footerAllRightsReserved": "Tous droits réservés.",
+  "bulkActionsAriaLabel": "Actions groupées — {count} hôte(s) sélectionné(s)",
+  "bulkSelectedCountLabel": "{count} hôte sélectionné | {count} hôtes sélectionnés",
+  "bulkClearSelectionAriaLabel": "Annuler la sélection"
 }
