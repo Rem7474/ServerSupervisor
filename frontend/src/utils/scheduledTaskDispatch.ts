@@ -1,16 +1,24 @@
-import { DISPATCH_MODULES } from './dispatchStep'
+import { dispatchModules } from './dispatchStep'
 import type { DispatchOption } from './dispatchStep'
+import { i18n } from '../i18n'
+
+const { t } = i18n.global
 
 // Scheduled tasks are the only DispatchStepEditor caller whose backend scope
-// exceeds DISPATCH_MODULES (validModules in scheduledtask.Service) — restic
+// exceeds dispatchModules() (validModules in scheduledtask.Service) — restic
 // isn't allowed for runbook steps or alert-rule command triggers, so it's
 // added only here rather than to the shared list (see DispatchStepEditor's
 // `modules` prop doc). Shared by both scheduled-task editors (the global
 // "Tâches planifiées" view and the per-host tab) so they stay in sync.
-export const SCHEDULED_TASK_MODULES: DispatchOption[] = [
-  ...DISPATCH_MODULES,
-  { value: 'restic', label: 'Restic (backup)' },
-]
+//
+// A function (not a static array) for the same locale-reactivity reason as
+// dispatchModules() itself.
+export function scheduledTaskModules(): DispatchOption[] {
+  return [
+    ...dispatchModules(),
+    { value: 'restic', label: t('common.dispatchModuleResticLabel') },
+  ]
+}
 
 // Advisory only — the scheduled-task backend validates the module but not
 // the action string (see root CLAUDE.md), so these lists just drive the
@@ -25,12 +33,14 @@ const MODULE_ACTIONS: Record<string, string[]> = {
   restic: ['run_backup'],
 }
 
-const TARGET_LABELS: Record<string, string> = {
-  docker: 'Conteneur (nom ou ID)',
-  systemd: 'Service systemd',
-  custom: 'ID de tâche custom',
-  apt: 'Paquet (optionnel pour install/remove)',
-  restic: 'Profil ou groupe resticprofile (optionnel)',
+function targetLabels(): Record<string, string> {
+  return {
+    docker: t('common.dispatchContainerTargetLabel'),
+    systemd: t('common.dispatchModuleSystemdLabel'),
+    custom: t('common.dispatchCustomTaskIdTargetLabel'),
+    apt: t('common.dispatchAptTargetLabel'),
+    restic: t('common.dispatchResticTargetLabel'),
+  }
 }
 
 const TARGET_PLACEHOLDERS: Record<string, string> = {
@@ -56,7 +66,7 @@ const MODULE_CAPABILITY_KEY: Partial<Record<string, string>> = {
 // host with collect_docker/collect_apt/collect_restic off shouldn't offer
 // that module, since dispatching it would just fail on the agent.
 export function availableScheduledTaskModules(collectors: Record<string, boolean> | null | undefined): DispatchOption[] {
-  return SCHEDULED_TASK_MODULES.filter((m) => {
+  return scheduledTaskModules().filter((m) => {
     const key = MODULE_CAPABILITY_KEY[m.value]
     return !key || !!collectors?.[key]
   })
@@ -67,6 +77,6 @@ export function scheduledTaskActions(module: string): DispatchOption[] {
 }
 
 export function scheduledTaskTargetConfig(module: string): { label: string; placeholder?: string } | null {
-  const label = TARGET_LABELS[module]
+  const label = targetLabels()[module]
   return label ? { label, placeholder: TARGET_PLACEHOLDERS[module] } : null
 }

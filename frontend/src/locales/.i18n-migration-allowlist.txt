@@ -6,7 +6,6 @@ src/components/AppFooter.vue
 src/components/BulkActionBar.vue
 src/components/CommandPalette.vue
 src/components/CronBuilder.vue
-src/components/DispatchStepEditor.vue
 src/components/NotificationBell.vue
 src/components/PageRefreshBar.vue
 src/components/RelativeTime.vue

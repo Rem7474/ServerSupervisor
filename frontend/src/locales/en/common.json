@@ -81,5 +81,21 @@
   "moduleCrowdsec": "CrowdSec",
   "moduleRestic": "Restic",
   "moduleAgent": "Agent",
-  "moduleProxmox": "Proxmox"
+  "moduleProxmox": "Proxmox",
+  "dispatchHostLabel": "Host",
+  "dispatchSelectHostPlaceholder": "Select a host...",
+  "dispatchResticGroupHint": "A group runs several profiles in a single execution.",
+  "dispatchSchedulingLabel": "Scheduling",
+  "dispatchModuleSystemdLabel": "Systemd service",
+  "dispatchModuleJournalLabel": "Systemd journal",
+  "dispatchModuleCustomLabel": "Custom task",
+  "dispatchModuleResticLabel": "Restic (backup)",
+  "dispatchProfilesGroupLabel": "Profiles",
+  "dispatchGroupsGroupLabel": "Groups",
+  "dispatchSelectTaskPlaceholder": "Select a task...",
+  "dispatchDefaultProfilePlaceholder": "Profile (default)",
+  "dispatchContainerTargetLabel": "Container (name or ID)",
+  "dispatchCustomTaskIdTargetLabel": "Custom task ID",
+  "dispatchAptTargetLabel": "Package (optional for install/remove)",
+  "dispatchResticTargetLabel": "Restic profile or group (optional)"
 }
