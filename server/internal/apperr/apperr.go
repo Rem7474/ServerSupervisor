@@ -11,13 +11,24 @@ import "errors"
 // Error is a domain error with a stable code and an HTTP status.
 type Error struct {
 	Code       string // machine-readable: not_found | validation | conflict | forbidden | unauthorized | internal
-	Message    string // human-facing message (unchanged from the previous gin.H{"error": …})
+	Message    string // human-facing message (unchanged from the previous gin.H{"error": …}); fallback when I18nKey is empty
+	I18nKey    string // optional: a stable key into ErrorCatalog, e.g. CodeNodeNotFound — lets respondError render a message in the caller's language instead of Message
+	Params     map[string]string // optional: {name} placeholders substituted into the catalog message (see GetMessage)
 	HTTPStatus int
 	wrapped    error
 }
 
 func (e *Error) Error() string { return e.Message }
 func (e *Error) Unwrap() error { return e.wrapped }
+
+// I18n attaches a stable catalog key (+ optional interpolation params) to an
+// error, so respondError renders a localized message instead of Message.
+// Chainable: apperr.BadGateway(msg).I18n(CodeGitProviderNotFound, nil).
+func (e *Error) I18n(key string, params map[string]string) *Error {
+	e.I18nKey = key
+	e.Params = params
+	return e
+}
 
 // NotFound — the requested resource does not exist (404).
 func NotFound(msg string) *Error { return &Error{Code: "not_found", Message: msg, HTTPStatus: 404} }

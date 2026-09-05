@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const { openMock, closeMock, resizeMock, sendInputMock } = vi.hoisted(() => ({
   openMock: vi.fn(),
@@ -72,6 +73,7 @@ class FakeResizeObserver {
 describe('ProxmoxConsole', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     statusRef.value = 'idle'
     errorRef.value = ''
     vi.stubGlobal('ResizeObserver', FakeResizeObserver)
@@ -264,5 +266,16 @@ describe('ProxmoxConsole', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('console PVE non configurée pour cette connexion')
+  })
+
+  it('shows the translated "connecting" and falls back to the raw value for an unrecognized status', async () => {
+    statusRef.value = 'connecting'
+    const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Connexion…')
+
+    statusRef.value = 'reconnecting' as never
+    await flushPromises()
+    expect(wrapper.text()).toContain('reconnecting')
   })
 })

@@ -1,5 +1,6 @@
 import { computed, watch, onMounted, onUnmounted, ref, Ref, ComputedRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api, { getApiErrorMessage } from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useCommandStream } from './useCommandStream'
@@ -143,6 +144,7 @@ interface UseGitWebhooksPageApi {
 }
 
 export function useGitWebhooksPage(): UseGitWebhooksPageApi {
+  const { t, locale } = useI18n()
   const dialog = useConfirmDialog()
   const route = useRoute()
   const router = useRouter()
@@ -284,7 +286,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       const response = await api.getGitWebhooks()
       webhooks.value = response.data.webhooks || []
     } catch (err: unknown) {
-      error.value = readError(err, 'Erreur lors du chargement des webhooks')
+      error.value = readError(err, t('webhooks.loadWebhooksError'))
     } finally {
       loadingWebhooks.value = false
     }
@@ -298,7 +300,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       trackers.value = response.data.trackers || []
       ensureRunningRefresh()
     } catch (err: unknown) {
-      error.value = readError(err, 'Erreur lors du chargement des trackers')
+      error.value = readError(err, t('webhooks.loadTrackersError'))
     } finally {
       loadingTrackers.value = false
     }
@@ -348,7 +350,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       closeWebhookModal()
       await loadWebhooks()
     } catch (err: unknown) {
-      modalError.value = readError(err, 'Erreur')
+      modalError.value = readError(err, t('common.error'))
     } finally {
       saving.value = false
     }
@@ -359,14 +361,14 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.updateGitWebhook(webhook.id, { ...webhook, enabled: !webhook.enabled })
       await loadWebhooks()
     } catch (err: unknown) {
-      error.value = readError(err, 'Erreur')
+      error.value = readError(err, t('common.error'))
     }
   }
 
   async function confirmDeleteWebhook(webhook: GitWebhook): Promise<void> {
     const ok = await dialog.confirm({
-      title: `Supprimer le webhook "${webhook.name}" ?`,
-      message: 'Toutes les executions associees seront egalement supprimees.',
+      title: t('webhooks.deleteWebhookConfirmTitle', { name: webhook.name }),
+      message: t('webhooks.deleteAssociatedExecutionsWarning'),
       variant: 'danger',
     })
     if (!ok) return
@@ -374,7 +376,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.deleteGitWebhook(webhook.id)
       await loadWebhooks()
     } catch (err: unknown) {
-      error.value = readError(err, 'Erreur lors de la suppression')
+      error.value = readError(err, t('webhooks.deleteError'))
     }
   }
 
@@ -419,7 +421,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       closeTrackerModal()
       await loadTrackers()
     } catch (err: unknown) {
-      modalError.value = readError(err, 'Erreur')
+      modalError.value = readError(err, t('common.error'))
     } finally {
       saving.value = false
     }
@@ -430,7 +432,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.updateReleaseTracker(tracker.id, { ...tracker, enabled: !tracker.enabled })
       await loadTrackers()
     } catch (err: unknown) {
-      error.value = readError(err, 'Erreur')
+      error.value = readError(err, t('common.error'))
     }
   }
 
@@ -439,14 +441,14 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.checkReleaseTrackerNow(tracker.id)
       setTimeout(() => loadTrackers(), 2000)
     } catch (err: unknown) {
-      error.value = readError(err, 'Erreur')
+      error.value = readError(err, t('common.error'))
     }
   }
 
   async function confirmDeleteTracker(tracker: ReleaseTracker): Promise<void> {
     const ok = await dialog.confirm({
-      title: `Supprimer le tracker "${tracker.name}" ?`,
-      message: 'Toutes les executions associees seront egalement supprimees.',
+      title: t('webhooks.deleteTrackerConfirmTitle', { name: tracker.name }),
+      message: t('webhooks.deleteAssociatedExecutionsWarning'),
       variant: 'danger',
     })
     if (!ok) return
@@ -454,7 +456,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.deleteReleaseTracker(tracker.id)
       await loadTrackers()
     } catch (err: unknown) {
-      error.value = readError(err, 'Erreur lors de la suppression')
+      error.value = readError(err, t('webhooks.deleteError'))
     }
   }
 
@@ -486,12 +488,12 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
 
   function formatRelative(dateStr: string): string {
     if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleString('fr-FR')
+    return new Date(dateStr).toLocaleString(locale.value)
   }
 
   function formatDateOnly(dateStr?: string): string {
     if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleDateString('fr-FR')
+    return new Date(dateStr).toLocaleDateString(locale.value)
   }
 
   function cooldownRemainingMs(tracker: ReleaseTracker): number {
@@ -521,7 +523,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     const days = Math.floor(totalMinutes / (24 * 60))
     const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
     const minutes = totalMinutes % 60
-    if (days > 0) return `${days}j ${hours}h`
+    if (days > 0) return `${days}${t('webhooks.daySuffix')} ${hours}h`
     if (hours > 0) return `${hours}h ${minutes}m`
     return `${minutes}m`
   }
@@ -532,7 +534,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     const detectedAt = new Date(tracker.last_release_detected_at).getTime()
     if (!Number.isFinite(detectedAt)) return '-'
     const eta = new Date(detectedAt + (hours * 60 * 60 * 1000))
-    return eta.toLocaleString('fr-FR')
+    return eta.toLocaleString(locale.value)
   }
 
   // ── Tracker "live console" (command output streaming) ──────────────────────

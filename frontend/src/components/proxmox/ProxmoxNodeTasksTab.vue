@@ -5,7 +5,7 @@
         <tr>
           <th>
             <SortableHeader
-              label="Type"
+              :label="t('proxmox.typeColumn')"
               :active="sortKey === 'task_type'"
               :direction="sortDir"
               @toggle="toggleSort('task_type')"
@@ -13,7 +13,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Objet"
+              :label="t('proxmox.objectColumn')"
               :active="sortKey === 'object_id'"
               :direction="sortDir"
               @toggle="toggleSort('object_id')"
@@ -21,7 +21,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Utilisateur"
+              :label="t('proxmox.userColumn')"
               :active="sortKey === 'user_name'"
               :direction="sortDir"
               @toggle="toggleSort('user_name')"
@@ -29,7 +29,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Début"
+              :label="t('proxmox.startColumn')"
               :active="sortKey === 'start_time'"
               :direction="sortDir"
               @toggle="toggleSort('start_time')"
@@ -37,7 +37,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Durée"
+              :label="t('proxmox.durationColumn')"
               :active="sortKey === 'duration'"
               :direction="sortDir"
               @toggle="toggleSort('duration')"
@@ -45,7 +45,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Statut"
+              :label="t('proxmox.statusColumn')"
               :active="sortKey === 'status'"
               :direction="sortDir"
               @toggle="toggleSort('status')"
@@ -58,42 +58,42 @@
         <template v-if="!tasks.length">
           <tr>
             <td colspan="7">
-              <EmptyState title="Aucune tâche récente pour ce nœud." />
+              <EmptyState :title="t('proxmox.noTasksTitle')" />
             </td>
           </tr>
         </template>
         <tr
-          v-for="t in sortedTasks"
+          v-for="task in sortedTasks"
           v-else
-          :key="t.id"
-          :class="activeUpid === t.upid ? 'table-active' : ''"
+          :key="task.id"
+          :class="activeUpid === task.upid ? 'table-active' : ''"
         >
-          <td><span class="badge bg-azure-lt text-azure font-monospace">{{ t.task_type }}</span></td>
+          <td><span class="badge bg-azure-lt text-azure font-monospace">{{ task.task_type }}</span></td>
           <td class="text-muted">
-            {{ t.object_id || '—' }}
+            {{ task.object_id || '—' }}
           </td>
           <td class="text-muted small">
-            {{ t.user_name }}
+            {{ task.user_name }}
           </td>
           <td class="text-muted small">
-            {{ formatDate(t.start_time) }}
+            {{ formatDate(task.start_time) }}
           </td>
           <td class="text-muted small">
-            {{ taskDuration(t) }}
+            {{ taskDuration(task) }}
           </td>
           <td>
             <span
               class="badge task-status-badge"
-              :class="taskStatusBadgeClass(t)"
-              :title="taskStatusLabel(t)"
-            >{{ taskStatusLabel(t) }}</span>
+              :class="taskStatusBadgeClass(task)"
+              :title="taskStatusLabel(task)"
+            >{{ taskStatusLabel(task) }}</span>
           </td>
           <td>
             <button
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
-              title="Voir les logs"
-              @click="emit('view-logs', { upid: t.upid, action: t.task_type, label: t.object_id })"
+              :title="t('proxmox.viewLogsTooltip')"
+              @click="emit('view-logs', { upid: task.upid, action: task.task_type, label: task.object_id })"
             >
               <IconList
                 :size="16"
@@ -109,11 +109,14 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconList } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import type { ProxmoxTask } from '../../types/proxmox'
 import { compareValues } from '../../utils/sort'
+
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   tasks: ProxmoxTask[]
@@ -164,14 +167,14 @@ const sortedTasks = computed(() => {
 
 function formatDate(iso?: string): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function taskDuration(t: ProxmoxTask): string {
-  if (!t.start_time) return '—'
-  const end = t.end_time ? new Date(t.end_time) : (t.status === 'running' ? new Date() : null)
+function taskDuration(task: ProxmoxTask): string {
+  if (!task.start_time) return '—'
+  const end = task.end_time ? new Date(task.end_time) : (task.status === 'running' ? new Date() : null)
   if (!end) return '—'
-  const secs = Math.floor((end.getTime() - new Date(t.start_time).getTime()) / 1000)
+  const secs = Math.floor((end.getTime() - new Date(task.start_time).getTime()) / 1000)
   if (secs < 60) return `${secs}s`
   const m = Math.floor(secs / 60)
   const s = secs % 60
@@ -180,17 +183,17 @@ function taskDuration(t: ProxmoxTask): string {
   return `${h}h ${m % 60}m`
 }
 
-function taskStatusLabel(t: ProxmoxTask): string {
-  if (t.status === 'running') return 'En cours'
-  if (t.exit_status === 'OK' || t.status === 'OK') return 'OK'
-  if (t.exit_status) return String(t.exit_status)
-  return String(t.status || '—')
+function taskStatusLabel(task: ProxmoxTask): string {
+  if (task.status === 'running') return t('proxmox.runningStatusLabel')
+  if (task.exit_status === 'OK' || task.status === 'OK') return 'OK'
+  if (task.exit_status) return String(task.exit_status)
+  return String(task.status || '—')
 }
 
-function taskStatusBadgeClass(t: ProxmoxTask): string {
-  if (t.status === 'running') return 'bg-primary-lt text-primary'
-  if (t.exit_status === 'OK' || t.status === 'OK') return 'bg-success-lt text-success'
-  if (t.exit_status) return 'bg-danger-lt text-danger'
+function taskStatusBadgeClass(task: ProxmoxTask): string {
+  if (task.status === 'running') return 'bg-primary-lt text-primary'
+  if (task.exit_status === 'OK' || task.status === 'OK') return 'bg-success-lt text-success'
+  if (task.exit_status) return 'bg-danger-lt text-danger'
   return 'bg-secondary-lt text-secondary'
 }
 </script>

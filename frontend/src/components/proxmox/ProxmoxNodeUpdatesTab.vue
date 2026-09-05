@@ -22,10 +22,10 @@
 
     <EmptyState
       v-if="pendingUpdates === 0"
-      title="Aucune mise à jour en attente détectée."
+      :title="t('proxmox.noPendingUpdatesTitle')"
       :subtitle="lastUpdateCheckAt
-        ? `Dernière vérification : ${formatDate(lastUpdateCheckAt)}`
-        : 'Données non encore disponibles (prochain cycle de polling).'"
+        ? t('proxmox.lastCheckSubtitle', { date: formatDate(lastUpdateCheckAt) })
+        : t('proxmox.noUpdateDataYetSubtitle')"
     />
     <div v-else>
       <div class="d-flex align-items-center gap-3 mb-3">
@@ -34,26 +34,29 @@
         </div>
         <div>
           <div class="fw-medium">
-            paquet(s) en attente de mise à jour
+            {{ t('proxmox.pendingPackagesLabel') }}
           </div>
           <div
             v-if="lastUpdateCheckAt"
             class="text-muted small"
           >
-            Détecté le {{ formatDate(lastUpdateCheckAt) }}
+            {{ t('proxmox.detectedOnLabel', { date: formatDate(lastUpdateCheckAt) }) }}
           </div>
         </div>
       </div>
       <div class="alert alert-info mb-0">
-        Ces informations proviennent du cache apt du nœud Proxmox (lecture seule).
-        Pour appliquer les mises à jour, connectez-vous directement au nœud.
+        {{ t('proxmox.aptCacheReadOnlyHint') }}
+        {{ t('proxmox.applyUpdatesHint') }}
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import EmptyState from '../EmptyState.vue'
+
+const { t, locale } = useI18n()
 
 defineProps<{
   pendingUpdates?: number
@@ -67,6 +70,6 @@ const emit = defineEmits<{ (e: 'refresh-apt'): void }>()
 
 function formatDate(iso?: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 </script>

@@ -17,7 +17,7 @@
         />
         <div>
           <h4 class="alert-title">
-            Configuration de l'agent incomplète
+            {{ t('host.incompleteAgentConfigTitle') }}
           </h4>
           <ul class="mb-0 ps-3">
             <li
@@ -31,7 +31,7 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 class="ms-1"
-              >Voir le guide de configuration →</a>
+              >{{ t('host.viewConfigGuide') }}</a>
             </li>
           </ul>
         </div>
@@ -48,7 +48,7 @@
         />
         <div>
           <h4 class="alert-title">
-            Fonctionnalités partiellement dégradées
+            {{ t('host.partiallyDegradedTitle') }}
           </h4>
           <ul class="mb-0 ps-3">
             <li
@@ -62,7 +62,7 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 class="ms-1"
-              >Voir le guide de configuration →</a>
+              >{{ t('host.viewConfigGuide') }}</a>
             </li>
           </ul>
         </div>
@@ -73,10 +73,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconAlertCircle, IconAlertTriangle } from '@tabler/icons-vue'
 import { formatRelativeTime } from '../../composables/useDateFormatter'
 import { RESTIC_BACKUP_DOC_URL } from '../../utils/docLinks'
 import type { DiagnosticIssue } from '../../types/host'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   diagnostics: DiagnosticIssue[] | undefined
@@ -87,18 +90,17 @@ const props = defineProps<{
 // issue.collector is the raw agent.yaml key (collect_<key>) — not meant for
 // display. Falls back to the raw key for any collector added agent-side
 // before this map is updated.
-const COLLECTOR_LABELS: Record<string, string> = {
-  apt: 'APT',
-  docker: 'Docker',
-  smart: 'SMART',
-  cpu_temperature: 'Température CPU',
-  web_logs: 'Logs web',
-  crowdsec: 'CrowdSec',
-  restic: 'Restic',
-}
-
 function collectorLabel(collector: string): string {
-  return COLLECTOR_LABELS[collector] || collector
+  const labels: Record<string, string> = {
+    apt: 'APT',
+    docker: 'Docker',
+    smart: 'SMART',
+    cpu_temperature: t('host.collectorCpuTemp'),
+    web_logs: t('host.collectorWebLogs'),
+    crowdsec: 'CrowdSec',
+    restic: 'Restic',
+  }
+  return labels[collector] || collector
 }
 
 const errors = computed(() => (props.diagnostics || []).filter((d) => d.severity === 'error'))
@@ -111,10 +113,10 @@ const warnings = computed(() => (props.diagnostics || []).filter((d) => d.severi
 const freshnessNote = computed(() => {
   const since = props.lastSeen ? formatRelativeTime(props.lastSeen) : null
   if (props.hostStatus && props.hostStatus !== 'online') {
-    return `Hôte hors ligne — ces informations datent du dernier rapport reçu${since ? ` (${since})` : ''}.`
+    return since ? t('host.offlineNoteWithSince', { since }) : t('host.offlineNoteNoSince')
   }
   if (since) {
-    return `D'après le dernier rapport de l'agent, ${since}.`
+    return t('host.lastReportNote', { since })
   }
   return null
 })

@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
       <h3 class="card-title mb-0">
-        Domaines &amp; exposition
+        {{ t('proxmox.domainsExposureTitle') }}
       </h3>
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <div class="d-flex gap-2 flex-wrap">
@@ -14,7 +14,7 @@
             :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
             @click="period = p.value"
           >
-            {{ p.label }}
+            {{ t(p.labelKey) }}
           </button>
         </div>
         <span
@@ -26,7 +26,7 @@
     <div class="card-body">
       <EmptyState
         v-if="!ipsKnown"
-        title="Aucune adresse IP détectée pour ce guest (agent invité PVE absent ou guest arrêté)."
+        :title="t('proxmox.noIpDetectedTitle')"
       />
       <ExposureDomainsPanel
         v-else
@@ -35,7 +35,7 @@
         :error="error"
         :period="period"
         :period-label="periodLabel"
-        subject-label="ce guest"
+        :subject-label="t('proxmox.thisGuestSubjectLabel')"
       />
     </div>
   </div>
@@ -43,18 +43,21 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../../api'
 import ExposureDomainsPanel from '../security/ExposureDomainsPanel.vue'
 import EmptyState from '../EmptyState.vue'
 import type { HostExposure } from '../../types/host'
 import { getApiErrorMessage } from '../../api/client'
 
+const { t } = useI18n()
+
 const props = defineProps<{ guestId: string }>()
 
 const PERIODS = [
-  { value: '24h', label: '24h' },
-  { value: '168h', label: '7j' },
-  { value: '720h', label: '30j' },
+  { value: '24h', labelKey: 'proxmox.timeRange24h' },
+  { value: '168h', labelKey: 'proxmox.timeRange7d' },
+  { value: '720h', labelKey: 'proxmox.timeRange30d' },
 ]
 
 const exposure = ref<HostExposure | null>(null)
@@ -62,7 +65,10 @@ const loading = ref(false)
 const error = ref('')
 const period = ref('24h')
 
-const periodLabel = computed(() => PERIODS.find((p) => p.value === period.value)?.label ?? period.value)
+const periodLabel = computed(() => {
+  const found = PERIODS.find((p) => p.value === period.value)
+  return found ? t(found.labelKey) : period.value
+})
 // GuestExposure returns ip_address = '' when the guest has no live/static IP
 // at all (guest stopped, no QEMU agent, ...) — distinct from "has an IP but
 // no NPM domain routes to it", which ExposureDomainsPanel already renders as
@@ -76,7 +82,7 @@ async function load(): Promise<void> {
     const res = await api.getProxmoxGuestExposure(props.guestId, period.value)
     exposure.value = res.data
   } catch (err: unknown) {
-    error.value = getApiErrorMessage(err, 'Erreur de chargement')
+    error.value = getApiErrorMessage(err, t('proxmox.loadErrorGeneric'))
   } finally {
     loading.value = false
   }

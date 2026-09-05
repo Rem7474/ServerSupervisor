@@ -5,7 +5,7 @@
         class="badge"
         :class="summary.status === 'ok' ? 'bg-success-lt text-success' : 'bg-danger-lt text-danger'"
       >{{ summary.status }}</span>
-      <span class="text-secondary small">{{ summary.profile || 'défaut' }}</span>
+      <span class="text-secondary small">{{ summary.profile || t('host.defaultProfileLabel') }}</span>
     </div>
 
     <div
@@ -17,7 +17,7 @@
 
     <dl class="row mb-0">
       <dt class="col-5 text-muted">
-        Durée
+        {{ t('host.durationLabel') }}
       </dt>
       <dd class="col-7">
         {{ formatDuration(summary.duration_sec) }}
@@ -25,18 +25,18 @@
 
       <template v-if="summary.files_new != null || summary.files_changed != null">
         <dt class="col-5 text-muted">
-          Fichiers
+          {{ t('host.filesLabel') }}
         </dt>
         <dd class="col-7">
-          <span v-if="summary.files_new != null">{{ summary.files_new }} nouveau{{ summary.files_new > 1 ? 'x' : '' }}</span>
+          <span v-if="summary.files_new != null">{{ t('host.newFilesCount', { count: summary.files_new }, summary.files_new) }}</span>
           <span v-if="summary.files_new != null && summary.files_changed != null"> · </span>
-          <span v-if="summary.files_changed != null">{{ summary.files_changed }} modifié{{ summary.files_changed > 1 ? 's' : '' }}</span>
+          <span v-if="summary.files_changed != null">{{ t('host.changedFilesCount', { count: summary.files_changed }, summary.files_changed) }}</span>
         </dd>
       </template>
 
       <template v-if="summary.bytes_added != null">
         <dt class="col-5 text-muted">
-          Volume ajouté
+          {{ t('host.volumeAddedLabel') }}
         </dt>
         <dd class="col-7">
           {{ formatBytes(summary.bytes_added) }}
@@ -57,7 +57,7 @@
 
       <template v-if="summary.repo_size_bytes != null">
         <dt class="col-5 text-muted">
-          Taille du dépôt
+          {{ t('host.repoSizeLabel') }}
         </dt>
         <dd class="col-7">
           {{ formatBytes(summary.repo_size_bytes) }}
@@ -68,6 +68,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 // Mirrors agent/internal/collector.ResticBackupSummary — the terminal Output
 // of a module=restic action=run_backup command. Same shape (and same field
 // set) as the "Historique" row / summary card in HostBackupTab.vue, just
@@ -89,11 +91,11 @@ defineProps<{
   summary: ResticBackupSummary
 }>()
 
+const { t } = useI18n()
+
 // Duplicated from HostBackupTab.vue rather than shared — this codebase
 // consistently keeps a small local formatBytes/formatDuration per
-// component (20+ existing copies) rather than a single shared one; kept in
-// French units (o/Ko/Mo) to match how the same data already reads in the
-// Sauvegardes tab.
+// component (20+ existing copies) rather than a single shared one.
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
   const minutes = Math.floor(seconds / 60)
@@ -104,7 +106,7 @@ function formatDuration(seconds: number): string {
 
 function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null) return '—'
-  const units = ['o', 'Ko', 'Mo', 'Go', 'To']
+  const units = [t('host.unitByte'), t('host.unitKB'), t('host.unitMB'), t('host.unitGB'), t('host.unitTB')]
   let value = bytes
   let unitIndex = 0
   while (value >= 1024 && unitIndex < units.length - 1) {

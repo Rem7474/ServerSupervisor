@@ -37,12 +37,14 @@ vi.mock('topojson-client', () => ({
   feature: () => ({ features: [] }),
 }))
 
+import { setLocale } from '../../i18n'
 import apiClient from '../../api'
 import TrafficOverviewPanel from './TrafficOverviewPanel.vue'
 
 describe('TrafficOverviewPanel (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     // TrafficOverviewPanel calls useHostsStore() in setup; install a fresh Pinia
     // so the store resolves without the app having to register the plugin.
     setActivePinia(createPinia())
@@ -99,5 +101,57 @@ describe('TrafficOverviewPanel (characterization)', () => {
     // fr-FR grouping uses a (narrow) no-break space; strip whitespace first.
     const compact = wrapper.text().replace(/\s/g, '')
     expect(compact).toContain('1234')
+  })
+
+  it('renders the translated section titles, table headers and non-empty rows', async () => {
+    const wrapper = mount(TrafficOverviewPanel, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('Trafic - requêtes par tranche')
+    expect(text).toContain('Distribution HTTP')
+    expect(text).toContain('Top endpoints')
+    expect(text).toContain('Top IPs suspectes')
+    expect(text).toContain('Carte mondiale des IP clientes')
+    expect(text).toContain('Pays les plus actifs')
+    expect(text).toContain('Répartition du trafic par domaine')
+    expect(text).toContain('Top domaines cibles')
+    expect(text).toContain('Flux temps réel - dernières requêtes')
+    expect(text).toContain('auto-refresh')
+    expect(text).toContain('France')
+    expect(text).toContain('example.com')
+  })
+
+  it('shows the translated empty states when there is no data at all', async () => {
+    vi.mocked(apiClient.getWebLogsSummary).mockResolvedValue({
+      data: {
+        traffic: { total_requests: 0, total_bytes: 0, ratio_5xx: 0, status_distribution: {}, top_domains: [], country_distribution: [], top_client_ips: [] },
+        threats: { suspicious_ips: 0, top_ips: [] },
+        compare: { delta_percent: {} },
+      },
+    } as never)
+    const wrapper = mount(TrafficOverviewPanel, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('Aucun endpoint sur la période.')
+    expect(text).toContain('Aucune IP suspecte.')
+    expect(text).toContain('Aucune donnée pays.')
+    expect(text).toContain('Aucune donnée domaine.')
+    expect(text).toContain('Aucune donnée de trafic.')
+    expect(text).toContain('Aucune requête récente.')
+  })
+
+  it('translates to English when the locale is switched', async () => {
+    setLocale('en')
+    const wrapper = mount(TrafficOverviewPanel, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('Total requests')
+    expect(text).toContain('Top target domains')
   })
 })

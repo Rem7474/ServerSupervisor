@@ -4,7 +4,7 @@
       <div class="text-center mb-4">
         <span class="h1">ServerSupervisor</span>
         <div class="text-secondary">
-          Connexion au dashboard
+          {{ t('auth.subtitle') }}
         </div>
       </div>
 
@@ -14,34 +14,59 @@
       >
         <div class="card-body">
           <h2 class="card-title text-center mb-4">
-            Se connecter
+            {{ t('auth.signIn') }}
           </h2>
-          <div class="mb-3">
-            <label class="form-label">Utilisateur</label>
-            <input
-              ref="usernameInput"
-              v-model="username"
-              type="text"
-              class="form-control"
-              placeholder="admin"
-              name="username"
-              autocomplete="username webauthn"
-              required
-              :disabled="loading || needsMFA"
+
+          <!-- OIDC / SSO Button -->
+          <div
+            v-if="oidcStatus?.enabled"
+            class="mb-3"
+          >
+            <button
+              type="button"
+              class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2"
+              @click="loginWithOIDC"
             >
+              <IconKey :size="18" />
+              <span>{{ t('auth.signInWithProvider', { provider: oidcStatus.display_name || 'SSO / OpenID Connect' }) }}</span>
+            </button>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Mot de passe</label>
-            <input
-              v-model="password"
-              type="password"
-              class="form-control"
-              placeholder="••••••••"
-              name="password"
-              autocomplete="current-password"
-              required
-              :disabled="loading || needsMFA"
-            >
+
+          <div
+            v-if="oidcStatus?.enabled && oidcStatus?.allow_local_login"
+            class="hr-text my-3"
+          >
+            {{ t('auth.orLocalCredentials') }}
+          </div>
+
+          <div v-if="!oidcStatus?.enabled || oidcStatus?.allow_local_login">
+            <div class="mb-3">
+              <label class="form-label">{{ t('common.user') }}</label>
+              <input
+                ref="usernameInput"
+                v-model="username"
+                type="text"
+                class="form-control"
+                placeholder="admin"
+                name="username"
+                autocomplete="username webauthn"
+                required
+                :disabled="loading || needsMFA"
+              >
+            </div>
+            <div class="mb-3">
+              <label class="form-label">{{ t('auth.password') }}</label>
+              <input
+                v-model="password"
+                type="password"
+                class="form-control"
+                placeholder="••••••••"
+                name="password"
+                autocomplete="current-password"
+                required
+                :disabled="loading || needsMFA"
+              >
+            </div>
           </div>
 
           <Transition name="slide-down">
@@ -52,7 +77,7 @@
               <label
                 v-if="mfaMethods?.totp"
                 class="form-label"
-              >Code TOTP</label>
+              >{{ t('auth.totpCode') }}</label>
               <input
                 v-if="mfaMethods?.totp"
                 ref="totpInput"
@@ -69,14 +94,14 @@
                 v-if="mfaMethods?.totp"
                 class="text-secondary small mt-1"
               >
-                Entrez le code de votre application d'authentification.
+                {{ t('auth.totpHint') }}
               </div>
 
               <div
                 v-if="mfaMethods?.totp && mfaMethods?.webauthn"
                 class="text-secondary small text-center my-2"
               >
-                ou
+                {{ t('auth.or') }}
               </div>
 
               <button
@@ -86,7 +111,7 @@
                 :disabled="webauthnLoading"
                 @click="loginWithWebAuthn"
               >
-                {{ webauthnLoading ? 'Vérification...' : 'Utiliser une clé de sécurité / passkey' }}
+                {{ webauthnLoading ? t('auth.verifying') : t('auth.useSecurityKey') }}
               </button>
             </div>
           </Transition>
@@ -100,7 +125,7 @@
           </div>
 
           <div
-            v-if="!needsMFA || mfaMethods?.totp"
+            v-if="(!oidcStatus?.enabled || oidcStatus?.allow_local_login) && (!needsMFA || mfaMethods?.totp)"
             class="form-footer"
           >
             <button
@@ -108,7 +133,7 @@
               class="btn btn-primary w-100"
               :disabled="loading"
             >
-              {{ loading ? 'Connexion...' : (needsMFA ? 'Vérifier le code' : 'Se connecter') }}
+              {{ loading ? t('auth.signingIn') : (needsMFA ? t('auth.verifyCode') : t('auth.signIn')) }}
             </button>
           </div>
         </div>
@@ -119,7 +144,11 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { IconKey } from '@tabler/icons-vue'
 import { useLogin } from '../composables/useLogin'
+
+const { t } = useI18n()
 
 const {
   username,
@@ -132,6 +161,8 @@ const {
   mfaMethods,
   webauthnAvailable,
   webauthnLoading,
+  oidcStatus,
+  loginWithOIDC,
   handleLogin,
   loginWithWebAuthn,
 } = useLogin()

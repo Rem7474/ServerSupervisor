@@ -5,7 +5,7 @@
   >
     <div class="d-flex align-items-center justify-content-between mb-2">
       <span class="small fw-semibold text-secondary">
-        Paquets en attente
+        {{ t('apt.pendingPackages') }}
         <span class="badge bg-warning-lt text-warning ms-1">
           {{ packages.length }}
         </span>
@@ -16,7 +16,7 @@
         class="btn btn-link btn-sm p-0 small text-secondary"
         @click="showAll = !showAll"
       >
-        {{ showAll ? 'Réduire' : `Voir tout (${packages.length})` }}
+        {{ showAll ? t('apt.collapse') : t('apt.seeAllWithCount', { count: packages.length }) }}
       </button>
     </div>
     <div class="apt-packages-grid">
@@ -35,6 +35,9 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   packages: string[]

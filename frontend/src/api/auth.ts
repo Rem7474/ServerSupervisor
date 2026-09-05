@@ -1,11 +1,12 @@
 import { api, rangeParams } from './client'
 import type { TimeRange } from './client'
 import type { IPTimelineResponse, DomainDetailsParams } from '../types/security'
-import type { LoginEvent } from '../types/generated'
+import type { LoginEvent, OIDCStatusResponse } from '../types/generated'
 import type { SecurityData } from '../components/security/AuditSecurityPanel.vue'
 import type { WebAuthnCredential } from '../types/webauthn'
 
 export const authApi = {
+  getOIDCStatus: () => api.get<OIDCStatusResponse>('/auth/oidc/status'),
   login: (username: string, password: string, totpCode?: string) =>
     api.post('/auth/login', { username, password, ...(totpCode ? { totp_code: totpCode } : {}) }),
   getProfile: (signal?: AbortSignal) => api.get('/v1/auth/profile', { signal }),

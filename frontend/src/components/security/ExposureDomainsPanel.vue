@@ -18,7 +18,7 @@
           <div class="card card-sm">
             <div class="card-body">
               <div class="text-muted small">
-                Adresse IP
+                {{ t('security.ipAddressLabel') }}
               </div>
               <div class="h3 mb-0 font-monospace">
                 {{ exposure.ip_address || '—' }}
@@ -30,10 +30,10 @@
           <div class="card card-sm">
             <div class="card-body">
               <div class="text-muted small">
-                Requêtes ({{ periodLabel }})
+                {{ t('security.requestsPeriodLabel', { period: periodLabel }) }}
               </div>
               <div class="h3 mb-0">
-                {{ exposure.total_requests.toLocaleString('fr-FR') }}
+                {{ exposure.total_requests.toLocaleString(locale) }}
               </div>
             </div>
           </div>
@@ -42,13 +42,13 @@
           <div class="card card-sm">
             <div class="card-body">
               <div class="text-muted small">
-                Suspectes
+                {{ t('security.suspiciousShortLabel') }}
               </div>
               <div
                 class="h3 mb-0"
                 :class="exposure.total_suspicious_requests > 0 ? 'text-warning' : ''"
               >
-                {{ exposure.total_suspicious_requests.toLocaleString('fr-FR') }}
+                {{ exposure.total_suspicious_requests.toLocaleString(locale) }}
               </div>
             </div>
           </div>
@@ -57,13 +57,13 @@
           <div class="card card-sm">
             <div class="card-body">
               <div class="text-muted small">
-                Bloquées
+                {{ t('security.blockedShortLabel') }}
               </div>
               <div
                 class="h3 mb-0"
                 :class="exposure.total_blocked_requests > 0 ? 'text-danger' : ''"
               >
-                {{ exposure.total_blocked_requests.toLocaleString('fr-FR') }}
+                {{ exposure.total_blocked_requests.toLocaleString(locale) }}
               </div>
             </div>
           </div>
@@ -72,7 +72,7 @@
 
       <EmptyState
         v-if="exposure.domains.length === 0"
-        :title="`Aucun domaine NPM ne route vers ${subjectLabel}.`"
+        :title="t('security.noNpmDomainsTitle', { subject: subjectLabel })"
       />
 
       <div
@@ -82,24 +82,24 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Domaine</th>
-              <th>Connexion NPM</th>
-              <th>Cible</th>
-              <th>Disponibilité</th>
+              <th>{{ t('security.domainColumn') }}</th>
+              <th>{{ t('security.npmConnectionColumn') }}</th>
+              <th>{{ t('security.targetColumn') }}</th>
+              <th>{{ t('security.availabilityColumn') }}</th>
               <th class="text-end">
-                Requêtes
+                {{ t('security.requestsColumn') }}
               </th>
               <th class="text-end">
-                Volume
+                {{ t('security.volumeColumn') }}
               </th>
               <th class="text-end">
-                Erreurs 4xx/5xx
+                {{ t('security.errors4xx5xxColumn') }}
               </th>
               <th class="text-end">
-                Suspectes
+                {{ t('security.suspiciousShortLabel') }}
               </th>
               <th class="text-end">
-                Bloquées
+                {{ t('security.blockedShortLabel') }}
               </th>
             </tr>
           </thead>
@@ -112,7 +112,7 @@
                 <button
                   type="button"
                   class="btn btn-link btn-sm p-0 font-monospace small fw-medium text-decoration-none"
-                  title="Voir le détail des requêtes/menaces pour ce domaine"
+                  :title="t('security.viewDomainDetailTooltip')"
                   @click="openDomain(row.d.domain_name)"
                 >
                   {{ row.d.domain_name }}
@@ -128,14 +128,14 @@
                 <span
                   v-if="!row.d.npm_enabled"
                   class="badge bg-danger-lt text-danger"
-                >Désactivé</span>
+                >{{ t('security.disabledBadge') }}</span>
               </td>
               <td>
                 <router-link
                   v-if="row.probe || row.cert"
                   :to="`/monitoring/host/${row.d.proxy_host_id}`"
                   class="d-inline-flex flex-column gap-1 text-decoration-none"
-                  title="Voir le détail monitoring de ce domaine"
+                  :title="t('security.viewMonitoringDetailTooltip')"
                 >
                   <span class="d-flex align-items-center gap-1">
                     <span
@@ -158,7 +158,7 @@
                       class="flex-fill rounded-1"
                       :class="tick.success ? 'bg-success' : 'bg-danger'"
                       style="height: 100%; min-width: 2px;"
-                      :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? 'OK' : 'KO'}`"
+                      :title="`${formatDateTime(tick.checked_at)} — ${tick.success ? t('monitoring.tickOkLabel') : t('monitoring.tickKoLabel')}`"
                     />
                   </div>
                 </router-link>
@@ -168,22 +168,22 @@
                 >—</span>
               </td>
               <td class="text-end">
-                {{ row.d.requests.toLocaleString('fr-FR') }}
+                {{ row.d.requests.toLocaleString(locale) }}
               </td>
               <td class="text-end">
                 {{ formatBytes(row.d.bytes) }}
               </td>
               <td class="text-end text-muted">
-                {{ row.d.errors_4xx.toLocaleString('fr-FR') }} / {{ row.d.errors_5xx.toLocaleString('fr-FR') }}
+                {{ row.d.errors_4xx.toLocaleString(locale) }} / {{ row.d.errors_5xx.toLocaleString(locale) }}
               </td>
               <td class="text-end">
                 <span :class="row.d.suspicious_requests > 0 ? 'text-warning fw-medium' : 'text-muted'">
-                  {{ row.d.suspicious_requests.toLocaleString('fr-FR') }}
+                  {{ row.d.suspicious_requests.toLocaleString(locale) }}
                 </span>
               </td>
               <td class="text-end">
                 <span :class="row.d.blocked_requests > 0 ? 'text-danger fw-medium' : 'text-muted'">
-                  {{ row.d.blocked_requests.toLocaleString('fr-FR') }}
+                  {{ row.d.blocked_requests.toLocaleString(locale) }}
                 </span>
               </td>
             </tr>
@@ -218,6 +218,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import DomainDetailsModal from './DomainDetailsModal.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
@@ -235,13 +236,14 @@ const props = defineProps<{
   error?: string
   period: string
   periodLabel: string
-  // "cet hôte" / "ce guest" — the only sentence left that still needs to
+  // "this host" / "this guest" — the only sentence left that still needs to
   // name the subject, now that its IP has its own KPI card instead of being
   // buried in prose (see HostExposureTab.vue and GuestExposureCard.vue, the
   // two callers of this shared panel).
   subjectLabel: string
 }>()
 
+const { t, locale } = useI18n()
 const domainModal = useDomainDetails()
 
 function openDomain(domain: string): void {

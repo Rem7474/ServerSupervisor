@@ -8,7 +8,7 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-8">
-          <label class="form-label">Hote SMTP</label>
+          <label class="form-label">{{ t('settings.smtpHost') }}</label>
           <input
             v-model="form.smtpHost"
             type="text"
@@ -26,7 +26,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Utilisateur</label>
+          <label class="form-label">{{ t('common.user') }}</label>
           <input
             v-model="form.smtpUser"
             type="text"
@@ -36,7 +36,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Mot de passe</label>
+          <label class="form-label">{{ t('settings.password') }}</label>
           <div class="input-group">
             <input
               v-model="form.smtpPass"
@@ -49,12 +49,12 @@
               type="button"
               @click="$emit('update:show-smtp-pass', !showSmtpPass)"
             >
-              {{ showSmtpPass ? 'Masquer' : 'Afficher' }}
+              {{ showSmtpPass ? t('settings.hide') : t('settings.show') }}
             </button>
           </div>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Expediteur (From)</label>
+          <label class="form-label">{{ t('settings.sender') }}</label>
           <input
             v-model="form.smtpFrom"
             type="email"
@@ -63,7 +63,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Destinataire (To)</label>
+          <label class="form-label">{{ t('settings.recipient') }}</label>
           <input
             v-model="form.smtpTo"
             type="email"
@@ -74,7 +74,7 @@
           <small
             id="smtp-to-hint"
             class="form-hint"
-          >Destinataire par défaut, utilisé par toute alerte dont le champ "Destinataire(s) email" est laissé vide.</small>
+          >{{ t('settings.recipientHint') }}</small>
         </div>
         <div class="col-12">
           <label class="form-check">
@@ -83,7 +83,7 @@
               type="checkbox"
               class="form-check-input"
             >
-            <span class="form-check-label">TLS / STARTTLS active</span>
+            <span class="form-check-label">{{ t('settings.tlsStartTlsEnabled') }}</span>
           </label>
         </div>
       </div>
@@ -96,7 +96,7 @@
         :disabled="savingSmtp"
         @click="$emit('save')"
       >
-        {{ savingSmtp ? 'Enregistrement...' : 'Enregistrer SMTP' }}
+        {{ savingSmtp ? t('common.saving') : t('settings.saveSmtp') }}
       </button>
       <button
         type="button"
@@ -104,7 +104,7 @@
         :disabled="testingSmtp || !form.smtpHost"
         @click="$emit('test')"
       >
-        {{ testingSmtp ? 'Test en cours...' : 'Tester la connexion' }}
+        {{ testingSmtp ? t('settings.testInProgress') : t('settings.testConnection') }}
       </button>
       <span
         v-if="smtpSaveMsg"
@@ -123,6 +123,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 interface SmtpForm {
   smtpHost: string
   smtpPort: number

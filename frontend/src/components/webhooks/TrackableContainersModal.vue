@@ -11,7 +11,7 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">
-            Activer la mise à jour automatique
+            {{ t('webhooks.enableAutoUpdateTitle') }}
           </h5>
           <button
             type="button"
@@ -28,11 +28,7 @@
           </div>
 
           <p class="text-muted small">
-            La détection des mises à jour est désormais automatique pour tous les conteneurs
-            (badge de version dans l'onglet Docker) : cette liste sert à activer en plus la
-            <strong>mise à jour automatique</strong>. Conteneurs gérés par compose, sans tracker :
-            un tracker Docker en mode <strong>Compose</strong> sera créé pour chacun (pull + up -d
-            automatique à chaque nouvelle image).
+            {{ t('webhooks.autoUpdateExplanation') }}
           </p>
 
           <LoadingSkeleton
@@ -42,8 +38,8 @@
 
           <EmptyState
             v-else-if="!containers.length"
-            title="Aucun conteneur à suivre"
-            subtitle="Tous les conteneurs compose détectés ont déjà un tracker, ou aucun n'a été collecté."
+            :title="t('webhooks.noContainersToTrackTitle')"
+            :subtitle="t('webhooks.noContainersToTrackSubtitle')"
           />
 
           <template v-else>
@@ -52,7 +48,7 @@
               <div class="card-body py-2">
                 <div class="row g-2 align-items-end">
                   <div class="col-md-4">
-                    <label class="form-label mb-1">Healthcheck (s)</label>
+                    <label class="form-label mb-1">{{ t('webhooks.healthcheckSecondsLabel') }}</label>
                     <input
                       v-model.number="options.healthcheck_timeout_sec"
                       type="number"
@@ -69,7 +65,7 @@
                           class="form-check-input"
                           type="checkbox"
                         >
-                        <span class="form-check-label">Rollback si échec</span>
+                        <span class="form-check-label">{{ t('webhooks.rollbackOnFailureLabel') }}</span>
                       </label>
                       <label class="form-check mb-0">
                         <input
@@ -77,7 +73,7 @@
                           class="form-check-input"
                           type="checkbox"
                         >
-                        <span class="form-check-label">Nettoyer images orphelines</span>
+                        <span class="form-check-label">{{ t('webhooks.cleanupOrphanImagesLabel') }}</span>
                       </label>
                     </div>
                   </div>
@@ -98,9 +94,9 @@
                         @change="toggleAll"
                       >
                     </th>
-                    <th>Hôte</th>
+                    <th>{{ t('webhooks.hostColumn') }}</th>
                     <th>Image</th>
-                    <th>Projet / Service</th>
+                    <th>{{ t('webhooks.projectServiceColumn') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -144,7 +140,7 @@
             class="btn btn-outline-secondary"
             @click="close"
           >
-            Fermer
+            {{ t('common.close') }}
           </button>
           <button
             type="button"
@@ -152,7 +148,7 @@
             :disabled="saving || !selected.length"
             @click="submit"
           >
-            {{ saving ? 'Création...' : `Créer ${selected.length} tracker${selected.length > 1 ? 's' : ''}` }}
+            {{ saving ? t('webhooks.creatingLabel') : t('webhooks.createTrackersButton', { n: selected.length }, selected.length) }}
           </button>
         </div>
       </div>
@@ -162,10 +158,13 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../../api'
 import { useModalChrome } from '../../composables/useModalChrome'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
+
+const { t } = useI18n()
 
 interface Container {
   host_id: string
@@ -233,7 +232,7 @@ async function loadContainers(): Promise<void> {
     containers.value = Array.isArray(response.data?.containers) ? response.data.containers : []
     selected.value = containers.value.map((_, idx) => idx)
   } catch {
-    errorMessage.value = 'Impossible de charger les conteneurs détectés.'
+    errorMessage.value = t('webhooks.couldNotLoadContainersError')
     containers.value = []
   } finally {
     loading.value = false
@@ -277,13 +276,13 @@ async function submit(): Promise<void> {
     const failed = ((response.data?.results || []) as BulkResult[]).filter((r) => !r.created)
     emit('created')
     if (failed.length) {
-      resultSummary.value = `${created} tracker(s) créé(s), ${failed.length} en échec : ${failed.map((r) => r.name || '?').join(', ')}`
+      resultSummary.value = t('webhooks.trackersCreatedSummary', { created, failed: failed.length, names: failed.map((r) => r.name || '?').join(', ') })
       await loadContainers()
     } else {
       close()
     }
   } catch {
-    errorMessage.value = 'La création groupée a échoué.'
+    errorMessage.value = t('webhooks.bulkCreationFailedError')
   } finally {
     saving.value = false
   }

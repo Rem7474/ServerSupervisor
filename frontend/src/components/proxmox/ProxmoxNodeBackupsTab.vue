@@ -21,13 +21,13 @@
     <template v-if="!loading || jobs.length || runs.length">
       <div class="card-body">
         <div class="fw-semibold mb-2">
-          Jobs configurés
+          {{ t('proxmox.configuredJobsLabel') }}
         </div>
         <div
           v-if="!jobs.length"
           class="text-secondary small"
         >
-          Aucun job de sauvegarde configuré sur ce cluster Proxmox.
+          {{ t('proxmox.noBackupJobsText') }}
         </div>
         <div
           v-else
@@ -36,12 +36,12 @@
           <table class="table table-sm table-vcenter card-table mb-0">
             <thead>
               <tr>
-                <th>Job</th>
-                <th>Planification</th>
-                <th>Stockage</th>
-                <th>Mode</th>
-                <th>Cibles</th>
-                <th>Statut</th>
+                <th>{{ t('proxmox.jobColumn') }}</th>
+                <th>{{ t('proxmox.scheduleColumn') }}</th>
+                <th>{{ t('proxmox.storageColumn') }}</th>
+                <th>{{ t('proxmox.modeColumn') }}</th>
+                <th>{{ t('proxmox.targetsColumn') }}</th>
+                <th>{{ t('proxmox.statusColumn') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -62,13 +62,13 @@
                   {{ j.mode || '—' }}
                 </td>
                 <td class="small">
-                  {{ j.vmids === 'all' ? 'Tous' : (j.vmids || '—') }}
+                  {{ j.vmids === 'all' ? t('proxmox.allLabel') : (j.vmids || '—') }}
                 </td>
                 <td>
                   <span
                     class="badge"
                     :class="j.enabled ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
-                  >{{ j.enabled ? 'Activé' : 'Désactivé' }}</span>
+                  >{{ j.enabled ? t('proxmox.enabledBadge') : t('proxmox.disabledBadge') }}</span>
                 </td>
               </tr>
             </tbody>
@@ -78,11 +78,11 @@
 
       <div class="card-body border-top">
         <div class="fw-semibold mb-2">
-          Dernier résultat par VM
+          {{ t('proxmox.lastResultPerVmLabel') }}
         </div>
         <EmptyState
           v-if="!runs.length"
-          title="Aucun résultat de sauvegarde pour ce nœud."
+          :title="t('proxmox.noBackupRunsTitle')"
         />
         <div
           v-else
@@ -93,7 +93,7 @@
               <tr>
                 <th>
                   <SortableHeader
-                    label="VM"
+                    :label="t('proxmox.vmColumn')"
                     :active="sortKey === 'guest_name'"
                     :direction="sortDir"
                     @toggle="toggleSort('guest_name')"
@@ -101,7 +101,7 @@
                 </th>
                 <th>
                   <SortableHeader
-                    label="Statut"
+                    :label="t('proxmox.statusColumn')"
                     :active="sortKey === 'status'"
                     :direction="sortDir"
                     @toggle="toggleSort('status')"
@@ -109,7 +109,7 @@
                 </th>
                 <th>
                   <SortableHeader
-                    label="Fin"
+                    :label="t('proxmox.endColumn')"
                     :active="sortKey === 'end_time'"
                     :direction="sortDir"
                     @toggle="toggleSort('end_time')"
@@ -138,7 +138,7 @@
                     v-if="r.task_upid"
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Voir les logs"
+                    :title="t('proxmox.viewLogsTooltip')"
                     @click="emit('view-logs', { upid: r.task_upid, action: 'vzdump', label: r.guest_name || `VM ${r.vmid}` })"
                   >
                     <IconList
@@ -158,6 +158,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconList } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
@@ -165,6 +166,8 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { getExecutionStateClass, getExecutionStateLabel } from '../../utils/statusClasses'
 import { compareValues } from '../../utils/sort'
 import type { ProxmoxBackupJob, ProxmoxBackupRun } from '../../types/proxmox'
+
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   jobs: ProxmoxBackupJob[]
@@ -202,6 +205,6 @@ const sortedRuns = computed(() => {
 
 function formatDate(iso?: string): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 </script>

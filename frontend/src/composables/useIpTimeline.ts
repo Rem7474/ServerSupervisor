@@ -1,4 +1,5 @@
 import { ref, computed, watch, toValue, type MaybeRefOrGetter } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { WebLogIPTimelineRow } from '../types/security'
 
 export interface TimelineBucket {
@@ -56,14 +57,6 @@ function statusFamilyKey(status: number | string): string {
   return 'other'
 }
 
-function statusFamilyLabel(family: string): string {
-  if (family === '5xx') return '5xx Serveur'
-  if (family === '4xx') return '4xx Client'
-  if (family === '3xx') return '3xx Redirection'
-  if (family === '2xx') return '2xx Succès'
-  return 'Autres statuts'
-}
-
 function statusFamilyBadgeClass(family: string): string {
   if (family === '5xx') return 'bg-danger-lt text-danger'
   if (family === '4xx') return 'bg-warning-lt text-warning'
@@ -117,6 +110,16 @@ export function useIpTimeline(
   timeline: MaybeRefOrGetter<WebLogIPTimelineRow[]>,
   show: MaybeRefOrGetter<boolean>,
 ) {
+  const { t } = useI18n()
+
+  function statusFamilyLabel(family: string): string {
+    if (family === '5xx') return t('security.statusFamily5xx')
+    if (family === '4xx') return t('security.statusFamily4xx')
+    if (family === '3xx') return t('security.statusFamily3xx')
+    if (family === '2xx') return t('security.statusFamily2xx')
+    return t('security.statusFamilyOther')
+  }
+
   const selectedBucketKey = ref('')
   const bucketFilterEnabled = ref(true)
   const selectedInterval = ref('auto')
@@ -165,9 +168,9 @@ export function useIpTimeline(
 
   const timelineBucketLabel = computed(() => {
     const ms = timelineBucketMs.value
-    if (ms < 60 * 1000) return `${Math.round(ms / 1000)} secondes`
-    if (ms < 60 * 60 * 1000) return `${Math.round(ms / (60 * 1000))} minutes`
-    return `${Math.round(ms / (60 * 60 * 1000))} heure(s)`
+    if (ms < 60 * 1000) return t('security.bucketLabelSeconds', { n: Math.round(ms / 1000) })
+    if (ms < 60 * 60 * 1000) return t('security.bucketLabelMinutes', { n: Math.round(ms / (60 * 1000)) })
+    return t('security.bucketLabelHours', { n: Math.round(ms / (60 * 60 * 1000)) })
   })
 
   const timelineBuckets = computed<TimelineBucket[]>(() => {

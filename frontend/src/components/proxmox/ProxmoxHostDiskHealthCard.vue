@@ -2,11 +2,11 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        État SMART des disques
+        {{ t('proxmox.diskSmartStatusTitle') }}
         <span
           v-if="nodeName"
           class="text-muted fw-normal ms-1"
-        >· nœud Proxmox {{ nodeName }}</span>
+        >{{ t('proxmox.nodeSuffixLabel', { name: nodeName }) }}</span>
       </h3>
     </div>
     <div
@@ -24,24 +24,24 @@
     >
       <EmptyState
         :icon="IconDisc"
-        title="Aucune donnée disque côté nœud Proxmox"
-        subtitle="Le poller Proxmox n'a pas encore remonté de disque pour ce nœud (rôle PVEAuditor requis)."
+        :title="t('proxmox.noDiskDataTitle')"
+        :subtitle="t('proxmox.noDiskDataSubtitle')"
       />
     </div>
     <template v-else>
       <div class="card-body pb-0">
         <div class="mb-0 small text-muted">
-          Cet hôte ne peut pas lire le SMART localement (conteneur/VM). Santé remontée par le nœud Proxmox qui l'héberge.
+          {{ t('proxmox.cantReadSmartLocallyHint') }}
         </div>
       </div>
       <div class="table-responsive scroll-table">
         <table class="table table-vcenter card-table table-sm">
           <thead>
             <tr>
-              <th>Périphérique</th>
-              <th>Statut</th>
-              <th>Taille</th>
-              <th>Durée de vie restante</th>
+              <th>{{ t('proxmox.deviceColumn') }}</th>
+              <th>{{ t('proxmox.statusColumn') }}</th>
+              <th>{{ t('proxmox.sizeColumn') }}</th>
+              <th>{{ t('proxmox.remainingLifeColumn') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -103,12 +103,15 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import BadgePill from '../common/BadgePill.vue'
 import EmptyState from '../EmptyState.vue'
 import { IconDisc } from '@tabler/icons-vue'
 import { useProxmoxHostDisks } from '../../composables/useProxmoxHostDisks'
 import { smartStatusTone } from '../../utils/diskHealth'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   hostId: string
@@ -121,14 +124,14 @@ onMounted(load)
 
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return 'N/A'
-  const units = ['o', 'Ko', 'Mo', 'Go', 'To', 'Po']
+  const unitKeys = ['proxmox.byteUnitBytes', 'proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera', 'proxmox.byteUnitPeta']
   let value = bytes
   let i = 0
-  while (value >= 1024 && i < units.length - 1) {
+  while (value >= 1024 && i < unitKeys.length - 1) {
     value /= 1024
     i++
   }
-  return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${units[i]}`
+  return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${t(unitKeys[i])}`
 }
 
 // wearout is remaining life (100 = new, 0 = worn out) — same direction and

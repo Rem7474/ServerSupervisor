@@ -1,5 +1,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import apiClient, { getApiErrorMessage } from '../api'
 import { addToast } from './useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
@@ -20,6 +21,7 @@ export function useBot() {
   const route = useRoute()
   const router = useRouter()
   const dialog = useConfirmDialog()
+  const { t } = useI18n()
 
   const period = ref(typeof route.query.period === 'string' ? route.query.period : '24h')
   const periodOptions = [
@@ -41,8 +43,8 @@ export function useBot() {
     to: to.value,
   })
 
-  watch([period, source, hostId, from, to], ([p, s, h, f, t]) => {
-    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined, from: f || undefined, to: t || undefined } })
+  watch([period, source, hostId, from, to], ([p, s, h, f, toVal]) => {
+    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined, from: f || undefined, to: toVal || undefined } })
   })
 
   const loading = ref(false)
@@ -103,12 +105,12 @@ export function useBot() {
       }
     })
   })
-  // host_id du snapshot CrowdSec renvoyé par l'API (présent même sans filtre hôte)
+  // host_id from the CrowdSec snapshot returned by the API (present even without a host filter)
   const crowdSecHostId = computed(() => (threats.value.crowdsec_host_id as string) || '')
   const isSelectedIPBlocked = computed(() =>
     crowdSecIPs.value.some((e: AnyRecord) => e.ip === selectedIP.value),
   )
-  // host_id effectif : filtre manuel > host_id du snapshot CrowdSec > déduit des lignes de la timeline
+  // Effective host_id: manual filter > CrowdSec snapshot's host_id > derived from the timeline rows
   const effectiveHostId = computed(() => hostId.value || crowdSecHostId.value || timelineHostId.value)
 
   function levelClass(level: string): string {
@@ -121,28 +123,28 @@ export function useBot() {
   }
 
   function decisionLabel(type: string | undefined | null): string {
-    const t = (type || 'ban').toLowerCase().trim()
-    if (!t) return 'Ban'
-    switch (t) {
+    const normalized = (type || 'ban').toLowerCase().trim()
+    if (!normalized) return 'Ban'
+    switch (normalized) {
       case 'ban': return 'Ban'
       case 'captcha': return 'Captcha'
       case 'audit': return 'Audit'
-      default: return t.charAt(0).toUpperCase() + t.slice(1)
+      default: return normalized.charAt(0).toUpperCase() + normalized.slice(1)
     }
   }
 
   function decisionBadgeClass(type: string, blockedUntil?: string): string {
     if (!type) return 'bg-secondary-lt text-secondary'
 
-    const t = type.toLowerCase()
+    const normalized = type.toLowerCase()
     let baseClass = 'bg-secondary-lt text-secondary'
-    switch (t) {
+    switch (normalized) {
       case 'ban': baseClass = 'bg-danger-lt text-danger'; break
       case 'captcha': baseClass = 'bg-warning-lt text-warning'; break
       case 'audit': baseClass = 'bg-primary-lt text-primary'; break
     }
 
-    // Si blockedUntil est fourni et valide, c'est un blocage temporaire (moins définitif qu'un ban)
+    // If blockedUntil is provided and valid, it's a temporary block (less definitive than a ban)
     if (blockedUntil) {
       const d = new Date(blockedUntil)
       if (!Number.isNaN(d.getTime()) && d > new Date()) {
@@ -158,11 +160,11 @@ export function useBot() {
   }
 
   function formatBlockedUntil(blockedUntil?: string): string {
-    if (!blockedUntil) return 'Bloquée'
+    if (!blockedUntil) return t('security.blockedBadge')
     const d = new Date(blockedUntil)
-    if (Number.isNaN(d.getTime())) return `Bloquée (date invalide: ${blockedUntil})`
+    if (Number.isNaN(d.getTime())) return t('security.blockedInvalidDateLabel', { date: blockedUntil })
     const now = new Date()
-    if (d <= now) return 'Bloquée (permanent)'
+    if (d <= now) return t('security.blockedPermanentLabel')
     const diff = d.getTime() - now.getTime()
     const totalSeconds = Math.floor(diff / 1000)
     const seconds = totalSeconds % 60
@@ -172,10 +174,10 @@ export function useBot() {
     const hours = totalHours % 24
     const days = Math.floor(totalHours / 24)
 
-    if (days > 0) return `Bloquée ${days}j ${hours}h`
-    if (totalHours > 0) return `Bloquée ${totalHours}h ${minutes}m`
-    if (totalMinutes > 0) return `Bloquée ${totalMinutes}m`
-    return `Bloquée ${seconds}s`
+    if (days > 0) return t('security.blockedForDaysHours', { days, hours })
+    if (totalHours > 0) return t('security.blockedForHoursMinutes', { hours: totalHours, minutes })
+    if (totalMinutes > 0) return t('security.blockedForMinutes', { minutes: totalMinutes })
+    return t('security.blockedForSeconds', { seconds })
   }
 
   async function loadThreats() {
@@ -187,7 +189,7 @@ export function useBot() {
       const range = from.value && to.value ? { from: from.value, to: to.value } : undefined
       const res = await apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined, 'threats', range)
       summary.value = { threats: res.data?.threats || {} }
-      // Purger les bans optimistes dont le snapshot réel prend le relais
+      // Purge optimistic bans now superseded by the real snapshot
       const snapshotIPs = new Set((res.data?.threats?.crowdsec_top_blocked || []).map((e: AnyRecord) => e.ip as string))
       optimisticBans.value = optimisticBans.value.filter((e) => !snapshotIPs.has(e.ip as string))
     } catch (err) {
@@ -283,16 +285,16 @@ export function useBot() {
         { ip, type: 'ban', reason: 'manual', origin: 'cscli', blocked_until: new Date(Date.now() + ms).toISOString() },
       ]
       banState.value = 'idle'
-      addToast(`IP ${ip} bloquée par CrowdSec (${duration})`, 'success')
+      addToast(t('security.ipBlockedToast', { ip, duration }), 'success')
       closeTimeline()
       const { status, output } = await pollCommand(commandId)
       if (status === 'failed') {
         optimisticBans.value = optimisticBans.value.filter((e) => e.ip !== ip)
-        addToast(`Échec blocage ${ip} : ${output}`, 'error')
+        addToast(t('security.blockFailedToast', { ip, output }), 'error')
       }
     } catch (error) {
       banState.value = 'error'
-      addToast(`Impossible de bloquer l'IP : ${getApiErrorMessage(error)}`, 'error')
+      addToast(t('security.blockErrorToast', { error: getApiErrorMessage(error) }), 'error')
     }
   }
 
@@ -307,7 +309,7 @@ export function useBot() {
         // ignore transient poll errors
       }
     }
-    // Timeout après 60s (2× le cycle agent) — la commande est probablement passée
+    // Timeout after 60s (2x the agent cycle) — the command probably went through
     return { status: 'timeout', output: '' }
   }
 
@@ -315,13 +317,13 @@ export function useBot() {
     const matchedEntry = crowdSecIPs.value.find((entry: AnyRecord) => entry.ip === ip)
     const targetHost = hostId.value || (matchedEntry?.host_id as string) || crowdSecHostId.value
     if (!targetHost) {
-      addToast('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte', 'error')
+      addToast(t('security.targetHostUnknownToast'), 'error')
       return
     }
 
     const confirmed = await dialog.confirm({
-      title: `Débloquer l'IP ${ip}`,
-      message: `Cette IP ne sera plus bannie par CrowdSec sur cet hôte.`,
+      title: t('security.unblockConfirmTitle', { ip }),
+      message: t('security.unblockConfirmMessage'),
       variant: 'danger',
     })
     if (!confirmed) return
@@ -337,14 +339,14 @@ export function useBot() {
         unblockedIPs.value = next
         const { [ip]: _, ...rest } = rowState.value
         rowState.value = rest
-        addToast(`IP ${ip} débloquée`, 'success')
+        addToast(t('security.ipUnblockedToast', { ip }), 'success')
       } else {
         rowState.value = { ...rowState.value, [ip]: 'error' }
-        addToast(`Échec déblocage ${ip} : ${output}`, 'error')
+        addToast(t('security.unblockFailedToast', { ip, output }), 'error')
       }
     } catch (error) {
       rowState.value = { ...rowState.value, [ip]: 'error' }
-      addToast(`Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`, 'error')
+      addToast(t('security.unblockErrorToast', { error: getApiErrorMessage(error) }), 'error')
     }
   }
 

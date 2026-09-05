@@ -12,12 +12,12 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              Appliquer « {{ template?.name }} »
+              {{ t('alerts.applyTemplateTitle', { name: template?.name }) }}
             </h5>
             <button
               type="button"
               class="btn-close"
-              aria-label="Fermer"
+              :aria-label="t('common.close')"
               @click="$emit('close')"
             />
           </div>
@@ -26,7 +26,7 @@
               v-if="!result"
             >
               <div class="mb-3">
-                <label class="form-label">Hôtes</label>
+                <label class="form-label">{{ t('alerts.hostsLabel') }}</label>
                 <div class="input-icon mb-2">
                   <span class="input-icon-addon">
                     <IconSearch :size="16" />
@@ -35,7 +35,7 @@
                     v-model="search"
                     type="text"
                     class="form-control"
-                    placeholder="Filtrer par nom ou tag…"
+                    :placeholder="t('alerts.filterHostsPlaceholder')"
                   >
                 </div>
                 <div
@@ -65,11 +65,11 @@
                     v-if="filteredHosts.length === 0"
                     class="text-muted small mb-0"
                   >
-                    Aucun hôte ne correspond.
+                    {{ t('alerts.noHostsMatch') }}
                   </p>
                 </div>
                 <div class="form-hint">
-                  {{ selectedHostIds.length }} hôte{{ selectedHostIds.length > 1 ? 's' : '' }} sélectionné{{ selectedHostIds.length > 1 ? 's' : '' }}
+                  {{ t('alerts.hostsSelectedCount', { count: selectedHostIds.length }, selectedHostIds.length) }}
                 </div>
               </div>
               <label class="form-check">
@@ -78,7 +78,7 @@
                   class="form-check-input"
                   type="checkbox"
                 >
-                <span class="form-check-label">Activer immédiatement les règles créées</span>
+                <span class="form-check-label">{{ t('alerts.enableCreatedRulesLabel') }}</span>
               </label>
               <div
                 v-if="error"
@@ -89,14 +89,14 @@
             </div>
             <div v-else>
               <div class="alert alert-success">
-                {{ result.created_rule_ids?.length || 0 }} règle(s) créée(s).
+                {{ t('alerts.rulesCreatedMsg', { count: result.created_rule_ids?.length || 0 }) }}
               </div>
               <div
                 v-if="result.errors && Object.keys(result.errors).length > 0"
                 class="alert alert-danger"
               >
                 <div class="fw-semibold mb-1">
-                  Échecs :
+                  {{ t('alerts.failuresLabel') }}
                 </div>
                 <ul class="mb-0 ps-3">
                   <li
@@ -115,7 +115,7 @@
               class="btn btn-outline-secondary"
               @click="$emit('close')"
             >
-              {{ result ? 'Fermer' : 'Annuler' }}
+              {{ result ? t('alerts.closeButton') : t('alerts.cancelButton') }}
             </button>
             <button
               v-if="!result"
@@ -128,7 +128,7 @@
                 v-if="applying"
                 class="spinner-border spinner-border-sm me-2"
               />
-              Appliquer
+              {{ t('alerts.applyButton') }}
             </button>
           </div>
         </div>
@@ -143,6 +143,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconSearch } from '@tabler/icons-vue'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { AlertRuleTemplate, ApplyAlertRuleTemplateResult, Host } from '../../types/generated'
@@ -168,6 +169,8 @@ const emit = defineEmits<{
   (e: 'apply', hostIds: string[], enabled: boolean): void
 }>()
 
+const { t } = useI18n()
+
 const modalRef = ref<HTMLElement | null>(null)
 useModalChrome(modalRef, () => props.visible, { onClose: () => emit('close') })
 
@@ -187,7 +190,7 @@ const filteredHosts = computed(() => {
   const q = search.value.trim().toLowerCase()
   if (!q) return props.hosts
   return props.hosts.filter((h) =>
-    (h.name || '').toLowerCase().includes(q) || (h.tags || []).some((t) => t.toLowerCase().includes(q))
+    (h.name || '').toLowerCase().includes(q) || (h.tags || []).some((tag) => tag.toLowerCase().includes(q))
   )
 })
 

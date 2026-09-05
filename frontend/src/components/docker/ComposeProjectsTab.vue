@@ -3,7 +3,7 @@
   <DataToolbar
     searchable
     :search="composeSearchInput"
-    search-placeholder="Rechercher un projet…"
+    :search-placeholder="t('docker.searchProjectPlaceholder')"
     @update:search="composeSearchInput = $event"
   >
     <template #bottom>
@@ -14,7 +14,7 @@
             class="form-select"
           >
             <option value="">
-              Tous les hôtes
+              {{ t('docker.allHosts') }}
             </option>
             <option
               v-for="h in uniqueHosts"
@@ -31,13 +31,13 @@
             class="form-select"
           >
             <option value="">
-              Tous les états
+              {{ t('docker.allStates') }}
             </option>
             <option value="running">
-              En cours
+              {{ t('docker.running') }}
             </option>
             <option value="stopped">
-              Arrêté
+              {{ t('docker.stopped') }}
             </option>
           </select>
         </div>
@@ -53,11 +53,11 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Projet</th>
-            <th>Hôte</th>
-            <th>État</th>
-            <th>Services</th>
-            <th>Fichier de config</th>
+            <th>{{ t('docker.projectColumn') }}</th>
+            <th>{{ t('docker.hostColumn') }}</th>
+            <th>{{ t('docker.stateColumn') }}</th>
+            <th>{{ t('docker.servicesColumn') }}</th>
+            <th>{{ t('docker.configFileColumn') }}</th>
             <th />
           </tr>
         </thead>
@@ -79,14 +79,14 @@
             </td>
             <td>
               <span :class="getComposeStatus(p) === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
-                {{ getComposeStatus(p) === 'running' ? 'En cours' : 'Arrêté' }}
+                {{ getComposeStatus(p) === 'running' ? t('docker.running') : t('docker.stopped') }}
               </span>
               <span
                 v-if="getComposeUpdates(p).length > 0"
                 class="badge bg-warning-lt text-warning ms-1"
-                :title="getComposeUpdates(p).map(v => `${v.docker_image} : ${v.latest_version} dispo`).join('\n')"
+                :title="getComposeUpdates(p).map(v => t('docker.updateAvailableTooltipItem', { image: v.docker_image, version: v.latest_version })).join('\n')"
               >
-                {{ getComposeUpdates(p).length }} MAJ
+                {{ t('docker.updatesCountBadge', { count: getComposeUpdates(p).length }) }}
               </span>
               <div
                 v-if="getComposeUpdates(p).length > 0"
@@ -100,7 +100,7 @@
                     v-if="vc.tracker_id"
                     :to="`/release-trackers/${vc.tracker_id}`"
                     class="btn btn-sm btn-outline-secondary"
-                    title="Voir le suivi"
+                    :title="t('docker.viewTracking')"
                   >
                     {{ vc.docker_image }}
                   </router-link>
@@ -110,7 +110,7 @@
                     class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="isTrackerRunDisabled(vc)"
                     :title="trackerRunTooltip(vc)"
-                    aria-label="Déclencher le tracker"
+                    :aria-label="t('docker.triggerTracker')"
                     @click="runTracker(vc, p)"
                   >
                     <span
@@ -151,7 +151,7 @@
                     :disabled="!!actionLoading[p.name]"
                     class="btn btn-icon btn-sm btn-ghost-success"
                     title="Start (up -d)"
-                    aria-label="Démarrer le projet"
+                    :aria-label="t('docker.startProjectAriaLabel')"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_up', workingDir: p.working_dir || '' })"
                   >
                     <span
@@ -170,7 +170,7 @@
                       :disabled="!!actionLoading[p.name]"
                       class="btn btn-icon btn-sm btn-ghost-danger"
                       title="Stop (down)"
-                      aria-label="Arrêter le projet"
+                      :aria-label="t('docker.stopProjectTitle')"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_down', workingDir: p.working_dir || '' })"
                     >
                       <span
@@ -187,8 +187,8 @@
                       type="button"
                       :disabled="!!actionLoading[p.name]"
                       class="btn btn-icon btn-sm btn-ghost-warning"
-                      title="Redémarrer"
-                      aria-label="Redémarrer le projet"
+                      :title="t('docker.verbRestart')"
+                      :aria-label="t('docker.restartProjectTitle')"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_restart', workingDir: p.working_dir || '' })"
                     >
                       <span
@@ -206,8 +206,8 @@
                     type="button"
                     :disabled="!!actionLoading[p.name]"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Voir les logs"
-                    aria-label="Voir les logs du projet"
+                    :title="t('docker.viewProjectLogsTooltip')"
+                    :aria-label="t('docker.viewProjectLogsAriaLabel')"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_logs', workingDir: p.working_dir || '' })"
                   >
                     <span
@@ -224,7 +224,7 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Config"
+                  :title="t('docker.configTooltip')"
                   @click="selectedProject = p"
                 >
                   <IconFile
@@ -250,8 +250,8 @@
 
   <EmptyState
     v-if="filteredComposeProjects.length === 0"
-    :title="composeSearch || composeHostFilter || composeStateFilter ? 'Aucun résultat pour ces filtres' : 'Aucun projet Compose trouvé'"
-    :subtitle="composeSearch || composeHostFilter || composeStateFilter ? 'Modifiez vos critères de recherche' : 'Les projets Docker Compose apparaissent ici lorsque l\'agent les détecte'"
+    :title="composeSearch || composeHostFilter || composeStateFilter ? t('docker.noFilterResultsTitle') : t('docker.noComposeProjectsTitle')"
+    :subtitle="composeSearch || composeHostFilter || composeStateFilter ? t('docker.noFilterResultsSubtitle') : t('docker.noComposeProjectsSubtitle')"
   />
 
   <!-- Modal projet compose (raw config) -->
@@ -275,7 +275,7 @@
           <button
             type="button"
             class="btn-close"
-            aria-label="Fermer"
+            :aria-label="t('common.close')"
             @click="selectedProject = null"
           />
         </div>
@@ -284,13 +284,13 @@
             <div class="col-md-3 border-end p-3">
               <div class="mb-3">
                 <div class="text-secondary small fw-semibold text-uppercase mb-1">
-                  Hôte
+                  {{ t('docker.hostColumn') }}
                 </div>
                 <div>{{ selectedProject.hostname }}</div>
               </div>
               <div class="mb-3">
                 <div class="text-secondary small fw-semibold text-uppercase mb-1">
-                  Répertoire
+                  {{ t('docker.directoryLabel') }}
                 </div>
                 <div class="font-monospace small text-break">
                   {{ selectedProject.working_dir || '-' }}
@@ -298,7 +298,7 @@
               </div>
               <div class="mb-3">
                 <div class="text-secondary small fw-semibold text-uppercase mb-1">
-                  Fichier
+                  {{ t('docker.fileLabel') }}
                 </div>
                 <div class="font-monospace small text-break">
                   {{ selectedProject.config_file || '-' }}
@@ -306,7 +306,7 @@
               </div>
               <div>
                 <div class="text-secondary small fw-semibold text-uppercase mb-1">
-                  Services ({{ (selectedProject.services || []).length }})
+                  {{ t('docker.servicesWithCount', { count: (selectedProject.services || []).length }) }}
                 </div>
                 <div class="d-flex flex-wrap gap-1">
                   <span
@@ -323,13 +323,13 @@
             </div>
             <div class="col-md-9">
               <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2 border-bottom">
-                <span class="text-secondary small fw-semibold">docker compose config (résolu)</span>
+                <span class="text-secondary small fw-semibold">{{ t('docker.resolvedConfigLabel') }}</span>
                 <button
                   type="button"
                   :class="['btn', 'btn-sm', copied ? 'btn-success' : 'btn-ghost-secondary']"
                   @click="copyConfig(selectedProject.raw_config)"
                 >
-                  {{ copied ? '✓ Copié' : 'Copier' }}
+                  {{ copied ? t('docker.copiedBadge') : t('docker.copy') }}
                 </button>
               </div>
               <pre
@@ -341,7 +341,7 @@
                 v-else
                 class="p-4 text-secondary text-center"
               >
-                Config non disponible (agent trop ancien ou docker compose introuvable)
+                {{ t('docker.configNotAvailable') }}
               </div>
             </div>
           </div>
@@ -352,7 +352,7 @@
             class="btn"
             @click="selectedProject = null"
           >
-            Fermer
+            {{ t('common.close') }}
           </button>
         </div>
       </div>
@@ -366,6 +366,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconFile, IconList, IconPlayerPlay, IconRefresh, IconPlayerStop } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
@@ -423,6 +424,8 @@ const props = withDefaults(defineProps<{
 defineEmits<{
   (e: 'compose-action', ...args: unknown[]): void
 }>()
+
+const { t } = useI18n()
 
 const composeSearchInput = ref('')
 const composeSearch = ref('')
@@ -536,9 +539,9 @@ function isTrackerRunDisabled(vc: VersionComparison): boolean {
 }
 
 function trackerRunTooltip(vc: VersionComparison): string {
-  if (!props.canRunDocker) return 'Action réservée admin/opérateur'
-  if (!hasManualTrackerData(vc)) return 'Attendez la première vérification automatique'
-  return 'Déclencher la tâche du tracker maintenant'
+  if (!props.canRunDocker) return t('docker.adminOperatorOnly')
+  if (!hasManualTrackerData(vc)) return t('docker.waitFirstCheck')
+  return t('docker.triggerTrackerNow')
 }
 
 async function runTracker(vc: VersionComparison, project?: ComposeProject): Promise<void> {
@@ -549,9 +552,9 @@ async function runTracker(vc: VersionComparison, project?: ComposeProject): Prom
   trackerFeedbackIsError.value = false
   try {
     await apiClient.runReleaseTracker(id)
-    trackerFeedback.value = `Déclenchement lancé pour ${project?.name || vc?.docker_image || 'le tracker'}.`
+    trackerFeedback.value = t('docker.triggerLaunchedFor', { name: project?.name || vc?.docker_image || t('docker.trackerFallbackName') })
   } catch (e: unknown) {
-    trackerFeedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
+    trackerFeedback.value = getApiErrorMessage(e, t('docker.triggerFailed'))
     trackerFeedbackIsError.value = true
   } finally {
     const next = { ...trackerRunLoading.value }

@@ -4,19 +4,19 @@
       <label
         for="alert-source-name"
         class="form-label required"
-      >Nom</label>
+      >{{ t('alerts.sourceNameLabel') }}</label>
       <input
         id="alert-source-name"
         v-model="nameModel"
         type="text"
         class="form-control"
-        placeholder="Ex: CPU élevé sur serveur web"
+        :placeholder="t('alerts.sourceNamePlaceholder')"
       >
     </div>
 
     <div class="mb-3">
       <div class="form-label required">
-        Source des données
+        {{ t('alerts.sourceDataLabel') }}
       </div>
       <div
         class="btn-group w-100"
@@ -29,7 +29,7 @@
           :class="form.source_type === 'agent' ? 'btn-primary' : 'btn-outline-primary'"
           @click="emit('set-source-type', 'agent')"
         >
-          Agent
+          {{ t('alerts.sourceTypeAgentLabel') }}
         </button>
         <button
           type="button"
@@ -37,7 +37,7 @@
           :class="form.source_type === 'proxmox' ? 'btn-primary' : 'btn-outline-primary'"
           @click="emit('set-source-type', 'proxmox')"
         >
-          Proxmox
+          {{ t('alerts.sourceTypeProxmoxLabel') }}
         </button>
         <button
           type="button"
@@ -45,7 +45,7 @@
           :class="form.source_type === 'synthetic' ? 'btn-primary' : 'btn-outline-primary'"
           @click="emit('set-source-type', 'synthetic')"
         >
-          Synthétique
+          {{ t('alerts.sourceTypeSyntheticLabel') }}
         </button>
         <button
           type="button"
@@ -53,7 +53,7 @@
           :class="form.source_type === 'docker' ? 'btn-primary' : 'btn-outline-primary'"
           @click="emit('set-source-type', 'docker')"
         >
-          🐳 Docker
+          🐳 {{ t('alerts.sourceTypeDockerLabel') }}
         </button>
       </div>
     </div>
@@ -65,7 +65,7 @@
       <label
         for="alert-source-host-id"
         class="form-label"
-      >Hôte cible</label>
+      >{{ t('alerts.sourceTargetHostLabel') }}</label>
       <select
         id="alert-source-host-id"
         v-model="hostIdModel"
@@ -73,7 +73,7 @@
         :disabled="!metricSupportsHostFilter"
       >
         <option :value="null">
-          Tous les hôtes
+          {{ t('alerts.allHostsBadge') }}
         </option>
         <option
           v-for="host in hosts"
@@ -87,18 +87,18 @@
         v-if="!metricSupportsHostFilter"
         :id="`host-filter-hint-${rule?.id || 'new'}`"
         class="form-hint"
-      >Cette métrique est globale et n'est pas liée à un hôte.</small>
+      >{{ t('alerts.sourceHostFilterHint') }}</small>
     </div>
 
 
     <div class="mb-2 fw-semibold">
-      Choisissez une métrique à surveiller
+      {{ t('alerts.sourceChooseMetricLabel') }}
     </div>
     <div
       v-if="capabilitiesLoading"
       class="alert alert-info py-2 small mb-2"
     >
-      Chargement des métriques...
+      {{ t('alerts.sourceLoadingMetricsMsg') }}
     </div>
     <div
       v-else-if="capabilitiesError"
@@ -110,7 +110,7 @@
       v-if="form.host_id && hostMetricsLoading"
       class="alert alert-info py-2 small mb-2"
     >
-      Chargement des métriques pour cet hôte...
+      {{ t('alerts.sourceLoadingHostMetricsMsg') }}
     </div>
     <div
       v-else-if="form.host_id && hostMetricsError"
@@ -122,7 +122,7 @@
       v-else-if="form.host_id && hostMetrics?.metrics && hostMetrics.metrics.length < (capabilities?.metrics?.length || 0)"
       class="alert alert-info py-2 small mb-2"
     >
-      ℹ️ Cet hôte dispose de {{ hostMetrics.metrics.length }} métrique(s) — certains collecteurs peuvent ne pas être actifs.
+      {{ t('alerts.sourceHostMetricsCountInfo', { n: hostMetrics?.metrics?.length ?? 0 }) }}
     </div>
     <div class="metric-grid">
       <button
@@ -145,44 +145,44 @@
         <label
           for="alert-source-proxmox-scope-mode"
           class="form-label"
-        >Scope Proxmox</label>
+        >{{ t('alerts.sourceProxmoxScopeLabel') }}</label>
         <select
           id="alert-source-proxmox-scope-mode"
           v-model="proxmoxScopeModeModel"
           class="form-select"
         >
           <option value="global">
-            Global
+            {{ t('alerts.sourceScopeGlobalOption') }}
           </option>
           <option
             v-if="!metricAllowsGuestScope"
             value="connection"
           >
-            Connexion
+            {{ t('alerts.sourceScopeConnectionLabel') }}
           </option>
           <option
             v-if="!metricAllowsGuestScope"
             value="node"
           >
-            Nœud
+            {{ t('alerts.sourceScopeNodeLabel') }}
           </option>
           <option
             v-if="metricAllowsGuestScope"
             value="guest"
           >
-            VM/LXC
+            {{ t('alerts.sourceScopeGuestLabel') }}
           </option>
           <option
             v-if="metricAllowsStorageScope"
             value="storage"
           >
-            Stockage
+            {{ t('alerts.conditionsStorageColumnLabel') }}
           </option>
           <option
             v-if="metricAllowsDiskScope"
             value="disk"
           >
-            Disque physique
+            {{ t('alerts.sourceScopeDiskLabel') }}
           </option>
         </select>
       </div>
@@ -193,14 +193,14 @@
         <label
           for="alert-source-proxmox-connection"
           class="form-label"
-        >Connexion</label>
+        >{{ t('alerts.sourceScopeConnectionLabel') }}</label>
         <select
           id="alert-source-proxmox-connection"
           v-model="proxmoxConnectionIdModel"
           class="form-select"
         >
           <option value="">
-            Sélectionner...
+            {{ t('alerts.sourceSelectPlaceholderOption') }}
           </option>
           <option
             v-for="opt in proxmoxConnections"
@@ -218,14 +218,14 @@
         <label
           for="alert-source-proxmox-node"
           class="form-label"
-        >Nœud</label>
+        >{{ t('alerts.sourceScopeNodeLabel') }}</label>
         <select
           id="alert-source-proxmox-node"
           v-model="proxmoxNodeIdModel"
           class="form-select"
         >
           <option value="">
-            Sélectionner...
+            {{ t('alerts.sourceSelectPlaceholderOption') }}
           </option>
           <option
             v-for="opt in proxmoxNodes"
@@ -243,14 +243,14 @@
         <label
           for="alert-source-proxmox-guest"
           class="form-label"
-        >VM/LXC</label>
+        >{{ t('alerts.sourceScopeGuestLabel') }}</label>
         <select
           id="alert-source-proxmox-guest"
           v-model="proxmoxGuestIdModel"
           class="form-select"
         >
           <option value="">
-            Sélectionner...
+            {{ t('alerts.sourceSelectPlaceholderOption') }}
           </option>
           <option
             v-for="opt in proxmoxGuests"
@@ -268,14 +268,14 @@
         <label
           for="alert-source-proxmox-storage"
           class="form-label"
-        >Stockage</label>
+        >{{ t('alerts.conditionsStorageColumnLabel') }}</label>
         <select
           id="alert-source-proxmox-storage"
           v-model="proxmoxStorageIdModel"
           class="form-select"
         >
           <option value="">
-            Sélectionner...
+            {{ t('alerts.sourceSelectPlaceholderOption') }}
           </option>
           <option
             v-for="opt in proxmoxStorages"
@@ -293,14 +293,14 @@
         <label
           for="alert-source-proxmox-disk"
           class="form-label"
-        >Disque physique</label>
+        >{{ t('alerts.sourceScopeDiskLabel') }}</label>
         <select
           id="alert-source-proxmox-disk"
           v-model="proxmoxDiskIdModel"
           class="form-select"
         >
           <option value="">
-            Sélectionner...
+            {{ t('alerts.sourceSelectPlaceholderOption') }}
           </option>
           <option
             v-for="opt in proxmoxDisks"
@@ -316,7 +316,7 @@
           :id="`proxmox-scope-hint-${rule?.id || 'new'}`"
           class="form-hint d-block"
         >
-          Connexion = toute l'instance Proxmox liée. Nœud = un hôte Proxmox précis à l'intérieur de cette connexion.
+          {{ t('alerts.sourceProxmoxScopeHint') }}
         </small>
       </div>
     </div>
@@ -328,7 +328,7 @@
         <label
           for="alert-source-docker-host"
           class="form-label required"
-        >Hôte</label>
+        >{{ t('alerts.hostLabel') }}</label>
         <select
           id="alert-source-docker-host"
           :value="form.docker_scope.host_id"
@@ -336,7 +336,7 @@
           @change="onDockerHostChange"
         >
           <option value="">
-            Sélectionner un hôte...
+            {{ t('alerts.sourceSelectHostPlaceholder') }}
           </option>
           <option
             v-for="h in dockerHosts"
@@ -350,7 +350,7 @@
           v-if="dockerCapabilitiesLoading"
           class="form-hint"
         >
-          Chargement...
+          {{ t('alerts.sourceDockerLoadingMsg') }}
         </div>
       </div>
       <!-- Scope selector: shown for docker_container_state, hidden for docker_compose_degraded_services (forced compose_project) -->
@@ -361,7 +361,7 @@
         <label
           for="alert-source-docker-scope-mode"
           class="form-label"
-        >Scope</label>
+        >{{ t('alerts.sourceDockerScopeLabel') }}</label>
         <select
           id="alert-source-docker-scope-mode"
           :value="form.docker_scope.scope_mode"
@@ -369,10 +369,10 @@
           @change="onDockerScopeModeChange"
         >
           <option value="host">
-            Tous les containers
+            {{ t('alerts.sourceAllContainersOption') }}
           </option>
           <option value="container">
-            Container spécifique
+            {{ t('alerts.sourceSpecificContainerOption') }}
           </option>
         </select>
       </div>
@@ -381,13 +381,13 @@
         class="col-md-8"
       >
         <div class="form-label required">
-          Container(s)
+          {{ t('alerts.sourceContainersLabel') }}
         </div>
         <div
           v-if="(selectedDockerHost?.containers || []).length === 0"
           class="form-hint"
         >
-          Aucun container sur cet hôte.
+          {{ t('alerts.sourceNoContainersMsg') }}
         </div>
         <div
           v-else
@@ -415,7 +415,7 @@
           v-if="form.docker_scope.container_ids.length === 0"
           class="text-warning small mt-1"
         >
-          Sélectionnez au moins un container.
+          {{ t('alerts.sourceSelectContainerWarning') }}
         </div>
       </div>
       <div
@@ -425,21 +425,21 @@
         <label
           for="alert-source-docker-project"
           class="form-label required"
-        >Projet Compose</label>
+        >{{ t('alerts.conditionsComposeProjectColumnLabel') }}</label>
         <select
           id="alert-source-docker-project"
           v-model="dockerProjectNameModel"
           class="form-select"
         >
           <option value="">
-            Sélectionner...
+            {{ t('alerts.sourceSelectPlaceholderOption') }}
           </option>
           <option
             v-for="p in selectedDockerHost?.projects || []"
             :key="p.name"
             :value="p.name"
           >
-            {{ p.name }} ({{ p.services.length }} service{{ p.services.length > 1 ? 's' : '' }})
+            {{ p.name }} ({{ t('alerts.sourceComposeProjectServiceCount', { n: p.services.length }, p.services.length) }})
           </option>
         </select>
       </div>
@@ -447,13 +447,13 @@
         v-if="form.metric === 'docker_container_state' && form.docker_scope.scope_mode === 'host'"
         class="col-12"
       >
-        <small class="form-hint">Un incident sera créé par container dont l'état correspond à la condition définie à l'étape suivante.</small>
+        <small class="form-hint">{{ t('alerts.sourceDockerHostScopeHint') }}</small>
       </div>
       <div
         v-if="form.metric === 'docker_compose_degraded_services'"
         class="col-12"
       >
-        <small class="form-hint">Compare les services déclarés dans le compose.yml au nombre de services avec au moins un container running. La valeur est le nombre de services dégradés.</small>
+        <small class="form-hint">{{ t('alerts.sourceDockerComposeScopeHint') }}</small>
       </div>
     </div>
 
@@ -461,25 +461,26 @@
       v-if="form.metric === 'proxmox_storage_percent'"
       class="text-secondary small mt-2"
     >
-      Cette métrique est globale Proxmox: elle surveille le stockage le plus rempli parmi les stockages actifs.
+      {{ t('alerts.sourceProxmoxStorageGlobalHint') }}
     </div>
     <div
       v-else-if="form.metric === 'disk_smart_status'"
       class="text-secondary small mt-2"
     >
-      Utilisez typiquement un seuil > 0.5 pour déclencher quand au moins un disque est en état SMART FAILED.
+      {{ t('alerts.sourceDiskSmartHint') }}
     </div>
     <div
       v-else-if="form.metric === 'docker_container_not_running'"
       class="text-secondary small mt-2"
     >
-      Valeur 1 = container non running, 0 = running. Utilisez &gt; 0.5 comme seuil d'alerte.
+      {{ t('alerts.sourceDockerNotRunningHint') }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { AlertRuleFormData, DockerScope } from '../../composables/useAlertRuleForm'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 
@@ -527,6 +528,8 @@ const emit = defineEmits<{
   (e: 'set-source-type', value: 'agent' | 'proxmox' | 'synthetic' | 'docker'): void
   (e: 'update:form', value: AlertRuleFormData): void
 }>()
+
+const { t } = useI18n()
 
 // ── Shared form-field emit helpers ───────────────────────────────────
 // The `form` prop is owned by the parent (AlertRuleModal, via

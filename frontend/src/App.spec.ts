@@ -27,8 +27,13 @@ import App from './App.vue'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { emitHttpError, emitNetworkOk } from './utils/httpErrorBus'
+import { setLocale } from './i18n'
 
 function mountApp() {
+  // This suite's assertions are written against French copy (this app's
+  // default for its target audience) — happy-dom's navigator.language
+  // doesn't match, so without this the i18n auto-detect falls back to 'en'.
+  setLocale('fr')
   setActivePinia(createPinia())
   const auth = useAuthStore()
   auth.setAuth({ role: 'admin', username: 'admin' } as never, 'admin')
@@ -178,6 +183,27 @@ describe('App.vue — logout', () => {
     await flushPromises()
 
     expect(auth.isAuthenticated).toBe(false)
+    wrapper.unmount()
+  })
+})
+
+describe('App.vue — language switcher', () => {
+  it('switches the UI language and persists the choice', async () => {
+    const { wrapper } = mountApp()
+
+    await wrapper.find('.user-menu > .btn').trigger('click')
+    expect(wrapper.text()).toContain('Mon compte')
+
+    await wrapper.find('[aria-label="English"]').trigger('click')
+
+    expect(wrapper.text()).toContain('My account')
+    expect(wrapper.text()).not.toContain('Mon compte')
+    expect(localStorage.getItem('locale')).toBe('en')
+
+    await wrapper.find('[aria-label="Français"]').trigger('click')
+    expect(wrapper.text()).toContain('Mon compte')
+    expect(localStorage.getItem('locale')).toBe('fr')
+
     wrapper.unmount()
   })
 })

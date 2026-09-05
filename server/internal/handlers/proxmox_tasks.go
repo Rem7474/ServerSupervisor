@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/errors"
+	"github.com/serversupervisor/server/internal/apperr"
 )
 
 // ListTasks returns recent tasks, optionally filtered by ?connection_id and ?limit.
@@ -55,8 +55,8 @@ func (h *ProxmoxHandler) ListBackupRuns(c *gin.Context) {
 func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 	upid := c.Param("upid")
 	if upid == "" {
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusBadRequest, errors.NewErrorResponse(errors.CodeMissingParameter, lang))
+		lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusBadRequest, apperr.NewErrorResponse(apperr.CodeMissingParameter, lang, nil))
 		return
 	}
 	lines, err := h.svc.TaskLog(c.Request.Context(), c.Param("id"), upid)

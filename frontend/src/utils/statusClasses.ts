@@ -1,9 +1,13 @@
+import { i18n } from '../i18n'
+
 /**
  * Single source of truth for status/state → CSS class mappings.
  * Two semantic categories:
  *  - Entity state  : is something alive? (host, container, service, Proxmox guest)
  *  - Execution state: is a task/command done? (pending → running → completed/failed)
  */
+
+const { t } = i18n.global
 
 // ─── Entity states ────────────────────────────────────────────────────────────
 
@@ -31,26 +35,31 @@ export function getEntityStateClass(
   return ENTITY_STATE_MAP[state.toLowerCase()] ?? fallback
 }
 
-// French labels for the same entity states — kept alongside the class map so
-// a badge's color and text can't drift apart the way they previously did
-// (Docker showed "En cours" for a running container, Proxmox showed the raw
-// "running" for the exact same concept on a guest).
-const ENTITY_STATE_LABELS: Record<string, string> = {
-  online:     'En ligne',
-  offline:    'Hors ligne',
-  running:    'En cours',
-  restarting: 'Redémarrage',
-  paused:     'En pause',
-  created:    'Créé',
-  exited:     'Arrêté',
-  dead:       'Mort',
-  removing:   'Suppression',
-  stopped:    'Arrêté',
+// Labels for the same entity states — kept alongside the class map so a
+// badge's color and text can't drift apart the way they previously did
+// (Docker showed "running" translated for a running container, Proxmox
+// showed the raw "running" for the exact same concept on a guest). Built as
+// a function (not a static Record) so it re-evaluates t() on every call
+// instead of freezing translations to whatever locale was active at import
+// time.
+function entityStateLabels(): Record<string, string> {
+  return {
+    online:     t('common.statusOnline'),
+    offline:    t('common.statusOffline'),
+    running:    t('common.stateRunning'),
+    restarting: t('common.stateRestarting'),
+    paused:     t('common.statePaused'),
+    created:    t('common.stateCreated'),
+    exited:     t('common.stateExited'),
+    dead:       t('common.stateDead'),
+    removing:   t('common.stateRemoving'),
+    stopped:    t('common.stateExited'),
+  }
 }
 
 export function getEntityStateLabel(state: string | null | undefined, fallback?: string): string {
   if (!state) return fallback ?? ''
-  return ENTITY_STATE_LABELS[state.toLowerCase()] ?? fallback ?? state
+  return entityStateLabels()[state.toLowerCase()] ?? fallback ?? state
 }
 
 // ─── Execution / command states ───────────────────────────────────────────────
@@ -77,22 +86,24 @@ export function getExecutionStateClass(
   return EXECUTION_STATE_MAP[status.toLowerCase()] ?? fallback
 }
 
-const EXECUTION_STATE_LABELS: Record<string, string> = {
-  pending:   'En attente',
-  running:   'En cours',
-  completed: 'Terminé',
-  success:   'Réussi',
-  succeeded: 'Réussi',
-  ok:        'OK',
-  failed:    'Échoué',
-  error:     'Erreur',
-  skipped:   'Ignoré',
-  cancelled: 'Annulé',
+function executionStateLabels(): Record<string, string> {
+  return {
+    pending:   t('common.statePending'),
+    running:   t('common.stateRunning'),
+    completed: t('common.stateCompleted'),
+    success:   t('common.stateSuccess'),
+    succeeded: t('common.stateSuccess'),
+    ok:        t('common.stateOk'),
+    failed:    t('common.stateFailed'),
+    error:     t('common.error'),
+    skipped:   t('common.stateSkipped'),
+    cancelled: t('common.stateCancelled'),
+  }
 }
 
 export function getExecutionStateLabel(status: string | null | undefined, fallback?: string): string {
   if (!status) return fallback ?? ''
-  return EXECUTION_STATE_LABELS[status.toLowerCase()] ?? fallback ?? status
+  return executionStateLabels()[status.toLowerCase()] ?? fallback ?? status
 }
 
 /**

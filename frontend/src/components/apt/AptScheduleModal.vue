@@ -11,7 +11,7 @@
           <div class="modal-header">
             <div>
               <h5 class="modal-title">
-                Planifier une commande APT
+                {{ t('apt.scheduleModalTitle') }}
               </h5>
               <div class="text-muted small mt-1">
                 {{ hostLabel }}
@@ -25,16 +25,16 @@
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label class="form-label">Nom de la tâche</label>
+              <label class="form-label">{{ t('apt.taskName') }}</label>
               <input
                 v-model="form.name"
                 type="text"
                 class="form-control"
-                placeholder="ex: apt upgrade hebdo"
+                :placeholder="t('apt.taskNamePlaceholder')"
               >
             </div>
             <div class="mb-3">
-              <label class="form-label">Commande</label>
+              <label class="form-label">{{ t('apt.command') }}</label>
               <select
                 v-model="form.action"
                 class="form-select"
@@ -57,7 +57,7 @@
                   type="checkbox"
                   class="form-check-input"
                 >
-                <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
+                <span class="form-check-label">{{ t('apt.manualExecutionOnly') }}</span>
               </label>
             </div>
             <div
@@ -79,7 +79,7 @@
               <label
                 class="form-check-label"
                 for="schedEnabled"
-              >Activée</label>
+              >{{ t('apt.enabled') }}</label>
             </div>
             <div
               v-if="form.error"
@@ -94,7 +94,7 @@
               class="btn btn-secondary"
               @click="$emit('close')"
             >
-              Annuler
+              {{ t('common.cancel') }}
             </button>
             <button
               type="button"
@@ -106,7 +106,7 @@
                 v-if="form.saving"
                 class="spinner-border spinner-border-sm me-1"
               />
-              Créer la tâche
+              {{ t('apt.createTask') }}
             </button>
           </div>
         </div>
@@ -118,11 +118,14 @@
 
 <script setup lang="ts">
 import { reactive, computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import apiClient from '../../api'
 import CronBuilder from '../CronBuilder.vue'
 import { MANUAL_SENTINEL } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
 import { useModalChrome } from '../../composables/useModalChrome'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   host: { id: string; name?: string; hostname?: string } | null
@@ -184,7 +187,7 @@ async function saveSchedule(): Promise<void> {
     emit('created')
     emit('close')
   } catch (e: unknown) {
-    form.error = getApiErrorMessage(e, 'Erreur lors de la création')
+    form.error = getApiErrorMessage(e, t('apt.createError'))
   } finally {
     form.saving = false
   }

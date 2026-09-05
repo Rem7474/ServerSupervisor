@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { confirmAptCommand } from './aptConfirm'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { setLocale } from '../i18n'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 describe('confirmAptCommand', () => {
   it('resolves true immediately for update, without opening a dialog', async () => {

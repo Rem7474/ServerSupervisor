@@ -8,23 +8,23 @@
               to="/"
               class="text-decoration-none"
             >
-              Dashboard
+              {{ t('nav.sections.control.items.dashboard') }}
             </router-link>
             <span class="text-muted mx-1">/</span>
-            <span>Hôte</span>
+            <span>{{ t('host.hostBreadcrumb') }}</span>
           </div>
           <h2 class="page-title">
-            {{ host?.name || host?.hostname || 'Chargement...' }}
+            {{ host?.name || host?.hostname || t('host.loadingLabel') }}
           </h2>
           <div class="text-secondary">
-            {{ host?.hostname || 'Non connecté' }} - {{ host?.os || 'OS inconnu' }} - {{ host?.ip_address }}
-            <span v-if="host?.last_seen">- Dernière activité: <RelativeTime :date="host.last_seen" /></span>
+            {{ host?.hostname || t('host.notConnected') }} - {{ host?.os || t('host.unknownOs') }} - {{ host?.ip_address }}
+            <span v-if="host?.last_seen">- {{ t('host.lastActivityLabel') }} <RelativeTime :date="host.last_seen" /></span>
           </div>
           <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
             <span
               v-if="host"
               :class="hostStatusClass(host.status)"
-              :aria-label="`Statut de l'hôte : ${formatHostStatus(host.status)}`"
+              :aria-label="t('host.hostStatusAriaLabel', { status: formatHostStatus(host.status) })"
             >
               <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
               {{ formatHostStatus(host.status) }}
@@ -32,9 +32,9 @@
             <BadgePill
               v-if="host?.agent_version"
               :tone="isAgentUpToDate(host.agent_version) ? 'success' : 'warning'"
-              :text="`Agent v${host.agent_version}`"
-              :aria-label="isAgentUpToDate(host.agent_version) ? `Agent version ${host.agent_version}, à jour` : `Agent version ${host.agent_version}, mise à jour disponible`"
-              :title="isAgentUpToDate(host.agent_version) ? 'Agent à jour' : 'Mise à jour de l\'agent disponible'"
+              :text="t('host.agentVersionBadge', { version: host.agent_version })"
+              :aria-label="isAgentUpToDate(host.agent_version) ? t('host.agentUpToDateAriaSuffix', { version: host.agent_version }) : t('host.agentUpdateAvailableAriaSuffix', { version: host.agent_version })"
+              :title="isAgentUpToDate(host.agent_version) ? t('host.agentUpToDateTitle') : t('host.agentUpdateAvailableTitle')"
               compact
             />
           </div>
@@ -49,7 +49,7 @@
               :size="16"
               class="icon me-1"
             />
-            Modifier
+            {{ t('host.editLabel') }}
           </button>
           <button
             v-if="canUpdateAgent"
@@ -62,7 +62,7 @@
               :size="16"
               class="icon me-1"
             />
-            Mettre à jour l'agent
+            {{ t('host.updateAgentLabel') }}
           </button>
           <button
             v-if="auth.isAdmin"
@@ -74,7 +74,7 @@
               :size="16"
               class="icon me-1"
             />
-            Supprimer
+            {{ t('host.deleteLabel') }}
           </button>
         </div>
       </div>
@@ -123,9 +123,9 @@
           <router-link
             :to="`/proxmox/guests/${proxmoxLink.guest_id}`"
             class="text-decoration-none small d-inline-flex align-items-center gap-1"
-            title="Voir le guest Proxmox (démarrer/arrêter, métriques détaillées)"
+            :title="t('host.viewGuestTooltip')"
           >
-            Voir le guest
+            {{ t('host.viewGuestLabel') }}
             <IconExternalLink :size="14" />
           </router-link>
         </div>
@@ -134,13 +134,13 @@
         <div class="d-flex align-items-center gap-2">
           <BadgePill
             v-if="proxmoxLink.status === 'suggested'"
-            text="Suggestion"
+            :text="t('host.suggestionBadge')"
             tone="warning"
             compact
           />
           <BadgePill
             v-else
-            text="Lié"
+            :text="t('host.linkedBadge')"
             tone="success"
             compact
           />
@@ -151,7 +151,7 @@
               :disabled="linkSaving"
               @click="confirmLink"
             >
-              Confirmer
+              {{ t('host.confirmLabel') }}
             </button>
             <button
               type="button"
@@ -159,7 +159,7 @@
               :disabled="linkSaving"
               @click="ignoreLink"
             >
-              Ignorer
+              {{ t('host.ignoreLabel') }}
             </button>
           </template>
         </div>
@@ -169,7 +169,7 @@
           v-if="proxmoxLink.status === 'confirmed'"
           class="d-flex align-items-center gap-2 ms-auto"
         >
-          <label class="form-label mb-0 text-muted small">Source métriques :</label>
+          <label class="form-label mb-0 text-muted small">{{ t('host.metricsSourceLabel') }}</label>
           <select
             class="form-select form-select-sm"
             style="width:auto"
@@ -177,7 +177,7 @@
             @change="changeMetricsSource(($event.target as HTMLSelectElement).value as 'agent' | 'proxmox' | 'auto')"
           >
             <option value="auto">
-              Automatique
+              {{ t('host.automaticOption') }}
             </option>
             <option value="agent">
               Agent
@@ -190,7 +190,7 @@
             type="button"
             class="btn btn-icon btn-sm btn-outline-danger"
             :disabled="linkSaving"
-            title="Supprimer le lien"
+            :title="t('host.deleteLinkTooltip')"
             @click="deleteLink"
           >
             <IconTrash
@@ -217,7 +217,7 @@
               v-if="linkDiskPct != null"
               class="text-muted small"
             >
-              Disque <strong :class="getMetricColorClass(linkDiskPct)">{{ linkDiskPct.toFixed(1) }}%</strong>
+              {{ t('host.diskLabel') }} <strong :class="getMetricColorClass(linkDiskPct)">{{ linkDiskPct.toFixed(1) }}%</strong>
             </div>
           </div>
         </template>
@@ -238,7 +238,7 @@
           :size="16"
           class="icon icon-sm me-1"
         />
-        Lier à Proxmox
+        {{ t('host.linkToProxmoxLabel') }}
       </button>
     </div>
 
@@ -249,19 +249,19 @@
     >
       <div class="card-body">
         <div class="fw-medium mb-2">
-          Lier cet hôte à un guest Proxmox
+          {{ t('host.linkHostToGuestLabel') }}
         </div>
         <div
           v-if="linkCandidatesLoading"
           class="text-muted small"
         >
-          Chargement...
+          {{ t('host.loadingLabel') }}
         </div>
         <div
           v-else-if="linkCandidates.length === 0"
           class="text-muted small"
         >
-          Aucun guest Proxmox disponible (non encore lié).
+          {{ t('host.noGuestAvailable') }}
         </div>
         <div
           v-else
@@ -272,7 +272,7 @@
             class="form-select form-select-sm candidate-select"
           >
             <option value="">
-              -- Choisir un guest --
+              {{ t('host.chooseGuestOption') }}
             </option>
             <option
               v-for="g in linkCandidates"
@@ -288,14 +288,14 @@
             :disabled="!selectedCandidate || linkSaving"
             @click="createManualLink"
           >
-            Lier
+            {{ t('host.linkButtonLabel') }}
           </button>
           <button
             type="button"
             class="btn btn-sm btn-outline-secondary"
             @click="showLinkForm = false; selectedCandidate = ''"
           >
-            Annuler
+            {{ t('host.cancel') }}
           </button>
         </div>
       </div>
@@ -330,12 +330,12 @@
                       {{ aptStatus?.pending_packages || 0 }}
                     </div>
                     <div class="text-secondary small">
-                      {{ aptStatus?.security_updates || 0 }} sécurité
+                      {{ aptStatus?.security_updates || 0 }} {{ t('host.securityUpdatesSuffix') }}
                       <a
                         href="#"
                         class="ms-1 text-decoration-none"
                         @click.prevent="activeTab = 'apt'"
-                      >voir</a>
+                      >{{ t('host.seeLabel') }}</a>
                     </div>
                   </div>
                 </div>
@@ -344,18 +344,18 @@
                 <div class="card card-sm h-100">
                   <div class="card-body">
                     <div class="subheader">
-                      Conteneurs Docker
+                      {{ t('host.dockerContainersLabel') }}
                     </div>
                     <div class="h2 mb-0 mt-1">
                       {{ dockerRunningCount }} / {{ containers.length }}
                     </div>
                     <div class="text-secondary small">
-                      en cours
+                      {{ t('host.runningLabel') }}
                       <a
                         href="#"
                         class="ms-1 text-decoration-none"
                         @click.prevent="activeTab = 'docker'"
-                      >voir</a>
+                      >{{ t('host.seeLabel') }}</a>
                     </div>
                   </div>
                 </div>
@@ -364,7 +364,7 @@
                 <div class="card card-sm h-100">
                   <div class="card-body">
                     <div class="subheader">
-                      Tâches planifiées
+                      {{ t('host.scheduledTasksTabLabel') }}
                     </div>
                     <div class="h2 mb-0 mt-1">
                       {{ tasksCount }}
@@ -374,7 +374,7 @@
                         href="#"
                         class="text-decoration-none"
                         @click.prevent="activeTab = 'planifiees'"
-                      >voir</a>
+                      >{{ t('host.seeLabel') }}</a>
                     </div>
                   </div>
                 </div>
@@ -383,7 +383,7 @@
                 <div class="card card-sm h-100">
                   <div class="card-body">
                     <div class="subheader">
-                      Commandes récentes
+                      {{ t('host.recentCommandsLabel') }}
                     </div>
                     <div class="h2 mb-0 mt-1">
                       {{ cmdHistory.length }}
@@ -393,7 +393,7 @@
                         href="#"
                         class="text-decoration-none"
                         @click.prevent="goToTimelineCommands"
-                      >voir</a>
+                      >{{ t('host.seeLabel') }}</a>
                     </div>
                   </div>
                 </div>
@@ -407,13 +407,13 @@
                     :size="24"
                     class="icon me-1"
                   />
-                  Alertes actives sur cet hôte
+                  {{ t('host.activeAlertsTitle') }}
                 </h3>
                 <router-link
                   to="/alerts?tab=incidents"
                   class="btn btn-sm btn-outline-secondary"
                 >
-                  Toutes les alertes
+                  {{ t('host.allAlertsLabel') }}
                 </router-link>
               </div>
               <div
@@ -426,7 +426,7 @@
                 v-else-if="!hostActiveIncidents.length"
                 class="card-body"
               >
-                <EmptyState title="Aucune alerte active sur cet hôte." />
+                <EmptyState :title="t('host.noActiveAlerts')" />
               </div>
               <div
                 v-else
@@ -458,7 +458,7 @@
                 :size="16"
                 class="icon me-2"
               />
-              Agent hors ligne — les données affichées peuvent être obsolètes ou indisponibles.
+              {{ t('host.agentOfflineWarning') }}
             </div>
             <HostMetricsPanel
               :host-id="hostId"
@@ -607,7 +607,7 @@
                     :size="16"
                     class="icon icon-sm text-warning"
                   />
-                  Permissions par hôte
+                  {{ t('host.perHostPermissionsTitle') }}
                 </h3>
                 <span class="badge badge-sm bg-danger text-white">Admin only</span>
               </div>
@@ -617,8 +617,8 @@
                 </div>
                 <EmptyState
                   v-else-if="!hostPerms.length"
-                  title="Aucune restriction"
-                  subtitle="Tous les utilisateurs accèdent à cet hôte selon leur rôle global."
+                  :title="t('host.noRestrictionsTitle')"
+                  :subtitle="t('host.noRestrictionsSubtitle')"
                 />
                 <table
                   v-else
@@ -626,8 +626,8 @@
                 >
                   <thead>
                     <tr>
-                      <th>Utilisateur</th>
-                      <th>Niveau</th>
+                      <th>{{ t('host.userColumn') }}</th>
+                      <th>{{ t('host.levelColumn') }}</th>
                       <th />
                     </tr>
                   </thead>
@@ -646,7 +646,7 @@
                         <button
                           type="button"
                           class="btn btn-icon btn-sm btn-ghost-danger"
-                          title="Révoquer"
+                          :title="t('host.revokeTooltip')"
                           @click="revokePermission(p.username)"
                         >
                           <IconX
@@ -665,7 +665,7 @@
                   class="btn btn-sm btn-outline-primary"
                   @click="openAddPermission"
                 >
-                  + Ajouter
+                  {{ t('host.addPermissionLabel') }}
                 </button>
               </div>
             </div>
@@ -676,8 +676,8 @@
       <CommandLogPanel
         :command="(liveCommand as any)"
         :show="showConsole"
-        title="Console Live"
-        empty-text="Aucune console active"
+        :title="t('host.consoleLive')"
+        :empty-text="t('host.noActiveConsole')"
         wrapper-class="side-panel"
         :clearable="true"
         @open="showConsole = true"
@@ -700,7 +700,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              Ajouter une permission
+              {{ t('host.addPermissionTitle') }}
             </h5>
             <button
               type="button"
@@ -710,13 +710,13 @@
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label class="form-label">Utilisateur</label>
+              <label class="form-label">{{ t('host.userColumn') }}</label>
               <select
                 v-model="newPermUsername"
                 class="form-select"
               >
                 <option value="">
-                  -- Choisir --
+                  {{ t('host.chooseEllipsis') }}
                 </option>
                 <option
                   v-for="u in availableUsers"
@@ -728,16 +728,16 @@
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label">Niveau</label>
+              <label class="form-label">{{ t('host.levelColumn') }}</label>
               <select
                 v-model="newPermLevel"
                 class="form-select"
               >
                 <option value="viewer">
-                  viewer — lecture seule
+                  {{ t('host.viewerReadOnlyOption') }}
                 </option>
                 <option value="operator">
-                  operator — lecture + commandes
+                  {{ t('host.operatorOption') }}
                 </option>
               </select>
             </div>
@@ -754,7 +754,7 @@
               class="btn btn-secondary"
               @click="addPermModal = false"
             >
-              Annuler
+              {{ t('host.cancel') }}
             </button>
             <button
               type="button"
@@ -766,7 +766,7 @@
                 v-if="permSaving"
                 class="spinner-border spinner-border-sm me-1"
               />
-              Enregistrer
+              {{ t('host.saveLabel') }}
             </button>
           </div>
         </div>
@@ -777,6 +777,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import { useModalChrome } from '../composables/useModalChrome'
@@ -808,6 +809,8 @@ import EmptyState from '../components/EmptyState.vue'
 import BadgePill from '../components/common/BadgePill.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { getMetricColorClass } from '../utils/metricColor'
+
+const { t } = useI18n()
 
 const {
   auth,
@@ -885,8 +888,8 @@ const {
 const permModalRef = ref<HTMLElement | null>(null)
 useModalChrome(permModalRef, () => addPermModal.value, { onClose: () => { addPermModal.value = false } })
 
-// "Commandes récentes" KPI card jumps to the Timeline tab pre-filtered to
-// command-type events — the Timeline tab absorbed the standalone Commandes
+// "Recent commands" KPI card jumps to the Timeline tab pre-filtered to
+// command-type events — the Timeline tab absorbed the standalone Commands
 // tab (same underlying remote_commands data, Timeline already merged it in
 // as one of its type filters plus richer context).
 const timelineRef = ref<{ filterCommands: () => void } | null>(null)
@@ -943,7 +946,7 @@ const exposureDomainCount = ref(0)
 // Incidents' `host_name` is `hosts.name` (see db_notifications.go), so this
 // pre-fills AlertIncidentList's search box to this host instead of landing on
 // the undifferentiated full incidents list.
-// Narrows the "Tâches planifiées" tab's module picker to what this host's
+// Narrows the "Scheduled tasks" tab's module picker to what this host's
 // agent actually reports collecting (see HostTasksTab's `collectors` prop).
 const hostCollectors = computed(() => host.value?.collectors as Record<string, boolean> | undefined)
 
@@ -963,12 +966,12 @@ const hostTabs = computed<EntityTab[]>(() => {
   const tabs: EntityTab[] = [
     {
       key: 'overview',
-      label: "Vue d'ensemble",
+      label: t('host.overviewTabLabel'),
       badges: hostActiveIncidents.value.length
         ? [{ value: hostActiveIncidents.value.length, badgeClass: 'badge bg-danger-lt text-danger ms-1' }]
         : [],
     },
-    { key: 'metrics', label: 'Métriques' },
+    { key: 'metrics', label: t('host.metricsTabLabel') },
     {
       key: 'docker',
       label: 'Docker',
@@ -983,11 +986,11 @@ const hostTabs = computed<EntityTab[]>(() => {
           ? [{ value: pendingPackages, badgeClass: 'badge bg-warning-lt text-warning ms-1' }]
           : [],
     },
-    { key: 'backup', label: 'Sauvegardes' },
-    { key: 'reseau-flux', label: 'Trafic réseau', lazy: true },
+    { key: 'backup', label: t('host.backupTabLabel') },
+    { key: 'reseau-flux', label: t('host.networkTrafficTabLabel'), lazy: true },
     {
       key: 'exposition',
-      label: 'Exposition',
+      label: t('host.exposureLabel'),
       badges: exposureDomainCount.value > 0
         ? [{ value: exposureDomainCount.value, badgeClass: 'badge bg-azure-lt text-azure ms-1' }]
         : [],
@@ -996,23 +999,23 @@ const hostTabs = computed<EntityTab[]>(() => {
 
   if (canRunApt.value) {
     tabs.push(
-      { key: 'systeme', label: 'Systeme' },
-      { key: 'processus', label: 'Processus' }
+      { key: 'systeme', label: t('host.systemTabLabel') },
+      { key: 'processus', label: t('host.processesTabLabel') }
     )
   }
 
-  // Labeled "Permissions" (not "Sécurité") to avoid colliding with
-  // ProxmoxNodeView's "Journaux sécurité" tab — same word, unrelated content
+  // Labeled "Permissions" (not "Security") to avoid colliding with
+  // ProxmoxNodeView's "Security logs" tab — same word, unrelated content
   // (per-host RBAC here vs. PVE syslog auth-failure search there).
-  tabs.push({ key: 'securite', label: 'Permissions' })
+  tabs.push({ key: 'securite', label: t('host.permissionsTabLabel') })
   tabs.push({
     key: 'taches-personnalisees',
-    label: 'Tâches personnalisées',
+    label: t('host.customTasksTabLabel'),
     badges: customTasksCount.value ? [{ value: customTasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
   })
   tabs.push({
     key: 'planifiees',
-    label: 'Tâches planifiées',
+    label: t('host.scheduledTasksTabLabel'),
     badges: tasksCount.value ? [{ value: tasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
   })
   tabs.push({ key: 'timeline', label: 'Timeline' })

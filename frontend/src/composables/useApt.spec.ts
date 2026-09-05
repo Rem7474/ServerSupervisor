@@ -31,15 +31,18 @@ vi.mock('./useCommandStream', () => ({
   }),
 }))
 
-const { updateHostAgent } = vi.hoisted(() => ({ updateHostAgent: vi.fn() }))
+const { updateHostAgent, sendAptCommand } = vi.hoisted(() => ({ updateHostAgent: vi.fn(), sendAptCommand: vi.fn() }))
 
 vi.mock('../api', () => ({
-  default: { sendAptCommand: vi.fn(), updateHostAgent },
+  default: { sendAptCommand, updateHostAgent },
   getApiErrorMessage: (e: unknown) => String(e),
 }))
 
 import { useApt } from './useApt'
 import { useConfirmDialog } from './useConfirmDialog'
+import { useGlobalToast } from './useGlobalToast'
+import { useAuthStore } from '../stores/auth'
+import { setLocale } from '../i18n'
 import type { Host } from '../types/host'
 
 const HOST: Host = { id: 'h1', name: 'web-01' } as Host
@@ -87,11 +90,14 @@ function emitFullAptSnapshot(overrides: FullSnapshotOverrides = {}) {
 
 beforeEach(() => {
   setActivePinia(createPinia())
+  setLocale('fr')
   streamOptionsByCommand.clear()
   wsMessageHandler.current = null
   updateHostAgent.mockClear()
   updateHostAgent.mockResolvedValue({ data: {} })
+  sendAptCommand.mockClear()
   openCommandStream.mockClear()
+  useGlobalToast().toasts.splice(0)
   vi.useFakeTimers()
 })
 
@@ -261,6 +267,180 @@ describe('useApt — bulk agent update', () => {
     await updatePromise
 
     expect(updateHostAgent).not.toHaveBeenCalled()
+  })
+})
+
+describe('useApt — host filter options', () => {
+  it('exposes the quick-filter options with their French labels', () => {
+    const { api } = mountUseApt()
+    expect(api.hostFilterOptions.value.map((f) => f.label)).toEqual([
+      'Tous', 'CVE critiques', 'Sécu > 0', 'Redémarrage requis', 'Agent obsolète',
+    ])
+  })
+})
+
+describe('useApt — runAptCmdForHost', () => {
+  beforeEach(() => {
+    useAuthStore().role = 'admin'
+  })
+
+  it('is a no-op for a caller without run permission', async () => {
+    useAuthStore().role = 'viewer'
+    sendAptCommand.mockResolvedValue({ data: { commands: [] } })
+    const { api } = mountUseApt()
+
+    await api.runAptCmdForHost(HOST, 'update')
+
+    expect(sendAptCommand).not.toHaveBeenCalled()
+  })
+
+  it('dispatches "update" immediately without a confirmation dialog', async () => {
+    sendAptCommand.mockResolvedValue({ data: { commands: [{ command_id: 'cmd1', host_id: 'h1', status: 'pending' }] } })
+    const { api } = mountUseApt()
+    const dialog = useConfirmDialog()
+
+    await api.runAptCmdForHost(HOST, 'update')
+
+    expect(dialog.isOpen.value).toBe(false)
+    expect(sendAptCommand).toHaveBeenCalledWith(['h1'], 'update')
+  })
+
+  it('asks for confirmation before "upgrade", and skips the dispatch when cancelled', async () => {
+    const { api } = mountUseApt()
+    const dialog = useConfirmDialog()
+
+    const promise = api.runAptCmdForHost(HOST, 'upgrade')
+    expect(dialog.title.value).toBe('apt upgrade')
+    dialog.onCancel()
+    await promise
+
+    expect(sendAptCommand).not.toHaveBeenCalled()
+  })
+
+  it('shows the mapped error from a per-command failure when nothing launched', async () => {
+    sendAptCommand.mockResolvedValue({ data: { commands: [{ host_id: 'h1', error: 'agent hors ligne' }] } })
+    const { api } = mountUseApt()
+    const dialog = useConfirmDialog()
+
+    const promise = api.runAptCmdForHost(HOST, 'update')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(dialog.isOpen.value).toBe(true)
+    expect(dialog.title.value).toBe('Erreur')
+    expect(dialog.message.value).toBe('agent hors ligne')
+    dialog.onConfirm()
+    await promise
+  })
+
+  it('shows a translated error when the dispatch request itself throws', async () => {
+    sendAptCommand.mockRejectedValue(new Error('network down'))
+    const { api } = mountUseApt()
+    const dialog = useConfirmDialog()
+
+    const promise = api.runAptCmdForHost(HOST, 'update')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(dialog.isOpen.value).toBe(true)
+    expect(dialog.title.value).toBe('Erreur')
+    expect(dialog.message.value).toContain('network down')
+    dialog.onConfirm()
+    await promise
+  })
+})
+
+describe('useApt — bulkAptCmd', () => {
+  it('shows the single-host success message', async () => {
+    sendAptCommand.mockResolvedValue({ data: { commands: [{ command_id: 'cmd1', host_id: 'h1', status: 'pending' }] } })
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({ hosts: [HOST] })
+    api.selectedHosts.value = ['h1']
+
+    const dialog = useConfirmDialog()
+    const promise = api.bulkAptCmd('upgrade')
+    dialog.onConfirm()
+    await promise
+
+    expect(sendAptCommand).toHaveBeenCalledWith(['h1'], 'upgrade')
+    // A single selected host takes a single-host phrasing branch (never
+    // reaches the toast at all, since selectedHosts.length === 1 and there
+    // are no failures) — no toast is expected here.
+    expect(useGlobalToast().toasts.length).toBe(0)
+  })
+
+  it('shows the multi-host success message with the host count', async () => {
+    sendAptCommand.mockResolvedValue({
+      data: {
+        commands: [
+          { command_id: 'cmd1', host_id: 'h1', status: 'pending' },
+          { command_id: 'cmd2', host_id: 'h2', status: 'pending' },
+        ],
+      },
+    })
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({ hosts: [HOST, HOST2] })
+    api.selectedHosts.value = ['h1', 'h2']
+
+    const dialog = useConfirmDialog()
+    const promise = api.bulkAptCmd('update')
+    dialog.onConfirm()
+    await promise
+
+    expect(sendAptCommand).toHaveBeenCalledWith(['h1', 'h2'], 'update')
+    const toasts = useGlobalToast().toasts
+    expect(toasts[toasts.length - 1]?.message).toBe('apt update lancée sur 2 hôtes')
+    expect(toasts[toasts.length - 1]?.type).toBe('success')
+  })
+
+  it('reports a mixed launched/failed summary', async () => {
+    sendAptCommand.mockResolvedValue({
+      data: {
+        commands: [
+          { command_id: 'cmd1', host_id: 'h1', status: 'pending' },
+          { host_id: 'h2', error: 'agent hors ligne' },
+        ],
+      },
+    })
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({ hosts: [HOST, HOST2] })
+    api.selectedHosts.value = ['h1', 'h2']
+
+    const dialog = useConfirmDialog()
+    const promise = api.bulkAptCmd('update')
+    dialog.onConfirm()
+    await promise
+
+    expect(sendAptCommand).toHaveBeenCalledWith(['h1', 'h2'], 'update')
+    const toasts = useGlobalToast().toasts
+    expect(toasts[toasts.length - 1]?.message).toBe('apt update lancée sur web-01 — échec sur : db-01')
+    expect(toasts[toasts.length - 1]?.type).toBe('warning')
+  })
+
+  it('does not dispatch when the bulk confirmation is cancelled', async () => {
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({ hosts: [HOST] })
+    api.selectedHosts.value = ['h1']
+
+    const dialog = useConfirmDialog()
+    const promise = api.bulkAptCmd('dist-upgrade')
+    expect(dialog.variant.value).toBe('danger')
+    dialog.onCancel()
+    await promise
+
+    expect(sendAptCommand).not.toHaveBeenCalled()
+  })
+
+  it('shows a translated error dialog when the bulk dispatch request throws', async () => {
+    sendAptCommand.mockRejectedValue(new Error('network down'))
+    const { api } = mountUseApt()
+    emitFullAptSnapshot({ hosts: [HOST] })
+    api.selectedHosts.value = ['h1']
+
+    const dialog = useConfirmDialog()
+    const promise = api.bulkAptCmd('upgrade')
+    dialog.onConfirm() // confirms the "apt upgrade" action dialog
+    await vi.advanceTimersByTimeAsync(0) // let the rejected sendAptCommand settle and reopen the dialog as an error
+    expect(dialog.title.value).toBe('Erreur')
+    expect(dialog.message.value).toContain('network down')
+    dialog.onConfirm() // dismiss the error dialog so the function can resolve
+    await promise
   })
 })
 

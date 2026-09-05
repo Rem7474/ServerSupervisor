@@ -13,10 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
-	errs "github.com/serversupervisor/server/internal/errors"
 	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/safego"
 	"golang.org/x/time/rate"
@@ -424,8 +424,8 @@ func AdminOnlyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get("role")
 		if role != "admin" {
-			lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeAdminRequired, lang)})
+			lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+			c.JSON(http.StatusForbidden, gin.H{"error": apperr.GetMessage(apperr.CodeAdminRequired, lang, nil)})
 			c.Abort()
 			return
 		}
@@ -455,8 +455,8 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 		username := c.GetString("username")
 		restricted, level, err := db.GetHostAccess(c.Request.Context(), username, hostID)
 		if err != nil {
-			lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errs.GetMessage(errs.CodePermissionFailed, lang)})
+			lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": apperr.GetMessage(apperr.CodePermissionFailed, lang, nil)})
 			c.Abort()
 			return
 		}
@@ -467,16 +467,16 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 			return
 		}
 
-		lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
 
 		if level == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeHostAccessDenied, lang)})
+			c.JSON(http.StatusForbidden, gin.H{"error": apperr.GetMessage(apperr.CodeHostAccessDenied, lang, nil)})
 			c.Abort()
 			return
 		}
 
 		if requiredLevel == "operator" && level != "operator" {
-			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeOperatorRequired, lang)})
+			c.JSON(http.StatusForbidden, gin.H{"error": apperr.GetMessage(apperr.CodeOperatorRequired, lang, nil)})
 			c.Abort()
 			return
 		}

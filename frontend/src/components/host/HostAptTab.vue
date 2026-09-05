@@ -5,7 +5,7 @@
   >
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        APT - Mises à jour système
+        {{ t('host.aptTitle') }}
       </h3>
       <div
         v-if="canRunApt"
@@ -51,7 +51,7 @@
       <span
         v-else
         class="text-secondary small"
-      >Mode lecture seule</span>
+      >{{ t('host.aptReadOnlyMode') }}</span>
     </div>
     <div class="card-body">
       <div class="row row-cards">
@@ -65,7 +65,7 @@
                 {{ aptStatus.pending_packages }}
               </div>
               <div class="text-secondary small">
-                Paquets en attente
+                {{ t('host.aptPendingPackagesLabel') }}
               </div>
             </div>
           </div>
@@ -77,7 +77,7 @@
                 {{ aptStatus.security_updates }}
               </div>
               <div class="text-secondary small">
-                Mises à jour sécurité
+                {{ t('host.aptSecurityUpdatesLabel') }}
               </div>
             </div>
           </div>
@@ -86,13 +86,13 @@
           <div class="card card-sm">
             <div class="card-body text-center">
               <div class="text-secondary small">
-                Dernier apt update
+                {{ t('host.aptLastUpdateLabel') }}
               </div>
               <div class="fw-semibold">
                 {{ formatDate(aptStatus.last_update) }}
               </div>
               <div class="text-secondary small mt-2">
-                Dernier upgrade
+                {{ t('host.aptLastUpgradeLabel') }}
               </div>
               <div class="fw-semibold">
                 {{ formatDate(lastUpgradeDate) }}
@@ -125,7 +125,7 @@
   >
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        APT - Mises à jour système
+        {{ t('host.aptTitle') }}
       </h3>
       <div
         v-if="canRunApt"
@@ -147,10 +147,10 @@
       <span
         v-else
         class="text-secondary small"
-      >Mode lecture seule</span>
+      >{{ t('host.aptReadOnlyMode') }}</span>
     </div>
     <div class="card-body text-secondary small">
-      Aucune donnée APT disponible. Lancez <strong>apt update</strong> pour initialiser.
+      {{ t('host.aptNoDataPrefix') }} <strong>apt update</strong> {{ t('host.aptNoDataSuffix') }}
     </div>
   </div>
 
@@ -158,7 +158,7 @@
   <div class="card mt-3">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title mb-0">
-        Mises à jour automatiques
+        {{ t('host.uuTitle') }}
       </h3>
       <div
         v-if="uuStatus"
@@ -167,16 +167,16 @@
         <span
           v-if="!uuStatus.installed"
           class="badge bg-secondary-lt text-secondary"
-        >Non installé</span>
+        >{{ t('host.uuNotInstalledBadge') }}</span>
         <template v-else>
           <span
             class="badge"
             :class="uuStatus.enabled ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
-          >{{ uuStatus.enabled ? 'Activé' : 'Désactivé' }}</span>
+          >{{ uuStatus.enabled ? t('host.uuEnabledBadge') : t('host.uuDisabledBadge') }}</span>
           <span
             v-if="uuStatus.reboot_required"
             class="badge bg-warning-lt text-warning"
-          >Redémarrage requis</span>
+          >{{ t('host.uuRebootRequiredBadge') }}</span>
         </template>
       </div>
     </div>
@@ -186,7 +186,7 @@
         v-if="uuStatus && !uuStatus.installed"
         class="d-flex align-items-center gap-3"
       >
-        <span class="text-secondary">unattended-upgrades n'est pas installé sur cet hôte.</span>
+        <span class="text-secondary">{{ t('host.uuNotInstalledMessage') }}</span>
         <button
           v-if="canRunApt"
           type="button"
@@ -198,7 +198,7 @@
             v-if="uuLoading === 'install'"
             class="spinner-border spinner-border-sm me-1"
           />
-          Installer
+          {{ t('host.uuInstallButton') }}
         </button>
       </div>
 
@@ -209,14 +209,14 @@
           v-if="uuStatus.last_run_at"
           class="mb-3 text-secondary small"
         >
-          Dernière exécution : <strong>{{ formatDate(uuStatus.last_run_at) }}</strong>
-          — {{ uuStatus.last_run_packages }} paquet(s) installé(s)
+          {{ t('host.uuLastRunPrefix') }} <strong>{{ formatDate(uuStatus.last_run_at) }}</strong>
+          — {{ t('host.uuLastRunPackagesSuffix', { count: uuStatus.last_run_packages }) }}
         </div>
         <div
           v-else
           class="mb-3 text-secondary small"
         >
-          Aucune exécution enregistrée.
+          {{ t('host.uuNoRunRecorded') }}
         </div>
 
         <!-- Config form -->
@@ -232,7 +232,7 @@
                 class="form-check-input"
                 type="checkbox"
               >
-              <span class="form-check-label fw-semibold">Activé</span>
+              <span class="form-check-label fw-semibold">{{ t('host.uuEnabledBadge') }}</span>
             </label>
           </div>
           <!-- Config options (only meaningful when enabled) -->
@@ -243,7 +243,7 @@
                 class="form-check-input"
                 type="checkbox"
               >
-              <span class="form-check-label">Sécurité uniquement</span>
+              <span class="form-check-label">{{ t('host.uuSecurityOnlyLabel') }}</span>
             </label>
           </div>
           <div class="col-md-6">
@@ -253,7 +253,7 @@
                 class="form-check-input"
                 type="checkbox"
               >
-              <span class="form-check-label">Supprimer les dépendances inutilisées</span>
+              <span class="form-check-label">{{ t('host.uuRemoveUnusedLabel') }}</span>
             </label>
           </div>
           <div class="col-md-6">
@@ -263,14 +263,14 @@
                 class="form-check-input"
                 type="checkbox"
               >
-              <span class="form-check-label">Redémarrage automatique</span>
+              <span class="form-check-label">{{ t('host.uuAutoRebootLabel') }}</span>
             </label>
           </div>
           <div
             v-if="uuForm.config.auto_reboot"
             class="col-md-6"
           >
-            <label class="form-label small mb-1">Heure de redémarrage</label>
+            <label class="form-label small mb-1">{{ t('host.uuRebootTimeLabel') }}</label>
             <input
               v-model="uuForm.config.auto_reboot_time"
               type="time"
@@ -290,7 +290,7 @@
                 v-if="uuLoading === 'configure'"
                 class="spinner-border spinner-border-sm me-1"
               />
-              Enregistrer
+              {{ t('host.uuSaveButton') }}
             </button>
             <button
               type="button"
@@ -302,7 +302,7 @@
                 v-if="uuLoading === 'run'"
                 class="spinner-border spinner-border-sm me-1"
               />
-              Lancer maintenant
+              {{ t('host.uuRunNowButton') }}
             </button>
           </div>
         </div>
@@ -310,16 +310,16 @@
         <!-- Run history -->
         <div v-if="uuRuns && uuRuns.length > 0">
           <div class="fw-semibold small mb-2">
-            Historique des upgrades automatiques
+            {{ t('host.uuHistoryTitle') }}
           </div>
           <div class="table-responsive scroll-table">
             <table class="table table-sm table-vcenter">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Paquets</th>
-                  <th>Statut</th>
-                  <th>Logs</th>
+                  <th>{{ t('host.dateColumn') }}</th>
+                  <th>{{ t('host.uuPackagesColumn') }}</th>
+                  <th>{{ t('host.statusColumn') }}</th>
+                  <th>{{ t('host.uuLogsColumn') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -341,19 +341,19 @@
                     <span
                       v-else
                       class="text-secondary"
-                    >Aucun</span>
+                    >{{ t('host.uuNonePackages') }}</span>
                   </td>
                   <td>
                     <span
                       class="badge"
                       :class="run.had_error ? 'bg-danger-lt text-danger' : 'bg-success-lt text-success'"
-                    >{{ run.had_error ? 'Erreur' : 'OK' }}</span>
+                    >{{ run.had_error ? t('common.error') : 'OK' }}</span>
                   </td>
                   <td>
                     <button
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-secondary"
-                      title="Voir les logs"
+                      :title="t('host.viewLogsTooltip')"
                       :disabled="!run.log_snippet"
                       @click="$emit('uu-log', run)"
                     >
@@ -372,7 +372,7 @@
           v-else-if="uuRuns"
           class="text-secondary small"
         >
-          Aucun upgrade automatique enregistré.
+          {{ t('host.uuNoAutoUpgrades') }}
         </div>
       </div>
 
@@ -381,7 +381,7 @@
         v-else
         class="d-flex align-items-center gap-3 text-secondary small"
       >
-        <span>En attente des données de l'agent…</span>
+        <span>{{ t('host.uuWaitingForData') }}</span>
         <button
           v-if="canRunApt"
           type="button"
@@ -393,7 +393,7 @@
             v-if="uuLoading === 'install'"
             class="spinner-border spinner-border-sm me-1"
           />
-          Installer
+          {{ t('host.uuInstallButton') }}
         </button>
       </div>
     </div>
@@ -402,6 +402,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconList } from '@tabler/icons-vue'
 import dayjs from '../../utils/dayjs'
 import CVEList from '../apt/CVEList.vue'
@@ -467,6 +468,8 @@ const props = withDefaults(defineProps<{
   uuLoading: '',
 })
 
+const { t } = useI18n()
+
 const pendingPackages = computed<string[]>(() => {
   const raw = props.aptStatus?.package_list
   if (!raw) return []
@@ -487,7 +490,7 @@ const lastUpgradeDate = computed(() => {
 })
 
 function formatDate(date: string | null | undefined): string {
-  if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
+  if (!date || date === '0001-01-01T00:00:00Z') return t('common.never')
   return dayjs.utc(date).local().fromNow()
 }
 </script>

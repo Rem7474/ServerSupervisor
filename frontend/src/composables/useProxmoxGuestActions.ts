@@ -1,16 +1,11 @@
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { useConfirmDialog } from './useConfirmDialog'
 import { addToast } from './useGlobalToast'
 
 export type GuestPowerAction = 'start' | 'shutdown' | 'reboot'
-
-export const GUEST_ACTION_LABELS: Record<GuestPowerAction, string> = {
-  start: 'Démarrer',
-  shutdown: 'Arrêter',
-  reboot: 'Redémarrer',
-}
 
 interface GuestActionTarget {
   id: string
@@ -23,7 +18,14 @@ interface GuestActionTarget {
 // exist on the single-guest detail page, forcing a click-through just to
 // start/stop a guest from the node's own list).
 export function useProxmoxGuestActions() {
+  const { t } = useI18n()
   const dialog = useConfirmDialog()
+
+  const actionLabels: Record<GuestPowerAction, string> = {
+    start: t('proxmox.startButton'),
+    shutdown: t('proxmox.stopButton'),
+    reboot: t('proxmox.restartButton'),
+  }
   // Keyed by guest id (not a single scalar) so a table with many rows shows a
   // per-row spinner without one guest's in-flight action disabling every
   // other row's buttons.
@@ -44,22 +46,22 @@ export function useProxmoxGuestActions() {
   ): Promise<void> {
     if (action !== 'start') {
       const confirmed = await dialog.confirm({
-        title: `${GUEST_ACTION_LABELS[action]} ${guest.name || `#${guest.vmid}`} ?`,
+        title: t('proxmox.guestActionConfirmTitle', { action: actionLabels[action], name: guest.name || `#${guest.vmid}` }),
         message: action === 'shutdown'
-          ? 'Une extinction propre (ACPI) sera demandée à la VM/CT. Les services qui y tournent seront interrompus.'
-          : 'La VM/CT va redémarrer immédiatement. Les services qui y tournent seront interrompus le temps du redémarrage.',
+          ? t('proxmox.guestShutdownConfirmMessage')
+          : t('proxmox.guestRebootConfirmMessage'),
         variant: 'danger',
-        okLabel: GUEST_ACTION_LABELS[action],
+        okLabel: actionLabels[action],
       })
       if (!confirmed) return
     }
     actionLoading.value = { ...actionLoading.value, [guest.id]: action }
     try {
       await api.proxmoxGuestAction(guest.id, action)
-      addToast(`${GUEST_ACTION_LABELS[action]} envoyé.`, 'success')
+      addToast(t('proxmox.guestActionSentToast', { action: actionLabels[action] }), 'success')
       await onDone?.()
     } catch (e: unknown) {
-      addToast(getApiErrorMessage(e, `Échec de l'action "${GUEST_ACTION_LABELS[action]}"`), 'error')
+      addToast(getApiErrorMessage(e, t('proxmox.guestActionFailedToast', { action: actionLabels[action] })), 'error')
     } finally {
       const next = { ...actionLoading.value }
       delete next[guest.id]
