@@ -38,6 +38,22 @@ describe('ProxmoxNodeTasksTab', () => {
     expect(wrapper.text()).toContain('En cours')
   })
 
+  it('shows the raw exit_status text (with a danger badge) for a failed task', () => {
+    const wrapper = mount(ProxmoxNodeTasksTab, {
+      props: { tasks: [task({ status: 'stopped', exit_status: 'unable to parse' })] },
+    })
+    expect(wrapper.text()).toContain('unable to parse')
+    expect(wrapper.find('.task-status-badge').classes()).toContain('bg-danger-lt')
+  })
+
+  it('falls back to the raw status (with a neutral badge) when neither running nor a known exit_status applies', () => {
+    const wrapper = mount(ProxmoxNodeTasksTab, {
+      props: { tasks: [task({ status: 'queued', exit_status: '' })] },
+    })
+    expect(wrapper.text()).toContain('queued')
+    expect(wrapper.find('.task-status-badge').classes()).toContain('bg-secondary-lt')
+  })
+
   it('shows the translated tooltip on the view-logs button and emits view-logs on click', async () => {
     const wrapper = mount(ProxmoxNodeTasksTab, { props: { tasks: [task()] } })
     const button = wrapper.find('button.btn-ghost-secondary')

@@ -22,7 +22,18 @@ const baseGuest = {
   uptime: 3600,
 }
 
-const { getProxmoxInstance } = vi.hoisted(() => ({ getProxmoxInstance: vi.fn() }))
+interface GuestLinkFixture {
+  id: string
+  status: string
+  host_id: string
+  host_hostname?: string
+  host_name?: string
+}
+
+const { getProxmoxInstance, getProxmoxGuestLink } = vi.hoisted(() => ({
+  getProxmoxInstance: vi.fn(),
+  getProxmoxGuestLink: vi.fn(async (): Promise<{ data: GuestLinkFixture | null }> => ({ data: null })),
+}))
 
 const qemuGuest = { ...baseGuest, id: 'g2', guest_type: 'qemu' }
 
@@ -33,7 +44,7 @@ vi.mock('../api', () => {
   return {
     default: {
       getProxmoxGuests: vi.fn(async () => guestsResponse),
-      getProxmoxGuestLink: ok(null),
+      getProxmoxGuestLink,
       getProxmoxNodes: ok([{ id: 'node-1', node_name: 'pve1' }]),
       getProxmoxNodeGuestNetworks: ok({}),
       getProxmoxGuestMetrics: ok([]),
@@ -133,5 +144,22 @@ describe('ProxmoxGuestView — console entry point', () => {
     expect(btn!.attributes('title')).toBe('VM QEMU : bientôt disponible')
     // The "console not configured" warning icon is lxc-only.
     expect(wrapper.find('[title*="Identifiants console PVE non configurés"]').exists()).toBe(false)
+  })
+
+  it('shows the translated exposure hint and correlation link once the guest is confirmed-linked to a host', async () => {
+    getProxmoxGuestLink.mockResolvedValue({
+      data: { id: 'link-1', status: 'confirmed', host_id: 'host-1', host_hostname: 'web-01.local', host_name: 'web-01' },
+    })
+    routeParamId.value = 'g1'
+    guestsResponse.data = [baseGuest]
+
+    const wrapper = mountView()
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Ce guest est lié à l'hôte web-01.local")
+    expect(wrapper.text()).toContain('Voir la corrélation domaine/IP')
+    // GuestExposureCard is only rendered for a guest that is NOT confirmed-linked.
+    expect(wrapper.findComponent({ name: 'GuestExposureCard' }).exists()).toBe(false)
   })
 })

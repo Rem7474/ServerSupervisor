@@ -96,6 +96,54 @@ describe('ProxmoxView', () => {
     expect(wrapper.text()).toContain('Aucun nœud ne correspond au filtre')
   })
 
+  it('filters by the storage-near-full health signal on click/keydown', async () => {
+    getProxmoxSummary.mockResolvedValue({
+      data: {
+        connection_count: 1, node_count: 1, vm_count: 0, lxc_count: 0, storage_total: 0, storage_used: 0,
+        storage_near_full: 1, storage_near_full_node_ids: ['n1'],
+      },
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const card = wrapper.findAll('.card-sm').find((c) => c.text().includes('Stockages > 80 %'))
+    await card!.trigger('keydown.enter')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Filtré : Stockages > 80 %')
+  })
+
+  it('filters by the storage-offline health signal on click', async () => {
+    getProxmoxSummary.mockResolvedValue({
+      data: {
+        connection_count: 1, node_count: 1, vm_count: 0, lxc_count: 0, storage_total: 0, storage_used: 0,
+        storage_offline: 1, storage_offline_node_ids: ['n1'],
+      },
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const card = wrapper.findAll('.card-sm').find((c) => c.text().includes('Stockages inactifs'))
+    await card!.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Filtré : Stockages inactifs')
+  })
+
+  it('filters by the failed-tasks health signal on click', async () => {
+    getProxmoxSummary.mockResolvedValue({
+      data: {
+        connection_count: 1, node_count: 1, vm_count: 0, lxc_count: 0, storage_total: 0, storage_used: 0,
+        recent_failed_tasks: 1, failed_task_node_ids: ['n1'],
+      },
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const card = wrapper.findAll('.card-sm').find((c) => c.text().includes('Tâches échouées (24 h)'))
+    await card!.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Filtré : Tâches échouées (24 h)')
+  })
+
   it('translates to English when the locale is switched', async () => {
     setLocale('en')
     const auth = useAuthStore()

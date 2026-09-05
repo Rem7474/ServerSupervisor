@@ -13,7 +13,10 @@ vi.mock('../../api', () => ({
 import GuestExposureCard from './GuestExposureCard.vue'
 
 const stubs = {
-  ExposureDomainsPanel: { props: ['periodLabel', 'subjectLabel'], template: '<div class="exposure-panel">{{ periodLabel }} / {{ subjectLabel }}</div>' },
+  ExposureDomainsPanel: {
+    props: ['periodLabel', 'subjectLabel', 'error'],
+    template: '<div class="exposure-panel">{{ periodLabel }} / {{ subjectLabel }} / {{ error }}</div>',
+  },
 }
 
 beforeEach(() => {
@@ -50,5 +53,18 @@ describe('GuestExposureCard', () => {
 
     expect(getProxmoxGuestExposure).toHaveBeenLastCalledWith('g1', '168h')
     expect(wrapper.text()).toContain('7j / ce guest')
+  })
+
+  it('surfaces the translated fallback error on a failed re-fetch, without losing the already-known IP', async () => {
+    getProxmoxGuestExposure.mockResolvedValueOnce({ data: { ip_address: '10.0.0.5' } })
+    const wrapper = mount(GuestExposureCard, { props: { guestId: 'g1' }, global: { stubs } })
+    await flushPromises()
+
+    getProxmoxGuestExposure.mockRejectedValueOnce('boom')
+    const sevenDayButton = wrapper.findAll('button').find((b) => b.text() === '7j')
+    await sevenDayButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Erreur de chargement')
   })
 })
