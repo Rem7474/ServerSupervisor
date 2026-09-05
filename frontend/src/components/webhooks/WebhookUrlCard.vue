@@ -3,7 +3,7 @@
     <div class="card-body">
       <!-- Webhook URL -->
       <div class="mb-3">
-        <label class="form-label fw-medium">URL du Webhook</label>
+        <label class="form-label fw-medium">{{ t('webhooks.webhookUrlLabel') }}</label>
         <div class="input-group">
           <input
             type="text"
@@ -14,7 +14,7 @@
           <button
             class="btn btn-outline-secondary"
             type="button"
-            :title="urlCopied ? 'Copié !' : 'Copier'"
+            :title="urlCopied ? t('webhooks.copiedTooltip') : t('webhooks.copyTooltip')"
             @click="copyUrl"
           >
             <IconCopy
@@ -32,7 +32,7 @@
 
       <!-- Secret -->
       <div class="mb-3">
-        <label class="form-label fw-medium">Secret HMAC</label>
+        <label class="form-label fw-medium">{{ t('webhooks.hmacSecretLabel') }}</label>
         <div class="input-group">
           <input
             :type="showSecret ? 'text' : 'password'"
@@ -59,7 +59,7 @@
             v-if="currentSecret"
             class="btn btn-outline-secondary"
             type="button"
-            :title="secretCopied ? 'Copié !' : 'Copier'"
+            :title="secretCopied ? t('webhooks.copiedTooltip') : t('webhooks.copyTooltip')"
             @click="copySecret"
           >
             <IconCopy
@@ -80,7 +80,7 @@
             @click="doRegenerate"
           >
             <IconRefresh :size="16" />
-            {{ regenerating ? '...' : 'Régénérer' }}
+            {{ regenerating ? '...' : t('webhooks.regenerateButton') }}
           </button>
         </div>
         <div
@@ -97,17 +97,17 @@
         v-if="provider"
         class="small text-muted border-top pt-3"
       >
-        <strong>Configuration {{ providerLabel }}:</strong>
+        <strong>{{ t('webhooks.providerConfigPrefix', { provider: providerLabel }) }}</strong>
         <div
           class="mt-1 font-monospace provider-setup-box"
         >
           <template v-if="provider === 'gitlab'">
-            Header: <strong>X-Gitlab-Token</strong> = &lt;secret&gt;
+            {{ t('webhooks.gitlabHeaderLabel') }} <strong>X-Gitlab-Token</strong> = &lt;secret&gt;
           </template>
           <template v-else>
-            Content type: <strong>application/json</strong><br>
-            Secret: coller le secret ci-dessus<br>
-            SSL: enabled (recommandé)
+            {{ t('webhooks.contentTypeLabel') }} <strong>application/json</strong><br>
+            Secret: {{ t('webhooks.secretPasteInstructions') }}<br>
+            {{ t('webhooks.sslEnabledRecommended') }}
           </template>
         </div>
       </div>
@@ -117,10 +117,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconCheck, IconCopy, IconEye, IconEyeOff, IconRefresh } from '@tabler/icons-vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import api from '../../api'
 import { getApiErrorMessage } from '../../api/client'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   webhookId?: string
@@ -177,8 +180,8 @@ function copySecret(): void {
 
 async function doRegenerate(): Promise<void> {
   const ok = await dialog.confirm({
-    title: 'Régénérer le secret ?',
-    message: 'L\'ancien secret sera invalidé immédiatement. Vous devrez mettre à jour la configuration dans votre provider Git.',
+    title: t('webhooks.regenerateSecretConfirmTitle'),
+    message: t('webhooks.regenerateSecretConfirmMessage'),
     variant: 'warning',
   })
   if (!ok) return
@@ -188,11 +191,11 @@ async function doRegenerate(): Promise<void> {
     const res = await api.regenerateWebhookSecret(props.webhookId)
     currentSecret.value = res.data.secret
     showSecret.value = true
-    regenMsg.value = 'Secret régénéré — copiez-le maintenant.'
+    regenMsg.value = t('webhooks.secretRegeneratedMessage')
     regenOk.value = true
     emit('secret-regenerated', res.data.secret)
   } catch (e: unknown) {
-    regenMsg.value = getApiErrorMessage(e, 'Erreur')
+    regenMsg.value = getApiErrorMessage(e, t('common.error'))
     regenOk.value = false
   } finally {
     regenerating.value = false

@@ -32,13 +32,13 @@
               <label
                 for="webhook-name"
                 class="form-label required"
-              >Nom</label>
+              >{{ t('webhooks.nameLabel') }}</label>
               <input
                 id="webhook-name"
                 v-model="form.name"
                 type="text"
                 class="form-control"
-                :placeholder="mode === 'webhook' ? 'ex: Deploy mon-app' : 'ex: Mise a jour Home Assistant'"
+                :placeholder="mode === 'webhook' ? t('webhooks.namePlaceholderWebhook') : t('webhooks.namePlaceholderTracker')"
               >
             </div>
 
@@ -75,7 +75,7 @@
                 <label
                   for="webhook-event-filter"
                   class="form-label"
-                >Evenement</label>
+                >{{ t('webhooks.eventLabel') }}</label>
                 <select
                   id="webhook-event-filter"
                   v-model="form.event_filter"
@@ -96,7 +96,7 @@
                 <label
                   for="webhook-repo-filter"
                   class="form-label"
-                >Filtre repo <span class="text-muted">(optionnel)</span></label>
+                >{{ t('webhooks.repoFilterLabel') }} <span class="text-muted">{{ t('webhooks.optionalLabel') }}</span></label>
                 <input
                   id="webhook-repo-filter"
                   v-model="form.repo_filter"
@@ -109,7 +109,7 @@
                 <label
                   for="webhook-branch-filter"
                   class="form-label"
-                >Filtre branche <span class="text-muted">(optionnel)</span></label>
+                >{{ t('webhooks.branchFilterLabel') }} <span class="text-muted">{{ t('webhooks.optionalLabel') }}</span></label>
                 <input
                   id="webhook-branch-filter"
                   v-model="form.branch_filter"
@@ -147,13 +147,13 @@
                   class="form-check-input"
                   type="checkbox"
                 >
-                <span class="form-check-label fw-medium">Déclencher une tâche lors d'une mise à jour</span>
+                <span class="form-check-label fw-medium">{{ t('webhooks.dispatchTaskSwitchLabel') }}</span>
               </label>
               <div
                 id="dispatch-task-hint"
                 class="form-hint text-muted"
               >
-                Si désactivé, le tracker surveille uniquement et enregistre la version sans exécuter de script.
+                {{ t('webhooks.monitorOnlyHint') }}
               </div>
             </div>
 
@@ -164,7 +164,7 @@
               <label
                 for="webhook-cooldown-hours"
                 class="form-label"
-              >Cooldown (heures)</label>
+              >{{ t('webhooks.cooldownHoursLabel') }}</label>
               <input
                 id="webhook-cooldown-hours"
                 v-model.number="form.cooldown_hours"
@@ -175,7 +175,7 @@
                 placeholder="0"
               >
               <div class="form-hint">
-                Délai avant déclenchement après détection d'une nouvelle version (0 = immédiat).
+                {{ t('webhooks.cooldownDelayHint') }}
               </div>
             </div>
 
@@ -185,7 +185,7 @@
               class="col-12"
             >
               <div class="form-label">
-                Mode de mise a jour
+                {{ t('webhooks.updateModeLabel') }}
               </div>
               <div class="row g-2">
                 <div class="col-6">
@@ -200,8 +200,8 @@
                       value="compose"
                     >
                     <span>
-                      <span class="fw-semibold d-block">Compose (natif)</span>
-                      <span class="text-muted small">pull + up -d automatique sur un projet compose, sans script</span>
+                      <span class="fw-semibold d-block">{{ t('webhooks.composeNativeLabel') }}</span>
+                      <span class="text-muted small">{{ t('webhooks.composeNativeDescription') }}</span>
                     </span>
                   </label>
                 </div>
@@ -217,8 +217,8 @@
                       value="custom"
                     >
                     <span>
-                      <span class="fw-semibold d-block">Tache (tasks.yaml)</span>
-                      <span class="text-muted small">Execute un script declare cote agent</span>
+                      <span class="fw-semibold d-block">{{ t('webhooks.customTaskModeLabel') }}</span>
+                      <span class="text-muted small">{{ t('webhooks.customTaskModeDescription') }}</span>
                     </span>
                   </label>
                 </div>
@@ -231,14 +231,14 @@
                   for="webhook-host-id"
                   class="form-label"
                   :class="(mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)) ? 'required' : ''"
-                >VM cible</label>
+                >{{ t('webhooks.targetVmSelectLabel') }}</label>
                 <select
                   id="webhook-host-id"
                   v-model="form.host_id"
                   class="form-select"
                 >
                   <option value="">
-                    -- Sélectionner un hôte --
+                    {{ t('webhooks.selectHostOption') }}
                   </option>
                   <option
                     v-for="host in hosts"
@@ -256,7 +256,7 @@
                   <label
                     for="webhook-compose-project"
                     class="form-label required"
-                  >Projet compose</label>
+                  >{{ t('webhooks.composeProjectLabel') }}</label>
                   <input
                     id="webhook-compose-project"
                     v-model="form.compose_project"
@@ -269,27 +269,27 @@
                     id="compose-project-hint"
                     class="form-hint"
                   >
-                    Nom du projet compose tel que decouvert sur l'hote (label <code>com.docker.compose.project</code>).
+                    {{ t('webhooks.composeProjectHint', { label: 'com.docker.compose.project' }) }}
                   </div>
                 </div>
                 <div class="col-md-6">
                   <label
                     for="webhook-compose-service"
                     class="form-label"
-                  >Service <span class="text-muted">(optionnel)</span></label>
+                  >{{ t('webhooks.serviceLabel') }} <span class="text-muted">{{ t('webhooks.optionalLabel') }}</span></label>
                   <input
                     id="webhook-compose-service"
                     v-model="form.compose_service"
                     type="text"
                     class="form-control"
-                    placeholder="laisser vide = tout le projet"
+                    :placeholder="t('webhooks.leaveEmptyWholeProjectPlaceholder')"
                   >
                 </div>
                 <div class="col-md-4">
                   <label
                     for="webhook-healthcheck-timeout"
                     class="form-label"
-                  >Healthcheck (s)</label>
+                  >{{ t('webhooks.healthcheckSecondsLabel') }}</label>
                   <input
                     id="webhook-healthcheck-timeout"
                     v-model.number="form.healthcheck_timeout_sec"
@@ -300,7 +300,7 @@
                     placeholder="0"
                   >
                   <div class="form-hint">
-                    Attente max de l'état healthy après up -d (0 = désactivé).
+                    {{ t('webhooks.healthcheckHint') }}
                   </div>
                 </div>
                 <div class="col-md-8 d-flex align-items-end">
@@ -311,7 +311,7 @@
                         class="form-check-input"
                         type="checkbox"
                       >
-                      <span class="form-check-label">Rollback si échec / unhealthy</span>
+                      <span class="form-check-label">{{ t('webhooks.rollbackUnhealthyLabel') }}</span>
                     </label>
                     <label class="form-check">
                       <input
@@ -319,7 +319,7 @@
                         class="form-check-input"
                         type="checkbox"
                       >
-                      <span class="form-check-label">Nettoyer les images orphelines</span>
+                      <span class="form-check-label">{{ t('webhooks.cleanupOrphanImagesShortLabel') }}</span>
                     </label>
                     <label class="form-check">
                       <input
@@ -327,7 +327,7 @@
                         class="form-check-input"
                         type="checkbox"
                       >
-                      <span class="form-check-label">Réconcilier automatiquement en cas de dérive</span>
+                      <span class="form-check-label">{{ t('webhooks.reconcileDriftLabel') }}</span>
                     </label>
                   </div>
                 </div>
@@ -336,14 +336,14 @@
                   class="col-12"
                 >
                   <div class="form-hint mt-0">
-                    Dérive : le conteneur réellement déployé ne correspond plus à la version suivie (modification manuelle, échec silencieux...). Coché : relance pull + up -d automatiquement. Décoché : la dérive est seulement signalée sur le tracker.
+                    {{ t('webhooks.driftExplanationHint') }}
                   </div>
                 </div>
                 <div class="col-md-6">
                   <label
                     for="webhook-pre-update-task-id"
                     class="form-label"
-                  >Hook avant MAJ <span class="text-muted">(optionnel)</span></label>
+                  >{{ t('webhooks.preUpdateHookLabel') }} <span class="text-muted">{{ t('webhooks.optionalLabel') }}</span></label>
                   <select
                     v-if="customTasks.length"
                     id="webhook-pre-update-task-id"
@@ -351,7 +351,7 @@
                     class="form-select"
                   >
                     <option value="">
-                      -- Aucun --
+                      {{ t('webhooks.noneOption') }}
                     </option>
                     <option
                       v-for="task in customTasks"
@@ -370,14 +370,14 @@
                     placeholder="ex: backup-postgres"
                   >
                   <div class="form-hint">
-                    Tâche <code>tasks.yaml</code> exécutée avant le pull (ex: sauvegarde).
+                    {{ t('webhooks.preUpdateHookHint', { code: 'tasks.yaml' }) }}
                   </div>
                 </div>
                 <div class="col-md-6">
                   <label
                     for="webhook-post-update-task-id"
                     class="form-label"
-                  >Hook apres MAJ <span class="text-muted">(optionnel)</span></label>
+                  >{{ t('webhooks.postUpdateHookLabel') }} <span class="text-muted">{{ t('webhooks.optionalLabel') }}</span></label>
                   <select
                     v-if="customTasks.length"
                     id="webhook-post-update-task-id"
@@ -385,7 +385,7 @@
                     class="form-select"
                   >
                     <option value="">
-                      -- Aucun --
+                      {{ t('webhooks.noneOption') }}
                     </option>
                     <option
                       v-for="task in customTasks"
@@ -415,7 +415,7 @@
                   for="webhook-custom-task-id"
                   class="form-label"
                   :class="(mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)) ? 'required' : ''"
-                >Tache (tasks.yaml)</label>
+                >{{ t('webhooks.customTaskLabel') }}</label>
                 <select
                   v-if="customTasks.length"
                   id="webhook-custom-task-id"
@@ -426,7 +426,7 @@
                     value=""
                     disabled
                   >
-                    -- Sélectionner une tâche --
+                    {{ t('webhooks.selectTaskOption') }}
                   </option>
                   <option
                     v-for="task in customTasks"
@@ -449,7 +449,7 @@
                   id="task-id-hint"
                   class="form-hint"
                 >
-                  Correspond a l'<code>id</code> dans <code>tasks.yaml</code> de l'agent.
+                  {{ t('webhooks.taskIdHint', { id: 'id', tasksYaml: 'tasks.yaml' }) }}
                 </div>
               </div>
             </template>
@@ -457,7 +457,7 @@
             <!-- Notifications -->
             <div class="col-12">
               <div class="form-label">
-                Notifications
+                {{ t('webhooks.notificationsLabel') }}
               </div>
               <div class="d-flex flex-wrap gap-3 mt-1">
                 <label
@@ -469,7 +469,7 @@
                     class="form-check-input"
                     type="checkbox"
                   >
-                  <span class="form-check-label">En cas de succès</span>
+                  <span class="form-check-label">{{ t('webhooks.onSuccessLabel') }}</span>
                 </label>
                 <label
                   v-if="mode === 'webhook'"
@@ -480,7 +480,7 @@
                     class="form-check-input"
                     type="checkbox"
                   >
-                  <span class="form-check-label">En cas d'échec</span>
+                  <span class="form-check-label">{{ t('webhooks.onFailureLabel') }}</span>
                 </label>
                 <label
                   v-if="mode === 'tracker'"
@@ -492,7 +492,7 @@
                     type="checkbox"
                     :disabled="!form.notify_channels.length"
                   >
-                  <span class="form-check-label">Notifier à chaque mise à jour détectée</span>
+                  <span class="form-check-label">{{ t('webhooks.notifyOnEveryUpdateLabel') }}</span>
                 </label>
               </div>
               <div class="d-flex flex-wrap gap-3 mt-2">
@@ -514,7 +514,7 @@
                 v-if="mode === 'tracker'"
                 class="form-hint mt-2"
               >
-                Activez au moins un canal pour pouvoir notifier les nouvelles versions.
+                {{ t('webhooks.enableChannelHint') }}
               </div>
             </div>
 
@@ -525,7 +525,7 @@
                   class="form-check-input"
                   type="checkbox"
                 >
-                <span class="form-check-label fw-medium">Activer ce {{ mode === 'tracker' ? 'tracker' : 'webhook' }}</span>
+                <span class="form-check-label fw-medium">{{ mode === 'tracker' ? t('webhooks.enableThisTrackerLabel') : t('webhooks.enableThisWebhookLabel') }}</span>
               </label>
             </div>
           </div>
@@ -542,7 +542,7 @@
             class="btn btn-outline-secondary"
             @click="close"
           >
-            Annuler
+            {{ t('webhooks.cancelButton') }}
           </button>
           <button
             type="button"
@@ -550,7 +550,7 @@
             :disabled="saving"
             @click="submit"
           >
-            {{ saving ? 'Enregistrement...' : submitLabel }}
+            {{ saving ? t('webhooks.savingLabel') : submitLabel }}
           </button>
         </div>
       </div>
@@ -560,6 +560,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useModalChrome } from '../../composables/useModalChrome'
 import { useWebhookForm, type WebhookItem, type Host, type WebhookFormData } from '../../composables/useWebhookForm'
 import WebhookTrackerFields from './WebhookTrackerFields.vue'
@@ -591,6 +592,8 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', payload: WebhookFormData): void
 }>()
+
+const { t } = useI18n()
 
 const modalRef = ref<HTMLElement | null>(null)
 useModalChrome(modalRef, () => props.visible, { onClose: close })

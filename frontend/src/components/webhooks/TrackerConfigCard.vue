@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        Configuration
+        {{ t('webhooks.configurationTitle') }}
       </h3>
       <div class="d-flex gap-2">
         <button
@@ -15,7 +15,7 @@
             :size="14"
             class="me-1"
           />
-          {{ checking ? 'Vérification...' : 'Vérifier maintenant' }}
+          {{ checking ? t('webhooks.checkingLabel') : t('webhooks.checkNowButton') }}
         </button>
         <button
           type="button"
@@ -28,14 +28,14 @@
             :size="14"
             class="me-1"
           />
-          {{ running ? 'Déclenchement...' : 'Exécuter' }}
+          {{ running ? t('webhooks.triggeringLabel') : t('webhooks.executeButton') }}
         </button>
         <button
           type="button"
           class="btn btn-sm btn-ghost-secondary"
           @click="$emit('edit')"
         >
-          Modifier
+          {{ t('webhooks.editButton') }}
         </button>
       </div>
     </div>
@@ -48,11 +48,11 @@
           <span
             v-if="tracker.tracker_type === 'docker'"
             class="badge bg-cyan-lt text-cyan"
-          >Image Docker</span>
+          >{{ t('webhooks.dockerImageBadge') }}</span>
           <span
             v-else
             class="badge bg-blue-lt text-blue"
-          >Release Git</span>
+          >{{ t('webhooks.gitReleaseBadge') }}</span>
         </dd>
 
         <!-- Git-specific -->
@@ -64,7 +64,7 @@
             {{ tracker.provider }}
           </dd>
           <dt class="col-5 text-muted">
-            Dépôt
+            {{ t('webhooks.repositoryLabel') }}
           </dt>
           <dd class="col-7">
             <a
@@ -76,7 +76,7 @@
             </a>
           </dd>
           <dt class="col-5 text-muted">
-            Dernière release
+            {{ t('webhooks.lastReleaseLabel') }}
           </dt>
           <dd class="col-7">
             <span
@@ -86,7 +86,7 @@
             <span
               v-else
               class="text-muted"
-            >En attente...</span>
+            >{{ t('webhooks.pendingEllipsisLabel') }}</span>
           </dd>
         </template>
 
@@ -99,14 +99,14 @@
             <code>{{ tracker.docker_image }}</code>
           </dd>
           <dt class="col-5 text-muted">
-            Tag surveillé
+            {{ t('webhooks.watchedTagLabel') }}
           </dt>
           <dd class="col-7">
             <code>{{ tracker.docker_tag || 'latest' }}</code>
           </dd>
           <template v-if="tracker.latest_image_digest">
             <dt class="col-5 text-muted">
-              Dernier digest
+              {{ t('webhooks.lastDigestLabel') }}
             </dt>
             <dd class="col-7">
               <code
@@ -118,19 +118,19 @@
             </dd>
           </template>
           <dt class="col-5 text-muted">
-            Dernier check
+            {{ t('webhooks.lastCheckLabel') }}
           </dt>
           <dd class="col-7">
             <span v-if="tracker.last_checked_at"><RelativeTime :date="tracker.last_checked_at" /></span>
             <span
               v-else
               class="text-muted"
-            >Jamais</span>
+            >{{ t('webhooks.neverLabel') }}</span>
           </dd>
 
           <template v-if="tracker.repo_owner && tracker.repo_name">
             <dt class="col-5 text-muted">
-              Repo lié
+              {{ t('webhooks.linkedRepoLabel') }}
             </dt>
             <dd class="col-7">
               <a
@@ -145,7 +145,7 @@
                   :href="releaseNotesURL"
                   target="_blank"
                   class="link-secondary"
-                >Voir les release notes</a>
+                >{{ t('webhooks.viewReleaseNotesLink') }}</a>
               </div>
             </dd>
           </template>
@@ -154,13 +154,13 @@
         <!-- Common fields -->
         <template v-if="tracker.host_id && tracker.custom_task_id">
           <dt class="col-5 text-muted">
-            VM cible
+            {{ t('webhooks.targetVmLabel') }}
           </dt>
           <dd class="col-7">
             {{ tracker.host_name || tracker.host_id }}
           </dd>
           <dt class="col-5 text-muted">
-            Tâche
+            {{ t('webhooks.taskLabel') }}
           </dt>
           <dd class="col-7">
             <code>{{ tracker.custom_task_id }}</code>
@@ -168,17 +168,17 @@
         </template>
         <template v-else-if="!tracker.host_id || !tracker.custom_task_id">
           <dt class="col-5 text-muted">
-            Mode
+            {{ t('webhooks.modeLabel') }}
           </dt>
           <dd class="col-7">
-            <span class="badge bg-blue-lt text-blue">Surveillance seule</span>
+            <span class="badge bg-blue-lt text-blue">{{ t('webhooks.monitoringOnlyBadge') }}</span>
           </dd>
         </template>
         <dt
           v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at"
           class="col-5 text-muted"
         >
-          Dernier check
+          {{ t('webhooks.lastCheckLabel') }}
         </dt>
         <dd
           v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at"
@@ -188,7 +188,7 @@
         </dd>
         <template v-if="tracker.last_error">
           <dt class="col-5 text-muted">
-            Erreur
+            {{ t('common.error') }}
           </dt>
           <dd class="col-7 text-danger small">
             {{ tracker.last_error }}
@@ -198,7 +198,7 @@
           v-if="tracker.last_triggered_at"
           class="col-5 text-muted"
         >
-          Dernier déclench.
+          {{ t('webhooks.lastTriggeredLabel') }}
         </dt>
         <dd
           v-if="tracker.last_triggered_at"
@@ -210,7 +210,7 @@
           v-if="tracker.notify_channels?.length"
           class="col-5 text-muted"
         >
-          Notifications
+          {{ t('webhooks.notificationsLabel') }}
         </dt>
         <dd
           v-if="tracker.notify_channels?.length"
@@ -224,14 +224,14 @@
           >{{ ch }}</span>
         </dd>
         <dt class="col-5 text-muted">
-          Créé le
+          {{ t('webhooks.createdOnLabel') }}
         </dt>
         <dd class="col-7">
           {{ formatDateTime(tracker.created_at) }}
         </dd>
         <template v-if="Number(tracker.cooldown_hours || 0) > 0">
           <dt class="col-5 text-muted">
-            Cooldown
+            {{ t('webhooks.cooldownLabel') }}
           </dt>
           <dd class="col-7">
             {{ `${tracker.cooldown_hours}h` }}
@@ -239,7 +239,7 @@
         </template>
         <template v-if="cooldownActive">
           <dt class="col-5 text-muted">
-            Déploiement prévu
+            {{ t('webhooks.plannedDeploymentLabel') }}
           </dt>
           <dd class="col-7">
             {{ cooldownEtaText }}
@@ -252,10 +252,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPlayerPlay, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import { formatDateTime } from '../../utils/formatters'
 import type { ReleaseTracker } from '../../types/tracker'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   tracker: ReleaseTracker
@@ -274,25 +277,25 @@ defineEmits<{
 }>()
 
 const repoURL = computed(() => {
-  const t = props.tracker
-  if (!t || !t.repo_owner || !t.repo_name) return '#'
-  switch (t.provider) {
-    case 'gitlab': return `https://gitlab.com/${t.repo_owner}/${t.repo_name}`
-    case 'gitea': return `https://codeberg.org/${t.repo_owner}/${t.repo_name}`
-    default: return `https://github.com/${t.repo_owner}/${t.repo_name}`
+  const tracker = props.tracker
+  if (!tracker || !tracker.repo_owner || !tracker.repo_name) return '#'
+  switch (tracker.provider) {
+    case 'gitlab': return `https://gitlab.com/${tracker.repo_owner}/${tracker.repo_name}`
+    case 'gitea': return `https://codeberg.org/${tracker.repo_owner}/${tracker.repo_name}`
+    default: return `https://github.com/${tracker.repo_owner}/${tracker.repo_name}`
   }
 })
 
 const releaseNotesURL = computed(() => {
-  const t = props.tracker
-  if (!t || !t.repo_owner || !t.repo_name) return '#'
-  switch (t.provider) {
-    case 'gitlab': return `https://gitlab.com/${t.repo_owner}/${t.repo_name}/-/releases`
+  const tracker = props.tracker
+  if (!tracker || !tracker.repo_owner || !tracker.repo_name) return '#'
+  switch (tracker.provider) {
+    case 'gitlab': return `https://gitlab.com/${tracker.repo_owner}/${tracker.repo_name}/-/releases`
     case 'gitea':
     case 'forgejo':
-      return `https://codeberg.org/${t.repo_owner}/${t.repo_name}/releases`
+      return `https://codeberg.org/${tracker.repo_owner}/${tracker.repo_name}/releases`
     default:
-      return `https://github.com/${t.repo_owner}/${t.repo_name}/releases`
+      return `https://github.com/${tracker.repo_owner}/${tracker.repo_name}/releases`
   }
 })
 

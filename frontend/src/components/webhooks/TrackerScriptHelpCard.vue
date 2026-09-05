@@ -3,7 +3,7 @@
   <div class="card mt-3">
     <div class="card-header">
       <h3 class="card-title">
-        Variables disponibles dans le script
+        {{ t('webhooks.availableVarsInScriptTitle') }}
       </h3>
     </div>
     <div class="card-body p-0">
@@ -16,7 +16,7 @@
             >
               <td><code class="small">{{ v.name }}</code></td>
               <td class="text-muted small">
-                {{ v.desc }}
+                {{ t(v.descKey) }}
               </td>
             </tr>
           </tbody>
@@ -32,20 +32,20 @@
   >
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title mb-0">
-        Exemple de script tasks.yaml
+        {{ t('webhooks.exampleTasksYamlTitle') }}
       </h3>
       <div class="d-flex align-items-center gap-2">
         <span
           v-if="detectedComposePath"
           class="badge bg-success-lt text-success"
-          title="Chemin détecté depuis les projets Compose de l'hôte"
+          :title="t('webhooks.detectedPathTooltip')"
         >
-          Chemin détecté automatiquement
+          {{ t('webhooks.autoDetectedPathBadge') }}
         </span>
         <button
           type="button"
           class="btn btn-sm btn-ghost-secondary"
-          :title="copied ? 'Copié !' : 'Copier'"
+          :title="copied ? t('webhooks.copiedTooltip') : t('webhooks.copyTooltip')"
           @click="copySnippet"
         >
           <IconCopy
@@ -75,7 +75,7 @@
           class="px-3 pt-2 pb-0"
         >
           <p class="small text-muted mb-1">
-            Contenu actuel de <code>tasks.yaml</code> sur l'hôte — ajoutez la tâche ci-dessous :
+            {{ t('webhooks.currentTasksYamlPrefix') }} <code>tasks.yaml</code> {{ t('webhooks.currentTasksYamlSuffix') }}
           </p>
           <pre
             class="bg-dark text-light rounded p-2 small"
@@ -87,13 +87,13 @@
             v-if="!tasksYaml"
             class="small text-muted mb-1"
           >
-            Ajoutez cette tâche dans <code>/etc/serversupervisor/tasks.yaml</code> sur l'hôte :
+            {{ t('webhooks.addTaskInFilePrefix') }} <code>/etc/serversupervisor/tasks.yaml</code> {{ t('webhooks.addTaskInFileSuffix') }}
           </p>
           <p
             v-else
             class="small text-muted mb-1"
           >
-            Tâche à ajouter dans la section <code>tasks:</code> :
+            {{ t('webhooks.taskToAddInSection') }}
           </p>
           <pre
             class="bg-dark text-light rounded p-2 small mb-0"
@@ -107,10 +107,13 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconCheck, IconCopy } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import type { ReleaseTracker } from '../../types/tracker'
 import type { ComposeProject } from '../../types/docker'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   tracker: ReleaseTracker
@@ -120,19 +123,19 @@ const props = defineProps<{
 }>()
 
 const gitEnvVars = [
-  { name: 'SS_REPO_NAME', desc: 'owner/repo (ex: home-assistant/core)' },
-  { name: 'SS_TAG_NAME', desc: 'Tag de la nouvelle release (ex: v1.2.3)' },
-  { name: 'SS_RELEASE_URL', desc: 'URL de la release sur le provider' },
-  { name: 'SS_RELEASE_NAME', desc: 'Titre de la release' },
-  { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
+  { name: 'SS_REPO_NAME', descKey: 'webhooks.repoOwnerDesc' },
+  { name: 'SS_TAG_NAME', descKey: 'webhooks.newReleaseTagDesc' },
+  { name: 'SS_RELEASE_URL', descKey: 'webhooks.releaseProviderUrlDesc' },
+  { name: 'SS_RELEASE_NAME', descKey: 'webhooks.releaseTitleDesc' },
+  { name: 'SS_TRACKER_NAME', descKey: 'webhooks.trackerNameDesc' },
 ]
 
 const dockerEnvVars = [
-  { name: 'SS_IMAGE_NAME', desc: 'image:tag surveille (ex: nginx:latest)' },
-  { name: 'SS_IMAGE_TAG', desc: 'Tag surveille (ex: latest)' },
-  { name: 'SS_OLD_DIGEST', desc: 'Digest manifest SHA256 precedent' },
-  { name: 'SS_NEW_DIGEST', desc: 'Nouveau digest manifest SHA256' },
-  { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
+  { name: 'SS_IMAGE_NAME', descKey: 'webhooks.watchedImageTagDesc' },
+  { name: 'SS_IMAGE_TAG', descKey: 'webhooks.watchedTagDesc' },
+  { name: 'SS_OLD_DIGEST', descKey: 'webhooks.oldDigestDesc' },
+  { name: 'SS_NEW_DIGEST', descKey: 'webhooks.newDigestDesc' },
+  { name: 'SS_TRACKER_NAME', descKey: 'webhooks.trackerNameDesc' },
 ]
 
 const envVars = computed(() =>
@@ -141,9 +144,9 @@ const envVars = computed(() =>
 
 // Find the compose project whose raw_config references the tracked Docker image.
 const detectedComposePath = computed(() => {
-  const t = props.tracker
-  if (!t || t.tracker_type !== 'docker' || !t.docker_image) return null
-  const imageName = t.docker_image.split(':')[0].toLowerCase()
+  const tracker = props.tracker
+  if (!tracker || tracker.tracker_type !== 'docker' || !tracker.docker_image) return null
+  const imageName = tracker.docker_image.split(':')[0].toLowerCase()
   for (const p of props.composeProjects) {
     const raw = (p.raw_config || '').toLowerCase()
     if (raw.includes(imageName) && p.working_dir) {
@@ -155,32 +158,32 @@ const detectedComposePath = computed(() => {
 
 // Derive a safe task ID from the tracker name or image name.
 const snippetTaskId = computed(() => {
-  const t = props.tracker
-  if (!t) return 'update-service'
-  const base = (t.tracker_type === 'docker' ? t.docker_image?.split('/').pop()?.split(':')[0] : t.repo_name) || t.name
+  const tracker = props.tracker
+  if (!tracker) return 'update-service'
+  const base = (tracker.tracker_type === 'docker' ? tracker.docker_image?.split('/').pop()?.split(':')[0] : tracker.repo_name) || tracker.name
   return 'update-' + base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
 })
 
 // Build the YAML snippet tailored to the tracker type.
 const generatedSnippet = computed(() => {
-  const t = props.tracker
-  if (!t) return ''
+  const tracker = props.tracker
+  if (!tracker) return ''
   const taskId = snippetTaskId.value
 
-  if (t.tracker_type === 'docker') {
-    const image = t.docker_image || 'mon-image'
-    const path = detectedComposePath.value || '/opt/mon-projet'
-    const name = t.name || image
+  if (tracker.tracker_type === 'docker') {
+    const image = tracker.docker_image || t('webhooks.exampleImagePlaceholder')
+    const path = detectedComposePath.value || `/opt/${t('webhooks.exampleProjectPlaceholder')}`
+    const name = tracker.name || image
     return `  - id: ${taskId}
-    name: "Pull et redémarrage ${name}"
+    name: "${t('webhooks.pullAndRestartTaskName', { name })}"
     command: ["bash", "-c", "cd ${path} && docker compose pull && docker compose down && docker compose up -d"]
     timeout: 3600`
   } else {
-    const repo = t.repo_name || 'mon-app'
-    const name = t.name || repo
+    const repo = tracker.repo_name || t('webhooks.exampleAppPlaceholder')
+    const name = tracker.name || repo
     return `  - id: ${taskId}
-    name: "Déploiement ${name}"
-    command: ["bash", "-c", "echo 'Nouvelle release: $SS_TAG_NAME' && /opt/${repo}/deploy.sh"]
+    name: "${t('webhooks.deploymentTaskName', { name })}"
+    command: ["bash", "-c", "echo '${t('webhooks.newReleaseEchoPrefix')}: $SS_TAG_NAME' && /opt/${repo}/deploy.sh"]
     timeout: 3600`
   }
 })
