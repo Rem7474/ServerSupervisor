@@ -2,7 +2,7 @@
   <div>
     <div class="d-flex align-items-center justify-content-between mb-3">
       <div class="subheader mb-0">
-        Historique RRD
+        {{ t('proxmox.rrdHistoryTitle') }}
       </div>
       <div
         v-if="!loading"
@@ -15,7 +15,7 @@
           :class="timeframe === opt.value ? 'btn btn-primary' : 'btn btn-outline-secondary'"
           @click="$emit('timeframe-changed', opt.value)"
         >
-          {{ opt.label }}
+          {{ t(opt.labelKey) }}
         </button>
       </div>
       <span
@@ -27,50 +27,50 @@
     <div class="row row-cards mb-4">
       <div class="col-12 col-lg-4">
         <RRDChartCard
-          title="CPU"
+          :title="t('proxmox.cpuChartTitle')"
           :series="cpuChart || undefined"
           :options="pctOptions"
-          :empty-text="error || 'Aucune donnée'"
+          :empty-text="error || t('proxmox.noDataLabel')"
         />
       </div>
       <div class="col-12 col-lg-4">
         <RRDChartCard
-          title="RAM"
+          :title="t('proxmox.ramChartTitle')"
           :series="ramChart || undefined"
           :options="pctOptions"
-          :empty-text="error || 'Aucune donnée'"
+          :empty-text="error || t('proxmox.noDataLabel')"
         />
       </div>
       <div class="col-12 col-lg-4">
         <RRDChartCard
-          title="IO Wait"
+          :title="t('proxmox.iowaitChartTitle')"
           :series="iowaitChart || undefined"
           :options="pctOptions"
-          :empty-text="error || 'Aucune donnée'"
+          :empty-text="error || t('proxmox.noDataLabel')"
         />
       </div>
       <div class="col-12 col-lg-4">
         <RRDChartCard
-          title="Réseau"
+          :title="t('proxmox.networkChartTitle')"
           :series="netChart || undefined"
           :options="netOptions"
-          :empty-text="error || 'Aucune donnée'"
+          :empty-text="error || t('proxmox.noDataLabel')"
         />
       </div>
       <div class="col-12 col-lg-4">
         <RRDChartCard
-          title="Température CPU"
+          :title="t('proxmox.cpuTempChartTitle')"
           :series="tempChart || undefined"
           :options="tempOptions"
-          :empty-text="tempEmptyText"
+          :empty-text="tempEmptyText ?? t('proxmox.noTempDataText')"
         />
       </div>
       <div class="col-12 col-lg-4">
         <RRDChartCard
-          title="RPM Ventilateurs"
+          :title="t('proxmox.fanRpmChartTitle')"
           :series="fanChart || undefined"
           :options="fanOptions"
-          :empty-text="fanEmptyText"
+          :empty-text="fanEmptyText ?? t('proxmox.noFanDataText')"
         />
       </div>
     </div>
@@ -79,10 +79,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import RRDChartCard, { type RRDChartSeries } from './RRDChartCard.vue'
 import { getApexChartPalette } from '../../utils/apexChartTheme'
 import dayjs from '../../utils/dayjs'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   cpuChart?: RRDChartSeries | null
@@ -106,8 +109,6 @@ const props = withDefaults(defineProps<{
   timeframe: 'hour',
   loading: false,
   error: '',
-  tempEmptyText: 'Aucune donnée température disponible',
-  fanEmptyText: 'Aucune donnée ventilateur disponible',
 })
 
 defineEmits<{
@@ -115,11 +116,11 @@ defineEmits<{
 }>()
 
 const timeframeOptions = [
-  { value: 'hour', label: '1h' },
-  { value: 'day', label: '24h' },
-  { value: 'week', label: '7j' },
-  { value: 'month', label: '30j' },
-  { value: 'year', label: '1 an' },
+  { value: 'hour', labelKey: 'proxmox.timeRange1h' },
+  { value: 'day', labelKey: 'proxmox.timeRange24h' },
+  { value: 'week', labelKey: 'proxmox.timeRange7d' },
+  { value: 'month', labelKey: 'proxmox.timeRange30d' },
+  { value: 'year', labelKey: 'proxmox.timeRangeYear' },
 ]
 
 function formatBytesPerSec(v: number | null | undefined): string {

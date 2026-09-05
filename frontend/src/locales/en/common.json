@@ -56,5 +56,19 @@
   "commandLogEmptyText": "No log selected",
   "commandLogEmptyHint": "Click \"Logs\" to show a command's output",
   "commandLogExecutedPrefix": "Executed",
-  "commandLogNoOutput": "No output available."
+  "commandLogNoOutput": "No output available.",
+  "stateRunning": "Running",
+  "stateRestarting": "Restarting",
+  "statePaused": "Paused",
+  "stateCreated": "Created",
+  "stateExited": "Exited",
+  "stateDead": "Dead",
+  "stateRemoving": "Removing",
+  "statePending": "Pending",
+  "stateCompleted": "Completed",
+  "stateSuccess": "Succeeded",
+  "stateOk": "OK",
+  "stateFailed": "Failed",
+  "stateSkipped": "Skipped",
+  "stateCancelled": "Cancelled"
 }

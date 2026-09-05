@@ -1,5 +1,6 @@
 import { computed, ref, shallowRef, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import dayjs from '../utils/dayjs'
 import api from '../api'
@@ -38,6 +39,7 @@ interface ProxmoxGuest {
 interface GuestNetworkIface { name: string; ips: string[] }
 
 export function useProxmoxGuest() {
+  const { t } = useI18n()
   const route = useRoute()
   const signal = useAbortSignal()
   const guestActions = useProxmoxGuestActions()
@@ -101,7 +103,7 @@ export function useProxmoxGuest() {
       const list = Array.isArray(res.data) ? res.data : []
       const found = list.find((g: ProxmoxGuest) => g.id === route.params.id)
       if (!found) {
-        error.value = 'Guest introuvable'
+        error.value = t('proxmox.guestNotFoundError')
         return
       }
       guest.value = found
@@ -110,7 +112,7 @@ export function useProxmoxGuest() {
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       if (isApiAbort(e)) return
-      error.value = getApiErrorMessage(e, 'Erreur lors du chargement du guest Proxmox.')
+      error.value = getApiErrorMessage(e, t('proxmox.loadGuestError'))
     } finally {
       loading.value = false
     }
@@ -164,10 +166,10 @@ export function useProxmoxGuest() {
     try {
       const res = await api.updateProxmoxLink(guestLink.value.id, { status: 'confirmed' })
       guestLink.value = res.data
-      linkMsg.value = 'Lien confirmé.'
+      linkMsg.value = t('proxmox.linkConfirmedMessage')
       linkMsgOk.value = true
     } catch (e: unknown) {
-      linkMsg.value = getApiErrorMessage(e, 'Erreur.')
+      linkMsg.value = getApiErrorMessage(e, t('proxmox.genericErrorMessage'))
       linkMsgOk.value = false
     } finally {
       linkSaving.value = false
@@ -181,10 +183,10 @@ export function useProxmoxGuest() {
     try {
       await api.deleteProxmoxLink(guestLink.value.id)
       guestLink.value = null
-      linkMsg.value = 'Suggestion ignorée.'
+      linkMsg.value = t('proxmox.suggestionIgnoredMessage')
       linkMsgOk.value = true
     } catch (e: unknown) {
-      linkMsg.value = getApiErrorMessage(e, 'Erreur.')
+      linkMsg.value = getApiErrorMessage(e, t('proxmox.genericErrorMessage'))
       linkMsgOk.value = false
     } finally {
       linkSaving.value = false
@@ -308,9 +310,9 @@ export function useProxmoxGuest() {
   }, { immediate: true })
 
   const consoleButtonTitle = computed(() => {
-    if (!guest.value || guest.value.guest_type !== 'lxc') return 'VM QEMU : bientôt disponible'
-    if (consoleConfigured.value === false) return 'Console PVE non configurée pour cette connexion (Paramètres → Proxmox VE)'
-    return 'Ouvrir une console interactive'
+    if (!guest.value || guest.value.guest_type !== 'lxc') return t('proxmox.vmQemuComingSoonTitle')
+    if (consoleConfigured.value === false) return t('proxmox.consoleNotConfiguredTitle')
+    return t('proxmox.openConsoleTitle')
   })
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined

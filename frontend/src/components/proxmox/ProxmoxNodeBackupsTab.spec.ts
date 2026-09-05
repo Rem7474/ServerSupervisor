@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import ProxmoxNodeBackupsTab from './ProxmoxNodeBackupsTab.vue'
 import type { ProxmoxBackupJob, ProxmoxBackupRun } from '../../types/proxmox'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 const JOB: ProxmoxBackupJob = {
   id: 'j1', connection_id: 'c1', job_id: 'backup-nightly', enabled: true,

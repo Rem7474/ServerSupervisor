@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 const { getSSLCertificate, getSSLCertificateHistory } = vi.hoisted(() => ({
   getSSLCertificate: vi.fn(),
@@ -20,6 +21,7 @@ import SslDetailSection from './SslDetailSection.vue'
 describe('SslDetailSection', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    setLocale('fr')
   })
 
   afterEach(() => {
@@ -106,7 +108,7 @@ describe('SslDetailSection', () => {
     const wrapper = mount(SslDetailSection, { props: { certId: 'cert-1' } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('1 version(s) détectée(s)')
+    expect(wrapper.text()).toContain('1 version détectée')
     expect(wrapper.text()).toContain('1 ans') // certDuration: 365 days -> "1 ans"
     const rows = wrapper.findAll('tbody tr')
     expect(rows).toHaveLength(1)

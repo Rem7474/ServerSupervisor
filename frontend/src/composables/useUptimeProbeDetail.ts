@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
@@ -42,10 +43,10 @@ interface ResultGroup {
 export const PROBE_REFRESH_SEC = 30
 
 export const STATS_WINDOWS = [
-  { hours: 1, label: '1h' },
-  { hours: 24, label: '24h' },
-  { hours: 168, label: '7j' },
-  { hours: 720, label: '30j' },
+  { hours: 1, labelKey: 'monitoring.timeRange1h' },
+  { hours: 24, labelKey: 'monitoring.timeRange24h' },
+  { hours: 168, labelKey: 'monitoring.timeRange7d' },
+  { hours: 720, labelKey: 'monitoring.timeRange30d' },
 ] as const
 
 // probeIdOverride lets MonitoringHostDetailView's unified per-host page reuse
@@ -57,6 +58,7 @@ export const STATS_WINDOWS = [
 // composable's own independent ref — standalone routes never pass it, so
 // their behavior is unchanged.
 export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverride?: Ref<boolean>) {
+  const { t } = useI18n()
   const route = useRoute()
   const probeId = probeIdOverride ?? (route.params.id as string)
   const signal = useAbortSignal()
@@ -112,7 +114,7 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
     return {
       categories: buckets.value.map((b) => formatBucketLabel(b.bucket_start, statsWindow.value)),
       series: [{
-        name: 'Latence moy. ms',
+        name: t('monitoring.avgLatencySeriesName'),
         data: buckets.value.map((b) => b.up_checks > 0 ? Math.round(b.avg_latency_ms) : null),
         color: '#2fb344',
       }],
@@ -123,7 +125,7 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
     if (!probe.value) return ''
     if (probe.value.last_status === 'up') return 'UP'
     if (probe.value.last_status === 'down') return 'DOWN'
-    return 'Inconnue'
+    return t('monitoring.probeStatusUnknown')
   })
 
   const statusColor = computed(() => {
@@ -158,7 +160,7 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       if (isApiAbort(e)) return
-      error.value = getApiErrorMessage(e, 'Impossible de charger la sonde')
+      error.value = getApiErrorMessage(e, t('monitoring.probeLoadSingleError'))
     } finally {
       loading.value = false
     }
@@ -179,7 +181,7 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
       buckets.value = br.data?.buckets || []
     } catch (e: unknown) {
       if (isApiAbort(e)) return
-      error.value = getApiErrorMessage(e, 'Impossible de charger les statistiques')
+      error.value = getApiErrorMessage(e, t('monitoring.statsLoadError'))
     } finally {
       statsLoading.value = false
     }

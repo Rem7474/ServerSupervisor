@@ -17,7 +17,7 @@
         v-else
         class="h-100 d-flex align-items-center justify-content-center text-secondary small"
       >
-        {{ emptyText }}
+        {{ emptyText ?? t('proxmox.noDataLabel') }}
       </div>
     </div>
   </div>
@@ -25,9 +25,12 @@
 
 <script setup lang="ts">
 import type { ApexOptions } from 'apexcharts'
+import { useI18n } from 'vue-i18n'
 import { AsyncApexChart as ApexChart } from '../../utils/apexChartTheme'
 
 export type RRDChartSeries = NonNullable<ApexOptions['series']>
+
+const { t } = useI18n()
 
 withDefaults(defineProps<{
   title: string
@@ -37,6 +40,5 @@ withDefaults(defineProps<{
 }>(), {
   series: null,
   options: () => ({}),
-  emptyText: 'Aucune donnée',
 })
 </script>

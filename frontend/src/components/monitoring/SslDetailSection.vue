@@ -3,7 +3,7 @@
     <PageRefreshBar
       v-if="!hideRefreshBar"
       v-model="autoRefresh"
-      label="Certificat SSL"
+      :label="t('monitoring.certTypeToggle')"
       :interval-sec="REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />
@@ -34,7 +34,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Statut
+                {{ t('monitoring.statusColumn') }}
               </div>
               <div
                 class="h2 mb-0 mt-1"
@@ -49,7 +49,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Expiration
+                {{ t('monitoring.expirationLabel') }}
               </div>
               <div
                 class="h2 mb-0 mt-1"
@@ -67,7 +67,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Valide depuis
+                {{ t('monitoring.validSinceLabel') }}
               </div>
               <div class="h3 mb-0 mt-1">
                 {{ cert.valid_from ? formatDate(cert.valid_from) : '—' }}
@@ -79,7 +79,7 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Dernière vérification
+                {{ t('monitoring.lastCheckedColumn') }}
               </div>
               <div class="h3 mb-0 mt-1">
                 <RelativeTime
@@ -89,7 +89,7 @@
                 <span
                   v-else
                   class="text-secondary"
-                >Jamais</span>
+                >{{ t('monitoring.neverLabel') }}</span>
               </div>
             </div>
           </div>
@@ -102,14 +102,14 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Détails du certificat
+                {{ t('monitoring.certDetailsTitle') }}
               </h3>
             </div>
             <div class="card-body">
               <div class="datagrid">
                 <div class="datagrid-item">
                   <div class="datagrid-title">
-                    Sujet
+                    {{ t('monitoring.subjectLabel') }}
                   </div>
                   <div class="datagrid-content text-break">
                     {{ shortDN(cert.subject) || '—' }}
@@ -117,7 +117,7 @@
                 </div>
                 <div class="datagrid-item">
                   <div class="datagrid-title">
-                    Émetteur
+                    {{ t('monitoring.issuerLabel') }}
                   </div>
                   <div class="datagrid-content text-break">
                     {{ shortDN(cert.issuer) || '—' }}
@@ -125,7 +125,7 @@
                 </div>
                 <div class="datagrid-item">
                   <div class="datagrid-title">
-                    Numéro de série
+                    {{ t('monitoring.serialNumberLabel') }}
                   </div>
                   <div class="datagrid-content font-monospace small text-break">
                     {{ cert.serial_number || '—' }}
@@ -133,7 +133,7 @@
                 </div>
                 <div class="datagrid-item">
                   <div class="datagrid-title">
-                    SAN / DNS
+                    {{ t('monitoring.sanDnsLabel') }}
                   </div>
                   <div class="datagrid-content">
                     <template v-if="cert.dns_names && cert.dns_names.length">
@@ -161,7 +161,7 @@
           <div class="card h-100 border-danger">
             <div class="card-header text-danger">
               <h3 class="card-title mb-0">
-                Erreur de vérification
+                {{ t('monitoring.verificationErrorTitle') }}
               </h3>
             </div>
             <div class="card-body">
@@ -177,9 +177,9 @@
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h3 class="card-title mb-0">
-            Historique des renouvellements
+            {{ t('monitoring.renewalHistoryTitle') }}
           </h3>
-          <small class="text-secondary">{{ events.length }} version(s) détectée(s)</small>
+          <small class="text-secondary">{{ t('monitoring.versionsDetectedCount', { n: events.length }, events.length) }}</small>
         </div>
 
         <div
@@ -194,8 +194,8 @@
           class="card-body"
         >
           <EmptyState
-            title="Aucun renouvellement enregistré"
-            subtitle="Les changements de certificat seront tracés lors des prochaines vérifications."
+            :title="t('monitoring.noRenewalsTitle')"
+            :subtitle="t('monitoring.noRenewalsSubtitle')"
           />
         </div>
 
@@ -206,12 +206,12 @@
           <table class="table table-vcenter card-table">
             <thead>
               <tr>
-                <th>Détecté le</th>
-                <th>Valide du</th>
-                <th>Valide au</th>
-                <th>Durée</th>
-                <th>Émetteur</th>
-                <th>Numéro de série</th>
+                <th>{{ t('monitoring.detectedOnColumn') }}</th>
+                <th>{{ t('monitoring.validFromColumn') }}</th>
+                <th>{{ t('monitoring.validToColumn') }}</th>
+                <th>{{ t('monitoring.durationColumn') }}</th>
+                <th>{{ t('monitoring.issuerLabel') }}</th>
+                <th>{{ t('monitoring.serialNumberLabel') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -253,6 +253,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import RelativeTime from '../RelativeTime.vue'
@@ -262,9 +263,11 @@ import type { SSLCertificate } from '../../types/ssl'
 
 // hideRefreshBar/autoRefresh: set together by MonitoringHostDetailView when
 // both a probe and a cert are configured, so the two sections share one
-// PageRefreshBar instead of each rendering its own "dernière MAJ" + dot.
+// PageRefreshBar instead of each rendering its own "last updated" + dot.
 // Neither is passed by the standalone /monitoring/ssl/:id route, which keeps
 // its own independent bar exactly as before.
+const { t } = useI18n()
+
 const props = defineProps<{
   certId: string
   hideRefreshBar?: boolean
