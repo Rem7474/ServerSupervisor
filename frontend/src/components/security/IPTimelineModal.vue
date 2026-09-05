@@ -9,10 +9,10 @@
       <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap timeline-header">
         <div>
           <h3 class="card-title mb-0">
-            Chronologie IP: <span class="font-monospace">{{ ip }}</span>
+            {{ t('security.ipTimelineTitlePrefix') }} <span class="font-monospace">{{ ip }}</span>
           </h3>
           <div class="text-secondary small">
-            Chronologie des requêtes suspectes
+            {{ t('security.suspiciousRequestsTimelineSubtitle') }}
           </div>
         </div>
         <div class="d-flex gap-2 flex-wrap timeline-header-actions">
@@ -44,23 +44,23 @@
                 class="btn btn-sm"
                 :class="banError ? 'btn-danger' : 'btn-outline-danger'"
                 :disabled="banLoading || !hostId"
-                :title="!hostId ? 'Hôte non déterminé — renseigne le filtre Hôte' : ''"
+                :title="!hostId ? t('security.hostNotDeterminedTooltip') : ''"
                 @click="handleBanClick"
               >
                 <span
                   v-if="banLoading"
                   class="spinner-border spinner-border-sm me-1"
                 />
-                <span v-if="banLoading">Blocage…</span>
-                <span v-else-if="banError">Erreur — Réessayer</span>
-                <span v-else>Bloquer (CrowdSec)</span>
+                <span v-if="banLoading">{{ t('security.blockingInProgressLabel') }}</span>
+                <span v-else-if="banError">{{ t('security.errorRetryTooltip') }}</span>
+                <span v-else>{{ t('security.blockButtonLabel') }}</span>
               </button>
             </template>
             <span
               v-else
               class="badge bg-success-lt text-success align-self-center"
             >
-              IP bloquée par CrowdSec
+              {{ t('security.ipBlockedByCrowdsecBadge') }}
             </span>
           </template>
           <button
@@ -68,7 +68,7 @@
             class="btn btn-sm btn-outline-secondary"
             @click="$emit('close')"
           >
-            Fermer
+            {{ t('common.close') }}
           </button>
         </div>
       </div>
@@ -82,17 +82,17 @@
           v-else-if="!timeline.length"
           class="text-center py-4 text-secondary"
         >
-          Aucune requête
+          {{ t('security.noRequestsTitle') }}
         </div>
         <template v-else>
           <div class="timeline-frieze border-bottom px-3 py-3">
             <div class="timeline-controls d-flex align-items-center justify-content-between mb-2 gap-2">
               <div class="timeline-interval-row">
-                <span class="small text-secondary timeline-interval-label">Intervalle:</span>
+                <span class="small text-secondary timeline-interval-label">{{ t('security.intervalLabel') }}</span>
                 <div
                   class="timeline-interval-chips"
                   role="group"
-                  aria-label="Intervalle timeline"
+                  :aria-label="t('security.intervalGroupAriaLabel')"
                 >
                   <button
                     v-for="opt in timelineIntervalOptions"
@@ -107,12 +107,12 @@
                 </div>
               </div>
               <div class="small text-secondary">
-                Regroupement: {{ timelineBucketLabel }} · {{ timelineBuckets.length }} tranches
+                {{ t('security.groupingSummary', { label: timelineBucketLabel, count: timelineBuckets.length }) }}
                 <span
                   v-if="selectedInterval === 'auto'"
                   class="badge bg-azure-lt text-azure ms-1"
                 >
-                  Auto cible ~{{ AUTO_BUCKET_TARGET }}
+                  {{ t('security.autoTargetBadge', { n: AUTO_BUCKET_TARGET }) }}
                 </span>
               </div>
               <button
@@ -120,7 +120,7 @@
                 class="btn btn-sm btn-outline-secondary"
                 @click="toggleBucketFilter"
               >
-                {{ bucketFilterEnabled ? 'Mode focus: tranche sélectionnée' : 'Mode global: toutes les tranches' }}
+                {{ bucketFilterEnabled ? t('security.focusModeButtonFocus') : t('security.focusModeButtonGlobal') }}
               </button>
             </div>
 
@@ -129,24 +129,24 @@
               open
             >
               <summary class="timeline-controls-toggle">
-                <span>Statistiques</span>
+                <span>{{ t('security.statisticsLabel') }}</span>
                 <span class="timeline-controls-toggle-arrow">▾</span>
               </summary>
               <div class="timeline-kpis mb-3">
                 <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Requêtes affichées</span>
+                  <span class="timeline-kpi-label">{{ t('security.displayedRequestsLabel') }}</span>
                   <span class="timeline-kpi-value">{{ timelineStats.total }}</span>
                 </div>
                 <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Erreurs</span>
+                  <span class="timeline-kpi-label">{{ t('security.errorsLabel') }}</span>
                   <span class="timeline-kpi-value text-danger">{{ timelineStats.errors }}</span>
                 </div>
                 <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Chemins uniques</span>
+                  <span class="timeline-kpi-label">{{ t('security.uniquePathsLabel') }}</span>
                   <span class="timeline-kpi-value">{{ timelineStats.uniquePaths }}</span>
                 </div>
                 <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Domaines cibles uniques</span>
+                  <span class="timeline-kpi-label">{{ t('security.uniqueTargetDomainsLabel') }}</span>
                   <span class="timeline-kpi-value">{{ timelineStats.uniqueVhosts }}</span>
                 </div>
               </div>
@@ -188,7 +188,7 @@
               v-if="selectedBucket"
               class="small text-secondary mt-2"
             >
-              Tranche sélectionnée: {{ selectedBucket.rangeLabel }} · {{ selectedBucket.count }} requête{{ selectedBucket.count > 1 ? 's' : '' }} · {{ selectedBucket.errorCount }} erreur{{ selectedBucket.errorCount > 1 ? 's' : '' }}
+              {{ t('security.selectedBucketPrefix', { range: selectedBucket.rangeLabel }) }} · {{ t('security.requestCountLabel', { count: selectedBucket.count }, selectedBucket.count) }} · {{ t('security.errorCountLabel', { count: selectedBucket.errorCount }, selectedBucket.errorCount) }}
             </div>
           </div>
 
@@ -204,10 +204,10 @@
                   <span class="small text-secondary">{{ group.rangeLabel }}</span>
                 </div>
                 <div class="timeline-group-kpis">
-                  <span class="badge bg-blue-lt text-blue">{{ group.count }} req</span>
-                  <span class="badge bg-danger-lt text-danger">{{ group.errorCount }} erreurs</span>
-                  <span class="badge bg-warning-lt text-warning">{{ group.uniquePaths }} chemins</span>
-                  <span class="badge bg-indigo-lt text-indigo">{{ group.uniqueVhosts }} domaines</span>
+                  <span class="badge bg-blue-lt text-blue">{{ t('security.requestsAbbrBadge', { n: group.count }) }}</span>
+                  <span class="badge bg-danger-lt text-danger">{{ t('security.errorsCountBadge', { n: group.errorCount }) }}</span>
+                  <span class="badge bg-warning-lt text-warning">{{ t('security.pathsCountBadge', { n: group.uniquePaths }) }}</span>
+                  <span class="badge bg-indigo-lt text-indigo">{{ t('security.domainsCountBadge', { n: group.uniqueVhosts }) }}</span>
                 </div>
               </div>
 
@@ -222,7 +222,7 @@
                       class="badge"
                       :class="statusGroup.badgeClass"
                     >{{ statusGroup.label }}</span>
-                    <span class="small text-secondary">{{ statusGroup.count }} log{{ statusGroup.count > 1 ? 's' : '' }}</span>
+                    <span class="small text-secondary">{{ t('security.logsCountLabel', { count: statusGroup.count }, statusGroup.count) }}</span>
                   </div>
 
                   <div class="timeline-status-group-grid">
@@ -246,8 +246,8 @@
                         {{ r.domain || '(unknown)' }} {{ r.path }}
                       </div>
                       <div class="timeline-event-meta small text-secondary">
-                        <span><strong>Domaine:</strong> {{ r.domain || '-' }}</span>
-                        <span><strong>Hôte:</strong> {{ r.host_name || '-' }}</span>
+                        <span><strong>{{ t('security.domainLabel') }}:</strong> {{ r.domain || '-' }}</span>
+                        <span><strong>{{ t('security.hostColumnLabel') }}:</strong> {{ r.host_name || '-' }}</span>
                         <span
                           class="text-truncate"
                           :title="r.user_agent || '-'"
@@ -255,7 +255,7 @@
                           <strong>User-Agent:</strong> {{ r.user_agent || '-' }}
                         </span>
                         <span v-if="r.blocked">
-                          <strong>Blocage:</strong>
+                          <strong>{{ t('security.blockingLabel') }}:</strong>
                           <span
                             class="badge bg-success-lt text-success ms-1"
                             :title="r.blocked_reason || '-'"
@@ -270,7 +270,7 @@
                           </span>
                         </span>
                         <span v-if="r.blocked_until">
-                          <strong>Expire:</strong> {{ formatDate(String(r.blocked_until)) }}
+                          <strong>{{ t('security.expiresLabel') }}:</strong> {{ formatDate(String(r.blocked_until)) }}
                         </span>
                       </div>
                     </article>
@@ -287,6 +287,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useIpTimeline } from '../../composables/useIpTimeline'
 import { useModalChrome } from '../../composables/useModalChrome'
@@ -306,6 +307,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'ban'])
+
+const { t } = useI18n()
 
 const modalRef = ref<HTMLElement | null>(null)
 useModalChrome(modalRef, () => props.show, { onClose: () => emit('close') })
@@ -336,8 +339,8 @@ const {
 
 async function handleBanClick() {
   const confirmed = await dialog.confirm({
-    title: `Bloquer l'IP ${props.ip}`,
-    message: `Bloquer ${props.ip} via CrowdSec pour ${banDuration.value} ?`,
+    title: t('security.blockIpConfirmTitle', { ip: props.ip }),
+    message: t('security.blockIpConfirmMessage', { ip: props.ip, duration: banDuration.value }),
     variant: 'danger',
   })
   if (!confirmed) return

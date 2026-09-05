@@ -37,12 +37,14 @@ vi.mock('topojson-client', () => ({
   feature: () => ({ features: [] }),
 }))
 
+import { setLocale } from '../../i18n'
 import apiClient from '../../api'
 import TrafficOverviewPanel from './TrafficOverviewPanel.vue'
 
 describe('TrafficOverviewPanel (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     // TrafficOverviewPanel calls useHostsStore() in setup; install a fresh Pinia
     // so the store resolves without the app having to register the plugin.
     setActivePinia(createPinia())
