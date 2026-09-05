@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from './useConfirmDialog'
 import apiClient from '../api'
@@ -16,6 +17,7 @@ interface User {
 const USERS_REFRESH_SEC = 60
 
 export function useUsers() {
+  const { t } = useI18n()
   const auth = useAuthStore()
   const signal = useAbortSignal()
   const dialog = useConfirmDialog()
@@ -52,9 +54,9 @@ export function useUsers() {
   }
 
   function getDeleteButtonTitle(user: User): string {
-    if (user.username === auth.username) return 'Impossible de supprimer votre propre compte'
-    if (isLastAdmin(user.id)) return 'Impossible de supprimer le dernier admin'
-    return 'Supprimer cet utilisateur'
+    if (user.username === auth.username) return t('account.cannotDeleteOwnAccountTooltip')
+    if (isLastAdmin(user.id)) return t('account.cannotDeleteLastAdminTooltip')
+    return t('account.deleteThisUserTooltip')
   }
 
   async function fetchUsers(): Promise<void> {
@@ -88,13 +90,13 @@ export function useUsers() {
 
   async function createUser(): Promise<void> {
     if (!newUserForm.value.username || !newUserForm.value.password) {
-      createMessage.value = 'Veuillez remplir tous les champs'
+      createMessage.value = t('account.createFieldsRequiredError')
       createSuccess.value = false
       return
     }
 
     if (users.value.find((u) => u.username === newUserForm.value.username)) {
-      createMessage.value = 'Ce nom d\'utilisateur existe déjà'
+      createMessage.value = t('account.usernameAlreadyExistsError')
       createSuccess.value = false
       return
     }
@@ -108,12 +110,12 @@ export function useUsers() {
         newUserForm.value.role
       )
       createSuccess.value = true
-      createMessage.value = 'Utilisateur créé avec succès'
+      createMessage.value = t('account.userCreatedSuccessMessage')
       newUserForm.value = { username: '', password: '', role: 'viewer' }
       await fetchUsers()
     } catch (e: unknown) {
       createSuccess.value = false
-      createMessage.value = getApiErrorMessage(e, 'Erreur lors de la création')
+      createMessage.value = getApiErrorMessage(e, t('account.createUserError'))
     } finally {
       creatingUser.value = false
     }
@@ -121,8 +123,8 @@ export function useUsers() {
 
   async function saveRole(user: User): Promise<void> {
     const confirmed = await dialog.confirm({
-      title: 'Modifier le rôle',
-      message: `Attribuer le rôle « ${user.role} » à ${user.username} ?`,
+      title: t('account.editRoleConfirmTitle'),
+      message: t('account.assignRoleConfirmMessage', { role: user.role, username: user.username }),
       variant: 'warning',
     })
     if (!confirmed) {
@@ -133,10 +135,10 @@ export function useUsers() {
     try {
       await apiClient.updateUserRole(user.id, user.role)
       actionSuccess.value = true
-      actionMessage.value = `Rôle de ${user.username} mis à jour.`
+      actionMessage.value = t('account.roleUpdatedMessage', { username: user.username })
     } catch (e) {
       actionSuccess.value = false
-      actionMessage.value = getApiErrorMessage(e, `Échec de la mise à jour du rôle de ${user.username}.`)
+      actionMessage.value = getApiErrorMessage(e, t('account.roleUpdateFailedError', { username: user.username }))
       await fetchUsers()
     } finally {
       saving.value = false
@@ -145,8 +147,8 @@ export function useUsers() {
 
   async function deleteUser(user: User): Promise<void> {
     const confirmed = await dialog.confirm({
-      title: `Supprimer l'utilisateur`,
-      message: `Cette action est irréversible.`,
+      title: t('account.deleteUserConfirmTitle'),
+      message: t('account.irreversibleActionMessage'),
       variant: 'danger',
       requiredText: user.username,
     })
@@ -156,11 +158,11 @@ export function useUsers() {
     try {
       await apiClient.deleteUser(user.id)
       actionSuccess.value = true
-      actionMessage.value = `Utilisateur ${user.username} supprimé.`
+      actionMessage.value = t('account.userDeletedMessage', { username: user.username })
       await fetchUsers()
     } catch (e) {
       actionSuccess.value = false
-      actionMessage.value = getApiErrorMessage(e, `Échec de la suppression de ${user.username}.`)
+      actionMessage.value = getApiErrorMessage(e, t('account.deleteUserFailedError', { username: user.username }))
     } finally {
       saving.value = false
     }

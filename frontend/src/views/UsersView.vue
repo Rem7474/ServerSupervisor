@@ -2,7 +2,7 @@
   <div>
     <PageRefreshBar
       v-model="autoRefresh"
-      label="Utilisateurs"
+      :label="t('account.usersPageLabel')"
       :interval-sec="USERS_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />
@@ -13,16 +13,16 @@
             to="/"
             class="text-decoration-none"
           >
-            Dashboard
+            {{ t('account.dashboardBreadcrumb') }}
           </router-link>
           <span class="text-muted mx-1">/</span>
-          <span>Utilisateurs</span>
+          <span>{{ t('account.usersPageLabel') }}</span>
         </div>
         <h2 class="page-title">
-          Utilisateurs
+          {{ t('account.usersPageLabel') }}
         </h2>
         <div class="text-secondary">
-          Gestion des rôles (admin / operator / viewer)
+          {{ t('account.rolesManagementSubtitle') }}
         </div>
       </div>
     </div>
@@ -31,7 +31,7 @@
     <div class="card mb-4">
       <div class="card-header">
         <h3 class="card-title">
-          Ajouter un utilisateur
+          {{ t('account.addUserTitle') }}
         </h3>
       </div>
       <div class="card-body">
@@ -41,11 +41,11 @@
         >
           <div class="row g-3">
             <div class="col-md-4">
-              <label class="form-label">Nom d'utilisateur</label>
-              <input 
+              <label class="form-label">{{ t('account.usernameLabel') }}</label>
+              <input
                 v-model="newUserForm.username"
                 name="username"
-                type="text" 
+                type="text"
                 class="form-control"
                 placeholder="john_doe"
                 autocomplete="username"
@@ -56,11 +56,11 @@
               >
             </div>
             <div class="col-md-4">
-              <label class="form-label">Mot de passe</label>
-              <input 
+              <label class="form-label">{{ t('account.passwordLabel') }}</label>
+              <input
                 v-model="newUserForm.password"
                 name="new-password"
-                type="password" 
+                type="password"
                 class="form-control"
                 placeholder="••••••••"
                 autocomplete="new-password"
@@ -69,7 +69,7 @@
               >
             </div>
             <div class="col-md-3">
-              <label class="form-label">Rôle</label>
+              <label class="form-label">{{ t('account.roleLabel') }}</label>
               <select
                 v-model="newUserForm.role"
                 class="form-select"
@@ -94,7 +94,7 @@
                 class="btn btn-primary w-100"
                 :disabled="creatingUser"
               >
-                {{ creatingUser ? 'Création...' : 'Ajouter' }}
+                {{ creatingUser ? t('account.creatingEllipsisLabel') : t('account.addButtonLabel') }}
               </button>
             </div>
           </div>
@@ -138,9 +138,9 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Utilisateur</th>
-              <th>Rôle</th>
-              <th>Création</th>
+              <th>{{ t('account.userColumnLabel') }}</th>
+              <th>{{ t('account.roleLabel') }}</th>
+              <th>{{ t('account.creationColumnLabel') }}</th>
               <th style="width: 200px;" />
             </tr>
           </thead>
@@ -154,14 +154,14 @@
                 <span
                   v-if="user.username === auth.username"
                   class="badge bg-blue-lt text-blue ms-2"
-                >Vous</span>
+                >{{ t('account.youBadge') }}</span>
               </td>
               <td>
-                <select 
-                  v-model="user.role" 
-                  class="form-select form-select-sm" 
+                <select
+                  v-model="user.role"
+                  class="form-select form-select-sm"
                   :disabled="saving || user.username === auth.username"
-                  :title="user.username === auth.username ? 'Impossible de modifier votre propre rôle' : ''"
+                  :title="user.username === auth.username ? t('account.cannotEditOwnRoleTooltip') : ''"
                   @change="saveRole(user)"
                 >
                   <option value="viewer">
@@ -184,7 +184,7 @@
                   class="btn btn-icon btn-sm btn-ghost-danger"
                   :disabled="saving || user.username === auth.username || (isLastAdmin(user.id) && user.role === 'admin')"
                   :title="getDeleteButtonTitle(user)"
-                  aria-label="Supprimer l'utilisateur"
+                  :aria-label="t('account.deleteUserAriaLabel')"
                   @click="deleteUser(user)"
                 >
                   <IconTrash
@@ -196,7 +196,7 @@
             </tr>
             <tr v-if="!users.length && !loading">
               <td colspan="4">
-                <EmptyState title="Aucun utilisateur" />
+                <EmptyState :title="t('account.noUsersTitle')" />
               </td>
             </tr>
           </tbody>
@@ -207,11 +207,14 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { IconTrash } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { useUsers } from '../composables/useUsers'
+
+const { t } = useI18n()
 
 const {
   auth,
