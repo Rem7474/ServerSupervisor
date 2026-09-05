@@ -14,8 +14,6 @@ src/components/WsStatusBar.vue
 src/views/AccountSecurityView.vue
 src/views/AccountView.vue
 src/views/AuditLogsView.vue
-src/views/GitWebhookDetailView.vue
-src/views/GitWebhooksView.vue
 src/views/GlobalScheduledTasksView.vue
 src/views/NPMView.vue
 src/views/NetworkView.vue
