@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        {{ title }}
+        {{ resolvedTitle }}
       </h3>
       <button
         v-if="showRefresh"
@@ -11,7 +11,7 @@
         @click="$emit('refresh')"
       >
         <IconRefresh :size="14" />
-        Actualiser
+        {{ t('proxmox.refreshButton') }}
       </button>
     </div>
 
@@ -25,7 +25,7 @@
       v-else-if="executions.length === 0"
       class="card-body"
     >
-      <EmptyState :title="emptyText" />
+      <EmptyState :title="resolvedEmptyText" />
     </div>
     <div
       v-else
@@ -35,17 +35,17 @@
         <thead>
           <tr v-if="kind === 'tracker'">
             <th>Date</th>
-            <th>Release</th>
-            <th>Hôte</th>
-            <th>Statut</th>
-            <th>Logs</th>
+            <th>{{ t('webhooks.releaseColumn') }}</th>
+            <th>{{ t('webhooks.hostColumn') }}</th>
+            <th>{{ t('webhooks.statusColumn') }}</th>
+            <th>{{ t('webhooks.logsColumn') }}</th>
           </tr>
           <tr v-else>
             <th>Date</th>
-            <th>Repo / Branche</th>
-            <th>Commit</th>
-            <th>Statut</th>
-            <th>Logs</th>
+            <th>{{ t('webhooks.repoBranchColumn') }}</th>
+            <th>{{ t('webhooks.commitColumn') }}</th>
+            <th>{{ t('webhooks.statusColumn') }}</th>
+            <th>{{ t('webhooks.logsColumn') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -90,7 +90,7 @@
                   v-if="execution.alerts_after_count"
                   to="/alerts?tab=incidents"
                   class="badge bg-danger-lt text-danger ms-1 text-decoration-none"
-                  :title="`${execution.alerts_after_count} alerte(s) déclenchée(s) sur l'hôte dans les 15 min suivant ce déploiement`"
+                  :title="t('webhooks.alertsTriggeredTooltip', { n: execution.alerts_after_count })"
                 >
                   ⚠ {{ execution.alerts_after_count }}
                 </router-link>
@@ -100,7 +100,7 @@
                   v-if="execution.command_id && logsMode === 'inline'"
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Voir les logs"
+                  :title="t('proxmox.viewLogsTooltip')"
                   @click="$emit('open-logs', execution.command_id)"
                 >
                   <IconFileText :size="14" />
@@ -109,7 +109,7 @@
                   v-else-if="execution.command_id"
                   :to="`/audit?command=${execution.command_id}`"
                   class="btn btn-sm btn-ghost-secondary"
-                  title="Voir les logs"
+                  :title="t('proxmox.viewLogsTooltip')"
                 >
                   <IconFileText :size="14" />
                 </router-link>
@@ -161,7 +161,7 @@
                   v-if="execution.command_id && logsMode === 'inline'"
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Voir les logs"
+                  :title="t('proxmox.viewLogsTooltip')"
                   @click="$emit('open-logs', execution.command_id)"
                 >
                   <IconFileText :size="14" />
@@ -170,7 +170,7 @@
                   v-else-if="execution.command_id"
                   :to="`/audit?command=${execution.command_id}`"
                   class="btn btn-sm btn-ghost-secondary"
-                  title="Voir les logs"
+                  :title="t('proxmox.viewLogsTooltip')"
                 >
                   <IconFileText :size="14" />
                 </router-link>
@@ -182,7 +182,7 @@
                   v-if="execution.raw_payload"
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Voir le payload reçu"
+                  :title="t('webhooks.viewReceivedPayloadTooltip')"
                   @click="$emit('open-payload', execution.raw_payload)"
                 >
                   <IconBraces :size="14" />
@@ -198,7 +198,7 @@
       class="card-footer d-flex align-items-center justify-content-between"
     >
       <div class="text-secondary small">
-        {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, props.executions.length) }} sur {{ props.executions.length }}
+        {{ t('webhooks.paginationRangeLabel', { from: (currentPage - 1) * PAGE_SIZE + 1, to: Math.min(currentPage * PAGE_SIZE, props.executions.length), total: props.executions.length }) }}
       </div>
       <PaginationNav
         :current-page="currentPage"
@@ -211,6 +211,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconBraces, IconFileText, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
@@ -240,6 +241,8 @@ interface Execution {
   raw_payload?: string
 }
 
+const { t } = useI18n()
+
 const props = withDefaults(defineProps<{
   executions?: Execution[]
   loading?: boolean
@@ -252,11 +255,12 @@ const props = withDefaults(defineProps<{
   executions: () => [],
   loading: false,
   kind: 'webhook',
-  title: 'Historique des exécutions',
-  emptyText: 'Aucune exécution enregistrée.',
   showRefresh: false,
   logsMode: 'link',
 })
+
+const resolvedTitle = computed(() => props.title ?? t('webhooks.executionHistoryTitle'))
+const resolvedEmptyText = computed(() => props.emptyText ?? t('webhooks.noExecutionRecordedTitle'))
 
 const PAGE_SIZE = 20
 

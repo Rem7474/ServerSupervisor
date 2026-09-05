@@ -10,5 +10,16 @@
   "detailsColumn": "Details",
   "publicationDateColumn": "Publication date",
   "showLessButton": "Show less",
-  "showMoreButton": "Show more ({n})"
+  "showMoreButton": "Show more ({n})",
+  "executionHistoryTitle": "Execution history",
+  "noExecutionRecordedTitle": "No execution recorded.",
+  "releaseColumn": "Release",
+  "hostColumn": "Host",
+  "statusColumn": "Status",
+  "logsColumn": "Logs",
+  "repoBranchColumn": "Repo / Branch",
+  "commitColumn": "Commit",
+  "alertsTriggeredTooltip": "{n} alert(s) triggered on the host within 15 min of this deployment",
+  "viewReceivedPayloadTooltip": "View received payload",
+  "paginationRangeLabel": "{from}–{to} of {total}"
 }
