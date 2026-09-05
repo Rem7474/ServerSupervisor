@@ -1405,6 +1405,42 @@ export interface NPMProxyHostPreview {
 }
 
 //////////
+// source: oidc.go
+
+/**
+ * OIDCStatusResponse is returned to public callers (such as LoginView.vue)
+ * so the UI knows whether to display the SSO button and with what label.
+ */
+export interface OIDCStatusResponse {
+  enabled: boolean;
+  display_name: string;
+  allow_local_login: boolean;
+}
+/**
+ * OIDCAuthState represents a pending authorization session before callback.
+ */
+export interface OIDCAuthState {
+  state_id: string;
+  nonce: string;
+  code_verifier: string;
+  redirect_url: string;
+  created_at: string;
+  expires_at: string;
+}
+/**
+ * OIDCTokenClaims represents the claims extracted from an ID token.
+ */
+export interface OIDCTokenClaims {
+  sub: string;
+  email: string;
+  email_verified: boolean;
+  preferred_username: string;
+  name: string;
+  groups: string[];
+  roles: string[];
+}
+
+//////////
 // source: proxmox.go
 
 /**
@@ -2281,6 +2317,9 @@ export interface User {
   id: number /* int64 */;
   username: string;
   role: string; // admin, operator, viewer
+  auth_provider: string; // local, oidc
+  oidc_sub?: string;
+  email?: string;
   mfa_enabled: boolean;
   must_change_password: boolean;
   created_at: string;

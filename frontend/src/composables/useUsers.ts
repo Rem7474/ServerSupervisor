@@ -11,6 +11,9 @@ interface User {
   id: string
   username: string
   role: string
+  auth_provider?: string
+  oidc_sub?: string
+  email?: string
   created_at?: string
 }
 

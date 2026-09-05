@@ -33,6 +33,7 @@ import (
 	networksvc "github.com/serversupervisor/server/internal/services/network"
 	notifssvc "github.com/serversupervisor/server/internal/services/notifications"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
+	oidcsvc "github.com/serversupervisor/server/internal/services/oidc"
 	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	releasetrackersvc "github.com/serversupervisor/server/internal/services/releasetracker"
@@ -65,7 +66,10 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	webhookRateLimiter := NewIPRateLimiter(5, 10, cfg.TrustedProxyCIDRs)
 
 	// Instantiate handlers
-	authH := handlers.NewAuthHandler(authnsvc.NewService(db, cfg), cfg)
+	authnService := authnsvc.NewService(db, cfg)
+	authH := handlers.NewAuthHandler(authnService, cfg)
+	oidcSvc := oidcsvc.NewService(db, authnService, cfg)
+	oidcH := handlers.NewOIDCHandler(oidcSvc, cfg)
 	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}, bus))
@@ -134,7 +138,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		return networkview.BuildIPInventory(ctx, db, proxmoxService, npmService)
 	})
 
-	registerPublicRoutes(r, authH, db)
+	registerPublicRoutes(r, authH, oidcH, db)
 	registerWSRoutes(r, wsH, cfg)
 	registerAgentRoutes(r, db, cfg, agentH, wsH, agentRateLimiter)
 
@@ -175,10 +179,14 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	return r, releaseTrackerH, proxmoxH, npmH, cleanup
 }
 
-func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.DB) {
+func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, oidcH *handlers.OIDCHandler, db *database.DB) {
 	r.POST("/api/auth/login", h.Login)
 	r.POST("/api/auth/refresh", h.RefreshToken)
 	r.POST("/api/auth/logout", h.Logout)
+	// OIDC / SSO public endpoints
+	r.GET("/api/auth/oidc/status", oidcH.GetStatus)
+	r.GET("/api/auth/oidc/login", oidcH.Login)
+	r.GET("/api/auth/oidc/callback", oidcH.Callback)
 	// WebAuthn login ceremony: alternative to submitting a TOTP code during the
 	// MFA step, so it must be reachable before a session exists — each of these
 	// re-verifies the password itself (see BeginWebAuthnLogin's doc comment).

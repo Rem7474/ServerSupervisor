@@ -92,4 +92,26 @@ describe('UsersView', () => {
     expect(wrapper.text()).toContain('Add a user')
     expect(wrapper.text()).toContain('No user')
   })
+
+  it('renders SSO badges and email for OIDC-provisioned users', async () => {
+    getUsers.mockResolvedValue({
+      data: [
+        user({ id: 'u1', username: 'local_admin', role: 'admin', auth_provider: 'local' }),
+        user({
+          id: 'u2',
+          username: 'sso_user',
+          role: 'operator',
+          auth_provider: 'oidc',
+          email: 'sso_user@example.com',
+        }),
+      ],
+    })
+    const wrapper = mount(UsersView, mountOpts)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('local_admin')
+    expect(wrapper.text()).toContain('sso_user')
+    expect(wrapper.text()).toContain('sso_user@example.com')
+    expect(wrapper.text()).toContain('SSO')
+  })
 })
