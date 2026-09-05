@@ -4,14 +4,18 @@ import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../i18n'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 
-const { getRunbooks, getHosts, getRunbookExecutions } = vi.hoisted(() => ({
+const { getRunbooks, getHosts, getRunbookExecutions, getRunbookExecution, createRunbook, updateRunbook, runRunbook } = vi.hoisted(() => ({
   getRunbooks: vi.fn(),
   getHosts: vi.fn(),
   getRunbookExecutions: vi.fn(),
+  getRunbookExecution: vi.fn(),
+  createRunbook: vi.fn(),
+  updateRunbook: vi.fn(),
+  runRunbook: vi.fn(),
 }))
 
 vi.mock('../api', () => ({
-  default: { getRunbooks, getHosts, getRunbookExecutions },
+  default: { getRunbooks, getHosts, getRunbookExecutions, getRunbookExecution, createRunbook, updateRunbook, runRunbook },
   getApiErrorMessage: (e: unknown, fallback?: string) => fallback || String(e),
 }))
 
@@ -127,5 +131,95 @@ describe('RunbooksView', () => {
 
     expect(wrapper.text()).toContain('No runbook configured')
     expect(wrapper.text()).toContain('New runbook')
+  })
+
+  it('opens the edit modal pre-filled from the selected runbook, then closes it', async () => {
+    getRunbooks.mockResolvedValue({ data: [runbook({ description: 'nightly restart' })] })
+    const wrapper = mount(RunbooksView, mountOpts)
+    await flushPromises()
+
+    await wrapper.findAll('button.btn-ghost-secondary')[1].trigger('click') // edit
+    await flushPromises()
+
+    const nameInput = wrapper.find('input[type="text"]')
+    expect((nameInput.element as HTMLInputElement).value).toBe('Restart stack')
+    expect(wrapper.text()).toContain('Modifier le runbook')
+
+    await wrapper.find('.btn-close').trigger('click')
+    expect(wrapper.find('.modal').exists()).toBe(false)
+  })
+
+  it('adds and removes a step in the create modal', async () => {
+    const wrapper = mount(RunbooksView, mountOpts)
+    await flushPromises()
+    await wrapper.find('button.btn-primary').trigger('click')
+
+    expect(wrapper.findAll('.border.rounded.p-2.mb-2')).toHaveLength(1)
+    await wrapper.find('button.btn-outline-secondary.btn-sm').trigger('click')
+    expect(wrapper.findAll('.border.rounded.p-2.mb-2')).toHaveLength(2)
+
+    await wrapper.find('button.btn-ghost-danger').trigger('click')
+    expect(wrapper.findAll('.border.rounded.p-2.mb-2')).toHaveLength(1)
+  })
+
+  it('shows a translated save error', async () => {
+    createRunbook.mockRejectedValue(new Error('boom'))
+    const wrapper = mount(RunbooksView, mountOpts)
+    await flushPromises()
+    await wrapper.find('button.btn-primary').trigger('click')
+    await wrapper.find('input[type="text"]').setValue('New runbook')
+    await wrapper.find('select').setValue('h1')
+    await flushPromises()
+
+    await wrapper.find('.modal-footer button.btn-primary').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('boom')
+  })
+
+  it('renders execution history rows with status badges and expands step details', async () => {
+    getRunbooks.mockResolvedValue({ data: [runbook()] })
+    getRunbookExecutions.mockResolvedValue({
+      data: [
+        { id: 'e1', status: 'completed', triggered_by: 'admin', started_at: '2026-01-01T00:00:00Z', completed_at: '2026-01-01T00:01:00Z' },
+      ],
+    })
+    getRunbookExecution.mockResolvedValue({
+      data: {
+        id: 'e1', status: 'completed', steps: [
+          { position: 0, host_id: 'h1', module: 'docker', action: 'restart', target: '', status: 'completed', command_id: 'c1' },
+          { position: 1, host_id: 'h1', module: 'apt', action: 'update', status: '' },
+        ],
+      },
+    })
+    const wrapper = mount(RunbooksView, mountOpts)
+    await flushPromises()
+
+    await wrapper.find('button.btn-ghost-secondary').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Terminé')
+
+    await wrapper.find('tr.clickable-row').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('docker/restart')
+    expect(wrapper.text()).toContain('en attente')
+
+    await wrapper.find('button[title="Voir les logs de cette étape"]').trigger('click')
+    expect(wrapper.text()).toContain("Logs de l'étape")
+  })
+
+  it('runs a runbook on confirmation', async () => {
+    getRunbooks.mockResolvedValue({ data: [runbook()] })
+    runRunbook.mockResolvedValue({})
+    getRunbookExecutions.mockResolvedValue({ data: [] })
+    const dialog = useConfirmDialog()
+    const wrapper = mount(RunbooksView, mountOpts)
+    await flushPromises()
+
+    const p = wrapper.find('button.btn-ghost-success').trigger('click')
+    await flushPromises()
+    dialog.onConfirm()
+    await p
+    await flushPromises()
+    expect(runRunbook).toHaveBeenCalledWith('r1')
   })
 })
