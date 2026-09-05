@@ -20,5 +20,15 @@
   "refreshButton": "Rafraîchir",
   "searchDomainOrIpLabel": "Rechercher un domaine ou une IP",
   "searchPlaceholderExample": "exemple.com ou 1.2.3.4",
-  "viewRequestsButton": "Voir les requêtes"
+  "viewRequestsButton": "Voir les requêtes",
+  "connectionsPeriodLabel": "Connexions ({period})",
+  "failuresPeriodLabel": "Échecs ({period})",
+  "uniqueIpsPeriodLabel": "IPs uniques ({period})",
+  "blockedIpsTitle": "IPs bloquées",
+  "noBlockedIpTitle": "Aucune IP bloquée",
+  "blockedBadge": "Bloquée",
+  "unblockButton": "Débloquer",
+  "topFailedIpsTitle": "Top IPs — échecs de connexion ({period})",
+  "noFailuresRecordedTitle": "Aucun échec enregistré sur cette période",
+  "failuresCountBadge": "{count} échec | {count} échecs"
 }
