@@ -172,5 +172,10 @@
   "cronBuilderDayThu": "Jeu",
   "cronBuilderDayFri": "Ven",
   "cronBuilderDaySat": "Sam",
-  "cronBuilderDaySun": "Dim"
+  "cronBuilderDaySun": "Dim",
+  "pageRefreshPauseTooltip": "Cliquer pour mettre en pause",
+  "pageRefreshResumeTooltip": "Cliquer pour reprendre",
+  "pageRefreshAutoLabel": "Auto ({n}s)",
+  "pageRefreshPausedLabel": "Pause",
+  "pageRefreshLastUpdateLabel": "dernière MAJ {time}"
 }

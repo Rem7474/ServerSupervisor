@@ -172,5 +172,10 @@
   "cronBuilderDayThu": "Thu",
   "cronBuilderDayFri": "Fri",
   "cronBuilderDaySat": "Sat",
-  "cronBuilderDaySun": "Sun"
+  "cronBuilderDaySun": "Sun",
+  "pageRefreshPauseTooltip": "Click to pause",
+  "pageRefreshResumeTooltip": "Click to resume",
+  "pageRefreshAutoLabel": "Auto ({n}s)",
+  "pageRefreshPausedLabel": "Paused",
+  "pageRefreshLastUpdateLabel": "last updated {time}"
 }
