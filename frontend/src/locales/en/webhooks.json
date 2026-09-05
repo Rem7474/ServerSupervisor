@@ -2,5 +2,13 @@
   "payloadReceivedTitle": "Payload received",
   "copiedTooltip": "Copied!",
   "copyTooltip": "Copy",
-  "payloadTruncatedWarning": "Truncated or non-JSON payload — raw display."
+  "payloadTruncatedWarning": "Truncated or non-JSON payload — raw display.",
+  "versionHistoryTitle": "Version history",
+  "publicationDetectionSubtitle": "Publication / detection",
+  "noVersionAvailableTitle": "No version available.",
+  "versionColumn": "Version",
+  "detailsColumn": "Details",
+  "publicationDateColumn": "Publication date",
+  "showLessButton": "Show less",
+  "showMoreButton": "Show more ({n})"
 }

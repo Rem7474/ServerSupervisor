@@ -14,7 +14,6 @@ src/components/WsStatusBar.vue
 src/components/webhooks/TrackableContainersModal.vue
 src/components/webhooks/TrackerConfigCard.vue
 src/components/webhooks/TrackerScriptHelpCard.vue
-src/components/webhooks/TrackerVersionHistoryCard.vue
 src/components/webhooks/WebhookExecutionList.vue
 src/components/webhooks/WebhookModal.vue
 src/components/webhooks/WebhookTrackerFields.vue
