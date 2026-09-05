@@ -38,5 +38,4 @@ src/views/NPMView.vue
 src/views/NetworkView.vue
 src/views/ReleaseTrackerDetailView.vue
 src/views/RunbooksView.vue
-src/views/TrafficThreatsShell.vue
 src/views/UsersView.vue

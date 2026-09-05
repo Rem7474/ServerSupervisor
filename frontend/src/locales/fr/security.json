@@ -1,1 +1,9 @@
-{}
+{
+  "threatsPageTitle": "Menaces web",
+  "trafficPageTitle": "Stats web",
+  "threatsPageDescription": "IPs suspectes, chemins scannés, corrélation multi-hôtes et chronologie détaillée",
+  "trafficPageDescription": "Trafic HTTP, erreurs, endpoints, géographie des clients et actualisation automatique",
+  "modeToggleAriaLabel": "Vue d'ensemble ou Menaces",
+  "overviewModeButton": "Vue d'ensemble",
+  "threatsModeButton": "Menaces"
+}

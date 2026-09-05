@@ -7,38 +7,36 @@
             to="/"
             class="text-decoration-none"
           >
-            Dashboard
+            {{ t('nav.sections.control.items.dashboard') }}
           </router-link>
           <span class="text-muted mx-1">/</span>
-          <span>{{ mode === 'threats' ? 'Menaces web' : 'Stats web' }}</span>
+          <span>{{ mode === 'threats' ? t('security.threatsPageTitle') : t('security.trafficPageTitle') }}</span>
         </div>
         <h2 class="page-title">
-          {{ mode === 'threats' ? 'Menaces web' : 'Stats web' }}
+          {{ mode === 'threats' ? t('security.threatsPageTitle') : t('security.trafficPageTitle') }}
         </h2>
         <div class="text-secondary">
-          {{ mode === 'threats'
-            ? 'IPs suspectes, chemins scannés, corrélation multi-hôtes et chronologie détaillée'
-            : 'Trafic HTTP, erreurs, endpoints, géographie des clients et actualisation automatique' }}
+          {{ mode === 'threats' ? t('security.threatsPageDescription') : t('security.trafficPageDescription') }}
         </div>
       </div>
       <div
         class="btn-group"
         role="group"
-        aria-label="Vue d'ensemble ou Menaces"
+        :aria-label="t('security.modeToggleAriaLabel')"
       >
         <router-link
           to="/traffic"
           class="btn"
           :class="mode === 'overview' ? 'btn-primary' : 'btn-outline-secondary'"
         >
-          Vue d'ensemble
+          {{ t('security.overviewModeButton') }}
         </router-link>
         <router-link
           to="/threats"
           class="btn"
           :class="mode === 'threats' ? 'btn-primary' : 'btn-outline-secondary'"
         >
-          Menaces
+          {{ t('security.threatsModeButton') }}
         </router-link>
       </div>
     </div>
@@ -51,9 +49,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import TrafficOverviewPanel from '../components/security/TrafficOverviewPanel.vue'
 import ThreatsPanel from '../components/security/ThreatsPanel.vue'
 
 const route = useRoute()
+const { t } = useI18n()
 const mode = computed(() => (route.path === '/threats' ? 'threats' : 'overview'))
 </script>

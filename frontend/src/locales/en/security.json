@@ -1,1 +1,9 @@
-{}
+{
+  "threatsPageTitle": "Web threats",
+  "trafficPageTitle": "Web stats",
+  "threatsPageDescription": "Suspicious IPs, scanned paths, cross-host correlation and a detailed timeline",
+  "trafficPageDescription": "HTTP traffic, errors, endpoints, client geography and automatic refresh",
+  "modeToggleAriaLabel": "Overview or Threats",
+  "overviewModeButton": "Overview",
+  "threatsModeButton": "Threats"
+}
