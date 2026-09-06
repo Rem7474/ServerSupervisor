@@ -25,6 +25,9 @@
 **Hôtes**
 - [Host-Discovery](Host-Discovery.md)
 
+**Interface**
+- [Internationalization](Internationalization.md)
+
 ---
 [README](https://github.com/Rem7474/ServerSupervisor/blob/main/README.md)
 [ROADMAP](https://github.com/Rem7474/ServerSupervisor/blob/main/ROADMAP.md)
