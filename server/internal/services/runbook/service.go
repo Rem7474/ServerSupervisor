@@ -63,7 +63,7 @@ func (s *Service) List(ctx context.Context) ([]models.Runbook, error) {
 func (s *Service) Get(ctx context.Context, id string) (*models.Runbook, error) {
 	rb, err := s.repo.GetRunbook(ctx, id)
 	if err == sql.ErrNoRows {
-		return nil, apperr.NotFound("Runbook introuvable.")
+		return nil, apperr.NotFound("runbook not found").I18n(apperr.CodeRunbookNotFound, nil)
 	}
 	if err != nil {
 		return nil, err
@@ -73,26 +73,26 @@ func (s *Service) Get(ctx context.Context, id string) (*models.Runbook, error) {
 
 func (s *Service) Create(ctx context.Context, req models.RunbookCreate) (*models.Runbook, error) {
 	if strings.TrimSpace(req.Name) == "" {
-		return nil, apperr.Validation("Le nom du runbook est requis.")
+		return nil, apperr.Validation("the runbook name is required").I18n(apperr.CodeRunbookNameRequired, nil)
 	}
 	if err := s.validateSteps(ctx, req.Steps); err != nil {
 		return nil, err
 	}
 	rb, err := s.repo.CreateRunbook(ctx, req.Name, req.Description, req.Steps)
 	if err != nil {
-		return nil, apperr.Failed("Erreur lors de la création du runbook.")
+		return nil, apperr.Failed("could not create the runbook").I18n(apperr.CodeRunbookCreateFailed, nil)
 	}
 	return rb, nil
 }
 
 func (s *Service) Update(ctx context.Context, id string, req models.RunbookUpdate) error {
 	if _, err := s.repo.GetRunbook(ctx, id); err == sql.ErrNoRows {
-		return apperr.NotFound("Runbook introuvable.")
+		return apperr.NotFound("runbook not found").I18n(apperr.CodeRunbookNotFound, nil)
 	} else if err != nil {
 		return err
 	}
 	if req.Name != nil && strings.TrimSpace(*req.Name) == "" {
-		return apperr.Validation("Le nom du runbook est requis.")
+		return apperr.Validation("the runbook name is required").I18n(apperr.CodeRunbookNameRequired, nil)
 	}
 	if req.Steps != nil {
 		if err := s.validateSteps(ctx, *req.Steps); err != nil {
@@ -100,14 +100,14 @@ func (s *Service) Update(ctx context.Context, id string, req models.RunbookUpdat
 		}
 	}
 	if err := s.repo.UpdateRunbook(ctx, id, req.Name, req.Description, req.Steps); err != nil {
-		return apperr.Failed("Erreur lors de la mise à jour du runbook.")
+		return apperr.Failed("could not update the runbook").I18n(apperr.CodeRunbookUpdateFailed, nil)
 	}
 	return nil
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if _, err := s.repo.GetRunbook(ctx, id); err == sql.ErrNoRows {
-		return apperr.NotFound("Runbook introuvable.")
+		return apperr.NotFound("runbook not found").I18n(apperr.CodeRunbookNotFound, nil)
 	} else if err != nil {
 		return err
 	}
@@ -122,18 +122,18 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 func (s *Service) Run(ctx context.Context, runbookID, triggeredBy string) (*models.RunbookExecution, error) {
 	rb, err := s.repo.GetRunbook(ctx, runbookID)
 	if err == sql.ErrNoRows {
-		return nil, apperr.NotFound("Runbook introuvable.")
+		return nil, apperr.NotFound("runbook not found").I18n(apperr.CodeRunbookNotFound, nil)
 	}
 	if err != nil {
 		return nil, err
 	}
 	if len(rb.Steps) == 0 {
-		return nil, apperr.Validation("Ce runbook n'a aucune étape.")
+		return nil, apperr.Validation("this runbook has no steps").I18n(apperr.CodeRunbookNoSteps, nil)
 	}
 
 	exec, err := s.repo.CreateRunbookExecution(ctx, runbookID, triggeredBy)
 	if err != nil {
-		return nil, apperr.Failed("Erreur lors du lancement du runbook.")
+		return nil, apperr.Failed("could not start the runbook").I18n(apperr.CodeRunbookRunFailed, nil)
 	}
 
 	s.dispatchStep(ctx, exec.ID, rb.Steps[0])
@@ -151,7 +151,7 @@ func (s *Service) ListExecutions(ctx context.Context, runbookID string, limit in
 func (s *Service) GetExecution(ctx context.Context, id string) (*models.RunbookExecution, error) {
 	exec, err := s.repo.GetRunbookExecution(ctx, id)
 	if err == sql.ErrNoRows {
-		return nil, apperr.NotFound("Exécution introuvable.")
+		return nil, apperr.NotFound("execution not found").I18n(apperr.CodeRunbookExecutionNotFound, nil)
 	}
 	if err != nil {
 		return nil, err
@@ -260,7 +260,7 @@ var commandModuleRequiresTarget = map[string]bool{
 
 func (s *Service) validateSteps(ctx context.Context, steps []models.RunbookStepCreate) error {
 	if len(steps) == 0 {
-		return apperr.Validation("Le runbook doit avoir au moins une étape.")
+		return apperr.Validation("a runbook must have at least one step").I18n(apperr.CodeRunbookStepsRequired, nil)
 	}
 	for i, step := range steps {
 		n := i + 1
@@ -268,7 +268,7 @@ func (s *Service) validateSteps(ctx context.Context, steps []models.RunbookStepC
 			return apperr.Validation(fmt.Sprintf("Étape %d : l'hôte est requis.", n))
 		}
 		if ok, err := s.repo.HostExists(ctx, step.HostID); err != nil {
-			return apperr.Failed("Erreur lors de la validation des étapes.")
+			return apperr.Failed("could not validate the steps").I18n(apperr.CodeRunbookStepsInvalid, nil)
 		} else if !ok {
 			return apperr.Validation(fmt.Sprintf("Étape %d : hôte introuvable.", n))
 		}

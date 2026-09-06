@@ -41,6 +41,42 @@ const (
 	CodeGitProviderRateLimited  = "GIT_PROVIDER_RATE_LIMITED"
 	CodeGitProviderNotFound     = "GIT_PROVIDER_NOT_FOUND"
 	CodeGitProviderError        = "GIT_PROVIDER_ERROR"
+
+	// Alert rules (internal/services/alertrule)
+	CodeAlertRuleNotFound                = "ALERT_RULE_NOT_FOUND"
+	CodeAlertSourceTypeImmutable         = "ALERT_SOURCE_TYPE_IMMUTABLE"
+	CodeAlertIncidentResolveFailed       = "ALERT_INCIDENT_RESOLVE_FAILED"
+	CodeAlertDockerScopeRequired         = "ALERT_DOCKER_SCOPE_REQUIRED"
+	CodeAlertDockerHostNotFound          = "ALERT_DOCKER_HOST_NOT_FOUND"
+	CodeAlertDockerContainerNotFound     = "ALERT_DOCKER_CONTAINER_NOT_FOUND"
+	CodeAlertComposeProjectNotFound      = "ALERT_COMPOSE_PROJECT_NOT_FOUND"
+	CodeAlertProxmoxScopeRequired        = "ALERT_PROXMOX_SCOPE_REQUIRED"
+	CodeAlertProxmoxConnNotFound         = "ALERT_PROXMOX_CONNECTION_NOT_FOUND"
+	CodeAlertProxmoxNodeNotFound         = "ALERT_PROXMOX_NODE_NOT_FOUND"
+	CodeAlertProxmoxStorageNotFound      = "ALERT_PROXMOX_STORAGE_NOT_FOUND"
+	CodeAlertProxmoxGuestNotFound        = "ALERT_PROXMOX_GUEST_NOT_FOUND"
+	CodeAlertProxmoxDiskNotFound         = "ALERT_PROXMOX_DISK_NOT_FOUND"
+	CodeAlertRollingWindowNotAllowed     = "ALERT_ROLLING_WINDOW_NOT_ALLOWED"
+	CodeAlertRollingWindowInvalid        = "ALERT_ROLLING_WINDOW_INVALID"
+	CodeAlertCooldownNegative            = "ALERT_COOLDOWN_NEGATIVE"
+	CodeAlertEscalationNegative          = "ALERT_ESCALATION_NEGATIVE"
+	CodeAlertCommandTriggerIncomplete    = "ALERT_COMMAND_TRIGGER_INCOMPLETE"
+	CodeAlertMetricUnsupportedForLogs    = "ALERT_METRIC_UNSUPPORTED_FOR_LOGS"
+	CodeAlertMetricRequiresProxmox       = "ALERT_METRIC_REQUIRES_PROXMOX"
+	CodeAlertTemplateMetricNotHostScoped = "ALERT_TEMPLATE_METRIC_NOT_HOST_SCOPED"
+	CodeAlertTemplateNotFound            = "ALERT_TEMPLATE_NOT_FOUND"
+
+	// Runbooks (internal/services/runbook)
+	CodeRunbookNotFound          = "RUNBOOK_NOT_FOUND"
+	CodeRunbookNameRequired      = "RUNBOOK_NAME_REQUIRED"
+	CodeRunbookCreateFailed      = "RUNBOOK_CREATE_FAILED"
+	CodeRunbookUpdateFailed      = "RUNBOOK_UPDATE_FAILED"
+	CodeRunbookNoSteps           = "RUNBOOK_NO_STEPS"
+	CodeRunbookRunFailed         = "RUNBOOK_RUN_FAILED"
+	CodeRunbookExecutionNotFound = "RUNBOOK_EXECUTION_NOT_FOUND"
+	CodeRunbookStepsRequired     = "RUNBOOK_STEPS_REQUIRED"
+	CodeRunbookStepsInvalid      = "RUNBOOK_STEPS_INVALID"
+	CodeAlertRuleIDInvalid       = "ALERT_RULE_ID_INVALID"
 )
 
 // ErrorMessage holds translated strings for a catalog entry. {name}
@@ -144,6 +180,43 @@ var ErrorCatalog = map[string]ErrorMessage{
 		EN: "GitHub API error ({status})",
 		FR: "erreur GitHub API ({status})",
 	},
+
+	CodeAlertRuleNotFound:             {EN: "alert rule not found", FR: "règle d'alerte introuvable"},
+	CodeAlertSourceTypeImmutable:      {EN: "changing source_type is not allowed", FR: "le changement de source_type n'est pas autorisé"},
+	CodeAlertIncidentResolveFailed:    {EN: "rule updated, but resolving its open incidents failed", FR: "règle mise à jour, mais échec de résolution des incidents ouverts"},
+	CodeAlertDockerScopeRequired:      {EN: "a Docker scope is required", FR: "le scope Docker est requis"},
+	CodeAlertDockerHostNotFound:       {EN: "host not found for this Docker scope", FR: "hôte introuvable pour ce scope Docker"},
+	CodeAlertDockerContainerNotFound:  {EN: "Docker container not found for this scope", FR: "conteneur Docker introuvable pour ce scope"},
+	CodeAlertComposeProjectNotFound:   {EN: "Compose project not found for this scope", FR: "projet Compose introuvable pour ce scope"},
+	CodeAlertProxmoxScopeRequired:     {EN: "a Proxmox scope is required", FR: "le scope Proxmox est requis"},
+	CodeAlertProxmoxConnNotFound:      {EN: "Proxmox connection not found for this scope", FR: "connexion Proxmox introuvable pour ce scope"},
+	CodeAlertProxmoxNodeNotFound:      {EN: "Proxmox node not found for this scope", FR: "nœud Proxmox introuvable pour ce scope"},
+	CodeAlertProxmoxStorageNotFound:   {EN: "Proxmox storage not found for this scope", FR: "stockage Proxmox introuvable pour ce scope"},
+	CodeAlertProxmoxGuestNotFound:     {EN: "Proxmox VM/LXC not found for this scope", FR: "VM/LXC Proxmox introuvable pour ce scope"},
+	CodeAlertProxmoxDiskNotFound:      {EN: "Proxmox physical disk not found for this scope", FR: "disque physique Proxmox introuvable pour ce scope"},
+	CodeAlertRollingWindowNotAllowed:  {EN: "the rolling-average window does not apply to this metric", FR: "la fenêtre de moyenne glissante n'est pas applicable à cette métrique"},
+	CodeAlertRollingWindowInvalid:     {EN: "invalid rolling-average window (allowed: 1h, 6h, 24h)", FR: "fenêtre de moyenne glissante invalide (valeurs autorisées : 1h, 6h, 24h)"},
+	CodeAlertCooldownNegative:         {EN: "the silence period must be zero or positive", FR: "la période de silence doit être positive ou nulle"},
+	CodeAlertEscalationNegative:       {EN: "the escalation delay must be zero or positive", FR: "le délai d'escalade doit être positif ou nul"},
+	CodeAlertCommandTriggerIncomplete: {EN: "a command trigger must define both a module and an action", FR: "le déclencheur de commande doit définir un module et une action"},
+	CodeAlertMetricUnsupportedForLogs: {EN: "metric not supported for logs", FR: "métrique non supportée pour les logs"},
+	CodeAlertMetricRequiresProxmox:    {EN: "this metric requires a Proxmox source", FR: "la métrique requiert une source Proxmox"},
+	CodeAlertTemplateMetricNotHostScoped: {
+		EN: "Docker, Proxmox and synthetic metrics cannot be used in a template — they do not apply host by host",
+		FR: "les métriques Docker, Proxmox ou synthétiques ne peuvent pas être utilisées dans un template — elles ne s'appliquent pas hôte par hôte",
+	},
+	CodeAlertTemplateNotFound: {EN: "template not found", FR: "modèle introuvable"},
+
+	CodeRunbookNotFound:          {EN: "runbook not found", FR: "runbook introuvable"},
+	CodeRunbookNameRequired:      {EN: "the runbook name is required", FR: "le nom du runbook est requis"},
+	CodeRunbookCreateFailed:      {EN: "could not create the runbook", FR: "erreur lors de la création du runbook"},
+	CodeRunbookUpdateFailed:      {EN: "could not update the runbook", FR: "erreur lors de la mise à jour du runbook"},
+	CodeRunbookNoSteps:           {EN: "this runbook has no steps", FR: "ce runbook n'a aucune étape"},
+	CodeRunbookRunFailed:         {EN: "could not start the runbook", FR: "erreur lors du lancement du runbook"},
+	CodeRunbookExecutionNotFound: {EN: "execution not found", FR: "exécution introuvable"},
+	CodeRunbookStepsRequired:     {EN: "a runbook must have at least one step", FR: "le runbook doit avoir au moins une étape"},
+	CodeRunbookStepsInvalid:      {EN: "could not validate the steps", FR: "erreur lors de la validation des étapes"},
+	CodeAlertRuleIDInvalid:       {EN: "invalid alert rule id", FR: "identifiant de règle invalide"},
 }
 
 // ErrorResponse is the standalone error-response shape used by call sites
