@@ -13,12 +13,12 @@
         class="badge border-0 cursor-pointer"
         :class="modelValue ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'"
         type="button"
-        :title="modelValue ? 'Cliquer pour mettre en pause' : 'Cliquer pour reprendre'"
+        :title="modelValue ? t('common.pageRefreshPauseTooltip') : t('common.pageRefreshResumeTooltip')"
         @click="$emit('update:modelValue', !modelValue)"
       >
-        {{ modelValue ? `Auto (${intervalSec}s)` : 'Pause' }}
+        {{ modelValue ? t('common.pageRefreshAutoLabel', { n: intervalSec }) : t('common.pageRefreshPausedLabel') }}
       </button>
-      <span class="text-secondary small">dernière MAJ {{ lastUpdatedLabel }}</span>
+      <span class="text-secondary small">{{ t('common.pageRefreshLastUpdateLabel', { time: lastUpdatedLabel }) }}</span>
     </div>
     <slot />
   </div>
@@ -26,6 +26,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   modelValue: boolean
@@ -39,8 +42,8 @@ defineEmits<{
 }>()
 
 const lastUpdatedLabel = computed(() => {
-  if (!props.lastUpdatedAt) return 'jamais'
-  return props.lastUpdatedAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  if (!props.lastUpdatedAt) return t('common.never')
+  return props.lastUpdatedAt.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 })
 </script>
 
