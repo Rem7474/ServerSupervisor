@@ -1,6 +1,5 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from './useConfirmDialog'
 import apiClient from '../api'
@@ -8,31 +7,24 @@ import { addToast } from './useGlobalToast'
 import { getApiErrorMessage } from '../api/client'
 import { useStatusBadge } from './useStatusBadge'
 import { commandStatusLabel } from '../utils/commandStatus'
-import { moduleLabel, moduleClass, remoteCommandModuleOptions } from '../utils/moduleMeta'
+import { moduleLabel, moduleClass, REMOTE_COMMAND_MODULE_OPTIONS } from '../utils/moduleMeta'
 import { useCommandStream } from './useCommandStream'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
 import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
 import type { AuditLog, LoginEvent } from '../types/generated'
 import { AuditCategoryAlert, AuditCategoryAuth, AuditCategoryCommand, AuditCategorySettings } from '../types/generated'
 import type { SecurityData } from '../components/security/AuditSecurityPanel.vue'
-import { i18n } from '../i18n'
 
 // Values imported from the generated Go consts so they can't drift from
-// server/internal/models/audit.go's category keys. A function (not a static
-// array) so callers re-resolve the labels on every call — a locale switch
-// would otherwise leave these frozen in whichever language was active when
-// this module first loaded, same reasoning as moduleMeta.ts's
-// remoteCommandModuleOptions().
-export function journalCategoryOptions() {
-  const { t } = i18n.global
-  return [
-    { value: '', label: t('account.allCategoriesOption') },
-    { value: AuditCategoryAlert, label: t('account.alertsCategory') },
-    { value: AuditCategoryAuth, label: t('account.authCategory') },
-    { value: AuditCategorySettings, label: t('account.settingsCategory') },
-    { value: AuditCategoryCommand, label: t('account.commandsTab') },
-  ]
-}
+// server/internal/models/audit.go's category keys — only the French labels
+// are local to this file.
+export const JOURNAL_CATEGORY_OPTIONS = [
+  { value: '', label: 'Toutes catégories' },
+  { value: AuditCategoryAlert, label: 'Alertes' },
+  { value: AuditCategoryAuth, label: 'Authentification' },
+  { value: AuditCategorySettings, label: 'Réglages' },
+  { value: AuditCategoryCommand, label: 'Commandes' },
+]
 
 // Backs AuditLogsView.vue (command history + admin connexions/security tabs).
 // NOTE: this file previously held a small, unused `fetchAuditLogs` scaffold
@@ -40,15 +32,12 @@ export function journalCategoryOptions() {
 // the app — it predates AuditLogsView.vue's actual data needs (command
 // history + login/security admin endpoints) and has been replaced below.
 export function useAuditLogs() {
-  const { t } = useI18n()
   const { getStatusBadgeClass } = useStatusBadge()
 
   const route = useRoute()
   const router = useRouter()
   const auth = useAuthStore()
   const canViewCommands = computed(() => auth.role === 'admin' || auth.role === 'operator')
-  const moduleFilterOptions = computed(() => remoteCommandModuleOptions())
-  const journalCategoryFilterOptions = computed(() => journalCategoryOptions())
 
   const activeTab = ref((route.query.tab as string) || 'commandes')
 
@@ -136,13 +125,13 @@ export function useAuditLogs() {
   const lastConnFetchAt = ref(0)
 
   const dialog = useConfirmDialog()
-  const secPeriodOptions = computed(() => [
+  const secPeriodOptions = [
     { hours: 24, label: '24h' },
-    { hours: 168, label: t('account.sevenDaysLabel') },
-    { hours: 720, label: t('account.thirtyDaysLabel') },
-  ])
+    { hours: 168, label: '7j' },
+    { hours: 720, label: '30j' },
+  ]
   const securityPeriod = ref(24)
-  const securityPeriodLabel = computed(() => secPeriodOptions.value.find((p) => p.hours === securityPeriod.value)?.label ?? '24h')
+  const securityPeriodLabel = computed(() => secPeriodOptions.find((p) => p.hours === securityPeriod.value)?.label ?? '24h')
   const unblockingIP = ref('')
 
   const totalConnexionsPages = computed(() =>
@@ -351,7 +340,7 @@ export function useAuditLogs() {
       journalHasMore.value = journalLogs.value.length === journalLimit
       journalLoaded.value = true
     } catch (err: unknown) {
-      addToast(getApiErrorMessage(err, t('account.couldNotLoadJournalError')), 'error')
+      addToast(getApiErrorMessage(err, "Impossible de charger le journal d'audit"), 'error')
     } finally {
       journalLoading.value = false
     }
@@ -389,7 +378,7 @@ export function useAuditLogs() {
       link.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err: unknown) {
-      addToast(getApiErrorMessage(err, t('account.exportJournalFailedError')), 'error')
+      addToast(getApiErrorMessage(err, "Échec de l'export du journal d'audit"), 'error')
     } finally {
       journalExporting.value = false
     }
@@ -422,9 +411,9 @@ export function useAuditLogs() {
     try {
       await apiClient.cancelCommand(id)
       cmds.value = cmds.value.map((c) => (c.id === id ? { ...c, status: 'cancelled' } : c))
-      addToast(t('account.commandCancelledMessage'), 'success')
+      addToast('Commande annulée', 'success')
     } catch (err: unknown) {
-      addToast(getApiErrorMessage(err, t('account.couldNotCancelError')), 'error')
+      addToast(getApiErrorMessage(err, 'Impossible d\'annuler'), 'error')
     } finally {
       cancellingId.value = null
     }
@@ -432,8 +421,8 @@ export function useAuditLogs() {
 
   async function unblockIP(ip: string): Promise<void> {
     const ok = await dialog.confirm({
-      title: t('account.unblockIpConfirmTitle'),
-      message: t('account.removeIpFromBlocklistMessage', { ip }),
+      title: 'Débloquer cette IP',
+      message: `Retirer l'IP ${ip} de la liste noire ?`,
       variant: 'warning',
     })
     if (!ok) return
@@ -536,8 +525,7 @@ export function useAuditLogs() {
     unblockIP,
     moduleLabel,
     moduleClass,
-    moduleFilterOptions,
-    journalCategoryFilterOptions,
+    moduleFilterOptions: REMOTE_COMMAND_MODULE_OPTIONS,
     statusLabel,
     cmdLabel,
     formatDuration,

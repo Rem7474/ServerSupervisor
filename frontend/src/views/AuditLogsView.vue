@@ -7,16 +7,16 @@
             to="/"
             class="text-decoration-none"
           >
-            {{ t('account.dashboardBreadcrumb') }}
+            Dashboard
           </router-link>
           <span class="text-muted mx-1">/</span>
-          <span>{{ t('account.auditPageTitle') }}</span>
+          <span>Audit</span>
         </div>
         <h2 class="page-title">
-          {{ t('account.auditPageTitle') }}
+          Audit
         </h2>
         <div class="text-secondary">
-          {{ t('account.auditPageSubtitle') }}
+          Historique des actions, connexions et commandes
         </div>
       </div>
     </div>
@@ -33,7 +33,7 @@
           href="#"
           @click.prevent="switchToCommandes"
         >
-          {{ t('account.commandsTab') }}
+          Commandes
         </a>
       </li>
       <li
@@ -46,7 +46,7 @@
           href="#"
           @click.prevent="switchToConnexions"
         >
-          {{ t('account.connectionsTab') }}
+          Connexions
         </a>
       </li>
       <li
@@ -59,7 +59,7 @@
           href="#"
           @click.prevent="switchToJournal"
         >
-          {{ t('account.journalTab') }}
+          Journal
         </a>
       </li>
     </ul>
@@ -73,7 +73,7 @@
         <DataToolbar
           searchable
           :search="cmdSearch"
-          :search-placeholder="t('account.cmdSearchPlaceholder')"
+          search-placeholder="Rechercher hôte, commande, utilisateur…"
           @update:search="onSearchUpdate"
         >
           <template #bottom>
@@ -85,19 +85,19 @@
                   @change="onFilterChange"
                 >
                   <option value="">
-                    {{ t('account.allStatesOption') }}
+                    Tous les états
                   </option>
                   <option value="pending">
-                    {{ t('common.statePending') }}
+                    En attente
                   </option>
                   <option value="running">
-                    {{ t('common.stateRunning') }}
+                    En cours
                   </option>
                   <option value="completed">
-                    {{ t('common.stateCompleted') }}
+                    Terminé
                   </option>
                   <option value="failed">
-                    {{ t('common.stateFailed') }}
+                    Échoué
                   </option>
                 </select>
               </div>
@@ -108,7 +108,7 @@
                   @change="onFilterChange"
                 >
                   <option value="">
-                    {{ t('account.allModulesOption') }}
+                    Tous les modules
                   </option>
                   <option
                     v-for="opt in moduleFilterOptions"
@@ -130,7 +130,7 @@
                 <tr>
                   <th>
                     <SortableHeader
-                      :label="t('account.dateColumn')"
+                      label="Date"
                       :active="cmdSortBy === 'created_at'"
                       :direction="cmdSortDir"
                       @toggle="toggleCmdSort('created_at')"
@@ -138,7 +138,7 @@
                   </th>
                   <th>
                     <SortableHeader
-                      :label="t('account.hostColumnLabel')"
+                      label="Hôte"
                       :active="cmdSortBy === 'host_name'"
                       :direction="cmdSortDir"
                       @toggle="toggleCmdSort('host_name')"
@@ -146,7 +146,7 @@
                   </th>
                   <th>
                     <SortableHeader
-                      :label="t('account.typeColumn')"
+                      label="Type"
                       :active="cmdSortBy === 'module'"
                       :direction="cmdSortDir"
                       @toggle="toggleCmdSort('module')"
@@ -154,7 +154,7 @@
                   </th>
                   <th>
                     <SortableHeader
-                      :label="t('account.commandColumn')"
+                      label="Commande"
                       :active="cmdSortBy === 'command'"
                       :direction="cmdSortDir"
                       @toggle="toggleCmdSort('command')"
@@ -162,7 +162,7 @@
                   </th>
                   <th>
                     <SortableHeader
-                      :label="t('common.user')"
+                      label="Utilisateur"
                       :active="cmdSortBy === 'triggered_by'"
                       :direction="cmdSortDir"
                       @toggle="toggleCmdSort('triggered_by')"
@@ -170,13 +170,13 @@
                   </th>
                   <th>
                     <SortableHeader
-                      :label="t('common.status')"
+                      label="Statut"
                       :active="cmdSortBy === 'status'"
                       :direction="cmdSortDir"
                       @toggle="toggleCmdSort('status')"
                     />
                   </th>
-                  <th>{{ t('account.durationColumn') }}</th>
+                  <th>Durée</th>
                   <th />
                 </tr>
               </thead>
@@ -194,7 +194,7 @@
                 </tr>
                 <tr v-else-if="!sortedCmds.length">
                   <td colspan="8">
-                    <EmptyState :title="t('account.noCommandsRecordedTitle')" />
+                    <EmptyState title="Aucune commande enregistrée" />
                   </td>
                 </tr>
                 <tr
@@ -233,7 +233,7 @@
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
-                      :title="t('account.viewLogsTooltip')"
+                      title="Voir les logs"
                       @click="openLogViewer(cmd)"
                     >
                       <IconList
@@ -246,8 +246,8 @@
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-danger ms-1"
                       :disabled="cancellingId === cmd.id"
-                      :title="t('common.cancel')"
-                      :aria-label="t('account.cancelCommandAriaLabel')"
+                      title="Annuler"
+                      aria-label="Annuler la commande"
                       @click="cancelCmd(cmd.id)"
                     >
                       <span
@@ -267,7 +267,7 @@
           </div>
           <div class="card-footer d-flex align-items-center justify-content-between">
             <div class="text-secondary small">
-              {{ t('account.cmdsCountLabel', { count: cmdsTotal, page: cmdsPage, total: totalCmdsPages }, cmdsTotal) }}
+              {{ cmdsTotal }} commande{{ cmdsTotal !== 1 ? 's' : '' }} — page {{ cmdsPage }} / {{ totalCmdsPages }}
             </div>
             <PaginationNav
               :current-page="cmdsPage"
@@ -282,8 +282,8 @@
         :command="selectedCmd"
         :show="showLogViewer"
         wrapper-class="side-panel"
-        :title="t('common.commandLogTitle')"
-        :empty-text="t('common.commandLogEmptyText')"
+        title="Logs"
+        empty-text="Aucun log sélectionné"
         @close="closeLogViewer"
         @open="showLogViewer = true"
       />
@@ -305,7 +305,7 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">
-            {{ t('account.allConnectionsTitle') }}
+            Toutes les connexions
           </h3>
         </div>
         <ConnectionsTable
@@ -315,7 +315,7 @@
         />
         <div class="card-footer d-flex align-items-center justify-content-between">
           <div class="text-secondary small">
-            {{ t('account.pageOfTotalLabel', { page: connexionsPage, total: totalConnexionsPages }) }}
+            Page {{ connexionsPage }} / {{ totalConnexionsPages }}
           </div>
           <PaginationNav
             :current-page="connexionsPage"
@@ -331,7 +331,7 @@
       <div class="card">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
           <h3 class="card-title mb-0">
-            {{ t('account.auditJournalTitle') }}
+            Journal d'audit
           </h3>
           <button
             type="button"
@@ -348,7 +348,7 @@
               :size="14"
               class="icon me-1"
             />
-            {{ t('account.exportCsvButton') }}
+            Exporter CSV
           </button>
         </div>
         <div class="card-body border-bottom py-3">
@@ -359,7 +359,7 @@
                 class="form-select form-select-sm"
               >
                 <option
-                  v-for="opt in journalCategoryFilterOptions"
+                  v-for="opt in JOURNAL_CATEGORY_OPTIONS"
                   :key="opt.value"
                   :value="opt.value"
                 >
@@ -372,7 +372,7 @@
                 v-model="journalFrom"
                 type="date"
                 class="form-control form-control-sm"
-                :aria-label="t('account.sinceFilterAriaLabel')"
+                aria-label="Depuis"
               >
             </div>
             <div class="col-6 col-md-3">
@@ -380,7 +380,7 @@
                 v-model="journalTo"
                 type="date"
                 class="form-control form-control-sm"
-                :aria-label="t('account.untilFilterAriaLabel')"
+                aria-label="Jusqu'à"
               >
             </div>
           </div>
@@ -389,12 +389,12 @@
           <table class="table table-vcenter card-table">
             <thead>
               <tr>
-                <th>{{ t('account.dateColumn') }}</th>
-                <th>{{ t('account.categoryColumn') }}</th>
-                <th>{{ t('account.actionColumn') }}</th>
-                <th>{{ t('common.user') }}</th>
-                <th>{{ t('account.hostColumnLabel') }}</th>
-                <th>{{ t('common.status') }}</th>
+                <th>Date</th>
+                <th>Catégorie</th>
+                <th>Action</th>
+                <th>Utilisateur</th>
+                <th>Hôte</th>
+                <th>Statut</th>
               </tr>
             </thead>
             <tbody>
@@ -411,7 +411,7 @@
               </tr>
               <tr v-else-if="!journalLogs.length">
                 <td colspan="6">
-                  <EmptyState :title="t('account.noJournalEntriesTitle')" />
+                  <EmptyState title="Aucune entrée dans le journal d'audit" />
                 </td>
               </tr>
               <tr
@@ -449,7 +449,7 @@
         </div>
         <div class="card-footer d-flex align-items-center justify-content-between">
           <div class="text-secondary small">
-            {{ t('account.journalPageLabel', { page: journalPage }) }}
+            Page {{ journalPage }}
           </div>
           <div class="d-flex gap-2">
             <button
@@ -458,7 +458,7 @@
               :disabled="journalPage <= 1"
               @click="selectJournalPage(journalPage - 1)"
             >
-              {{ t('account.previousButton') }}
+              Précédent
             </button>
             <button
               type="button"
@@ -466,7 +466,7 @@
               :disabled="!journalHasMore"
               @click="selectJournalPage(journalPage + 1)"
             >
-              {{ t('account.nextButton') }}
+              Suivant
             </button>
           </div>
         </div>
@@ -476,10 +476,9 @@
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
 import { IconDownload, IconList, IconX } from '@tabler/icons-vue'
 import { useDateFormatter } from '../composables/useDateFormatter'
-import { useAuditLogs } from '../composables/useAuditLogs'
+import { useAuditLogs, JOURNAL_CATEGORY_OPTIONS } from '../composables/useAuditLogs'
 import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -489,7 +488,6 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import AuditSecurityPanel from '../components/security/AuditSecurityPanel.vue'
 import ConnectionsTable from '../components/common/ConnectionsTable.vue'
 
-const { t } = useI18n()
 const { formatLocaleDateTime: formatDate } = useDateFormatter()
 
 const {
@@ -544,7 +542,6 @@ const {
   moduleLabel,
   moduleClass,
   moduleFilterOptions,
-  journalCategoryFilterOptions,
   statusLabel,
   cmdLabel,
   formatDuration,

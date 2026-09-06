@@ -1,5 +1,4 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { formatDateLong as formatDate, formatDateTime } from '../utils/formatters'
@@ -22,7 +21,6 @@ interface Profile {
 }
 
 export function useAccount() {
-  const { t } = useI18n()
   const auth = useAuthStore()
 
   const signal = useAbortSignal()
@@ -52,20 +50,20 @@ export function useAccount() {
   const pwStrengthMeta = computed(() => {
     if (!pwForm.value.next) return null
     const s = pwStrength.value
-    if (s <= 1) return { label: t('account.weakLabel'), cls: 'bg-danger', width: '25%' }
-    if (s <= 2) return { label: t('account.mediumLabel'), cls: 'bg-warning', width: '50%' }
-    if (s <= 3) return { label: t('account.goodLabel'), cls: 'bg-info', width: '75%' }
-    return { label: t('account.strongLabel'), cls: 'bg-success', width: '100%' }
+    if (s <= 1) return { label: 'Faible', cls: 'bg-danger', width: '25%' }
+    if (s <= 2) return { label: 'Moyen', cls: 'bg-warning', width: '50%' }
+    if (s <= 3) return { label: 'Bon', cls: 'bg-info', width: '75%' }
+    return { label: 'Fort', cls: 'bg-success', width: '100%' }
   })
 
   watch(() => pwForm.value.next, (val) => {
     if (val.length > 0 && val.length < 8) {
-      pwErrors.value.next = t('account.atLeast8CharsRequiredError')
+      pwErrors.value.next = 'Au moins 8 caractères requis.'
     } else {
       pwErrors.value.next = ''
     }
     if (pwForm.value.confirm && val !== pwForm.value.confirm) {
-      pwErrors.value.confirm = t('account.confirmationMismatchError')
+      pwErrors.value.confirm = 'La confirmation ne correspond pas.'
     } else if (pwForm.value.confirm) {
       pwErrors.value.confirm = ''
     }
@@ -73,7 +71,7 @@ export function useAccount() {
 
   watch(() => pwForm.value.confirm, (val) => {
     if (val && val !== pwForm.value.next) {
-      pwErrors.value.confirm = t('account.confirmationMismatchError')
+      pwErrors.value.confirm = 'La confirmation ne correspond pas.'
     } else {
       pwErrors.value.confirm = ''
     }
@@ -97,11 +95,7 @@ export function useAccount() {
   })
 
   const roleLabel = computed(() => {
-    const map: Record<string, string> = {
-      admin: t('account.adminRoleLabel'),
-      operator: t('account.operatorRoleLabel'),
-      viewer: t('account.viewerRoleLabel'),
-    }
+    const map: Record<string, string> = { admin: 'Administrateur', operator: 'Opérateur', viewer: 'Lecteur' }
     return map[profile.value?.role ?? ""] || profile.value?.role || auth.role
   })
 
@@ -162,19 +156,19 @@ export function useAccount() {
     pwSuccess.value = ''
 
     let valid = true
-    if (!pwForm.value.current) { pwErrors.value.current = t('account.currentPasswordRequiredError'); valid = false }
-    if (pwForm.value.next.length < 8) { pwErrors.value.next = t('account.newPasswordMinLengthError'); valid = false }
-    if (pwForm.value.next !== pwForm.value.confirm) { pwErrors.value.confirm = t('account.confirmationMismatchError'); valid = false }
+    if (!pwForm.value.current) { pwErrors.value.current = 'Le mot de passe actuel est requis.'; valid = false }
+    if (pwForm.value.next.length < 8) { pwErrors.value.next = 'Le nouveau mot de passe doit faire au moins 8 caractères.'; valid = false }
+    if (pwForm.value.next !== pwForm.value.confirm) { pwErrors.value.confirm = 'La confirmation ne correspond pas.'; valid = false }
     if (!valid) return
 
     pwLoading.value = true
     try {
       await apiClient.changePassword(pwForm.value.current, pwForm.value.next)
-      pwSuccess.value = t('account.passwordUpdatedSuccessMessage')
+      pwSuccess.value = 'Mot de passe mis à jour avec succès.'
       pwForm.value = { current: '', next: '', confirm: '' }
       auth.clearMustChangePassword()
     } catch (e: unknown) {
-      pwError.value = getApiErrorMessage(e, t('account.updatePasswordError'))
+      pwError.value = getApiErrorMessage(e, 'Erreur lors de la mise à jour du mot de passe.')
     } finally {
       pwLoading.value = false
     }

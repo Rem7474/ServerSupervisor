@@ -12,13 +12,13 @@
           to="/"
           class="text-decoration-none"
         >
-          {{ t('npm.dashboardBreadcrumb') }}
+          Dashboard
         </router-link>
         <span class="text-muted mx-1">/</span>
-        <span>{{ t('npm.nginxProxyManagerLabel') }}</span>
+        <span>Nginx Proxy Manager</span>
       </div>
       <h2 class="page-title">
-        {{ t('npm.proxyHostsTitle') }}
+        Proxy Hosts NPM
       </h2>
     </div>
 
@@ -32,7 +32,7 @@
           :size="16"
           class="icon me-1"
         />
-        {{ t('npm.certificatesExpiringLabel', { n: expiringCerts.length }, expiringCerts.length) }}
+        {{ expiringCerts.length }} certificat{{ expiringCerts.length > 1 ? 's' : '' }} expirant sous 30 jours
       </div>
       <div class="d-flex flex-wrap gap-2">
         <router-link
@@ -42,7 +42,7 @@
           class="badge text-decoration-none"
           :class="sslBadge(c.ssl_days_remaining)"
         >
-          {{ c.domain_names[0] }} — {{ c.ssl_days_remaining }}{{ t('npm.daySuffix') }}
+          {{ c.domain_names[0] }} — {{ c.ssl_days_remaining }}j
         </router-link>
       </div>
     </div>
@@ -50,7 +50,7 @@
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title mb-0">
-          {{ t('npm.allProxyHostsTitle') }}
+          Tous les proxy hosts
         </h3>
       </div>
 
@@ -75,9 +75,9 @@
         class="card-body"
       >
         <EmptyState
-          :title="t('npm.noProxyHostFoundTitle')"
-          :subtitle="t('npm.configureNpmConnectionHint')"
-          :cta-label="t('npm.settingsIntegrationsLink')"
+          title="Aucun proxy host trouvé"
+          subtitle="Configurez une connexion NPM — les hosts apparaîtront automatiquement après le premier sync."
+          cta-label="Paramètres → Intégrations"
           cta-to="/settings?tab=integrations"
         />
       </div>
@@ -91,7 +91,7 @@
             <tr>
               <th>
                 <SortableHeader
-                  :label="t('npm.connectionColumn')"
+                  label="Connexion"
                   :active="sortKey === 'connection_name'"
                   :direction="sortDir"
                   @toggle="toggleSort('connection_name')"
@@ -99,7 +99,7 @@
               </th>
               <th>
                 <SortableHeader
-                  :label="t('npm.domainColumn')"
+                  label="Domaine"
                   :active="sortKey === 'domain'"
                   :direction="sortDir"
                   @toggle="toggleSort('domain')"
@@ -107,7 +107,7 @@
               </th>
               <th>
                 <SortableHeader
-                  :label="t('npm.forwardColumn')"
+                  label="Forward"
                   :active="sortKey === 'forward'"
                   :direction="sortDir"
                   @toggle="toggleSort('forward')"
@@ -115,10 +115,10 @@
               </th>
               <th
                 class="text-center"
-                :title="t('npm.toggleNpmHeaderTooltip')"
+                title="Activer/désactiver le proxy host dans NPM"
               >
                 <SortableHeader
-                  :label="t('npm.npmActiveColumn')"
+                  label="Actif NPM"
                   :active="sortKey === 'npm_enabled'"
                   :direction="sortDir"
                   @toggle="toggleSort('npm_enabled')"
@@ -126,7 +126,7 @@
               </th>
               <th
                 class="text-center"
-                :title="t('npm.monitoringHeaderTooltip')"
+                title="Suivi uptime et certificat SSL de ce proxy host"
               >
                 <div class="d-flex justify-content-center gap-3">
                   <SortableHeader
@@ -160,13 +160,13 @@
                     v-if="needsAttention(h)"
                     :size="14"
                     class="text-warning flex-shrink-0"
-                    :title="t('npm.blindSpotTooltip')"
+                    title="Proxy host actif dans NPM mais sans sonde uptime — une panne ne serait pas détectée."
                   />
                   <router-link
                     v-if="h.uptime_probe_id || h.ssl_certificate_id"
                     :to="`/monitoring/host/${h.id}`"
                     class="fw-medium text-decoration-none"
-                    :title="t('npm.viewMonitoringTooltip')"
+                    title="Voir le suivi uptime + SSL de ce proxy host"
                   >
                     {{ h.domain_names[0] }}
                   </router-link>
@@ -190,7 +190,7 @@
                 {{ h.forward_host }}:{{ h.forward_port }}
               </td>
 
-              <!-- Active in NPM — direct call to the NPM API -->
+              <!-- Actif NPM — appel direct à l'API NPM -->
               <td class="text-center">
                 <label class="form-check form-switch mb-0 d-inline-flex justify-content-center">
                   <input
@@ -198,7 +198,7 @@
                     type="checkbox"
                     :checked="h.npm_enabled"
                     :disabled="togglingNPM[h.id]"
-                    :title="t('npm.toggleNpmInputTooltip')"
+                    title="Activer ou désactiver ce proxy host dans Nginx Proxy Manager"
                     @change="toggleNPM(h, ($event.target as HTMLInputElement).checked)"
                   >
                 </label>
@@ -207,7 +207,7 @@
               <!-- Monitoring — uptime + SSL sub-toggles and badges grouped
                    under one column instead of two, since they're both just
                    "is monitoring active for this proxy host" controls (see
-                   ExposureDomainsPanel.vue's Availability column for the
+                   ExposureDomainsPanel.vue's Disponibilité column for the
                    same merge on the host exposure tab). Each sub-toggle
                    still applies independently (a proxy host can monitor
                    uptime only, SSL only, both, or neither). -->
@@ -220,7 +220,7 @@
                         type="checkbox"
                         :checked="h.uptime_monitoring_enabled"
                         :disabled="toggling[h.id] || !h.npm_enabled"
-                        :title="t('npm.enableUptimeMonitoringTooltip')"
+                        title="Activer le suivi uptime"
                         @change="toggle(h, 'uptime_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
                       >
                     </label>
@@ -229,7 +229,7 @@
                       :to="`/monitoring/host/${h.id}`"
                       class="badge small text-decoration-none"
                       :class="uptimeBadge(h.uptime_status)"
-                      :title="t('npm.viewUptimeProbeTooltip')"
+                      title="Voir la sonde uptime"
                     >
                       {{ h.uptime_status }}
                       <span
@@ -250,7 +250,7 @@
                         type="checkbox"
                         :checked="h.ssl_monitoring_enabled"
                         :disabled="toggling[h.id] || !h.ssl_enabled || !h.npm_enabled"
-                        :title="!h.ssl_enabled ? t('npm.noSslUsedTooltip') : t('npm.enableSslMonitoringTooltip')"
+                        :title="!h.ssl_enabled ? 'Ce proxy host n\'utilise pas SSL' : 'Activer le suivi du certificat SSL'"
                         @change="toggle(h, 'ssl_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
                       >
                     </label>
@@ -259,9 +259,9 @@
                       :to="`/monitoring/host/${h.id}`"
                       class="badge small text-decoration-none"
                       :class="sslBadge(h.ssl_days_remaining)"
-                      :title="t('npm.viewSslCertificateTooltip')"
+                      title="Voir le certificat SSL"
                     >
-                      {{ h.ssl_days_remaining }}{{ t('npm.daySuffix') }}
+                      {{ h.ssl_days_remaining }}j
                     </router-link>
                     <span
                       v-else-if="!h.ssl_enabled"
@@ -293,15 +293,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { IconLock, IconAlertTriangle } from '@tabler/icons-vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { useNPM } from '../composables/useNPM'
-
-const { t } = useI18n()
 
 const {
   hosts,

@@ -1,5 +1,4 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import type { LoginEvent } from '../types/generated'
 import type { WebAuthnCredential } from '../types/webauthn'
@@ -10,7 +9,6 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { createWebAuthnCredential, isWebAuthnSupported } from '../utils/webauthn'
 
 export function useAccountSecurity() {
-  const { t } = useI18n()
   const auth = useAuthStore()
   const signal = useAbortSignal()
   const dialog = useConfirmDialog()
@@ -50,7 +48,7 @@ export function useAccountSecurity() {
       if (setupSecondsLeft.value === 0) {
         if (setupTimer) clearInterval(setupTimer)
         setupVisible.value = false
-        error.value = t('account.setupTimeoutError')
+        error.value = 'Le délai de configuration a expiré. Veuillez cliquer sur "Activer MFA" pour recommencer.'
       }
     }, 1000)
   }
@@ -109,7 +107,7 @@ export function useAccountSecurity() {
       setupVisible.value = true
       startSetupTimer()
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, t('account.mfaSetupError'))
+      error.value = getApiErrorMessage(e, 'Erreur lors de la configuration MFA')
     } finally {
       loading.value = false
     }
@@ -121,13 +119,13 @@ export function useAccountSecurity() {
     success.value = ''
     try {
       await apiClient.verifyMFA(setup.value.secret, verifyCode.value, setup.value.backup_codes)
-      success.value = t('account.mfaEnabledSuccessMessage')
+      success.value = 'MFA activé avec succès.'
       setupVisible.value = false
       verifyCode.value = ''
       stopSetupTimer()
       await loadStatus()
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, t('account.invalidCodeError'))
+      error.value = getApiErrorMessage(e, 'Code invalide')
     } finally {
       loading.value = false
     }
@@ -135,10 +133,10 @@ export function useAccountSecurity() {
 
   async function disableMFA() {
     const confirmed = await dialog.confirm({
-      title: t('account.disableMfaButton'),
-      message: t('account.disableMfaConfirmMessage'),
+      title: 'Désactiver le MFA',
+      message: 'Votre compte sera moins protégé : une seule preuve d\'identité (le mot de passe) suffira pour se connecter. Continuer ?',
       variant: 'danger',
-      okLabel: t('account.disableWord'),
+      okLabel: 'Désactiver',
     })
     if (!confirmed) return
 
@@ -147,12 +145,12 @@ export function useAccountSecurity() {
     success.value = ''
     try {
       await apiClient.disableMFA(disablePassword.value)
-      success.value = t('account.mfaDisabledMessage')
+      success.value = 'MFA désactivé.'
       showDisable.value = false
       disablePassword.value = ''
       await loadStatus()
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, t('account.disableMfaError'))
+      error.value = getApiErrorMessage(e, 'Erreur lors de la désactivation')
     } finally {
       loading.value = false
     }
@@ -161,10 +159,10 @@ export function useAccountSecurity() {
   async function revokeOtherSessions() {
     if (!auth.isAuthenticated) return
     const confirmed = await dialog.confirm({
-      title: t('account.revokeOtherSessionsButton'),
-      message: t('account.revokeSessionsConfirmMessage'),
+      title: 'Révoquer les autres sessions',
+      message: 'Tous vos autres appareils/onglets connectés seront déconnectés immédiatement. Cette session-ci reste active.',
       variant: 'warning',
-      okLabel: t('account.revokeWord'),
+      okLabel: 'Révoquer',
     })
     if (!confirmed) return
 
@@ -173,10 +171,10 @@ export function useAccountSecurity() {
     revokeSuccess.value = ''
     try {
       await apiClient.revokeAllSessions()
-      revokeSuccess.value = t('account.sessionsRevokedMessage')
+      revokeSuccess.value = 'Toutes les autres sessions ont été révoquées.'
       await loadLoginEvents()
     } catch (e: unknown) {
-      revokeError.value = getApiErrorMessage(e, t('account.revokeSessionsError'))
+      revokeError.value = getApiErrorMessage(e, 'Erreur lors de la révocation des sessions.')
     } finally {
       revokeLoading.value = false
     }
@@ -227,11 +225,11 @@ export function useAccountSecurity() {
       const begin = await apiClient.beginWebAuthnRegistration()
       const credential = await createWebAuthnCredential(begin.data.options)
       await apiClient.finishWebAuthnRegistration(begin.data.session_token, newPasskeyName.value.trim(), credential)
-      webauthnSuccess.value = t('account.keyAddedMessage')
+      webauthnSuccess.value = 'Clé de sécurité ajoutée.'
       addingPasskey.value = false
       await loadWebAuthnCredentials()
     } catch (e: unknown) {
-      webauthnError.value = getApiErrorMessage(e, t('account.couldNotAddKeyError'))
+      webauthnError.value = getApiErrorMessage(e, 'Impossible d\'ajouter cette clé de sécurité')
     } finally {
       registeringPasskey.value = false
     }
@@ -239,9 +237,9 @@ export function useAccountSecurity() {
 
   async function deletePasskey(cred: WebAuthnCredential): Promise<void> {
     const confirmed = await dialog.confirm({
-      title: t('account.deleteKeyConfirmTitle'),
-      message: t('account.deleteKeyConfirmMessage', { name: cred.name || t('account.securityKeyFallbackName') }),
-      okLabel: t('account.deleteButton'),
+      title: 'Supprimer cette clé de sécurité ?',
+      message: `« ${cred.name || 'Clé de sécurité'} » ne pourra plus être utilisée pour se connecter.`,
+      okLabel: 'Supprimer',
       destructive: true,
     })
     if (!confirmed) return
@@ -249,10 +247,10 @@ export function useAccountSecurity() {
     webauthnSuccess.value = ''
     try {
       await apiClient.deleteWebAuthnCredential(cred.id)
-      webauthnSuccess.value = t('account.keyDeletedMessage')
+      webauthnSuccess.value = 'Clé de sécurité supprimée.'
       await loadWebAuthnCredentials()
     } catch (e: unknown) {
-      webauthnError.value = getApiErrorMessage(e, t('account.deleteFailedError'))
+      webauthnError.value = getApiErrorMessage(e, 'Suppression impossible')
     }
   }
 

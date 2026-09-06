@@ -11,7 +11,7 @@
           :size="24"
           class="icon alert-icon me-2"
         />
-        <strong>{{ t('account.passwordChangeRequiredTitle') }}</strong>&nbsp;{{ t('account.passwordChangeRequiredMessage') }}
+        <strong>Changement de mot de passe requis.</strong>&nbsp;Pour des raisons de sécurité, veuillez définir un nouveau mot de passe avant de continuer.
       </div>
     </div>
 
@@ -23,16 +23,16 @@
               to="/"
               class="text-decoration-none"
             >
-              {{ t('account.dashboardBreadcrumb') }}
+              Dashboard
             </router-link>
             <span class="text-muted mx-1">/</span>
-            <span>{{ t('common.myAccount') }}</span>
+            <span>Mon compte</span>
           </div>
           <h2 class="page-title">
-            {{ t('common.myAccount') }}
+            Mon compte
           </h2>
           <div class="text-secondary">
-            {{ t('account.manageAccountSubtitle') }}
+            Gérez vos informations personnelles et la sécurité de votre compte
           </div>
         </div>
       </div>
@@ -47,7 +47,7 @@
           :class="{ active: activeTab === 'profil' }"
           @click="activeTab = 'profil'"
         >
-          {{ t('account.profileTab') }}
+          Profil
         </button>
       </li>
       <li class="nav-item">
@@ -57,7 +57,7 @@
           :class="{ active: activeTab === 'historique' }"
           @click="switchToHistorique"
         >
-          {{ t('account.historyTab') }}
+          Historique
           <span
             v-if="myCommands.length"
             class="badge bg-azure-lt text-azure ms-1"
@@ -69,7 +69,7 @@
           to="/account/security"
           class="nav-link"
         >
-          {{ t('account.connectionsTab') }}
+          Connexions
         </router-link>
       </li>
     </ul>
@@ -100,28 +100,28 @@
                 v-if="profile?.created_at"
                 class="text-secondary small"
               >
-                {{ t('account.memberSinceLabel', { date: formatDate(profile.created_at) }) }}
+                Membre depuis {{ formatDate(profile.created_at) }}
               </div>
             </div>
             <div class="card-footer text-center py-3">
               <div class="row g-3">
                 <div class="col-6 border-end">
                   <div class="text-secondary small">
-                    {{ t('account.mfaLabel') }}
+                    MFA
                   </div>
                   <div
                     class="fw-bold"
                     :class="profile?.mfa_enabled ? 'text-success' : 'text-secondary'"
                   >
-                    {{ profile?.mfa_enabled ? t('account.enabledWord') : t('account.disabledWord') }}
+                    {{ profile?.mfa_enabled ? 'Activé' : 'Désactivé' }}
                   </div>
                 </div>
                 <div class="col-6">
                   <div class="text-secondary small">
-                    {{ t('common.status') }}
+                    Statut
                   </div>
                   <div class="fw-bold text-success">
-                    {{ t('account.activeWord') }}
+                    Actif
                   </div>
                 </div>
               </div>
@@ -136,7 +136,7 @@
                   :size="24"
                   class="icon me-2"
                 />
-                {{ t('account.twoFactorAuthTitle') }}
+                Authentification à deux facteurs
               </h3>
             </div>
             <div class="card-body">
@@ -153,14 +153,14 @@
                   class="badge"
                   :class="profile?.mfa_enabled ? 'bg-success-lt text-success' : 'bg-warning-lt text-warning'"
                 >
-                  {{ profile?.mfa_enabled ? t('account.activeWord') : t('account.inactiveWord') }}
+                  {{ profile?.mfa_enabled ? 'Actif' : 'Inactif' }}
                 </span>
               </div>
               <router-link
                 to="/account/security"
                 class="btn btn-outline-secondary w-100"
               >
-                {{ t('account.manageMfaButton') }}
+                Gérer le MFA du compte
               </router-link>
             </div>
           </div>
@@ -175,13 +175,13 @@
                   :size="24"
                   class="icon me-2"
                 />
-                {{ t('account.changePasswordTitle') }}
+                Changer le mot de passe
               </h3>
             </div>
             <div class="card-body">
               <form @submit.prevent="submitChangePassword">
                 <div class="mb-3">
-                  <label class="form-label required">{{ t('account.currentPasswordLabel') }}</label>
+                  <label class="form-label required">Mot de passe actuel</label>
                   <input
                     v-model="pwForm.current"
                     type="password"
@@ -198,7 +198,7 @@
                   </div>
                 </div>
                 <div class="mb-3">
-                  <label class="form-label required">{{ t('account.newPasswordLabel') }}</label>
+                  <label class="form-label required">Nouveau mot de passe</label>
                   <input
                     v-model="pwForm.next"
                     type="password"
@@ -228,18 +228,18 @@
                       />
                     </div>
                     <div class="form-hint mt-1">
-                      {{ t('account.passwordStrengthPrefix') }} <span :class="{ 'text-danger': pwStrength <= 1, 'text-warning': pwStrength === 2, 'text-success': pwStrength >= 4 }">{{ pwStrengthMeta.label }}</span>
+                      Force : <span :class="{ 'text-danger': pwStrength <= 1, 'text-warning': pwStrength === 2, 'text-success': pwStrength >= 4 }">{{ pwStrengthMeta.label }}</span>
                     </div>
                   </div>
                   <div
                     v-else
                     class="form-hint"
                   >
-                    {{ t('account.atLeast8CharsHint') }}
+                    Au moins 8 caractères.
                   </div>
                 </div>
                 <div class="mb-4">
-                  <label class="form-label required">{{ t('account.confirmNewPasswordLabel') }}</label>
+                  <label class="form-label required">Confirmer le nouveau mot de passe</label>
                   <input
                     v-model="pwForm.confirm"
                     type="password"
@@ -281,7 +281,7 @@
                       v-if="pwLoading"
                       class="spinner-border spinner-border-sm me-2"
                     />
-                    {{ pwLoading ? t('common.saving') : t('account.updatePasswordButton') }}
+                    {{ pwLoading ? 'Enregistrement...' : 'Mettre à jour le mot de passe' }}
                   </button>
                   <button
                     v-if="!auth.mustChangePassword"
@@ -289,7 +289,7 @@
                     class="btn btn-outline-secondary"
                     @click="resetPwForm"
                   >
-                    {{ t('common.cancel') }}
+                    Annuler
                   </button>
                 </div>
               </form>
@@ -313,7 +313,7 @@
                 :size="24"
                 class="icon me-2"
               />
-              {{ t('account.recentActivityTitle') }}
+              Activité récente
             </h3>
             <span
               v-if="myCommands.length"
@@ -324,12 +324,12 @@
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
-                  <th>{{ t('account.dateColumn') }}</th>
-                  <th>{{ t('account.hostColumnLabel') }}</th>
-                  <th>{{ t('account.typeColumn') }}</th>
-                  <th>{{ t('account.commandColumn') }}</th>
-                  <th>{{ t('common.status') }}</th>
-                  <th>{{ t('account.durationColumn') }}</th>
+                  <th>Date</th>
+                  <th>Hôte</th>
+                  <th>Type</th>
+                  <th>Commande</th>
+                  <th>Statut</th>
+                  <th>Durée</th>
                   <th />
                 </tr>
               </thead>
@@ -347,7 +347,7 @@
                 </tr>
                 <tr v-else-if="!myCommands.length">
                   <td colspan="7">
-                    <EmptyState :title="t('account.noRecentActivityTitle')" />
+                    <EmptyState title="Aucune activité récente" />
                   </td>
                 </tr>
                 <tr
@@ -377,7 +377,7 @@
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
-                      :title="t('account.viewLogsTooltip')"
+                      title="Voir les logs"
                       @click="openLogViewer(cmd)"
                     >
                       <IconFileText :size="14" />
@@ -394,8 +394,8 @@
         :command="selectedCmd"
         :show="showConsole"
         wrapper-class="side-panel"
-        :title="t('account.consoleTitle')"
-        :empty-text="t('account.noActiveConsoleText')"
+        title="Console"
+        empty-text="Aucune console active"
         @close="closeLogViewer"
         @open="showConsole = true"
       />
@@ -404,15 +404,12 @@
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { useAccount } from '../composables/useAccount'
-
-const { t } = useI18n()
 
 const {
   auth,

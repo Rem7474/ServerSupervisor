@@ -7,23 +7,23 @@
             to="/"
             class="text-decoration-none"
           >
-            {{ t('account.dashboardBreadcrumb') }}
+            Dashboard
           </router-link>
           <span class="text-muted mx-1">/</span>
           <router-link
             to="/account"
             class="text-decoration-none"
           >
-            {{ t('common.myAccount') }}
+            Mon compte
           </router-link>
           <span class="text-muted mx-1">/</span>
-          <span>{{ t('account.accountSecurityBreadcrumb') }}</span>
+          <span>Sécurité du compte</span>
         </div>
         <h2 class="page-title">
-          {{ t('account.mfaAuthTitle') }}
+          Authentification MFA
         </h2>
         <div class="text-secondary">
-          {{ t('account.securityConfigSubtitle') }}
+          Configuration de la sécurité utilisateur
         </div>
       </div>
     </div>
@@ -36,16 +36,16 @@
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <div class="fw-semibold">
-            {{ t('account.multiFactorAuthLabel') }}
+            Authentification multi-facteur
           </div>
           <span :class="mfaEnabled ? 'badge bg-success-lt text-success' : 'badge bg-warning-lt text-warning'">
-            {{ mfaEnabled ? t('account.enabledWord') : t('account.disabledWord') }}
+            {{ mfaEnabled ? 'Activé' : 'Désactivé' }}
           </span>
         </div>
 
         <div v-if="!mfaEnabled">
           <p class="text-secondary">
-            {{ t('account.enableMfaHint') }}
+            Activez le MFA pour renforcer la sécurité du compte.
           </p>
           <button
             type="button"
@@ -53,20 +53,20 @@
             :disabled="loading"
             @click="startSetup"
           >
-            {{ loading ? t('account.loadingEllipsisLabel') : t('account.enableMfaButton') }}
+            {{ loading ? 'Chargement...' : 'Activer MFA' }}
           </button>
         </div>
 
         <div v-else>
           <p class="text-secondary">
-            {{ t('account.mfaActiveHint') }}
+            Le MFA est actif. Vous pouvez le désactiver si besoin.
           </p>
           <button
             type="button"
             class="btn btn-outline-danger"
             @click="showDisable = true"
           >
-            {{ t('account.disableMfaButton') }}
+            Désactiver le MFA
           </button>
         </div>
 
@@ -77,7 +77,7 @@
         >
           <div class="border rounded p-3">
             <div class="fw-semibold mb-2">
-              {{ t('account.mfaSetupTitle') }}
+              Configuration MFA
             </div>
 
             <!-- Countdown bar -->
@@ -90,7 +90,7 @@
                 class="small fw-semibold"
                 :class="setupSecondsLeft < 120 ? 'text-danger' : 'text-secondary'"
               >
-                {{ t('account.expiresInLabel', { countdown: formatCountdown(setupSecondsLeft) }) }}
+                Expire dans {{ formatCountdown(setupSecondsLeft) }}
               </span>
               <div
                 class="progress flex-fill"
@@ -105,25 +105,25 @@
             </div>
 
             <div class="text-secondary small mb-3">
-              {{ t('account.scanQrCodeHint') }}
+              Scannez le QR code avec votre application d'authentification, puis saisissez le code généré pour confirmer.
             </div>
             <div class="d-flex flex-column flex-md-row gap-3 align-items-center">
               <img
                 :src="setup.qr_code"
-                :alt="t('account.qrCodeAlt')"
+                alt="QR Code"
                 class="border rounded"
                 style="width: 160px; height: 160px;"
               >
               <div class="flex-fill">
                 <div class="text-secondary small mb-1">
-                  {{ t('account.secretKeyLabel') }}
+                  Clé secrète
                 </div>
                 <div class="bg-dark text-light rounded p-2 mb-3 d-flex align-items-center justify-content-between gap-2">
                   <code class="small">{{ setup.secret }}</code>
                   <button
                     type="button"
                     class="btn btn-sm btn-ghost-secondary py-0"
-                    :title="t('account.copyButtonTooltip')"
+                    title="Copier"
                     @click="copySecret"
                   >
                     <IconCopy :size="14" />
@@ -131,7 +131,7 @@
                   </button>
                 </div>
                 <div class="mb-3">
-                  <label class="form-label">{{ t('account.totpCodeLabel') }}</label>
+                  <label class="form-label">Code TOTP</label>
                   <input
                     v-model="verifyCode"
                     type="text"
@@ -148,7 +148,7 @@
                   :disabled="loading || verifyCode.length !== 6"
                   @click="verifySetup"
                 >
-                  {{ loading ? t('account.verifyingEllipsisLabel') : t('account.verifyAndEnableButton') }}
+                  {{ loading ? 'Vérification...' : 'Vérifier et activer' }}
                 </button>
               </div>
             </div>
@@ -158,7 +158,7 @@
               class="mt-4"
             >
               <div class="text-secondary small mb-1">
-                {{ t('account.backupCodesHint') }}
+                Codes de secours — conservez-les dans un endroit sûr
               </div>
               <pre class="bg-dark text-light rounded p-2 small">{{ setup.backup_codes.join('\n') }}</pre>
               <button
@@ -166,7 +166,7 @@
                 class="btn btn-outline-secondary btn-sm"
                 @click="copyBackupCodes"
               >
-                {{ copiedBackup ? t('account.copiedCheckLabel') : t('account.copyBackupCodesButton') }}
+                {{ copiedBackup ? 'Copié ✓' : 'Copier les codes' }}
               </button>
             </div>
           </div>
@@ -179,10 +179,10 @@
         >
           <div class="border rounded p-3">
             <div class="fw-semibold mb-2">
-              {{ t('account.disableMfaButton') }}
+              Désactiver le MFA
             </div>
             <div class="mb-3">
-              <label class="form-label">{{ t('account.passwordLabel') }}</label>
+              <label class="form-label">Mot de passe</label>
               <input
                 v-model="disablePassword"
                 type="password"
@@ -196,7 +196,7 @@
               :disabled="loading || !disablePassword"
               @click="disableMFA"
             >
-              {{ loading ? t('account.disablingEllipsisLabel') : t('account.confirmDisableButton') }}
+              {{ loading ? 'Désactivation...' : 'Confirmer la désactivation' }}
             </button>
             <button
               type="button"
@@ -204,7 +204,7 @@
               :disabled="loading"
               @click="showDisable = false"
             >
-              {{ t('common.cancel') }}
+              Annuler
             </button>
           </div>
         </div>
@@ -226,7 +226,7 @@
       </div>
     </div>
 
-    <!-- Passkeys / security keys -->
+    <!-- Passkeys / clés de sécurité -->
     <div
       v-if="webauthnSupported"
       class="card mb-4"
@@ -238,7 +238,7 @@
             :size="24"
             class="icon me-2"
           />
-          {{ t('account.securityKeysTitle') }}
+          Clés de sécurité / Passkeys
         </h3>
         <button
           v-if="!addingPasskey"
@@ -246,12 +246,13 @@
           class="btn btn-sm btn-outline-primary"
           @click="startAddPasskey"
         >
-          {{ t('account.addKeyButton') }}
+          + Ajouter une clé
         </button>
       </div>
       <div class="card-body">
         <p class="text-secondary small mb-3">
-          {{ t('account.passkeyExplanation') }}
+          Utilisez une clé de sécurité physique (YubiKey…) ou la biométrie de votre appareil (Touch ID, Windows Hello…)
+          comme facteur d'authentification supplémentaire, en plus ou à la place du code TOTP.
         </p>
 
         <LoadingSkeleton
@@ -273,11 +274,11 @@
                   :size="16"
                   class="icon me-2 text-secondary"
                 />
-                {{ cred.name || t('account.securityKeyFallbackName') }}
+                {{ cred.name || 'Clé de sécurité' }}
               </td>
               <td class="text-secondary small">
-                {{ t('account.addedOnLabel', { date: formatExactDate(cred.created_at) }) }}
-                <span v-if="cred.last_used_at"> · {{ t('account.lastUsedLabel', { relative: formatRelativeTime(cred.last_used_at) }) }}</span>
+                Ajoutée le {{ formatExactDate(cred.created_at) }}
+                <span v-if="cred.last_used_at"> · dernière utilisation {{ formatRelativeTime(cred.last_used_at) }}</span>
               </td>
               <td class="text-end">
                 <button
@@ -285,7 +286,7 @@
                   class="btn btn-sm btn-outline-danger"
                   @click="deletePasskey(cred)"
                 >
-                  {{ t('account.deleteButton') }}
+                  Supprimer
                 </button>
               </td>
             </tr>
@@ -296,19 +297,19 @@
           v-else-if="!addingPasskey"
           class="text-secondary small mb-0"
         >
-          {{ t('account.noSecurityKeysTitle') }}
+          Aucune clé de sécurité enregistrée.
         </p>
 
         <div
           v-if="addingPasskey"
           class="border rounded p-3"
         >
-          <label class="form-label">{{ t('account.keyNameLabel') }}</label>
+          <label class="form-label">Nom de la clé (facultatif)</label>
           <input
             v-model="newPasskeyName"
             type="text"
             class="form-control mb-3"
-            :placeholder="t('account.keyNamePlaceholder')"
+            placeholder="Ex. YubiKey bureau, MacBook Touch ID…"
             :disabled="registeringPasskey"
             @keyup.enter="registerPasskey"
           >
@@ -318,7 +319,7 @@
             :disabled="registeringPasskey"
             @click="registerPasskey"
           >
-            {{ registeringPasskey ? t('account.registeringEllipsisLabel') : t('account.registerKeyButton') }}
+            {{ registeringPasskey ? 'Vérification…' : 'Enregistrer cette clé' }}
           </button>
           <button
             type="button"
@@ -326,7 +327,7 @@
             :disabled="registeringPasskey"
             @click="cancelAddPasskey"
           >
-            {{ t('common.cancel') }}
+            Annuler
           </button>
         </div>
 
@@ -358,7 +359,7 @@
             :size="24"
             class="icon me-2"
           />
-          {{ t('account.loginHistoryTitle') }}
+          Historique de connexion
         </h3>
         <button
           v-if="auth.isAuthenticated"
@@ -371,12 +372,12 @@
             :size="14"
             class="me-1"
           />
-          {{ revokeLoading ? t('account.revokingEllipsisLabel') : t('account.revokeOtherSessionsButton') }}
+          {{ revokeLoading ? 'Révocation...' : 'Révoquer les autres sessions' }}
         </button>
       </div>
       <div class="card-body pb-0">
         <p class="text-secondary small mb-3">
-          {{ t('account.recentConnectionsHint') }}
+          Connexions récentes associées à votre compte. Le bouton ci-dessus déconnecte tous les autres appareils immédiatement.
         </p>
       </div>
       <ConnectionsTable
@@ -411,14 +412,12 @@
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
 import { IconClock, IconCopy, IconDeviceDesktop, IconKey, IconX } from '@tabler/icons-vue'
 import ConnectionsTable from '../components/common/ConnectionsTable.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useAccountSecurity } from '../composables/useAccountSecurity'
 import { useDateFormatter } from '../composables/useDateFormatter'
 
-const { t } = useI18n()
 const { formatExactDate, formatRelativeTime } = useDateFormatter()
 
 const {

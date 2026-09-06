@@ -1,6 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
 import { useCommandStream } from './useCommandStream'
@@ -16,7 +15,6 @@ interface CmdRow { id: string; status?: string; output?: string; [key: string]: 
 type TrackerView = ReleaseTracker & { release_url?: string }
 
 export function useReleaseTrackerDetail() {
-  const { t } = useI18n()
   const route = useRoute()
   const id = route.params.id as string
   const signal = useAbortSignal()
@@ -57,22 +55,22 @@ export function useReleaseTrackerDetail() {
   const runDisabledReason = computed(() => {
     if (!tracker.value) return ''
     if (!tracker.value.host_id || !tracker.value.custom_task_id) {
-      return t('webhooks.monitorOnlyModeHint')
+      return 'Mode surveillance seule: configurez une VM cible et une tâche pour autoriser l\'exécution manuelle.'
     }
     return ''
   })
 
   const cooldownRemainingMs = computed(() => {
-    const trk = tracker.value
-    if (!trk) return 0
-    const hours = Number(trk.cooldown_hours || 0)
-    if (!hours || hours <= 0 || !trk.last_release_detected_at) return 0
+    const t = tracker.value
+    if (!t) return 0
+    const hours = Number(t.cooldown_hours || 0)
+    if (!hours || hours <= 0 || !t.last_release_detected_at) return 0
 
-    const detectedAt = new Date(trk.last_release_detected_at).getTime()
+    const detectedAt = new Date(t.last_release_detected_at).getTime()
     if (!Number.isFinite(detectedAt)) return 0
 
-    if (trk.last_triggered_at) {
-      const triggeredAt = new Date(trk.last_triggered_at).getTime()
+    if (t.last_triggered_at) {
+      const triggeredAt = new Date(t.last_triggered_at).getTime()
       if (Number.isFinite(triggeredAt) && triggeredAt >= detectedAt) return 0
     }
 
@@ -89,18 +87,18 @@ export function useReleaseTrackerDetail() {
     const days = Math.floor(totalMinutes / (24 * 60))
     const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
     const minutes = totalMinutes % 60
-    if (days > 0) return `${days}${t('webhooks.daySuffix')} ${hours}h`
+    if (days > 0) return `${days}j ${hours}h`
     if (hours > 0) return `${hours}h ${minutes}m`
     return `${minutes}m`
   })
 
   const cooldownEtaText = computed(() => {
-    const trk = tracker.value
-    if (!trk) return '-'
-    const hours = Number(trk.cooldown_hours || 0)
-    if (!hours || hours <= 0 || !trk.last_release_detected_at) return '-'
+    const t = tracker.value
+    if (!t) return '-'
+    const hours = Number(t.cooldown_hours || 0)
+    if (!hours || hours <= 0 || !t.last_release_detected_at) return '-'
 
-    const detectedAt = new Date(trk.last_release_detected_at).getTime()
+    const detectedAt = new Date(t.last_release_detected_at).getTime()
     if (!Number.isFinite(detectedAt)) return '-'
 
     return formatDateTime(new Date(detectedAt + (hours * 60 * 60 * 1000)).toISOString())
@@ -116,7 +114,7 @@ export function useReleaseTrackerDetail() {
       hosts.value = hostsRes.data || []
     } catch (e: unknown) {
       if (isApiAbort(e)) return
-      error.value = getApiErrorMessage(e, t('webhooks.loadErrorGeneric'))
+      error.value = getApiErrorMessage(e, 'Erreur lors du chargement')
     } finally {
       loading.value = false
     }
@@ -213,13 +211,13 @@ export function useReleaseTrackerDetail() {
         connectExecutionStream(commandId)
       }
     } catch {
-      error.value = t('webhooks.couldNotLoadCommandLogsError')
+      error.value = 'Impossible de charger les logs de la commande.'
     }
   }
 
   async function runManually(): Promise<void> {
     if (!canRunManually.value) {
-      error.value = runDisabledReason.value || t('webhooks.manualRunUnavailableError')
+      error.value = runDisabledReason.value || 'Exécution manuelle non disponible dans ce mode.'
       return
     }
     running.value = true
@@ -230,7 +228,7 @@ export function useReleaseTrackerDetail() {
         running.value = false
       }, 2000)
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, t('webhooks.triggerError'))
+      error.value = getApiErrorMessage(e, 'Erreur lors du déclenchement')
       running.value = false
     }
   }
@@ -244,7 +242,7 @@ export function useReleaseTrackerDetail() {
         checking.value = false
       }, 2000)
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, t('common.error'))
+      error.value = getApiErrorMessage(e, 'Erreur')
       checking.value = false
     }
   }
@@ -262,7 +260,7 @@ export function useReleaseTrackerDetail() {
       closeEdit()
       await load()
     } catch (e: unknown) {
-      modalError.value = getApiErrorMessage(e, t('common.error'))
+      modalError.value = getApiErrorMessage(e, 'Erreur')
     } finally {
       saving.value = false
     }

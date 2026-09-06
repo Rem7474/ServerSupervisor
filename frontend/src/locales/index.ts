@@ -1,4 +1,3 @@
-import frAccount from './fr/account.json'
 import frAlerts from './fr/alerts.json'
 import frApt from './fr/apt.json'
 import frAuth from './fr/auth.json'
@@ -10,13 +9,11 @@ import frHost from './fr/host.json'
 import frMonitoring from './fr/monitoring.json'
 import frNav from './fr/nav.json'
 import frNetwork from './fr/network.json'
-import frNpm from './fr/npm.json'
 import frProxmox from './fr/proxmox.json'
 import frSecurity from './fr/security.json'
 import frSettings from './fr/settings.json'
 import frWebhooks from './fr/webhooks.json'
 
-import enAccount from './en/account.json'
 import enAlerts from './en/alerts.json'
 import enApt from './en/apt.json'
 import enAuth from './en/auth.json'
@@ -28,7 +25,6 @@ import enHost from './en/host.json'
 import enMonitoring from './en/monitoring.json'
 import enNav from './en/nav.json'
 import enNetwork from './en/network.json'
-import enNpm from './en/npm.json'
 import enProxmox from './en/proxmox.json'
 import enSecurity from './en/security.json'
 import enSettings from './en/settings.json'
@@ -38,12 +34,10 @@ export const fr = {
   common: frCommon,
   nav: frNav,
   auth: frAuth,
-  account: frAccount,
   dashboard: frDashboard,
   docker: frDocker,
   proxmox: frProxmox,
   network: frNetwork,
-  npm: frNpm,
   alerts: frAlerts,
   settings: frSettings,
   apt: frApt,
@@ -58,12 +52,10 @@ export const en = {
   common: enCommon,
   nav: enNav,
   auth: enAuth,
-  account: enAccount,
   dashboard: enDashboard,
   docker: enDocker,
   proxmox: enProxmox,
   network: enNetwork,
-  npm: enNpm,
   alerts: enAlerts,
   settings: enSettings,
   apt: enApt,
