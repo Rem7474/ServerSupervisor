@@ -126,19 +126,25 @@ autant de variantes séparées par `|` dans chaque message concerné.
 
 ### 6. Ajouter les messages d'erreur du serveur
 
-Les codes d'erreur vivent dans `server/internal/apperr/catalog.go`, dans une
-structure à un champ par langue :
+Les codes d'erreur vivent dans `server/internal/apperr/catalog.go`. Déclarez la
+langue, puis ajoutez sa traduction à chaque entrée :
 
 ```go
-type ErrorMessage struct {
-	EN string
-	FR string
-	ES string
+var SupportedLanguages = []string{"en", "fr", "es"}
+
+var ErrorCatalog = map[string]ErrorMessage{
+	CodeAdminRequired: {
+		"en": "admin access required",
+		"fr": "accès administrateur requis",
+		"es": "se requiere acceso de administrador",
+	},
+	// …
 }
 ```
 
-Chaque entrée de `ErrorCatalog` doit alors fournir les trois. `GetMessage`
-choisit la langue à partir de l'en-tête `Accept-Language`.
+`GetMessage` choisit la langue à partir de l'en-tête `Accept-Language` (en
+respectant les facteurs de qualité `q=`) et se rabat sur l'anglais pour une
+langue qu'une entrée ne couvre pas.
 
 ### 7. Lancer les vérifications
 

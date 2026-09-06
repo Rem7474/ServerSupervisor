@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -65,13 +66,22 @@ func TestEveryCodeConstantHasACatalogEntry(t *testing.T) {
 	}
 }
 
-func TestEveryCatalogEntryIsTranslatedInBothLanguages(t *testing.T) {
+func TestEveryCatalogEntryIsTranslatedInEverySupportedLanguage(t *testing.T) {
 	for code, msg := range ErrorCatalog {
-		if strings.TrimSpace(msg.EN) == "" {
-			t.Errorf("code %q has an empty EN message", code)
+		for _, lang := range SupportedLanguages {
+			text, ok := msg[lang]
+			if !ok {
+				t.Errorf("code %q has no %s message", code, lang)
+				continue
+			}
+			if strings.TrimSpace(text) == "" {
+				t.Errorf("code %q has an empty %s message", code, lang)
+			}
 		}
-		if strings.TrimSpace(msg.FR) == "" {
-			t.Errorf("code %q has an empty FR message", code)
+		for lang := range msg {
+			if !slices.Contains(SupportedLanguages, lang) {
+				t.Errorf("code %q carries an unsupported language %q", code, lang)
+			}
 		}
 	}
 }
@@ -80,14 +90,17 @@ func TestCatalogPlaceholdersMatchAcrossLanguages(t *testing.T) {
 	// A {name} present in one language only leaves a literal "{name}" on screen
 	// for users of the other, since GetMessage substitutes per-language text.
 	for code, msg := range ErrorCatalog {
-		en, fr := placeholderSet(msg.EN), placeholderSet(msg.FR)
-		if len(en) != len(fr) {
-			t.Errorf("code %q: placeholders differ (EN %v, FR %v)", code, en, fr)
-			continue
-		}
-		for name := range en {
-			if !fr[name] {
-				t.Errorf("code %q: placeholder {%s} missing from the FR message", code, name)
+		want := placeholderSet(msg[DefaultLanguage])
+		for _, lang := range SupportedLanguages {
+			got := placeholderSet(msg[lang])
+			if len(got) != len(want) {
+				t.Errorf("code %q: %s placeholders %v differ from %s %v", code, lang, got, DefaultLanguage, want)
+				continue
+			}
+			for name := range want {
+				if !got[name] {
+					t.Errorf("code %q: placeholder {%s} missing from the %s message", code, name, lang)
+				}
 			}
 		}
 	}
@@ -109,10 +122,34 @@ func placeholderSet(msg string) map[string]bool {
 	}
 }
 
-func TestGetMessageFallsBackToEnglishForAnUnknownLanguage(t *testing.T) {
-	got := GetMessage(CodeRunbookNotFound, "de", nil)
-	if got != ErrorCatalog[CodeRunbookNotFound].EN {
-		t.Errorf("GetMessage(de) = %q, want the EN message", got)
+func TestGetMessageFallsBackToTheDefaultLanguage(t *testing.T) {
+	for _, lang := range []string{"de", "", "   ", "zz-ZZ"} {
+		got := GetMessage(CodeRunbookNotFound, lang, nil)
+		if got != ErrorCatalog[CodeRunbookNotFound][DefaultLanguage] {
+			t.Errorf("GetMessage(%q) = %q, want the %s message", lang, got, DefaultLanguage)
+		}
+	}
+}
+
+func TestGetMessageIsCaseInsensitiveAboutTheLanguage(t *testing.T) {
+	for _, lang := range []string{"fr", "FR", " Fr "} {
+		if got := GetMessage(CodeRunbookNotFound, lang, nil); got != ErrorCatalog[CodeRunbookNotFound]["fr"] {
+			t.Errorf("GetMessage(%q) = %q, want the fr message", lang, got)
+		}
+	}
+}
+
+func TestGetMessageDoesNotEchoAnUnknownCodeToTheUser(t *testing.T) {
+	// respondError still puts the machine-readable code in the response's
+	// `code` field; the prose must not become "error: SOME_TYPO".
+	for _, lang := range SupportedLanguages {
+		got := GetMessage("NOT_A_REAL_CODE", lang, nil)
+		if strings.Contains(got, "NOT_A_REAL_CODE") {
+			t.Errorf("GetMessage leaked the raw code for %s: %q", lang, got)
+		}
+		if got != ErrorCatalog[CodeInternalError][lang] {
+			t.Errorf("GetMessage(%s) = %q, want the generic internal-error message", lang, got)
+		}
 	}
 }
 
@@ -146,6 +183,48 @@ func TestEveryCodeHasAFrontendTranslation(t *testing.T) {
 			if _, ok := messages[code]; !ok {
 				t.Errorf("code %q has no key in frontend/src/locales/%s/errors.json", code, lang)
 			}
+		}
+	}
+}
+
+func TestGetLanguageFromAcceptLanguage(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		{"empty", "", "en"},
+		{"whitespace only", "   ", "en"},
+		{"simple French", "fr", "fr"},
+		{"region-qualified", "fr-FR", "fr"},
+		{"browser-style list", "fr-FR,fr;q=0.9,en;q=0.8", "fr"},
+		{"English preferred", "en-US,en;q=0.9", "en"},
+		// The reason this function exists: ranking by position rather than by
+		// quality reads this backwards and answers "en".
+		{"quality outranks position", "en;q=0.3, fr;q=0.9", "fr"},
+		{"quality outranks position, reversed", "fr;q=0.2, en;q=0.8", "en"},
+		{"explicitly rejected language", "fr;q=0", "en"},
+		{"unsupported language", "de-DE,de;q=0.9", "en"},
+		{"unsupported first, supported second", "de;q=1.0, fr;q=0.5", "fr"},
+		{"wildcard", "*", "en"},
+		{"malformed", ";;;", "en"},
+		{"case insensitive", "FR-FR", "fr"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := GetLanguageFromAcceptLanguage(tc.header); got != tc.want {
+				t.Errorf("GetLanguageFromAcceptLanguage(%q) = %q, want %q", tc.header, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGetLanguageFromAcceptLanguageAlwaysReturnsASupportedLanguage(t *testing.T) {
+	for _, header := range []string{"", "*", "de", "zh-Hant", "fr;q=0", "not a header at all", "en;q=0,fr;q=0"} {
+		got := GetLanguageFromAcceptLanguage(header)
+		if !slices.Contains(SupportedLanguages, got) {
+			t.Errorf("GetLanguageFromAcceptLanguage(%q) = %q, which is not a supported language", header, got)
 		}
 	}
 }
