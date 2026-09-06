@@ -113,7 +113,12 @@ export function useAlertRuleTemplates(): UseAlertRuleTemplatesApi {
       const failedCount = Object.keys(res.data.errors || {}).length
       if (failedCount > 0) {
         const created = res.data.created_rule_ids?.length || 0
-        addToast(i18n.global.t('alerts.templateApplyPartialToast', { created, failed: failedCount }, created), 'error')
+        // Two independent counts can't share one plural index, so each half is
+        // pluralized on its own and the wrapper only joins them.
+        addToast(i18n.global.t('alerts.templateApplyPartialToast', {
+          createdPart: i18n.global.t('alerts.templateApplySuccessToast', { created }, created),
+          failedPart: i18n.global.t('alerts.templateApplyFailedCount', { failed: failedCount }, failedCount),
+        }), 'error')
       } else {
         const created = res.data.created_rule_ids?.length || 0
         addToast(i18n.global.t('alerts.templateApplySuccessToast', { created }, created), 'success')

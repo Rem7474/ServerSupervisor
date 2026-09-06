@@ -408,7 +408,7 @@
   "templateDeleteConfirmMessage": "Supprimer le modèle « {name} » ? Les règles déjà créées à partir de ce modèle ne sont pas affectées.",
   "templateDeletedToast": "Modèle supprimé",
   "templateDeleteError": "Impossible de supprimer le modèle",
-  "templateApplyPartialToast": "{created} règle créée, {failed} échec | {created} règles créées, {failed} échecs",
+  "templateApplyPartialToast": "{createdPart}, {failedPart}",
   "templateApplySuccessToast": "{created} règle créée | {created} règles créées",
   "templateApplyError": "Impossible d'appliquer le modèle",
   "metricCapabilitiesLoadError": "Impossible de charger les capacités des métriques",
@@ -421,5 +421,6 @@
   "markAllReadSuccess": "Toutes les notifications marquées comme lues",
   "markAllReadError": "Erreur lors du marquage",
   "incidentAcknowledgedToast": "Incident pris en charge",
-  "incidentAcknowledgeError": "Impossible d'accuser réception"
+  "incidentAcknowledgeError": "Impossible d'accuser réception",
+  "templateApplyFailedCount": "{failed} échec | {failed} échecs"
 }

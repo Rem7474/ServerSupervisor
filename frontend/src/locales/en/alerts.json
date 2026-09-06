@@ -408,7 +408,7 @@
   "templateDeleteConfirmMessage": "Delete template \"{name}\"? Rules already created from it are unaffected.",
   "templateDeletedToast": "Template deleted",
   "templateDeleteError": "Could not delete the template",
-  "templateApplyPartialToast": "{created} rule created, {failed} failed | {created} rules created, {failed} failed",
+  "templateApplyPartialToast": "{createdPart}, {failedPart}",
   "templateApplySuccessToast": "{created} rule created | {created} rules created",
   "templateApplyError": "Could not apply the template",
   "metricCapabilitiesLoadError": "Could not load metric capabilities",
@@ -421,5 +421,6 @@
   "markAllReadSuccess": "All notifications marked as read",
   "markAllReadError": "Could not mark them as read",
   "incidentAcknowledgedToast": "Incident acknowledged",
-  "incidentAcknowledgeError": "Could not acknowledge"
+  "incidentAcknowledgeError": "Could not acknowledge",
+  "templateApplyFailedCount": "{failed} failure | {failed} failures"
 }
