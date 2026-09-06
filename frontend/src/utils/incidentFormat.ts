@@ -91,7 +91,7 @@ export function formatIncidentValue(item: ValueFields): string {
   }
   if (metric === 'docker_compose_degraded_services') {
     const n = Number(value)
-    return t('alerts.degradedServicesCount', { n }, n)
+    return t('alerts.degradedServicesCount', { count: n }, n)
   }
   return `${Number(value).toFixed(2)}${metricUnit(metric)}`
 }

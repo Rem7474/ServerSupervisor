@@ -94,7 +94,7 @@
               {{ (clusterResources.avgCpu * 100).toFixed(1) }}%
             </div>
             <div class="text-muted small">
-              {{ t('proxmox.onlineNodesSummary', { n: clusterResources.onlineCount }, clusterResources.onlineCount) }}
+              {{ t('proxmox.onlineNodesSummary', { count: clusterResources.onlineCount }, clusterResources.onlineCount) }}
             </div>
           </div>
         </div>

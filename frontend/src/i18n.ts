@@ -11,8 +11,30 @@ function isSupportedLocale(value: string | null): value is SupportedLocale {
   return value !== null && (SUPPORTED_LOCALES as readonly string[]).includes(value)
 }
 
+/**
+ * localStorage access, guarded. Reading or writing it throws outright in
+ * Safari's Lock Down / private modes and wherever site data is blocked — and
+ * this module is evaluated on the boot path, so an unguarded throw here takes
+ * the whole app down rather than just losing the stored preference.
+ */
+function readStoredLocale(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function persistLocale(locale: SupportedLocale): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, locale)
+  } catch {
+    // The switch still applies for this page; it just won't survive a reload.
+  }
+}
+
 function detectLocale(): SupportedLocale {
-  const stored = localStorage.getItem(STORAGE_KEY)
+  const stored = readStoredLocale()
   if (isSupportedLocale(stored)) return stored
 
   const browserLang = (navigator.language || '').slice(0, 2).toLowerCase()
@@ -101,7 +123,7 @@ export async function ensureLocaleMessages(locale: SupportedLocale): Promise<voi
 /** Switches the active locale, persists the choice, and keeps dayjs / <html lang> in sync. */
 export function setLocale(locale: SupportedLocale): void {
   i18n.global.locale.value = locale
-  localStorage.setItem(STORAGE_KEY, locale)
+  persistLocale(locale)
   setDayjsLocale(locale)
   document.documentElement.lang = locale
 }

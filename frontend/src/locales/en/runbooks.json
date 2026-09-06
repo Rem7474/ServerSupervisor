@@ -8,7 +8,7 @@
   "nameColumn": "Name",
   "stepsColumn": "Steps",
   "actionsColumn": "Actions",
-  "stepsCountBadge": "{n} step | {n} steps",
+  "stepsCountBadge": "{count} step | {count} steps",
   "runButton": "Run",
   "historyButton": "History",
   "editButton": "Edit",

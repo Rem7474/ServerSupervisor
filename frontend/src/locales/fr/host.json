@@ -234,7 +234,7 @@
   "unknownStatus": "Inconnue",
   "unknownCert": "Inconnu",
   "expiredDays": "Expiré ({days}j)",
-  "daysRemaining": "{days} jour | {days} jours",
+  "daysRemaining": "{count} jour | {count} jours",
   "editHostTitle": "Modifier l'hôte",
   "nameLabel": "Nom",
   "ipAddressLabel": "Adresse IP",

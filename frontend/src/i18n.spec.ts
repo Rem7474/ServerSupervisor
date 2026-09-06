@@ -124,3 +124,32 @@ describe('ensureLocaleMessages', () => {
     i18n.global.setLocaleMessage('en', original)
   })
 })
+
+describe('storage failures', () => {
+  // localStorage throws outright in Safari's Lock Down / private modes. i18n.ts
+  // is on the boot path, so an unguarded throw here takes the whole app down.
+  it('setLocale still switches when persisting throws', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError')
+    })
+
+    expect(() => setLocale('en')).not.toThrow()
+    expect(currentLocale()).toBe('en')
+    expect(document.documentElement.lang).toBe('en')
+
+    setItem.mockRestore()
+    setLocale('fr')
+  })
+
+  it('reading a blocked localStorage does not throw at module scope', () => {
+    // detectLocale() runs on import; this covers the same guarded read.
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('denied', 'SecurityError')
+    })
+
+    expect(() => setLocale('en')).not.toThrow()
+
+    getItem.mockRestore()
+    setLocale('fr')
+  })
+})

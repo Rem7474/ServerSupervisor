@@ -206,7 +206,7 @@ const certDaysLabel = computed(() => {
   const d = certLoaded.value?.days_remaining
   if (d == null) return t('host.unknownCert')
   if (d < 0) return t('host.expiredDays', { days: Math.abs(d) })
-  return t('host.daysRemaining', { days: d }, d)
+  return t('host.daysRemaining', { count: d }, d)
 })
 const certDaysColor = computed(() => {
   const d = certLoaded.value?.days_remaining

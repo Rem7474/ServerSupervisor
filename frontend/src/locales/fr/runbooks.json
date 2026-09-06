@@ -8,7 +8,7 @@
   "nameColumn": "Nom",
   "stepsColumn": "Étapes",
   "actionsColumn": "Actions",
-  "stepsCountBadge": "{n} étape | {n} étapes",
+  "stepsCountBadge": "{count} étape | {count} étapes",
   "runButton": "Lancer",
   "historyButton": "Historique",
   "editButton": "Modifier",

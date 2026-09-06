@@ -177,7 +177,7 @@
   "storageUsedLabel": "Stockage utilisé",
   "ofTotalLabel": "sur {total}",
   "cpuClusterAvgLabel": "CPU cluster (moy.)",
-  "onlineNodesSummary": "sur {n} nœud en ligne | sur {n} nœuds en ligne",
+  "onlineNodesSummary": "sur {count} nœud en ligne | sur {count} nœuds en ligne",
   "ramClusterTitle": "RAM cluster",
   "nodesDownLabel": "Nœuds hors ligne",
   "storageOver80Label": "Stockages > 80 %",

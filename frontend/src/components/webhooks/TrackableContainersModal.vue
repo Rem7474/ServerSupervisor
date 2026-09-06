@@ -148,7 +148,7 @@
             :disabled="saving || !selected.length"
             @click="submit"
           >
-            {{ saving ? t('webhooks.creatingLabel') : t('webhooks.createTrackersButton', { n: selected.length }, selected.length) }}
+            {{ saving ? t('webhooks.creatingLabel') : t('webhooks.createTrackersButton', { count: selected.length }, selected.length) }}
           </button>
         </div>
       </div>
