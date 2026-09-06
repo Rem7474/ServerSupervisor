@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { i18n, currentLocale, humanizeKeyLeaf, localeTag, setLocale, SUPPORTED_LOCALES } from './i18n'
+import {
+  currentLocale,
+  ensureLocaleMessages,
+  humanizeKeyLeaf,
+  i18n,
+  localeTag,
+  setLocale,
+  SUPPORTED_LOCALES,
+} from './i18n'
 
 const t = i18n.global.t
 
@@ -91,5 +99,28 @@ describe('i18n', () => {
     it('never returns a string containing a dot', () => {
       expect(humanizeKeyLeaf('a.b.c.d')).not.toContain('.')
     })
+  })
+})
+
+describe('ensureLocaleMessages', () => {
+  it('is a no-op for a locale whose messages are already registered', async () => {
+    // The test setup registers both locales up front, so this must not refetch.
+    const before = i18n.global.getLocaleMessage('en')
+
+    await ensureLocaleMessages('en')
+
+    expect(i18n.global.getLocaleMessage('en')).toBe(before)
+  })
+
+  it('registers a locale that has none yet', async () => {
+    const original = i18n.global.getLocaleMessage('en')
+    i18n.global.setLocaleMessage('en', {} as never)
+
+    await ensureLocaleMessages('en')
+
+    const loaded = i18n.global.getLocaleMessage('en')
+    expect(Object.keys(loaded).length).toBeGreaterThan(0)
+    expect(loaded).toHaveProperty('common')
+    i18n.global.setLocaleMessage('en', original)
   })
 })

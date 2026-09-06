@@ -74,3 +74,21 @@ describe('locales', () => {
     expect(Object.keys(fr as Messages).sort()).toEqual(Object.keys(en).sort())
   })
 })
+
+describe('loadLocaleMessages', () => {
+  it('returns the eagerly bundled fallback without a dynamic import', async () => {
+    // fr is statically imported, so this must resolve to the very same object
+    // rather than a second copy fetched over the network.
+    await expect(loadLocaleMessages('fr')).resolves.toBe(fr)
+  })
+
+  it('loads a lazy locale with the same namespaces as the fallback', async () => {
+    const messages = await loadLocaleMessages('en')
+    expect(Object.keys(messages).sort()).toEqual(Object.keys(fr as Messages).sort())
+  })
+
+  it('rejects a locale that has no bundled messages', async () => {
+    // Guards the "added to SUPPORTED_LOCALES but not to LOADERS" mistake.
+    await expect(loadLocaleMessages('de')).rejects.toThrow(/no messages bundled/)
+  })
+})
