@@ -27,6 +27,10 @@ type fakeRepo struct {
 	// makes that one existence check report false. Empty (the default) keeps
 	// every Proxmox check answering true, as before.
 	missingProxmoxKind string
+	// composeProjectMissing makes ComposeProjectExists report false.
+	composeProjectMissing bool
+	// resolveIncidentsErr makes ResolveOpenAlertIncidentsByRule fail.
+	resolveIncidentsErr error
 }
 
 func (f *fakeRepo) ListAlertRulesAPI(context.Context) ([]models.AlertRule, error) { return nil, nil }
@@ -47,7 +51,7 @@ func (f *fakeRepo) DockerContainerExists(_ context.Context, containerID, _ strin
 	return containerID != f.missingContainerID, nil
 }
 func (f *fakeRepo) ComposeProjectExists(context.Context, string, string) (bool, error) {
-	return true, nil
+	return !f.composeProjectMissing, nil
 }
 func (f *fakeRepo) ProxmoxConnectionExists(context.Context, string) (bool, error) {
 	return f.missingProxmoxKind != "connection", nil
@@ -65,7 +69,7 @@ func (f *fakeRepo) ProxmoxDiskExists(context.Context, string) (bool, error) {
 	return f.missingProxmoxKind != "disk", nil
 }
 func (f *fakeRepo) ResolveOpenAlertIncidentsByRule(context.Context, int64) (int64, error) {
-	return 0, nil
+	return 0, f.resolveIncidentsErr
 }
 func (f *fakeRepo) ResolveAlertIncident(context.Context, int64) error             { return nil }
 func (f *fakeRepo) AcknowledgeAlertIncident(context.Context, int64, string) error { return nil }

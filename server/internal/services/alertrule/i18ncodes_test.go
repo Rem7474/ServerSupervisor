@@ -2,6 +2,7 @@ package alertrule
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -179,5 +180,78 @@ func TestValidateAlertActions_PassesInterpolationParams(t *testing.T) {
 	}
 	if got := apperr.GetMessage(ae.I18nKey, "en", ae.Params); got == rendered {
 		t.Errorf("EN and FR rendered identically (%q) — one of them is missing", got)
+	}
+}
+
+func TestUpdate_UnknownRuleCarriesI18nCode(t *testing.T) {
+	svc := newSvc(&fakeRepo{getErr: sql.ErrNoRows})
+
+	err := svc.Update(context.Background(), 1, models.AlertRuleUpdate{})
+
+	if got := i18nKey(err); got != apperr.CodeAlertRuleNotFound {
+		t.Errorf("i18n key = %q, want %q (err: %v)", got, apperr.CodeAlertRuleNotFound, err)
+	}
+	if status(err) != 404 {
+		t.Errorf("status = %d, want 404", status(err))
+	}
+}
+
+func TestUpdate_ReportsAFailedIncidentResolution(t *testing.T) {
+	// Disabling a rule resolves its open incidents. The rule itself is already
+	// saved at that point, so this reports a partial success, not a rollback.
+	disabled := false
+	hostID := "h1"
+	repo := &fakeRepo{
+		rule:                &models.AlertRule{ID: 1, HostID: &hostID, SourceType: models.AlertSourceAgent, Metric: "cpu", Operator: ">", Enabled: true},
+		hostExists:          true,
+		resolveIncidentsErr: errors.New("db down"),
+	}
+
+	err := newSvc(repo).Update(context.Background(), 1, models.AlertRuleUpdate{Enabled: &disabled})
+
+	if got := i18nKey(err); got != apperr.CodeAlertIncidentResolveFailed {
+		t.Errorf("i18n key = %q, want %q (err: %v)", got, apperr.CodeAlertIncidentResolveFailed, err)
+	}
+	if repo.updated == nil {
+		t.Error("the rule update itself should still have been persisted")
+	}
+}
+
+func TestValidateDockerScope_UnknownComposeProject(t *testing.T) {
+	repo := &fakeRepo{hostExists: true, composeProjectMissing: true}
+	scope := &models.DockerMetricScope{HostID: "h1", ScopeMode: "compose_project", ProjectName: "stack"}
+
+	err := newSvc(repo).ValidateDockerScope(context.Background(), scope)
+
+	if got := i18nKey(err); got != apperr.CodeAlertComposeProjectNotFound {
+		t.Errorf("i18n key = %q, want %q (err: %v)", got, apperr.CodeAlertComposeProjectNotFound, err)
+	}
+}
+
+func TestValidateAlertActions_CommandTriggerActionAndTarget(t *testing.T) {
+	tests := []struct {
+		name    string
+		trigger *models.CommandTrigger
+		want    string
+	}{
+		{
+			name:    "action not allowed for the module",
+			trigger: &models.CommandTrigger{Module: "docker", Action: "delete"},
+			want:    apperr.CodeAlertCommandActionInvalid,
+		},
+		{
+			name:    "target-requiring module with no target",
+			trigger: &models.CommandTrigger{Module: "systemd", Action: "restart"},
+			want:    apperr.CodeAlertCommandTargetRequired,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateAlertActions(&models.AlertActions{CommandTrigger: tc.trigger})
+			if got := i18nKey(err); got != tc.want {
+				t.Errorf("i18n key = %q, want %q (err: %v)", got, tc.want, err)
+			}
+		})
 	}
 }

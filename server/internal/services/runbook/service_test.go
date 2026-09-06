@@ -17,6 +17,24 @@ type fakeRepo struct {
 	executions map[string]*models.RunbookExecution
 	commands   map[string]*models.RemoteCommand
 	validHosts map[string]bool
+	// failOn names a repo method that should return failErr instead of doing
+	// its normal thing, so the service's degraded paths can be exercised.
+	// Empty (the default) leaves every method behaving as before.
+	failOn  string
+	failErr error
+}
+
+// errFakeRepo is the failure every failOn injection reports.
+var errFakeRepo = errors.New("fake repo failure")
+
+func (f *fakeRepo) fails(method string) error {
+	if f.failOn != method {
+		return nil
+	}
+	if f.failErr != nil {
+		return f.failErr
+	}
+	return errFakeRepo
 }
 
 func newFakeRepo() *fakeRepo {
@@ -41,6 +59,9 @@ func stepsFor(id string, steps []models.RunbookStepCreate) []models.RunbookStep 
 }
 
 func (f *fakeRepo) CreateRunbook(_ context.Context, name, description string, steps []models.RunbookStepCreate) (*models.Runbook, error) {
+	if err := f.fails("CreateRunbook"); err != nil {
+		return nil, err
+	}
 	id := fmt.Sprintf("rb-%d", len(f.runbooks)+1)
 	rb := &models.Runbook{ID: id, Name: name, Description: description, Steps: stepsFor(id, steps)}
 	f.runbooks[id] = rb
@@ -65,6 +86,9 @@ func (f *fakeRepo) ListRunbooks(context.Context) ([]models.Runbook, error) {
 }
 
 func (f *fakeRepo) UpdateRunbook(_ context.Context, id string, name, description *string, steps *[]models.RunbookStepCreate) error {
+	if err := f.fails("UpdateRunbook"); err != nil {
+		return err
+	}
 	rb, ok := f.runbooks[id]
 	if !ok {
 		return sql.ErrNoRows
@@ -87,10 +111,16 @@ func (f *fakeRepo) DeleteRunbook(_ context.Context, id string) error {
 }
 
 func (f *fakeRepo) HostExists(_ context.Context, id string) (bool, error) {
+	if err := f.fails("HostExists"); err != nil {
+		return false, err
+	}
 	return f.validHosts[id], nil
 }
 
 func (f *fakeRepo) CreateRunbookExecution(_ context.Context, runbookID, triggeredBy string) (*models.RunbookExecution, error) {
+	if err := f.fails("CreateRunbookExecution"); err != nil {
+		return nil, err
+	}
 	id := fmt.Sprintf("exec-%d", len(f.executions)+1)
 	exec := &models.RunbookExecution{ID: id, RunbookID: runbookID, Status: "running", TriggeredBy: triggeredBy}
 	f.executions[id] = exec
