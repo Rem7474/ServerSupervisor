@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { i18n, currentLocale, localeTag, setLocale, SUPPORTED_LOCALES } from './i18n'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { i18n, currentLocale, humanizeKeyLeaf, localeTag, setLocale, SUPPORTED_LOCALES } from './i18n'
 
 const t = i18n.global.t
 
@@ -59,9 +59,37 @@ describe('i18n', () => {
       expect(t('common.language')).not.toBe('common.language')
     })
 
-    it('renders the key path when it exists in no locale', () => {
-      // Documents the worst case the `missing` handler warns about.
+    it('renders the key path in dev, where it is meant to be caught', () => {
+      // import.meta.env.DEV is true under vitest, so this is the dev branch.
       expect(t('common.__definitelyNotAKey')).toBe('common.__definitelyNotAKey')
+    })
+
+    it('warns on every miss so a production one is still observable', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      t('common.__anotherMissingKey')
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('missing key "common.__anotherMissingKey"'),
+      )
+      warn.mockRestore()
+    })
+  })
+
+  describe('humanizeKeyLeaf', () => {
+    // The production fallback: a user must never see a dotted developer path.
+    it.each([
+      ['errors.INVALID_TOKEN', 'Invalid token'],
+      ['alerts.metricLabels.cpu_temperature', 'Cpu temperature'],
+      ['nav.sections.automation.label', 'Label'],
+      ['someCamelCaseLeaf', 'Some camel case leaf'],
+      ['bare', 'Bare'],
+    ])('%s → %s', (key, expected) => {
+      expect(humanizeKeyLeaf(key)).toBe(expected)
+    })
+
+    it('never returns a string containing a dot', () => {
+      expect(humanizeKeyLeaf('a.b.c.d')).not.toContain('.')
     })
   })
 })

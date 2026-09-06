@@ -42,10 +42,33 @@ export const i18n = createI18n({
     fr: (choice: number) => (Math.abs(choice) <= 1 ? 0 : 1),
   },
   missing: (locale, key) => {
-    // Never let a raw key path reach the UI unnoticed.
-    if (import.meta.env.DEV) console.warn(`[i18n] missing key "${key}" for locale "${locale}"`)
+    // Always logged, not just in dev: a key can only go missing here through a
+    // *dynamically built* path (`errors.${code}`, `alerts.metricLabels.${m}`,
+    // …) since locales.spec.ts fails the build on a static key present in one
+    // language only — so this fires exactly when the server grew a code the
+    // SPA doesn't know yet, which is worth seeing in production.
+    console.warn(`[i18n] missing key "${key}" for locale "${locale}"`)
+
+    // Dev keeps vue-i18n's default (render the key path) — loud and greppable.
+    if (import.meta.env.DEV) return undefined
+
+    // Production never shows a dotted developer path. The leaf of a dynamic key
+    // is the server's own identifier (INVALID_TOKEN, cpu_temperature, …), which
+    // humanizes into something a user can act on.
+    return humanizeKeyLeaf(key)
   },
 })
+
+/** `errors.INVALID_TOKEN` → `Invalid token`; `…metricLabels.cpu_temp` → `Cpu temp`. */
+export function humanizeKeyLeaf(key: string): string {
+  const leaf = key.split('.').pop() ?? key
+  const words = leaf
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .trim()
+    .toLowerCase()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
 
 /** The active locale, narrowed back to `SupportedLocale`. */
 export function currentLocale(): SupportedLocale {
