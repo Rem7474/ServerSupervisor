@@ -70,5 +70,14 @@
   "RUNBOOK_EXECUTION_NOT_FOUND": "execution not found",
   "RUNBOOK_STEPS_REQUIRED": "a runbook must have at least one step",
   "RUNBOOK_STEPS_INVALID": "could not validate the steps",
-  "ALERT_RULE_ID_INVALID": "invalid alert rule id"
+  "ALERT_RULE_ID_INVALID": "invalid alert rule id",
+  "ALERT_CHANNEL_INVALID": "invalid notification channel: {channel}",
+  "ALERT_COMMAND_MODULE_INVALID": "invalid command module: {module}",
+  "ALERT_COMMAND_ACTION_INVALID": "invalid action for module {module}: {action}",
+  "ALERT_COMMAND_TARGET_REQUIRED": "module {module} requires a target",
+  "RUNBOOK_STEP_HOST_REQUIRED": "step {step}: the host is required",
+  "RUNBOOK_STEP_HOST_NOT_FOUND": "step {step}: host not found",
+  "RUNBOOK_STEP_MODULE_INVALID": "step {step}: invalid module ({module})",
+  "RUNBOOK_STEP_ACTION_INVALID": "step {step}: invalid action for module {module} ({action})",
+  "RUNBOOK_STEP_TARGET_REQUIRED": "step {step}: module {module} requires a target"
 }

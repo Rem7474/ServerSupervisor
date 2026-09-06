@@ -70,5 +70,14 @@
   "RUNBOOK_EXECUTION_NOT_FOUND": "exécution introuvable",
   "RUNBOOK_STEPS_REQUIRED": "le runbook doit avoir au moins une étape",
   "RUNBOOK_STEPS_INVALID": "erreur lors de la validation des étapes",
-  "ALERT_RULE_ID_INVALID": "identifiant de règle invalide"
+  "ALERT_RULE_ID_INVALID": "identifiant de règle invalide",
+  "ALERT_CHANNEL_INVALID": "canal de notification invalide : {channel}",
+  "ALERT_COMMAND_MODULE_INVALID": "module de commande invalide : {module}",
+  "ALERT_COMMAND_ACTION_INVALID": "action invalide pour le module {module} : {action}",
+  "ALERT_COMMAND_TARGET_REQUIRED": "le module {module} requiert une cible",
+  "RUNBOOK_STEP_HOST_REQUIRED": "étape {step} : l'hôte est requis",
+  "RUNBOOK_STEP_HOST_NOT_FOUND": "étape {step} : hôte introuvable",
+  "RUNBOOK_STEP_MODULE_INVALID": "étape {step} : module invalide ({module})",
+  "RUNBOOK_STEP_ACTION_INVALID": "étape {step} : action invalide pour le module {module} ({action})",
+  "RUNBOOK_STEP_TARGET_REQUIRED": "étape {step} : le module {module} requiert une cible"
 }

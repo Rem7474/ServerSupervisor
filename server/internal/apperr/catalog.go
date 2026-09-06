@@ -67,16 +67,25 @@ const (
 	CodeAlertTemplateNotFound            = "ALERT_TEMPLATE_NOT_FOUND"
 
 	// Runbooks (internal/services/runbook)
-	CodeRunbookNotFound          = "RUNBOOK_NOT_FOUND"
-	CodeRunbookNameRequired      = "RUNBOOK_NAME_REQUIRED"
-	CodeRunbookCreateFailed      = "RUNBOOK_CREATE_FAILED"
-	CodeRunbookUpdateFailed      = "RUNBOOK_UPDATE_FAILED"
-	CodeRunbookNoSteps           = "RUNBOOK_NO_STEPS"
-	CodeRunbookRunFailed         = "RUNBOOK_RUN_FAILED"
-	CodeRunbookExecutionNotFound = "RUNBOOK_EXECUTION_NOT_FOUND"
-	CodeRunbookStepsRequired     = "RUNBOOK_STEPS_REQUIRED"
-	CodeRunbookStepsInvalid      = "RUNBOOK_STEPS_INVALID"
-	CodeAlertRuleIDInvalid       = "ALERT_RULE_ID_INVALID"
+	CodeRunbookNotFound            = "RUNBOOK_NOT_FOUND"
+	CodeRunbookNameRequired        = "RUNBOOK_NAME_REQUIRED"
+	CodeRunbookCreateFailed        = "RUNBOOK_CREATE_FAILED"
+	CodeRunbookUpdateFailed        = "RUNBOOK_UPDATE_FAILED"
+	CodeRunbookNoSteps             = "RUNBOOK_NO_STEPS"
+	CodeRunbookRunFailed           = "RUNBOOK_RUN_FAILED"
+	CodeRunbookExecutionNotFound   = "RUNBOOK_EXECUTION_NOT_FOUND"
+	CodeRunbookStepsRequired       = "RUNBOOK_STEPS_REQUIRED"
+	CodeRunbookStepsInvalid        = "RUNBOOK_STEPS_INVALID"
+	CodeAlertRuleIDInvalid         = "ALERT_RULE_ID_INVALID"
+	CodeAlertChannelInvalid        = "ALERT_CHANNEL_INVALID"
+	CodeAlertCommandModuleInvalid  = "ALERT_COMMAND_MODULE_INVALID"
+	CodeAlertCommandActionInvalid  = "ALERT_COMMAND_ACTION_INVALID"
+	CodeAlertCommandTargetRequired = "ALERT_COMMAND_TARGET_REQUIRED"
+	CodeRunbookStepHostRequired    = "RUNBOOK_STEP_HOST_REQUIRED"
+	CodeRunbookStepHostNotFound    = "RUNBOOK_STEP_HOST_NOT_FOUND"
+	CodeRunbookStepModuleInvalid   = "RUNBOOK_STEP_MODULE_INVALID"
+	CodeRunbookStepActionInvalid   = "RUNBOOK_STEP_ACTION_INVALID"
+	CodeRunbookStepTargetRequired  = "RUNBOOK_STEP_TARGET_REQUIRED"
 )
 
 // ErrorMessage holds translated strings for a catalog entry. {name}
@@ -207,16 +216,25 @@ var ErrorCatalog = map[string]ErrorMessage{
 	},
 	CodeAlertTemplateNotFound: {EN: "template not found", FR: "modèle introuvable"},
 
-	CodeRunbookNotFound:          {EN: "runbook not found", FR: "runbook introuvable"},
-	CodeRunbookNameRequired:      {EN: "the runbook name is required", FR: "le nom du runbook est requis"},
-	CodeRunbookCreateFailed:      {EN: "could not create the runbook", FR: "erreur lors de la création du runbook"},
-	CodeRunbookUpdateFailed:      {EN: "could not update the runbook", FR: "erreur lors de la mise à jour du runbook"},
-	CodeRunbookNoSteps:           {EN: "this runbook has no steps", FR: "ce runbook n'a aucune étape"},
-	CodeRunbookRunFailed:         {EN: "could not start the runbook", FR: "erreur lors du lancement du runbook"},
-	CodeRunbookExecutionNotFound: {EN: "execution not found", FR: "exécution introuvable"},
-	CodeRunbookStepsRequired:     {EN: "a runbook must have at least one step", FR: "le runbook doit avoir au moins une étape"},
-	CodeRunbookStepsInvalid:      {EN: "could not validate the steps", FR: "erreur lors de la validation des étapes"},
-	CodeAlertRuleIDInvalid:       {EN: "invalid alert rule id", FR: "identifiant de règle invalide"},
+	CodeRunbookNotFound:            {EN: "runbook not found", FR: "runbook introuvable"},
+	CodeRunbookNameRequired:        {EN: "the runbook name is required", FR: "le nom du runbook est requis"},
+	CodeRunbookCreateFailed:        {EN: "could not create the runbook", FR: "erreur lors de la création du runbook"},
+	CodeRunbookUpdateFailed:        {EN: "could not update the runbook", FR: "erreur lors de la mise à jour du runbook"},
+	CodeRunbookNoSteps:             {EN: "this runbook has no steps", FR: "ce runbook n'a aucune étape"},
+	CodeRunbookRunFailed:           {EN: "could not start the runbook", FR: "erreur lors du lancement du runbook"},
+	CodeRunbookExecutionNotFound:   {EN: "execution not found", FR: "exécution introuvable"},
+	CodeRunbookStepsRequired:       {EN: "a runbook must have at least one step", FR: "le runbook doit avoir au moins une étape"},
+	CodeRunbookStepsInvalid:        {EN: "could not validate the steps", FR: "erreur lors de la validation des étapes"},
+	CodeAlertRuleIDInvalid:         {EN: "invalid alert rule id", FR: "identifiant de règle invalide"},
+	CodeAlertChannelInvalid:        {EN: "invalid notification channel: {channel}", FR: "canal de notification invalide : {channel}"},
+	CodeAlertCommandModuleInvalid:  {EN: "invalid command module: {module}", FR: "module de commande invalide : {module}"},
+	CodeAlertCommandActionInvalid:  {EN: "invalid action for module {module}: {action}", FR: "action invalide pour le module {module} : {action}"},
+	CodeAlertCommandTargetRequired: {EN: "module {module} requires a target", FR: "le module {module} requiert une cible"},
+	CodeRunbookStepHostRequired:    {EN: "step {step}: the host is required", FR: "étape {step} : l'hôte est requis"},
+	CodeRunbookStepHostNotFound:    {EN: "step {step}: host not found", FR: "étape {step} : hôte introuvable"},
+	CodeRunbookStepModuleInvalid:   {EN: "step {step}: invalid module ({module})", FR: "étape {step} : module invalide ({module})"},
+	CodeRunbookStepActionInvalid:   {EN: "step {step}: invalid action for module {module} ({action})", FR: "étape {step} : action invalide pour le module {module} ({action})"},
+	CodeRunbookStepTargetRequired:  {EN: "step {step}: module {module} requires a target", FR: "étape {step} : le module {module} requiert une cible"},
 }
 
 // ErrorResponse is the standalone error-response shape used by call sites

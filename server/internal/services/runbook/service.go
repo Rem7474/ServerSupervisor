@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"github.com/serversupervisor/server/internal/apperr"
@@ -265,22 +266,22 @@ func (s *Service) validateSteps(ctx context.Context, steps []models.RunbookStepC
 	for i, step := range steps {
 		n := i + 1
 		if strings.TrimSpace(step.HostID) == "" {
-			return apperr.Validation(fmt.Sprintf("Étape %d : l'hôte est requis.", n))
+			return apperr.Validation(fmt.Sprintf("step %d: the host is required", n)).I18n(apperr.CodeRunbookStepHostRequired, map[string]string{"step": strconv.Itoa(n)})
 		}
 		if ok, err := s.repo.HostExists(ctx, step.HostID); err != nil {
 			return apperr.Failed("could not validate the steps").I18n(apperr.CodeRunbookStepsInvalid, nil)
 		} else if !ok {
-			return apperr.Validation(fmt.Sprintf("Étape %d : hôte introuvable.", n))
+			return apperr.Validation(fmt.Sprintf("step %d: host not found", n)).I18n(apperr.CodeRunbookStepHostNotFound, map[string]string{"step": strconv.Itoa(n)})
 		}
 		allowedActions, ok := commandModuleActions[step.Module]
 		if !ok {
-			return apperr.Validation(fmt.Sprintf("Étape %d : module invalide (%s).", n, step.Module))
+			return apperr.Validation(fmt.Sprintf("step %d: invalid module (%s)", n, step.Module)).I18n(apperr.CodeRunbookStepModuleInvalid, map[string]string{"step": strconv.Itoa(n), "module": step.Module})
 		}
 		if !containsString(allowedActions, step.Action) {
-			return apperr.Validation(fmt.Sprintf("Étape %d : action invalide pour le module %s (%s).", n, step.Module, step.Action))
+			return apperr.Validation(fmt.Sprintf("step %d: invalid action for module %s (%s)", n, step.Module, step.Action)).I18n(apperr.CodeRunbookStepActionInvalid, map[string]string{"step": strconv.Itoa(n), "module": step.Module, "action": step.Action})
 		}
 		if commandModuleRequiresTarget[step.Module] && strings.TrimSpace(step.Target) == "" {
-			return apperr.Validation(fmt.Sprintf("Étape %d : le module %s requiert une cible.", n, step.Module))
+			return apperr.Validation(fmt.Sprintf("step %d: module %s requires a target", n, step.Module)).I18n(apperr.CodeRunbookStepTargetRequired, map[string]string{"step": strconv.Itoa(n), "module": step.Module})
 		}
 	}
 	return nil

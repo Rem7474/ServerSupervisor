@@ -447,7 +447,7 @@ func validateAlertActions(actions *models.AlertActions) error {
 	}
 	for _, channel := range actions.Channels {
 		if !validAlertChannels[channel] {
-			return apperr.Validation(fmt.Sprintf("Canal de notification invalide: %s", channel))
+			return apperr.Validation(fmt.Sprintf("invalid notification channel: %s", channel)).I18n(apperr.CodeAlertChannelInvalid, map[string]string{"channel": channel})
 		}
 	}
 	if actions.CommandTrigger != nil {
@@ -460,13 +460,13 @@ func validateAlertActions(actions *models.AlertActions) error {
 		}
 		allowedActions, ok := commandModuleActions[ct.Module]
 		if !ok {
-			return apperr.Validation(fmt.Sprintf("Module de commande invalide: %s", ct.Module))
+			return apperr.Validation(fmt.Sprintf("invalid command module: %s", ct.Module)).I18n(apperr.CodeAlertCommandModuleInvalid, map[string]string{"module": ct.Module})
 		}
 		if !containsString(allowedActions, ct.Action) {
-			return apperr.Validation(fmt.Sprintf("Action invalide pour le module %s: %s", ct.Module, ct.Action))
+			return apperr.Validation(fmt.Sprintf("invalid action for module %s: %s", ct.Module, ct.Action)).I18n(apperr.CodeAlertCommandActionInvalid, map[string]string{"module": ct.Module, "action": ct.Action})
 		}
 		if commandModuleRequiresTarget[ct.Module] && ct.Target == "" {
-			return apperr.Validation(fmt.Sprintf("Le module %s requiert une cible.", ct.Module))
+			return apperr.Validation(fmt.Sprintf("module %s requires a target", ct.Module)).I18n(apperr.CodeAlertCommandTargetRequired, map[string]string{"module": ct.Module})
 		}
 		if !commandModuleRequiresTarget[ct.Module] {
 			ct.Target = ""

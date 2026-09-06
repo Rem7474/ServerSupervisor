@@ -23,6 +23,10 @@ type fakeRepo struct {
 	// one specific container ID doesn't exist — every other ID still "exists"
 	// (defaults to true otherwise, matching the old unconditional behavior).
 	missingContainerID string
+	// missingProxmoxKind, when set to one of connection/node/storage/guest/disk,
+	// makes that one existence check report false. Empty (the default) keeps
+	// every Proxmox check answering true, as before.
+	missingProxmoxKind string
 }
 
 func (f *fakeRepo) ListAlertRulesAPI(context.Context) ([]models.AlertRule, error) { return nil, nil }
@@ -45,11 +49,21 @@ func (f *fakeRepo) DockerContainerExists(_ context.Context, containerID, _ strin
 func (f *fakeRepo) ComposeProjectExists(context.Context, string, string) (bool, error) {
 	return true, nil
 }
-func (f *fakeRepo) ProxmoxConnectionExists(context.Context, string) (bool, error) { return true, nil }
-func (f *fakeRepo) ProxmoxNodeExists(context.Context, string) (bool, error)       { return true, nil }
-func (f *fakeRepo) ProxmoxStorageExists(context.Context, string) (bool, error)    { return true, nil }
-func (f *fakeRepo) ProxmoxGuestExists(context.Context, string) (bool, error)      { return true, nil }
-func (f *fakeRepo) ProxmoxDiskExists(context.Context, string) (bool, error)       { return true, nil }
+func (f *fakeRepo) ProxmoxConnectionExists(context.Context, string) (bool, error) {
+	return f.missingProxmoxKind != "connection", nil
+}
+func (f *fakeRepo) ProxmoxNodeExists(context.Context, string) (bool, error) {
+	return f.missingProxmoxKind != "node", nil
+}
+func (f *fakeRepo) ProxmoxStorageExists(context.Context, string) (bool, error) {
+	return f.missingProxmoxKind != "storage", nil
+}
+func (f *fakeRepo) ProxmoxGuestExists(context.Context, string) (bool, error) {
+	return f.missingProxmoxKind != "guest", nil
+}
+func (f *fakeRepo) ProxmoxDiskExists(context.Context, string) (bool, error) {
+	return f.missingProxmoxKind != "disk", nil
+}
 func (f *fakeRepo) ResolveOpenAlertIncidentsByRule(context.Context, int64) (int64, error) {
 	return 0, nil
 }
