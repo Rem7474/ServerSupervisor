@@ -13,6 +13,12 @@ export default defineConfig({
   plugins: [vue()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // vue-i18n build flags: drop the Options-API path (this app is
+    // `legacy: false`) and the devtools hooks from the production bundle.
+    // Worth ~2.5 KB gzipped on vendor-vue.
+    __VUE_I18N_FULL_INSTALL__: false,
+    __VUE_I18N_LEGACY_API__: false,
+    __INTLIFY_PROD_DEVTOOLS__: false,
   },
   server: {
     port: 3000,

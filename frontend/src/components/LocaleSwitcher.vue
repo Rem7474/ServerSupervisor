@@ -28,7 +28,7 @@
  * with it the dropdown) is gated behind `auth.isAuthenticated`.
  */
 import { useI18n } from 'vue-i18n'
-import { setLocale, SUPPORTED_LOCALES, type SupportedLocale } from '../i18n'
+import { ensureLocaleMessages, setLocale, SUPPORTED_LOCALES, type SupportedLocale } from '../i18n'
 
 const { t, locale } = useI18n()
 
@@ -39,7 +39,10 @@ const FLAGS: Record<SupportedLocale, { labelKey: string; flagClass: string }> = 
 
 const options = SUPPORTED_LOCALES.map((l) => ({ locale: l, ...FLAGS[l] }))
 
-function switchLocale(l: SupportedLocale): void {
+// The target locale's chunk is fetched before the switch, so the UI never
+// flashes through the fallback language on its way there.
+async function switchLocale(l: SupportedLocale): Promise<void> {
+  await ensureLocaleMessages(l)
   setLocale(l)
 }
 </script>

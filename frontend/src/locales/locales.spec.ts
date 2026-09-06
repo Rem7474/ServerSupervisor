@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { en, fr } from './index'
+import { fr, loadLocaleMessages } from './index'
 
 type Messages = Record<string, unknown>
 
@@ -17,8 +17,12 @@ function flatten(node: Messages, prefix = ''): Record<string, string> {
   return out
 }
 
+// The fallback is bundled eagerly; every other locale is a lazy chunk, so it
+// has to be pulled in explicitly here.
+const en = (await loadLocaleMessages('en')) as Messages
+
 const FR = flatten(fr as Messages)
-const EN = flatten(en as Messages)
+const EN = flatten(en)
 
 /**
  * Distinct `{name}` interpolation placeholders used by a message. Deduplicated
@@ -67,6 +71,6 @@ describe('locales', () => {
   })
 
   it('exposes the same namespaces in both languages', () => {
-    expect(Object.keys(fr as Messages).sort()).toEqual(Object.keys(en as Messages).sort())
+    expect(Object.keys(fr as Messages).sort()).toEqual(Object.keys(en).sort())
   })
 })

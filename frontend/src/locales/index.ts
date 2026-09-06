@@ -1,83 +1,26 @@
-import frAccount from './fr/account.json'
-import frAlerts from './fr/alerts.json'
-import frApt from './fr/apt.json'
-import frAuth from './fr/auth.json'
-import frCommon from './fr/common.json'
-import frDashboard from './fr/dashboard.json'
-import frDocker from './fr/docker.json'
-import frErrors from './fr/errors.json'
-import frHost from './fr/host.json'
-import frMonitoring from './fr/monitoring.json'
-import frNav from './fr/nav.json'
-import frNetwork from './fr/network.json'
-import frNpm from './fr/npm.json'
-import frProxmox from './fr/proxmox.json'
-import frRunbooks from './fr/runbooks.json'
-import frScheduledTasks from './fr/scheduledTasks.json'
-import frSecurity from './fr/security.json'
-import frSettings from './fr/settings.json'
-import frWebhooks from './fr/webhooks.json'
+import fr from './fr'
 
-import enAccount from './en/account.json'
-import enAlerts from './en/alerts.json'
-import enApt from './en/apt.json'
-import enAuth from './en/auth.json'
-import enCommon from './en/common.json'
-import enDashboard from './en/dashboard.json'
-import enDocker from './en/docker.json'
-import enErrors from './en/errors.json'
-import enHost from './en/host.json'
-import enMonitoring from './en/monitoring.json'
-import enNav from './en/nav.json'
-import enNetwork from './en/network.json'
-import enNpm from './en/npm.json'
-import enProxmox from './en/proxmox.json'
-import enRunbooks from './en/runbooks.json'
-import enScheduledTasks from './en/scheduledTasks.json'
-import enSecurity from './en/security.json'
-import enSettings from './en/settings.json'
-import enWebhooks from './en/webhooks.json'
+/**
+ * The fallback locale is bundled eagerly: `i18n.ts` needs messages the moment
+ * the module evaluates (main.ts renders its boot placeholder before mount),
+ * and `fallbackLocale: 'fr'` means every other locale degrades to it rather
+ * than to a raw key while its own chunk is still in flight.
+ */
+export { fr }
 
-export const fr = {
-  common: frCommon,
-  nav: frNav,
-  auth: frAuth,
-  account: frAccount,
-  dashboard: frDashboard,
-  docker: frDocker,
-  proxmox: frProxmox,
-  network: frNetwork,
-  npm: frNpm,
-  alerts: frAlerts,
-  settings: frSettings,
-  apt: frApt,
-  host: frHost,
-  monitoring: frMonitoring,
-  runbooks: frRunbooks,
-  scheduledTasks: frScheduledTasks,
-  security: frSecurity,
-  webhooks: frWebhooks,
-  errors: frErrors,
+/**
+ * One dynamic import per non-fallback locale — each becomes its own chunk.
+ * A dynamic `import(`./${locale}`)` would defeat that by making Rollup emit a
+ * chunk for every file the pattern could match, so the map is explicit.
+ */
+const LOADERS: Record<string, () => Promise<{ default: Record<string, unknown> }>> = {
+  en: () => import('./en'),
 }
 
-export const en = {
-  common: enCommon,
-  nav: enNav,
-  auth: enAuth,
-  account: enAccount,
-  dashboard: enDashboard,
-  docker: enDocker,
-  proxmox: enProxmox,
-  network: enNetwork,
-  npm: enNpm,
-  alerts: enAlerts,
-  settings: enSettings,
-  apt: enApt,
-  host: enHost,
-  monitoring: enMonitoring,
-  runbooks: enRunbooks,
-  scheduledTasks: enScheduledTasks,
-  security: enSecurity,
-  webhooks: enWebhooks,
-  errors: enErrors,
+/** Loads one locale's messages on demand. */
+export async function loadLocaleMessages(locale: string): Promise<Record<string, unknown>> {
+  if (locale === 'fr') return fr
+  const load = LOADERS[locale]
+  if (!load) throw new Error(`[i18n] no messages bundled for locale "${locale}"`)
+  return (await load()).default
 }

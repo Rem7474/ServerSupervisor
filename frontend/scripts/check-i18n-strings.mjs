@@ -92,6 +92,23 @@ function isFrenchUserText(raw) {
   return distinctMatches(STRONG_RE, s) >= 1 || distinctMatches(WEAK_RE, s) >= 2
 }
 
+/**
+ * `v-html` on a translation would turn the locale files into an HTML injection
+ * surface — and a couple of messages are deliberately angle-bracketed
+ * placeholders ("<tous>" for an unset filter), which only stay harmless because
+ * every message reaches the DOM through {{ }} or a bound attribute.
+ */
+function checkDangerousHtmlBinding(node, hits) {
+  for (const prop of node.props ?? []) {
+    const isVHtml = prop.type === 7 && prop.name === 'html'
+    if (!isVHtml) continue
+    const expr = prop.exp?.content ?? ''
+    if (/\bt\s*\(|\$t\s*\(/.test(expr)) {
+      hits.push({ line: prop.loc.start.line, text: `v-html bound to a translation: ${expr.trim()}` })
+    }
+  }
+}
+
 function walkTemplate(node, hits) {
   if (!node) return
   if (node.type === 2 /* TEXT */) {
@@ -100,6 +117,7 @@ function walkTemplate(node, hits) {
     }
   }
   if (node.type === 1 /* ELEMENT */) {
+    checkDangerousHtmlBinding(node, hits)
     for (const prop of node.props ?? []) {
       // type 6 = plain (non-bound) attribute; a :bound value is an expression.
       if (prop.type === 6 && prop.value && USER_VISIBLE_ATTRS.has(prop.name)) {

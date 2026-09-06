@@ -1,5 +1,5 @@
 import { createI18n } from 'vue-i18n'
-import { en, fr } from './locales'
+import { fr, loadLocaleMessages } from './locales'
 import { setDayjsLocale } from './utils/dayjs'
 
 export const SUPPORTED_LOCALES = ['fr', 'en'] as const
@@ -34,7 +34,11 @@ export const i18n = createI18n({
   legacy: false,
   locale: detectLocale(),
   fallbackLocale: 'fr',
-  messages: { fr, en },
+  // Only the fallback ships in the entry chunk; the rest arrive via
+  // ensureLocaleMessages() before they are ever displayed. The cast tells
+  // vue-i18n every supported locale is legal to switch to — which it is, once
+  // its chunk has been registered.
+  messages: { fr } as Record<SupportedLocale, typeof fr>,
   pluralRules: {
     // CLDR's French rule is `one` for i = 0 or 1; vue-i18n's built-in default is
     // the English one (`one` for exactly 1), which renders "0 hôtes" instead of
@@ -82,6 +86,16 @@ export function currentLocale(): SupportedLocale {
  */
 export function localeTag(): string {
   return LOCALE_TAGS[currentLocale()]
+}
+
+/**
+ * Fetches a locale's chunk unless it is already registered. Callers that can
+ * change the locale (the switcher, the boot sequence) await this first, which
+ * keeps setLocale() synchronous for everyone else.
+ */
+export async function ensureLocaleMessages(locale: SupportedLocale): Promise<void> {
+  if (Object.keys(i18n.global.getLocaleMessage(locale) ?? {}).length > 0) return
+  i18n.global.setLocaleMessage(locale, await loadLocaleMessages(locale) as never)
 }
 
 /** Switches the active locale, persists the choice, and keeps dayjs / <html lang> in sync. */
