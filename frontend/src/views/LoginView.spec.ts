@@ -38,6 +38,7 @@ vi.mock('../utils/webauthn', () => ({
 
 import LoginView from './LoginView.vue'
 import { setLocale } from '../i18n'
+import LocaleSwitcher from '../components/LocaleSwitcher.vue'
 
 beforeEach(() => {
   setLocale('fr')
@@ -49,6 +50,21 @@ beforeEach(() => {
 })
 
 describe('LoginView', () => {
+  it('offers a language switcher, the only one reachable before signing in', async () => {
+    // App.vue's picker sits inside the authenticated shell, and detectLocale()
+    // falls back to French for any browser language that isn't fr/en.
+    const wrapper = mount(LoginView)
+    const switcher = wrapper.findComponent(LocaleSwitcher)
+    expect(switcher.exists()).toBe(true)
+
+    expect(wrapper.text()).toContain('Connexion au dashboard')
+
+    await switcher.findAll('button')[1].trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Sign in to the dashboard')
+  })
+
   it('renders the login form in French by default', () => {
     const wrapper = mount(LoginView)
     expect(wrapper.text()).toContain('Connexion au dashboard')

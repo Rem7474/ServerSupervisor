@@ -92,34 +92,7 @@
                   </div>
                   <div class="dropdown-item d-flex align-items-center justify-content-between">
                     <span class="text-secondary small">{{ t('common.language') }}</span>
-                    <div
-                      class="btn-group btn-group-sm"
-                      role="group"
-                      :aria-label="t('common.language')"
-                    >
-                      <button
-                        type="button"
-                        class="btn btn-icon"
-                        :class="locale === 'fr' ? 'btn-primary' : 'btn-outline-secondary'"
-                        :title="t('common.languageFrench')"
-                        :aria-label="t('common.languageFrench')"
-                        :aria-pressed="locale === 'fr'"
-                        @click="switchLocale('fr')"
-                      >
-                        <span class="flag flag-xs flag-country-fr" />
-                      </button>
-                      <button
-                        type="button"
-                        class="btn btn-icon"
-                        :class="locale === 'en' ? 'btn-primary' : 'btn-outline-secondary'"
-                        :title="t('common.languageEnglish')"
-                        :aria-label="t('common.languageEnglish')"
-                        :aria-pressed="locale === 'en'"
-                        @click="switchLocale('en')"
-                      >
-                        <span class="flag flag-xs flag-country-gb" />
-                      </button>
-                    </div>
+                    <LocaleSwitcher />
                   </div>
                   <div class="dropdown-divider" />
                   <router-link
@@ -291,11 +264,11 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { useRouter, useRoute } from 'vue-router'
-import { setLocale, type SupportedLocale } from './i18n'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
+import LocaleSwitcher from './components/LocaleSwitcher.vue'
 import { IconAlertTriangle, IconServer, IconSearch, IconUser } from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
 import CommandPalette from './components/CommandPalette.vue'
@@ -305,15 +278,12 @@ import { useAttentionCenter } from './composables/useAttentionCenter'
 import apiClient from './api'
 import { visibleNavSections, type NavSection } from './config/navigation'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const auth = useAuthStore()
 const hostsStore = useHostsStore()
 const router = useRouter()
 const route = useRoute()
 
-function switchLocale(l: SupportedLocale): void {
-  setLocale(l)
-}
 const { isOpen: paletteOpen, toggle: paletteToggle } = useCommandPalette()
 const navbarOpen = ref(false)
 const userMenuOpen = ref(false)
