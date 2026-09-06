@@ -177,5 +177,9 @@
   "noTrafficDataTitle": "No traffic data.",
   "realtimeFeedTitle": "Real-time feed - latest requests",
   "autoRefreshStatusLabel": "auto-refresh {status}",
-  "noRecentRequestTitle": "No recent request."
+  "noRecentRequestTitle": "No recent request.",
+  "worldMapAriaLabel": "World map of traffic by country",
+  "blockHostNotFound": "No host found to block {ip}",
+  "blockIpSuccess": "IP {ip} blocked by CrowdSec ({duration})",
+  "blockIpError": "Could not block {ip}: {message}"
 }

@@ -177,5 +177,9 @@
   "noTrafficDataTitle": "Aucune donnée de trafic.",
   "realtimeFeedTitle": "Flux temps réel - dernières requêtes",
   "autoRefreshStatusLabel": "auto-refresh {status}",
-  "noRecentRequestTitle": "Aucune requête récente."
+  "noRecentRequestTitle": "Aucune requête récente.",
+  "worldMapAriaLabel": "Carte mondiale du trafic par pays",
+  "blockHostNotFound": "Hôte introuvable pour bloquer {ip}",
+  "blockIpSuccess": "IP {ip} bloquée par CrowdSec ({duration})",
+  "blockIpError": "Impossible de bloquer {ip} : {message}"
 }

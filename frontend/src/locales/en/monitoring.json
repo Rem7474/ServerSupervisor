@@ -151,5 +151,7 @@
   "noResultsYet": "No result yet. The first check runs in {sec}s.",
   "noCheckYetTitle": "no check",
   "avgSuffix": "avg.",
-  "uptimeChartTitle": "Uptime ({window})"
+  "uptimeChartTitle": "Uptime ({window})",
+  "proxyHostNotFound": "Proxy host not found.",
+  "proxyHostLoadError": "Could not load the proxy host."
 }

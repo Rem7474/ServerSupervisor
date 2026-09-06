@@ -9,6 +9,7 @@ import type { Host } from '../types/host'
 import type { ReleaseTracker } from '../types/tracker'
 import type { AlertRule } from '../types/alert'
 import type { WSNotificationMessage } from '../types/ws'
+import { i18n } from '../i18n'
 
 interface AlertRuleCapabilities {
   metrics: unknown[]
@@ -122,7 +123,7 @@ export function useAlertsPage(): UseAlertsPageApi {
         proxmox_scope: proxmoxScope,
       }
     } else {
-      capabilitiesError.value = 'Impossible de charger les capacites des metriques'
+      capabilitiesError.value = i18n.global.t('alerts.metricCapabilitiesLoadError')
     }
 
     capabilitiesLoading.value = false
@@ -144,7 +145,7 @@ export function useAlertsPage(): UseAlertsPageApi {
       trackers.value = response.data?.trackers || []
       trackersLoaded.value = true
     } catch {
-      trackersError.value = 'Impossible de charger les trackers de versions'
+      trackersError.value = i18n.global.t('alerts.versionTrackersLoadError')
     } finally {
       trackersLoading.value = false
     }
@@ -179,7 +180,7 @@ export function useAlertsPage(): UseAlertsPageApi {
       await rulesStore.fetchRules(true)
       closeModal()
     } catch (err: unknown) {
-      saveError.value = `Erreur : ${getApiErrorMessage(err)}`
+      saveError.value = i18n.global.t('alerts.errorPrefix', { message: getApiErrorMessage(err) })
     } finally {
       saving.value = false
     }
@@ -200,8 +201,8 @@ export function useAlertsPage(): UseAlertsPageApi {
 
   async function deleteAlert(rule: AlertRule): Promise<void> {
     const confirmed = await confirm({
-      title: "Supprimer l'alerte ?",
-      message: `Voulez-vous vraiment supprimer la regle "${rule.name || 'Sans nom'}" ?\n\nCette action est irreversible.`,
+      title: i18n.global.t('alerts.deleteRuleConfirmTitle'),
+      message: i18n.global.t('alerts.deleteRuleConfirmMessage', { name: rule.name || i18n.global.t('alerts.unnamedRule') }),
       variant: 'danger',
     })
     if (!confirmed) return
@@ -210,7 +211,7 @@ export function useAlertsPage(): UseAlertsPageApi {
       await apiClient.deleteAlertRule(rule.id)
       await rulesStore.fetchRules(true)
     } catch (err: unknown) {
-      saveError.value = `Erreur lors de la suppression : ${getApiErrorMessage(err)}`
+      saveError.value = i18n.global.t('alerts.deleteRuleErrorPrefix', { message: getApiErrorMessage(err) })
     }
   }
 

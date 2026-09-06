@@ -22,5 +22,21 @@
   "GIT_PROVIDER_UNAUTHORIZED": "token GitHub invalide ou expiré (401) — vérifiez GITHUB_TOKEN dans les paramètres",
   "GIT_PROVIDER_RATE_LIMITED": "limite de taux GitHub atteinte (403) — configurez un GITHUB_TOKEN pour augmenter la limite",
   "GIT_PROVIDER_NOT_FOUND": "dépôt introuvable sur GitHub (404) — vérifiez owner/repo",
-  "GIT_PROVIDER_ERROR": "erreur GitHub API ({status})"
+  "GIT_PROVIDER_ERROR": "erreur GitHub API ({status})",
+  "legacy": {
+    "hostNotFound": "Hôte introuvable",
+    "unauthorized": "Accès non autorisé",
+    "forbidden": "Action non autorisée",
+    "invalidCredentials": "Identifiants incorrects",
+    "connectionRefused": "Connexion refusée",
+    "timeout": "Délai d'attente dépassé",
+    "networkError": "Erreur réseau",
+    "internalServerError": "Erreur serveur interne",
+    "notFound": "Ressource introuvable",
+    "badRequest": "Requête invalide",
+    "serviceUnavailable": "Service indisponible",
+    "alreadyExists": "Ressource déjà existante",
+    "invalidToken": "Jeton invalide ou expiré",
+    "permissionDenied": "Permission refusée"
+  }
 }

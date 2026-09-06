@@ -3,30 +3,5 @@
 # src/locales/{fr,en}/*.json; scripts/check-i18n-strings.mjs fails the build
 # on any hardcoded French text found outside this list.
 #
-# Seeded when the check was widened to *.ts and to unaccented French: every
-# entry below was already un-migrated, it was simply invisible to the previous
-# accented-only, *.vue-only grep.
-src/App.vue
-src/api/client.ts
-src/components/ConfirmDialog.vue
-src/components/ToastContainer.vue
-src/components/host/HostSystemTab.vue
-src/components/security/TrafficWorldMap.vue
-src/composables/useAlertRuleTemplates.ts
-src/composables/useAlertsPage.ts
-src/composables/useCommandStream.ts
-src/composables/useConfirmDialog.ts
-src/composables/useDomainDetails.ts
-src/composables/useFormValidator.ts
-src/composables/useHostDetail.ts
-src/composables/useMonitoringHostDetail.ts
-src/composables/useNotificationHistory.ts
-src/composables/useSettings.ts
-src/composables/useUsers.ts
-src/composables/useWebSocket.ts
-src/main.ts
-src/router/index.ts
-src/stores/alertRules.ts
-src/utils/portServices.ts
-src/utils/translateError.ts
-src/views/DockerView.vue
+# Empty: every source file is migrated. A new entry here is a regression, not
+# a normal step — prefer extracting the strings.

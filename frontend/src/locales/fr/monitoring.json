@@ -151,5 +151,7 @@
   "noResultsYet": "Aucun résultat encore. La première vérification arrive sous {sec}s.",
   "noCheckYetTitle": "aucun check",
   "avgSuffix": "moy.",
-  "uptimeChartTitle": "Uptime ({window})"
+  "uptimeChartTitle": "Uptime ({window})",
+  "proxyHostNotFound": "Proxy host introuvable.",
+  "proxyHostLoadError": "Impossible de charger le proxy host."
 }

@@ -339,5 +339,18 @@
   "consoleLive": "Live console",
   "noActiveConsole": "No active console",
   "invalidIpv4": "Invalid IPv4 address (e.g.: 192.168.1.100)",
-  "registerError": "Error while registering"
+  "registerError": "Error while registering",
+  "journalTitle": "System logs (journalctl)",
+  "journalServicePlaceholder": "Service name (e.g. nginx, ssh, docker)",
+  "journalLoadLabel": "Load logs",
+  "journalStreamHint": "Stream → command #{id} — logs appear in the Live console →",
+  "journalSendError": "Could not send the command",
+  "deleteHostConfirmTitle": "Delete host",
+  "deleteHostConfirmMessage": "This action cannot be undone. All associated data will be deleted.",
+  "agentUpdateConfirmTitle": "Update agent",
+  "agentUpdateConfirmMessage": "Deploy version {version} on {host}? The agent will restart during the operation.",
+  "deleteProxmoxLinkConfirmTitle": "Remove Proxmox link",
+  "deleteProxmoxLinkConfirmMessage": "The link between this host and its Proxmox VM/LXC will be removed. Metrics will fall back to the agent source (if available).",
+  "revokePermissionConfirmTitle": "Revoke permission",
+  "revokePermissionConfirmMessage": "{username} will no longer have access to this host."
 }

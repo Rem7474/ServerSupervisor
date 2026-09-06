@@ -6,7 +6,7 @@
           to="/"
           class="text-decoration-none"
         >
-          Dashboard
+          {{ t('nav.sections.control.items.dashboard') }}
         </router-link>
         <span class="text-muted mx-1">/</span>
         <span>Docker</span>
@@ -15,7 +15,7 @@
         Docker
       </h2>
       <div class="text-secondary">
-        Vue globale de tous les conteneurs sur l'infrastructure
+        {{ t('docker.pageSubtitle') }}
       </div>
     </div>
 
@@ -37,12 +37,12 @@
           href="#"
           @click.prevent="activeTab = 'containers'"
         >
-          Conteneurs
+          {{ t('docker.containersTab') }}
           <span class="badge bg-azure-lt text-azure ms-1">{{ containers.length }}</span>
           <span
             v-if="runningCount > 0"
             class="badge bg-success-lt text-success ms-1"
-          >{{ runningCount }} actifs</span>
+          >{{ t('docker.runningCountBadge', { count: runningCount }, runningCount) }}</span>
         </a>
       </li>
       <li class="nav-item">
@@ -52,7 +52,7 @@
           href="#"
           @click.prevent="activeTab = 'compose'"
         >
-          Projets Compose
+          {{ t('docker.composeProjectsTab') }}
           <span class="badge bg-azure-lt text-azure ms-1">{{ composeProjects.length }}</span>
         </a>
       </li>
@@ -84,8 +84,8 @@
       <CommandLogPanel
         :command="dockerLiveCmd"
         :show="showDockerConsole"
-        title="Console Live"
-        empty-text="Aucune console active"
+        :title="t('docker.liveConsoleTitle')"
+        :empty-text="t('docker.liveConsoleEmptyText')"
         wrapper-class="side-panel"
         @open="showDockerConsole = true"
         @close="closeDockerConsole"
@@ -95,12 +95,15 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useLocalStorage } from '../composables/useLocalStorage'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import DockerContainersTab from '../components/docker/DockerContainersTab.vue'
 import ComposeProjectsTab from '../components/docker/ComposeProjectsTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useDocker } from '../composables/useDocker'
+
+const { t } = useI18n()
 
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
 

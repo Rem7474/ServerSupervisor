@@ -22,5 +22,21 @@
   "GIT_PROVIDER_UNAUTHORIZED": "invalid or expired GitHub token (401) — check GITHUB_TOKEN in settings",
   "GIT_PROVIDER_RATE_LIMITED": "GitHub rate limit reached (403) — configure a GITHUB_TOKEN to raise the limit",
   "GIT_PROVIDER_NOT_FOUND": "repository not found on GitHub (404) — check owner/repo",
-  "GIT_PROVIDER_ERROR": "GitHub API error ({status})"
+  "GIT_PROVIDER_ERROR": "GitHub API error ({status})",
+  "legacy": {
+    "hostNotFound": "Host not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Action not allowed",
+    "invalidCredentials": "Invalid credentials",
+    "connectionRefused": "Connection refused",
+    "timeout": "Request timed out",
+    "networkError": "Network error",
+    "internalServerError": "Internal server error",
+    "notFound": "Resource not found",
+    "badRequest": "Invalid request",
+    "serviceUnavailable": "Service unavailable",
+    "alreadyExists": "Resource already exists",
+    "invalidToken": "Invalid or expired token",
+    "permissionDenied": "Permission denied"
+  }
 }

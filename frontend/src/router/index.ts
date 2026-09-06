@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw, NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { i18n } from '../i18n'
 
 interface RouteMeta {
   requiresAuth?: boolean
@@ -227,12 +228,12 @@ async function purgeChunkRelatedCaches(): Promise<void> {
 }
 
 function emitChunkFatalError(error: unknown): void {
-  const reason = error instanceof Error ? error.message : 'Erreur de chargement de module'
+  const reason = error instanceof Error ? error.message : i18n.global.t('common.chunkLoadReason')
   window.dispatchEvent(
     new CustomEvent('ss:fatal-error', {
       detail: {
-        title: 'Mise a jour detectee, chargement impossible',
-        message: `Le chargement des modules a echoue apres une tentative automatique. ${reason}`,
+        title: i18n.global.t('common.chunkLoadTitle'),
+        message: i18n.global.t('common.chunkLoadMessage', { reason }),
       },
     })
   )

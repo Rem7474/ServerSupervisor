@@ -1,6 +1,7 @@
 import { ref, onMounted, onUnmounted, Ref } from 'vue'
 import mitt from 'mitt'
 import { useAuthStore } from '../stores/auth'
+import { i18n } from '../i18n'
 
 // The session cookie (ss_access) is sent automatically by the browser on the
 // WebSocket upgrade; no in-band auth message is necessary anymore. We keep the
@@ -109,7 +110,7 @@ export function useWebSocket<TPayload = unknown>(
         // Auth error from server (invalid/expired token)
         if (payload.type === 'auth_error') {
           wsStatus.value = 'error'
-          wsError.value = 'Authentification refusée — reconnectez-vous'
+          wsError.value = i18n.global.t('common.wsAuthRefused')
           ws!.close()
           return
         }
@@ -149,14 +150,14 @@ export function useWebSocket<TPayload = unknown>(
       // 1008 = policy violation
       if (event.code === 1002 || event.code === 1008) {
         wsStatus.value = 'error'
-        wsError.value = 'Connexion refusée par le serveur — vérifiez la configuration BASE_URL'
+        wsError.value = i18n.global.t('common.wsConnectionRefused')
         return // No retry — it will keep failing
       }
 
       // 4001 = custom auth error code we could use in future
       if (event.code === 4001) {
         wsStatus.value = 'error'
-        wsError.value = 'Session expirée — rechargez la page'
+        wsError.value = i18n.global.t('common.wsSessionExpired')
         return
       }
 
@@ -164,7 +165,7 @@ export function useWebSocket<TPayload = unknown>(
       // We detect it via the fact that we never reached 'connected'
       wsStatus.value = 'reconnecting'
       if (retryCount.value === 0) {
-        wsError.value = 'Impossible de se connecter — vérifiez que le serveur est accessible et que BASE_URL est correctement configuré'
+        wsError.value = i18n.global.t('common.wsUnreachable')
       } else {
         wsError.value = ''
       }

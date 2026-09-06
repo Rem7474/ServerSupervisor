@@ -9,6 +9,7 @@ import { useWebSocket } from './useWebSocket'
 import type { WSHostSnapshot } from '../types/ws'
 import { useAuthStore } from '../stores/auth'
 import { confirmAptCommand } from '../utils/aptConfirm'
+import { i18n } from '../i18n'
 
 // AnyRecord is the raw shape of an untyped JSON payload received over WebSocket
 // or HTTP. The composable keeps it loose because the consuming components
@@ -296,7 +297,7 @@ export function useHostDetail() {
       }
     } catch (e: unknown) {
       await dialog.confirm({
-        title: 'Erreur',
+        title: i18n.global.t('common.errorTitle'),
         message: getApiErrorMessage(e),
         variant: 'danger',
       })
@@ -373,7 +374,7 @@ export function useHostDetail() {
         await pendingCommand.track(commandId)
       }
     } catch (e: unknown) {
-      await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
+      await dialog.confirm({ title: i18n.global.t('common.errorTitle'), message: getApiErrorMessage(e), variant: 'danger' })
     } finally {
       uuLoading.value = ''
     }
@@ -397,7 +398,7 @@ export function useHostDetail() {
       await Promise.all(commandIds.map((id) => pendingCommand.track(id)))
       await loadUUData()
     } catch (e: unknown) {
-      await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
+      await dialog.confirm({ title: i18n.global.t('common.errorTitle'), message: getApiErrorMessage(e), variant: 'danger' })
     } finally {
       uuLoading.value = ''
     }
@@ -413,7 +414,7 @@ export function useHostDetail() {
         await pendingCommand.track(commandId)
       }
     } catch (e: unknown) {
-      await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
+      await dialog.confirm({ title: i18n.global.t('common.errorTitle'), message: getApiErrorMessage(e), variant: 'danger' })
     } finally {
       uuLoading.value = ''
     }
@@ -431,8 +432,8 @@ export function useHostDetail() {
   async function deleteHost() {
     const requiredText = asString(host.value?.hostname) || asString(host.value?.name) || undefined
     const confirmed = await dialog.confirm({
-      title: "Supprimer l'hôte",
-      message: 'Cette action est irréversible. Toutes les données associées seront supprimées.',
+      title: i18n.global.t('host.deleteHostConfirmTitle'),
+      message: i18n.global.t('host.deleteHostConfirmMessage'),
       variant: 'danger',
       requiredText,
     })
@@ -444,7 +445,7 @@ export function useHostDetail() {
       router.push('/')
     } catch (e: unknown) {
       await dialog.confirm({
-        title: 'Erreur',
+        title: i18n.global.t('common.errorTitle'),
         message: getApiErrorMessage(e),
         variant: 'danger',
       })
@@ -456,8 +457,8 @@ export function useHostDetail() {
 
     const version = asString(latestAgentVersion.value)
     const confirmed = await dialog.confirm({
-      title: "Mettre à jour l'agent",
-      message: `Déployer la version ${version} sur ${host.value?.hostname || host.value?.name || hostId} ? L'agent sera redémarré pendant l'opération.`,
+      title: i18n.global.t('host.agentUpdateConfirmTitle'),
+      message: i18n.global.t('host.agentUpdateConfirmMessage', { version, host: String(host.value?.hostname || host.value?.name || hostId) }),
       variant: 'warning',
     })
 
@@ -479,7 +480,7 @@ export function useHostDetail() {
       }
     } catch (e: unknown) {
       await dialog.confirm({
-        title: 'Erreur',
+        title: i18n.global.t('common.errorTitle'),
         message: getApiErrorMessage(e),
         variant: 'danger',
       })
@@ -548,8 +549,8 @@ export function useHostDetail() {
     if (!linkId) return
 
     const confirmed = await dialog.confirm({
-      title: 'Supprimer le lien Proxmox',
-      message: 'Le lien entre cet hôte et sa VM/LXC Proxmox sera supprimé. Les métriques basculeront sur la source agent (si disponible).',
+      title: i18n.global.t('host.deleteProxmoxLinkConfirmTitle'),
+      message: i18n.global.t('host.deleteProxmoxLinkConfirmMessage'),
       variant: 'danger',
     })
     if (!confirmed) return
@@ -647,7 +648,7 @@ export function useHostDetail() {
       addPermModal.value = false
       await loadHostPerms()
     } catch (e: unknown) {
-      permError.value = getApiErrorMessage(e, "Erreur lors de l'enregistrement")
+      permError.value = getApiErrorMessage(e, i18n.global.t('common.saveError'))
     } finally {
       permSaving.value = false
     }
@@ -655,8 +656,8 @@ export function useHostDetail() {
 
   async function revokePermission(username: string) {
     const confirmed = await dialog.confirm({
-      title: 'Révoquer la permission',
-      message: `${username} n'aura plus accès à cet hôte.`,
+      title: i18n.global.t('host.revokePermissionConfirmTitle'),
+      message: i18n.global.t('host.revokePermissionConfirmMessage', { username }),
       variant: 'danger',
     })
     if (!confirmed) return

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { setLocale } from '../i18n'
 import type { AlertRule } from '../types/alert'
 
 vi.mock('../api', () => ({
@@ -17,6 +18,9 @@ function makeRule(overrides: Partial<AlertRule> = {}): AlertRule {
 
 describe('stores/alertRules', () => {
   beforeEach(() => {
+    // The store's fallback message is translated — pin the locale so the
+    // assertions below don't depend on the test env's detected language.
+    setLocale('fr')
     setActivePinia(createPinia())
     vi.clearAllMocks()
   })

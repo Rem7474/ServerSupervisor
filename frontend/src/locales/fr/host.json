@@ -339,5 +339,18 @@
   "consoleLive": "Console Live",
   "noActiveConsole": "Aucune console active",
   "invalidIpv4": "Adresse IPv4 invalide (ex: 192.168.1.100)",
-  "registerError": "Erreur lors de l'enregistrement"
+  "registerError": "Erreur lors de l'enregistrement",
+  "journalTitle": "Logs système (journalctl)",
+  "journalServicePlaceholder": "Nom du service (ex : nginx, ssh, docker)",
+  "journalLoadLabel": "Charger les logs",
+  "journalStreamHint": "Stream → commande #{id} — les logs apparaissent dans la Console Live →",
+  "journalSendError": "Impossible d'envoyer la commande",
+  "deleteHostConfirmTitle": "Supprimer l'hôte",
+  "deleteHostConfirmMessage": "Cette action est irréversible. Toutes les données associées seront supprimées.",
+  "agentUpdateConfirmTitle": "Mettre à jour l'agent",
+  "agentUpdateConfirmMessage": "Déployer la version {version} sur {host} ? L'agent sera redémarré pendant l'opération.",
+  "deleteProxmoxLinkConfirmTitle": "Supprimer le lien Proxmox",
+  "deleteProxmoxLinkConfirmMessage": "Le lien entre cet hôte et sa VM/LXC Proxmox sera supprimé. Les métriques basculeront sur la source agent (si disponible).",
+  "revokePermissionConfirmTitle": "Révoquer la permission",
+  "revokePermissionConfirmMessage": "{username} n'aura plus accès à cet hôte."
 }

@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { i18n } from '../i18n'
 
 export type ValidationRule = {
   validate: (value: unknown) => string | null
@@ -44,18 +45,18 @@ export function useFormValidator() {
 
 export const rules = {
   required: (fieldName: string): ValidationRule => ({
-    validate: (value) => !value ? `${fieldName} est requis` : null
+    validate: (value) => !value ? i18n.global.t('common.fieldRequired', { field: fieldName }) : null
   }),
   minLength: (min: number): ValidationRule => ({
     validate: (value) => {
       if (typeof value !== 'string') return null
-      return value.length < min ? `Minimum ${min} caractères` : null
+      return value.length < min ? i18n.global.t('common.fieldMinLength', { min }) : null
     }
   }),
   email: (): ValidationRule => ({
     validate: (value) => {
       if (typeof value !== 'string') return null
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Email invalide'
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : i18n.global.t('common.fieldInvalidEmail')
     }
   }),
   url: (): ValidationRule => ({
@@ -65,7 +66,7 @@ export const rules = {
         new URL(value)
         return null
       } catch {
-        return 'URL invalide'
+        return i18n.global.t('common.fieldInvalidUrl')
       }
     }
   })

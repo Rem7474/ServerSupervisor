@@ -36,13 +36,17 @@ const USER_VISIBLE_ATTRS = new Set([
  * too because part of this repo's un-migrated copy is written without accents.
  */
 const STRONG_WORDS = [
-  'actifs', 'actives', 'affiches', 'ajouter', 'annuler', 'aucun', 'aucune',
-  'aujourd', 'charger', 'chargement', 'conteneur', 'conteneurs', 'confirmer',
-  'deja', 'echec', 'echoue', 'enregistrer', 'enregistree', 'erreur', 'fermer',
-  'fenetre', 'hote', 'hors', 'impossible', 'introuvable', 'irreversible',
-  'lancer', 'ligne', 'modifier', 'nouveau', 'nouvelle', 'parametres', 'projets',
-  'regle', 'relancer', 'requis', 'requise', 'reussi', 'reussie', 'selectionner',
-  'supprimer', 'supprime', 'supprimee', 'tapez', 'utilisateur', 'utilisateurs',
+  'actifs', 'actives', 'affiches', 'ajouter', 'annule', 'annulee', 'annuler',
+  'aucun', 'aucune', 'aujourd', 'charger', 'chargement', 'conteneur',
+  'conteneurs', 'confirmer', 'connexion', 'deja', 'donnees', 'echec', 'echoue',
+  'enregistre', 'enregistree', 'enregistrement', 'enregistrer', 'erreur',
+  'expiree', 'fermer', 'fenetre', 'hote', 'hors', 'impossible', 'inconnu',
+  'inconnue', 'indisponible', 'introuvable', 'invalide', 'irreversible',
+  'lancer', 'ligne', 'modifier', 'nouveau', 'nouvelle', 'obligatoire',
+  'parametres', 'projets', 'refuse', 'refusee', 'reessayez', 'regle',
+  'relancer', 'requis', 'requise', 'reussi', 'reussie', 'sauvegarde',
+  'selectionner', 'suppression', 'supprimer', 'supprime', 'supprimee', 'tapez',
+  'termine', 'terminee', 'utilisateur', 'utilisateurs', 'verifier', 'verifiez',
   'veuillez',
 ]
 
@@ -109,19 +113,65 @@ function walkTemplate(node, hits) {
 }
 
 /**
- * Strips comments and template-literal expression holes, then yields every
- * string/template literal with its line number. Good enough for a lint guard:
- * it errs toward *not* reporting rather than misreporting.
+ * Character-level scan yielding every string/template literal with its line
+ * number. A regex can't do this correctly — a template literal containing
+ * `class="x"` would desynchronise a left-to-right pair matcher and hide the
+ * rest of the file — so quote state is tracked explicitly.
+ *
+ * Comments are skipped (French comments are idiomatic here and aren't shipped)
+ * and so are `console.*` arguments, which are developer logs rather than UI
+ * copy. Template-literal `${...}` holes are blanked out of the yielded text.
  */
 function* scriptLiterals(code) {
-  const withoutComments = code
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length))
-  const re = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g
-  let m
-  while ((m = re.exec(withoutComments)) !== null) {
-    const line = withoutComments.slice(0, m.index).split('\n').length
-    yield { line, text: m[2].replace(/\$\{[^}]*\}/g, '') }
+  let line = 1
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i]
+    if (ch === '\n') { line++; continue }
+
+    if (ch === '/' && code[i + 1] === '/') {
+      while (i < code.length && code[i] !== '\n') i++
+      i--
+      continue
+    }
+    if (ch === '/' && code[i + 1] === '*') {
+      i += 2
+      while (i < code.length && !(code[i] === '*' && code[i + 1] === '/')) {
+        if (code[i] === '\n') line++
+        i++
+      }
+      i++
+      continue
+    }
+
+    if (ch !== '"' && ch !== "'" && ch !== '`') continue
+
+    // Developer logs are not user-facing copy: skip the whole call's arguments.
+    const before = code.slice(Math.max(0, i - 40), i)
+    const inConsoleCall = /\bconsole\.\w+\(\s*$/.test(before)
+
+    const quote = ch
+    const startLine = line
+    let buf = ''
+    i++
+    for (; i < code.length; i++) {
+      const c = code[i]
+      if (c === '\\') { buf += c + (code[i + 1] ?? ''); if (code[i + 1] === '\n') line++; i++; continue }
+      if (c === quote) break
+      if (c === '\n') { line++; if (quote !== '`') break }
+      if (quote === '`' && c === '$' && code[i + 1] === '{') {
+        let depth = 1
+        i += 2
+        for (; i < code.length && depth > 0; i++) {
+          if (code[i] === '{') depth++
+          else if (code[i] === '}') depth--
+          else if (code[i] === '\n') line++
+        }
+        i--
+        continue
+      }
+      buf += c
+    }
+    if (!inConsoleCall) yield { line: startLine, text: buf }
   }
 }
 
