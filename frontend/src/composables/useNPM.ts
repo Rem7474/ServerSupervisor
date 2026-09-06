@@ -4,6 +4,7 @@ import { npmApi } from '../api/npm'
 import type { NPMProxyHostEnriched } from '../types/npm'
 import { getApiErrorMessage } from '../api/client'
 import { useConfirmDialog } from './useConfirmDialog'
+import { compareStrings } from '../utils/formatters'
 
 export type NPMSortKey = 'connection_name' | 'domain' | 'forward' | 'npm_enabled' | 'uptime_status' | 'ssl_days_remaining'
 
@@ -43,9 +44,9 @@ export function useNPM() {
     return [...hosts.value].sort((a, b) => {
       switch (sortKey.value) {
         case 'domain':
-          return dir * (a.domain_names[0] || '').localeCompare(b.domain_names[0] || '', 'fr')
+          return dir * compareStrings(a.domain_names[0] || '', b.domain_names[0] || '')
         case 'forward':
-          return dir * `${a.forward_host}:${a.forward_port}`.localeCompare(`${b.forward_host}:${b.forward_port}`, 'fr', { numeric: true })
+          return dir * compareStrings(`${a.forward_host}:${a.forward_port}`, `${b.forward_host}:${b.forward_port}`, { numeric: true })
         case 'npm_enabled':
           return dir * (Number(a.npm_enabled) - Number(b.npm_enabled))
         case 'uptime_status': {

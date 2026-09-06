@@ -32,6 +32,7 @@ import { scaleSequential } from 'd3-scale'
 import { interpolateYlOrRd } from 'd3-scale-chromatic'
 import { select } from 'd3-selection'
 import { feature } from 'topojson-client'
+import { formatNumber } from '../../utils/formatters'
 
 type AnyRecord = Record<string, any>
 
@@ -43,7 +44,7 @@ const tooltip = ref<{ x: number; y: number; country: string; hits: number } | nu
 let resizeHandler: (() => void) | null = null
 
 function numberFormat(v: number): string {
-  return new Intl.NumberFormat('fr-FR').format(Number(v) || 0)
+  return formatNumber(v)
 }
 
 function normalizeCountryName(name: string): string {

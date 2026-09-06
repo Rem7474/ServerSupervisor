@@ -177,5 +177,6 @@
   "pageRefreshResumeTooltip": "Cliquer pour reprendre",
   "pageRefreshAutoLabel": "Auto ({n}s)",
   "pageRefreshPausedLabel": "Pause",
-  "pageRefreshLastUpdateLabel": "dernière MAJ {time}"
+  "pageRefreshLastUpdateLabel": "dernière MAJ {time}",
+  "dayUnitShort": "j"
 }
