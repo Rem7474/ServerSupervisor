@@ -5,14 +5,14 @@
         v-if="count > 0"
         class="bulk-action-bar"
         role="toolbar"
-        :aria-label="`Actions groupées — ${count} hôte(s) sélectionné(s)`"
+        :aria-label="t('common.bulkActionsAriaLabel', { count })"
       >
         <span class="bulk-action-bar__count">
           <IconCheck
             :size="16"
             :stroke-width="2.5"
           />
-          {{ count }} hôte{{ count > 1 ? 's' : '' }} sélectionné{{ count > 1 ? 's' : '' }}
+          {{ t('common.bulkSelectedCountLabel', { count }, count) }}
         </span>
 
         <div class="bulk-action-bar__actions">
@@ -22,7 +22,7 @@
         <button
           class="bulk-action-bar__close"
           type="button"
-          aria-label="Annuler la sélection"
+          :aria-label="t('common.bulkClearSelectionAriaLabel')"
           @click="$emit('clear')"
         >
           <IconX
@@ -36,7 +36,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { IconCheck, IconX } from '@tabler/icons-vue'
+
+const { t } = useI18n()
 
 defineProps<{ count: number }>()
 defineEmits<{ clear: [] }>()

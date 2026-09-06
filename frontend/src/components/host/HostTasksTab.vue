@@ -350,7 +350,7 @@ import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
 import { getExecutionStateClass } from '../../utils/statusClasses'
 import { commandStatusLabel } from '../../utils/commandStatus'
-import { SCHEDULED_TASK_MODULES, availableScheduledTaskModules, scheduledTaskActions, scheduledTaskTargetConfig } from '../../utils/scheduledTaskDispatch'
+import { scheduledTaskModules, availableScheduledTaskModules, scheduledTaskActions, scheduledTaskTargetConfig } from '../../utils/scheduledTaskDispatch'
 
 interface Task {
   id: string | number
@@ -447,7 +447,7 @@ const taskForm = ref<TaskForm>({ name: '', module: 'apt', action: 'update', targ
 const availableModules = computed(() => {
   const filtered = availableScheduledTaskModules(props.collectors)
   if (filtered.some((m) => m.value === taskForm.value.module)) return filtered
-  const current = SCHEDULED_TASK_MODULES.find((m) => m.value === taskForm.value.module)
+  const current = scheduledTaskModules().find((m) => m.value === taskForm.value.module)
   return current ? [...filtered, current] : filtered
 })
 

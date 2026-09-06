@@ -1,4 +1,5 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useHostsStore } from '../stores/hosts'
 import { addToast } from './useGlobalToast'
@@ -13,6 +14,7 @@ import type { ScheduledTaskWithHost, ScheduledTaskExecution } from '../types/tas
 import { getApiErrorMessage } from '../api/client'
 import { getExecutionStateClass } from '../utils/statusClasses'
 import { commandStatusLabel } from '../utils/commandStatus'
+import { i18n } from '../i18n'
 
 const DEFAULT_CRON = '0 3 * * *'
 const TASKS_REFRESH_SEC = 30
@@ -23,7 +25,7 @@ function emptyCreateForm() {
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return ''
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(i18n.global.locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 
 function statusBadge(status: string | undefined): string {
@@ -35,20 +37,21 @@ function durationSec(start: string, end: string): string {
   return (ms / 1000).toFixed(1)
 }
 
-function updatePayloadFor(t: ScheduledTaskWithHost, overrides: Partial<{ enabled: boolean }> = {}) {
+function updatePayloadFor(task: ScheduledTaskWithHost, overrides: Partial<{ enabled: boolean }> = {}) {
   return {
-    name: t.name,
-    module: t.module,
-    action: t.action,
-    target: t.target,
-    payload: t.payload,
-    cron_expression: t.cron_expression,
-    enabled: t.enabled,
+    name: task.name,
+    module: task.module,
+    action: task.action,
+    target: task.target,
+    payload: task.payload,
+    cron_expression: task.cron_expression,
+    enabled: task.enabled,
     ...overrides,
   }
 }
 
 export function useGlobalScheduledTasks() {
+  const { t } = useI18n()
   const auth = useAuthStore()
   const hostsStore = useHostsStore()
   const dialog = useConfirmDialog()
@@ -172,7 +175,7 @@ export function useGlobalScheduledTasks() {
   })
 
   const hostList = computed(() => {
-    const names = [...new Set(tasks.value.map((t) => t.host_name))]
+    const names = [...new Set(tasks.value.map((task) => task.host_name))]
     return names.sort((a, b) => a.localeCompare(b))
   })
 
@@ -204,9 +207,9 @@ export function useGlobalScheduledTasks() {
   })
 
   const allVisibleSelected = computed(() =>
-    filteredTasks.value.length > 0 && filteredTasks.value.every((t) => selectedIds.value.has(t.id))
+    filteredTasks.value.length > 0 && filteredTasks.value.every((task) => selectedIds.value.has(task.id))
   )
-  const selectedTasks = computed(() => filteredTasks.value.filter((t) => selectedIds.value.has(t.id)))
+  const selectedTasks = computed(() => filteredTasks.value.filter((task) => selectedIds.value.has(task.id)))
 
   function toggleSelected(id: string | number, checked: boolean): void {
     const next = new Set(selectedIds.value)
@@ -216,7 +219,7 @@ export function useGlobalScheduledTasks() {
   }
 
   function toggleSelectAll(checked: boolean): void {
-    selectedIds.value = checked ? new Set(filteredTasks.value.map((t) => t.id)) : new Set()
+    selectedIds.value = checked ? new Set(filteredTasks.value.map((task) => task.id)) : new Set()
   }
 
   function clearSelection(): void {
@@ -256,7 +259,7 @@ export function useGlobalScheduledTasks() {
       createModalOpen.value = false
       await loadTasks()
     } catch (e: unknown) {
-      createError.value = getApiErrorMessage(e, 'Erreur lors de la création')
+      createError.value = getApiErrorMessage(e, t('scheduledTasks.createTaskError'))
     } finally {
       createSaving.value = false
     }
@@ -286,7 +289,7 @@ export function useGlobalScheduledTasks() {
       editTask.value = null
       await loadTasks()
     } catch (e: unknown) {
-      editError.value = getApiErrorMessage(e, 'Erreur lors de la sauvegarde')
+      editError.value = getApiErrorMessage(e, t('scheduledTasks.saveTaskError'))
     } finally {
       editSaving.value = false
     }
@@ -294,8 +297,8 @@ export function useGlobalScheduledTasks() {
 
   async function confirmDelete(task: ScheduledTaskWithHost): Promise<void> {
     const ok = await dialog.confirm({
-      title: 'Supprimer la tâche',
-      message: `Supprimer « ${task.name} » sur ${task.host_name} ?`,
+      title: t('scheduledTasks.deleteTaskConfirmTitle'),
+      message: t('scheduledTasks.deleteTaskConfirmMessage', { name: task.name, host: task.host_name }),
       variant: 'danger',
     })
     if (!ok) return
@@ -303,7 +306,7 @@ export function useGlobalScheduledTasks() {
       await api.deleteScheduledTask(task.id)
       await loadTasks()
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Erreur lors de la suppression')
+      error.value = getApiErrorMessage(e, t('scheduledTasks.deleteTaskError'))
     }
   }
 
@@ -316,7 +319,7 @@ export function useGlobalScheduledTasks() {
       const { data } = await api.getScheduledTaskExecutions(String(task.id), 20)
       executions.value = data
     } catch (e: unknown) {
-      historyError.value = getApiErrorMessage(e, 'Erreur de chargement')
+      historyError.value = getApiErrorMessage(e, t('scheduledTasks.loadErrorGeneric'))
     } finally {
       historyLoading.value = false
     }
@@ -330,7 +333,7 @@ export function useGlobalScheduledTasks() {
       tasks.value = data
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Erreur de chargement')
+      error.value = getApiErrorMessage(e, t('scheduledTasks.loadErrorGeneric'))
     } finally {
       loading.value = false
     }
@@ -352,8 +355,10 @@ export function useGlobalScheduledTasks() {
   async function toggleTask(task: ScheduledTaskWithHost): Promise<void> {
     const enabling = !task.enabled
     const ok = await dialog.confirm({
-      title: enabling ? 'Activer la tâche' : 'Désactiver la tâche',
-      message: `Voulez-vous ${enabling ? 'activer' : 'désactiver'} « ${task.name} » sur ${task.host_name} ?`,
+      title: enabling ? t('scheduledTasks.enableTaskConfirmTitle') : t('scheduledTasks.disableTaskConfirmTitle'),
+      message: enabling
+        ? t('scheduledTasks.enableTaskConfirmMessage', { name: task.name, host: task.host_name })
+        : t('scheduledTasks.disableTaskConfirmMessage', { name: task.name, host: task.host_name }),
       variant: 'warning',
     })
     if (!ok) return
@@ -361,7 +366,7 @@ export function useGlobalScheduledTasks() {
       await api.updateScheduledTask(task.id, updatePayloadFor(task, { enabled: enabling }))
       await loadTasks()
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Erreur')
+      error.value = getApiErrorMessage(e, t('common.error'))
     }
   }
 
@@ -369,12 +374,12 @@ export function useGlobalScheduledTasks() {
     runningId.value = task.id
     try {
       const { data } = await api.runScheduledTask(String(task.id))
-      addToast(`${task.name} déclenchée — commande ${data.command_id}`, 'success')
+      addToast(t('scheduledTasks.taskTriggeredToast', { name: task.name, id: data.command_id }), 'success')
       await loadTasks()
       await pendingCommand.track(data.command_id)
       await loadTasks()
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Erreur')
+      error.value = getApiErrorMessage(e, t('common.error'))
     } finally {
       runningId.value = null
     }
@@ -385,7 +390,7 @@ export function useGlobalScheduledTasks() {
   async function runBulk(
     items: ScheduledTaskWithHost[],
     verb: string,
-    action: (t: ScheduledTaskWithHost) => Promise<unknown>
+    action: (task: ScheduledTaskWithHost) => Promise<unknown>
   ): Promise<void> {
     if (!items.length || bulkLoading.value) return
     const ok = await confirmBulkAction(verb, items.length)
@@ -397,9 +402,9 @@ export function useGlobalScheduledTasks() {
       const succeeded = results.filter((r) => r.status === 'fulfilled').length
       const failed = results.length - succeeded
       if (failed === 0) {
-        addToast(`${succeeded} tâche${succeeded > 1 ? 's' : ''} traitée${succeeded > 1 ? 's' : ''}`, 'success')
+        addToast(t('scheduledTasks.tasksProcessedToast', { count: succeeded }, succeeded), 'success')
       } else {
-        addToast(`${succeeded} traitée(s), ${failed} échec(s)`, failed === results.length ? 'error' : 'warning', 6000)
+        addToast(t('scheduledTasks.partialResultToast', { succeeded, failed }), failed === results.length ? 'error' : 'warning', 6000)
       }
     } finally {
       bulkLoading.value = false
@@ -408,21 +413,21 @@ export function useGlobalScheduledTasks() {
   }
 
   async function handleBulkEnable(items: ScheduledTaskWithHost[]): Promise<void> {
-    await runBulk(items.filter((t) => !isManualOnly(t)), 'Activer', (t) =>
-      api.updateScheduledTask(t.id, updatePayloadFor(t, { enabled: true })))
+    await runBulk(items.filter((task) => !isManualOnly(task)), t('scheduledTasks.enableVerb'), (task) =>
+      api.updateScheduledTask(task.id, updatePayloadFor(task, { enabled: true })))
   }
 
   async function handleBulkDisable(items: ScheduledTaskWithHost[]): Promise<void> {
-    await runBulk(items.filter((t) => !isManualOnly(t)), 'Désactiver', (t) =>
-      api.updateScheduledTask(t.id, updatePayloadFor(t, { enabled: false })))
+    await runBulk(items.filter((task) => !isManualOnly(task)), t('scheduledTasks.disableVerb'), (task) =>
+      api.updateScheduledTask(task.id, updatePayloadFor(task, { enabled: false })))
   }
 
   async function handleBulkDelete(items: ScheduledTaskWithHost[]): Promise<void> {
-    await runBulk(items, 'Supprimer', (t) => api.deleteScheduledTask(t.id))
+    await runBulk(items, t('scheduledTasks.deleteVerb'), (task) => api.deleteScheduledTask(task.id))
   }
 
   async function handleBulkRun(items: ScheduledTaskWithHost[]): Promise<void> {
-    await runBulk(items, 'Exécuter', (t) => api.runScheduledTask(String(t.id)))
+    await runBulk(items, t('scheduledTasks.runVerb'), (task) => api.runScheduledTask(String(task.id)))
   }
 
   onMounted(() => {

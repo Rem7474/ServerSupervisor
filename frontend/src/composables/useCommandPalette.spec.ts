@@ -7,6 +7,7 @@ vi.mock('vue-router', () => ({
 }))
 
 import { useAuthStore } from '../stores/auth'
+import { useAlertRulesStore } from '../stores/alertRules'
 import { useCommandPalette } from './useCommandPalette'
 import type { PaletteResult } from './useCommandPalette'
 import { setLocale } from '../i18n'
@@ -54,5 +55,30 @@ describe('useCommandPalette — nav results', () => {
     query.value = 'docker'
     expect(results.value.some((r: PaletteResult) => r.to === '/docker')).toBe(true)
     expect(results.value.some((r: PaletteResult) => r.to === '/')).toBe(false)
+  })
+
+  it('uses a stable, non-French group key for nav results', () => {
+    const { query, results } = mountPalette('admin')
+    query.value = ''
+    const dashboard = results.value.find((r: PaletteResult) => r.to === '/')
+    expect(dashboard?.group).toBe('navigation')
+  })
+})
+
+describe('useCommandPalette — alert results', () => {
+  it('translates the disabled-rule sublabel through the active locale', () => {
+    const { query, results } = mountPalette('admin')
+    const alertRulesStore = useAlertRulesStore()
+    alertRulesStore.rules = [
+      { id: '1', name: 'CPU haut', metric: 'cpu_percent', enabled: false } as never,
+    ]
+    query.value = 'cpu'
+    const rule = results.value.find((r: PaletteResult) => r.key === 'alert-rule:1')
+    expect(rule?.group).toBe('alerts')
+    expect(rule?.sublabel).toBe('Désactivée')
+
+    setLocale('en')
+    const ruleEn = results.value.find((r: PaletteResult) => r.key === 'alert-rule:1')
+    expect(ruleEn?.sublabel).toBe('Disabled')
   })
 })

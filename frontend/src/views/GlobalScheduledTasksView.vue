@@ -2,7 +2,7 @@
   <div>
     <PageRefreshBar
       v-model="autoRefresh"
-      label="Tâches planifiées"
+      :label="t('scheduledTasks.pageTitle')"
       :interval-sec="TASKS_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />
@@ -14,13 +14,13 @@
               to="/"
               class="text-decoration-none"
             >
-              Dashboard
+              {{ t('scheduledTasks.dashboardBreadcrumb') }}
             </router-link>
             <span class="text-muted mx-1">/</span>
-            <span>Tâches planifiées</span>
+            <span>{{ t('scheduledTasks.pageTitle') }}</span>
           </div>
           <h2 class="page-title">
-            Tâches planifiées
+            {{ t('scheduledTasks.pageTitle') }}
           </h2>
         </div>
         <div class="d-flex gap-2">
@@ -30,7 +30,7 @@
             class="btn btn-primary btn-sm"
             @click="openCreate"
           >
-            + Nouvelle tâche
+            {{ t('scheduledTasks.newTaskButton') }}
           </button>
         </div>
       </div>
@@ -39,13 +39,12 @@
     <DataToolbar
       searchable
       :search="filterText"
-      search-placeholder="Rechercher une tâche…"
+      :search-placeholder="t('scheduledTasks.searchPlaceholder')"
       @update:search="filterText = $event"
     >
       <template #right>
         <span class="text-muted small">
-          {{ filteredTasks.length }}&thinsp;/&thinsp;{{ tasks.length }}
-          tâche{{ tasks.length !== 1 ? 's' : '' }}
+          {{ t('scheduledTasks.taskCountLabel', { filtered: filteredTasks.length, total: tasks.length }, tasks.length) }}
         </span>
       </template>
       <template #bottom>
@@ -55,7 +54,7 @@
             class="form-select form-select-sm tasks-filter-select"
           >
             <option value="">
-              Tous les hôtes
+              {{ t('scheduledTasks.allHostsOption') }}
             </option>
             <option
               v-for="host in hostList"
@@ -70,7 +69,7 @@
             class="form-select form-select-sm tasks-filter-select"
           >
             <option value="">
-              Tous les modules
+              {{ t('scheduledTasks.allModulesOption') }}
             </option>
             <option value="apt">
               apt
@@ -99,19 +98,19 @@
             class="form-select form-select-sm tasks-filter-select"
           >
             <option value="">
-              Tous les statuts
+              {{ t('scheduledTasks.allStatusesOption') }}
             </option>
             <option value="enabled">
-              Activées
+              {{ t('scheduledTasks.enabledStatusOption') }}
             </option>
             <option value="disabled">
-              Désactivées
+              {{ t('scheduledTasks.disabledStatusOption') }}
             </option>
             <option value="manual">
-              Manuelles
+              {{ t('scheduledTasks.manualStatusOption') }}
             </option>
             <option value="failed">
-              En échec
+              {{ t('scheduledTasks.failedStatusOption') }}
             </option>
           </select>
         </div>
@@ -138,8 +137,8 @@
       >
         <EmptyState
           :icon="IconClock"
-          title="Aucune tâche trouvée"
-          :subtitle="tasks.length ? 'Modifiez vos filtres.' : canManage ? 'Cliquez sur « Nouvelle tâche » pour commencer.' : 'Aucune tâche configurée.'"
+          :title="t('scheduledTasks.noTaskFoundTitle')"
+          :subtitle="tasks.length ? t('scheduledTasks.adjustFiltersHint') : canManage ? t('scheduledTasks.clickNewTaskHint') : t('scheduledTasks.noTaskConfiguredHint')"
         />
       </div>
       <div
@@ -158,14 +157,14 @@
                     class="form-check-input"
                     type="checkbox"
                     :checked="allVisibleSelected"
-                    aria-label="Sélectionner toutes les tâches affichées"
+                    :aria-label="t('scheduledTasks.selectAllVisibleAriaLabel')"
                     @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
                   >
                 </label>
               </th>
               <th>
                 <SortableHeader
-                  label="Hôte"
+                  :label="t('scheduledTasks.hostColumn')"
                   :active="sortKey === 'host_name'"
                   :direction="sortDir"
                   @toggle="toggleSort('host_name')"
@@ -173,18 +172,18 @@
               </th>
               <th>
                 <SortableHeader
-                  label="Nom"
+                  :label="t('scheduledTasks.nameColumn')"
                   :active="sortKey === 'name'"
                   :direction="sortDir"
                   @toggle="toggleSort('name')"
                 />
               </th>
               <th class="d-none d-sm-table-cell">
-                Module / Action
+                {{ t('scheduledTasks.moduleActionColumn') }}
               </th>
               <th class="d-none d-md-table-cell">
                 <SortableHeader
-                  label="Planification"
+                  :label="t('common.dispatchSchedulingLabel')"
                   :active="sortKey === 'next_run_at'"
                   :direction="sortDir"
                   @toggle="toggleSort('next_run_at')"
@@ -192,13 +191,13 @@
               </th>
               <th class="d-none d-md-table-cell">
                 <SortableHeader
-                  label="Dernier résultat"
+                  :label="t('scheduledTasks.lastResultColumn')"
                   :active="sortKey === 'last_run_at'"
                   :direction="sortDir"
                   @toggle="toggleSort('last_run_at')"
                 />
               </th>
-              <th>Activée</th>
+              <th>{{ t('scheduledTasks.enabledColumn') }}</th>
               <th />
             </tr>
           </thead>
@@ -214,7 +213,7 @@
                     class="form-check-input"
                     type="checkbox"
                     :checked="selectedIds.has(task.id)"
-                    :aria-label="`Sélectionner ${task.name}`"
+                    :aria-label="t('scheduledTasks.selectTaskAriaLabel', { name: task.name })"
                     @change="toggleSelected(task.id, ($event.target as HTMLInputElement).checked)"
                   >
                 </label>
@@ -240,7 +239,7 @@
                 <span
                   v-if="isManualOnly(task)"
                   class="badge bg-secondary-lt text-secondary"
-                >Manuel</span>
+                >{{ t('scheduledTasks.manualBadge') }}</span>
                 <template v-else>
                   <code class="small">{{ task.cron_expression }}</code>
                   <div
@@ -253,7 +252,7 @@
                     v-if="task.next_run_at"
                     class="text-primary small"
                   >
-                    → {{ formatDate(task.next_run_at) }}
+                    {{ t('scheduledTasks.nextRunArrowLabel', { date: formatDate(task.next_run_at) }) }}
                   </div>
                 </template>
               </td>
@@ -271,7 +270,7 @@
                 <span
                   v-else
                   class="text-muted"
-                >jamais</span>
+                >{{ t('scheduledTasks.neverRunLabel') }}</span>
               </td>
               <td>
                 <span
@@ -283,7 +282,7 @@
                   class="badge"
                   :class="task.enabled ? 'bg-success-lt' : 'bg-secondary-lt'"
                 >
-                  {{ task.enabled ? 'Oui' : 'Non' }}
+                  {{ task.enabled ? t('scheduledTasks.yesWord') : t('scheduledTasks.noWord') }}
                 </span>
                 <input
                   v-else
@@ -298,7 +297,7 @@
                   <button
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Historique d'exécutions"
+                    :title="t('scheduledTasks.executionHistoryTooltip')"
                     @click="openHistory(task)"
                   >
                     <IconClock
@@ -311,8 +310,8 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="runningId === task.id"
-                    title="Exécuter"
-                    aria-label="Exécuter la tâche maintenant"
+                    :title="t('scheduledTasks.runNowButton')"
+                    :aria-label="t('scheduledTasks.runTaskNowAriaLabel')"
                     @click="runNow(task)"
                   >
                     <span
@@ -329,7 +328,7 @@
                     v-if="canManage"
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
-                    title="Modifier"
+                    :title="t('scheduledTasks.editButton')"
                     @click="openEdit(task)"
                   >
                     <IconPencil
@@ -341,7 +340,7 @@
                     v-if="canManage"
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-danger"
-                    title="Supprimer"
+                    :title="t('scheduledTasks.deleteButton')"
                     @click="confirmDelete(task)"
                   >
                     <IconTrash
@@ -367,7 +366,7 @@
         :disabled="bulkLoading"
         @click="handleBulkEnable(selectedTasks)"
       >
-        Activer
+        {{ t('scheduledTasks.enableButton') }}
       </button>
       <button
         type="button"
@@ -375,7 +374,7 @@
         :disabled="bulkLoading"
         @click="handleBulkDisable(selectedTasks)"
       >
-        Désactiver
+        {{ t('scheduledTasks.disableButton') }}
       </button>
       <button
         type="button"
@@ -383,7 +382,7 @@
         :disabled="bulkLoading"
         @click="handleBulkRun(selectedTasks)"
       >
-        Exécuter
+        {{ t('scheduledTasks.runNowButton') }}
       </button>
       <button
         type="button"
@@ -391,7 +390,7 @@
         :disabled="bulkLoading"
         @click="handleBulkDelete(selectedTasks)"
       >
-        Supprimer
+        {{ t('scheduledTasks.deleteButton') }}
       </button>
     </BulkActionBar>
 
@@ -407,7 +406,7 @@
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">
-                Nouvelle tâche planifiée
+                {{ t('scheduledTasks.newScheduledTaskTitle') }}
               </h5>
               <button
                 type="button"
@@ -425,12 +424,12 @@
                 </div>
                 <div class="row g-3">
                   <div class="col-md-6">
-                    <label class="form-label required">Nom</label>
+                    <label class="form-label required">{{ t('scheduledTasks.nameColumn') }}</label>
                     <input
                       v-model="createForm.name"
                       type="text"
                       class="form-control"
-                      placeholder="Ex: Mise à jour quotidienne"
+                      :placeholder="t('scheduledTasks.namePlaceholder')"
                       required
                     >
                   </div>
@@ -454,7 +453,7 @@
                         type="checkbox"
                         class="form-check-input"
                       >
-                      <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
+                      <span class="form-check-label">{{ t('scheduledTasks.manualOnlyLabel') }}</span>
                     </label>
                   </div>
                   <div
@@ -462,7 +461,7 @@
                     class="col-12"
                   >
                     <div class="form-hint text-primary">
-                      → prochain : {{ formatDate(createNextRun?.toISOString()) }}
+                      {{ t('scheduledTasks.nextRunLabel', { date: formatDate(createNextRun?.toISOString()) }) }}
                     </div>
                   </div>
                   <div
@@ -475,7 +474,7 @@
                         type="checkbox"
                         class="form-check-input"
                       >
-                      <span class="form-check-label">Activée (planifiée automatiquement)</span>
+                      <span class="form-check-label">{{ t('scheduledTasks.enabledAutoScheduledLabel') }}</span>
                     </label>
                   </div>
                 </div>
@@ -487,7 +486,7 @@
                   :disabled="createSaving"
                   @click="createModalOpen = false"
                 >
-                  Annuler
+                  {{ t('common.cancel') }}
                 </button>
                 <button
                   type="submit"
@@ -498,7 +497,7 @@
                     v-if="createSaving"
                     class="spinner-border spinner-border-sm me-1"
                   />
-                  Créer la tâche
+                  {{ t('scheduledTasks.createTaskButton') }}
                 </button>
               </div>
             </form>
@@ -520,7 +519,7 @@
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">
-                Modifier la tâche
+                {{ t('scheduledTasks.editTaskTitle') }}
               </h5>
               <button
                 type="button"
@@ -530,7 +529,7 @@
             </div>
             <div class="modal-body">
               <div class="mb-3">
-                <label class="form-label">Nom</label>
+                <label class="form-label">{{ t('scheduledTasks.nameColumn') }}</label>
                 <input
                   v-model="editForm.name"
                   type="text"
@@ -547,19 +546,19 @@
                 <label
                   class="form-check-label"
                   for="editManualOnly"
-                >Exécution manuelle uniquement (pas de planification automatique)</label>
+                >{{ t('scheduledTasks.manualOnlyLabel') }}</label>
               </div>
               <div
                 v-if="!editManualOnly"
                 class="mb-3"
               >
-                <label class="form-label">Planification</label>
+                <label class="form-label">{{ t('common.dispatchSchedulingLabel') }}</label>
                 <CronBuilder v-model="editForm.cron_expression" />
                 <div
                   v-if="editNextRun"
                   class="form-hint text-primary"
                 >
-                  → prochain : {{ formatDate(editNextRun?.toISOString()) }}
+                  {{ t('scheduledTasks.nextRunLabel', { date: formatDate(editNextRun?.toISOString()) }) }}
                 </div>
               </div>
               <div
@@ -575,7 +574,7 @@
                 <label
                   class="form-check-label"
                   for="editEnabled"
-                >Activée</label>
+                >{{ t('scheduledTasks.enabledColumn') }}</label>
               </div>
               <div
                 v-if="editError"
@@ -590,7 +589,7 @@
                 class="btn btn-secondary"
                 @click="editTask = null"
               >
-                Annuler
+                {{ t('common.cancel') }}
               </button>
               <button
                 type="button"
@@ -602,7 +601,7 @@
                   v-if="editSaving"
                   class="spinner-border spinner-border-sm me-1"
                 />
-                Enregistrer
+                {{ t('common.save') }}
               </button>
             </div>
           </div>
@@ -624,7 +623,7 @@
             <div class="modal-header">
               <div>
                 <h5 class="modal-title mb-0">
-                  Historique d'exécutions
+                  {{ t('scheduledTasks.executionHistoryTooltip') }}
                 </h5>
                 <div class="text-muted small mt-1">
                   <span class="badge bg-blue-lt me-1">{{ historyTask.module }}</span>
@@ -650,16 +649,16 @@
               </div>
               <EmptyState
                 v-else-if="!executions.length"
-                title="Aucune exécution enregistrée pour cette tâche."
+                :title="t('scheduledTasks.noExecutionForTaskTitle')"
               />
               <div v-else>
                 <table class="table table-vcenter table-hover mb-0">
                   <thead>
                     <tr>
                       <th>Date</th>
-                      <th>Statut</th>
-                      <th>Durée</th>
-                      <th>Déclenché par</th>
+                      <th>{{ t('common.status') }}</th>
+                      <th>{{ t('scheduledTasks.durationColumn') }}</th>
+                      <th>{{ t('scheduledTasks.triggeredByColumn') }}</th>
                       <th class="text-end" />
                     </tr>
                   </thead>
@@ -686,8 +685,8 @@
                         <button
                           type="button"
                           class="btn btn-icon btn-sm btn-ghost-secondary"
-                          title="Voir les logs"
-                          aria-label="Voir les logs"
+                          :title="t('scheduledTasks.viewLogsTooltip')"
+                          :aria-label="t('scheduledTasks.viewLogsTooltip')"
                           @click="watchExecution(historyTask, ex)"
                         >
                           <IconList
@@ -702,13 +701,13 @@
               </div>
             </div>
             <div class="modal-footer">
-              <span class="text-muted small me-auto">{{ executions.length }} exécution{{ executions.length !== 1 ? 's' : '' }} (20 dernières)</span>
+              <span class="text-muted small me-auto">{{ t('scheduledTasks.executionCountLabel', { n: executions.length }, executions.length) }}</span>
               <button
                 type="button"
                 class="btn btn-secondary"
                 @click="historyTask = null"
               >
-                Fermer
+                {{ t('common.close') }}
               </button>
             </div>
           </div>
@@ -720,8 +719,8 @@
     <CommandLogPanel
       :command="(liveCommand as any)"
       :show="showConsole"
-      title="Logs de l'exécution"
-      empty-text="Aucune console active"
+      :title="t('scheduledTasks.executionLogsTitle')"
+      :empty-text="t('scheduledTasks.noActiveConsoleTitle')"
       wrapper-class="side-panel"
       @open="showConsole = true"
       @close="closeExecutionConsole"
@@ -731,6 +730,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconClock, IconList, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
@@ -744,6 +744,8 @@ import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { availableScheduledTaskModules, scheduledTaskActions, scheduledTaskTargetConfig } from '../utils/scheduledTaskDispatch'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 import { useModalChrome } from '../composables/useModalChrome'
+
+const { t } = useI18n()
 
 const {
   hostsStore,
@@ -821,7 +823,7 @@ useModalChrome(historyModalRef, () => !!historyTask.value, { onClose: () => { hi
 // The scheduled-task-specific module list/actions/target config live in
 // utils/scheduledTaskDispatch.ts, shared with HostTasksTab.vue's per-host
 // editor so both stay in sync (see that file's doc comment for why restic
-// is scoped here rather than to the shared DISPATCH_MODULES). Narrowed to
+// is scoped here rather than to the shared dispatchModules()). Narrowed to
 // whichever modules the selected host's agent actually reports as active
 // (collectors) — a host with e.g. collect_docker off shouldn't offer it.
 const scheduledTaskModules = computed(() => {

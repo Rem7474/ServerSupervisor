@@ -24,7 +24,7 @@ export function useRelativeTime(dateInput: RelativeDateInput, updateInterval: nu
   }
 
   function updateRelativeTime(): void {
-    relativeText.value = formatRelativeTime(resolveDate(), 'Jamais', true)
+    relativeText.value = formatRelativeTime(resolveDate(), undefined, true)
   }
 
   onMounted(() => {
@@ -43,5 +43,5 @@ export function useRelativeTime(dateInput: RelativeDateInput, updateInterval: nu
  * Utility function to format a date without reactivity.
  */
 export function formatRelativeTimeStatic(date: string | Date | null | undefined): string {
-  return formatRelativeTime(date, 'Jamais', true)
+  return formatRelativeTime(date, undefined, true)
 }

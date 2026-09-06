@@ -13,7 +13,7 @@ const props = defineProps({
   }
 })
 
-// Créer une fonction computed pour que la date soit réactive
+// Wrap in a computed so the date stays reactive
 const dateGetter = computed(() => props.date)
 const relativeTime = useRelativeTime(dateGetter)
 </script>

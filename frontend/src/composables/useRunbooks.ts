@@ -3,6 +3,7 @@ import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { useHostsStore } from '../stores/hosts'
 import { useCommandStream } from './useCommandStream'
+import { i18n } from '../i18n'
 import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
 import type { Runbook, RunbookCreate, RunbookStepCreate, RunbookExecution, RunbookExecutionStep } from '../types/generated'
 import type { DispatchOption } from '../utils/dispatchStep'
@@ -13,12 +14,20 @@ function isRunbookTerminal(status: string | undefined): boolean {
   return status === 'completed' || status === 'failed'
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  logs: 'Voir les logs', restart: 'Redémarrer', start: 'Démarrer', stop: 'Arrêter',
-  compose_up: 'Compose up', compose_down: 'Compose down', compose_pull: 'Mettre à jour les images',
-  compose_logs: 'Voir les logs Compose', compose_restart: 'Redémarrer (Compose)',
-  update: 'apt update', upgrade: 'apt upgrade', 'full-upgrade': 'apt full-upgrade', autoremove: 'apt autoremove',
-  status: 'Statut', list: 'Lister', read: 'Lire', run: 'Exécuter',
+// A function (not a static Record) so labels re-resolve on every call — a
+// locale switch would otherwise leave these frozen in whichever language was
+// active when this module first loaded, same reasoning as moduleMeta.ts.
+function actionLabels(): Record<string, string> {
+  const { t } = i18n.global
+  return {
+    logs: t('runbooks.logsActionLabel'), restart: t('runbooks.restartActionLabel'),
+    start: t('runbooks.startActionLabel'), stop: t('runbooks.stopActionLabel'),
+    compose_up: 'Compose up', compose_down: 'Compose down', compose_pull: t('runbooks.composePullActionLabel'),
+    compose_logs: t('runbooks.composeLogsActionLabel'), compose_restart: t('runbooks.composeRestartActionLabel'),
+    update: 'apt update', upgrade: 'apt upgrade', 'full-upgrade': 'apt full-upgrade', autoremove: 'apt autoremove',
+    status: t('runbooks.statusActionLabel'), list: t('runbooks.listActionLabel'),
+    read: t('runbooks.readActionLabel'), run: t('runbooks.runActionLabel'),
+  }
 }
 
 const MODULE_ACTIONS: Record<string, string[]> = {
@@ -34,7 +43,8 @@ const MODULES_REQUIRING_TARGET = new Set(['journal', 'systemd', 'custom'])
 
 export function actionsForModule(module: string): DispatchOption[] {
   const actions = MODULE_ACTIONS[module] || []
-  return actions.map((value) => ({ value, label: ACTION_LABELS[value] || value }))
+  const labels = actionLabels()
+  return actions.map((value) => ({ value, label: labels[value] || value }))
 }
 
 export function moduleRequiresTarget(module: string): boolean {
