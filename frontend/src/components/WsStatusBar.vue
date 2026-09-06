@@ -10,12 +10,7 @@
       role="status"
     />
     <span>
-      Reconnexion en cours
-      <span
-        v-if="retryCount > 1"
-        class="text-secondary ms-1"
-      >(tentative {{ retryCount }})</span>
-      …
+      {{ t('common.wsReconnectingLabel', { attempt: retryCount > 1 ? t('common.wsRetryAttemptLabel', { n: retryCount }) : '' }) }}
     </span>
   </div>
 
@@ -28,7 +23,7 @@
       class="spinner-border spinner-border-sm flex-shrink-0"
       role="status"
     />
-    <span>Connexion au serveur…</span>
+    <span>{{ t('common.wsConnectingToServerLabel') }}</span>
   </div>
 
   <div
@@ -43,11 +38,11 @@
         class="flex-shrink-0"
       />
       <span>
-        <strong>Erreur WebSocket</strong>
+        <strong>{{ t('common.wsErrorTitle') }}</strong>
         <span
           v-if="error"
           class="ms-1"
-        >— {{ error }}</span>
+        >{{ t('common.wsErrorDetailLabel', { error }) }}</span>
       </span>
     </div>
     <button
@@ -55,7 +50,7 @@
       class="btn btn-sm btn-danger"
       @click="$emit('reconnect')"
     >
-      Réessayer
+      {{ t('common.retry') }}
     </button>
   </div>
 
@@ -70,13 +65,13 @@
         class="flex-shrink-0 icon icon-sm"
       />
       <span class="flex-grow-1">
-        <strong>Données actualisées</strong>
-        <span class="ms-1">après reconnexion</span>
+        <strong>{{ t('common.wsDataRefreshedTitle') }}</strong>
+        <span class="ms-1">{{ t('common.wsAfterReconnectLabel') }}</span>
       </span>
       <button
         type="button"
         class="btn-close"
-        aria-label="Fermer l'alerte de fraîcheur"
+        :aria-label="t('common.wsCloseStaleAlertAriaLabel')"
         @click="$emit('dismiss-stale-alert')"
       />
     </div>
@@ -84,7 +79,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle, IconBroadcast } from '@tabler/icons-vue'
+
+const { t } = useI18n()
 
 withDefaults(defineProps<{
   status: string

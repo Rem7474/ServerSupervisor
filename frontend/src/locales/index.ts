@@ -12,6 +12,8 @@ import frNav from './fr/nav.json'
 import frNetwork from './fr/network.json'
 import frNpm from './fr/npm.json'
 import frProxmox from './fr/proxmox.json'
+import frRunbooks from './fr/runbooks.json'
+import frScheduledTasks from './fr/scheduledTasks.json'
 import frSecurity from './fr/security.json'
 import frSettings from './fr/settings.json'
 import frWebhooks from './fr/webhooks.json'
@@ -30,6 +32,8 @@ import enNav from './en/nav.json'
 import enNetwork from './en/network.json'
 import enNpm from './en/npm.json'
 import enProxmox from './en/proxmox.json'
+import enRunbooks from './en/runbooks.json'
+import enScheduledTasks from './en/scheduledTasks.json'
 import enSecurity from './en/security.json'
 import enSettings from './en/settings.json'
 import enWebhooks from './en/webhooks.json'
@@ -49,6 +53,8 @@ export const fr = {
   apt: frApt,
   host: frHost,
   monitoring: frMonitoring,
+  runbooks: frRunbooks,
+  scheduledTasks: frScheduledTasks,
   security: frSecurity,
   webhooks: frWebhooks,
   errors: frErrors,
@@ -69,6 +75,8 @@ export const en = {
   apt: enApt,
   host: enHost,
   monitoring: enMonitoring,
+  runbooks: enRunbooks,
+  scheduledTasks: enScheduledTasks,
   security: enSecurity,
   webhooks: enWebhooks,
   errors: enErrors,
