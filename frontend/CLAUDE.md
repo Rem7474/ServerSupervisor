@@ -35,7 +35,7 @@ Four stores, each with a `stores/*.spec.ts` — update the matching spec when yo
 - Don't add a new Axios call inline in a view — add it to the domain's `api/<domain>.ts` module and call it from a composable.
 - Don't hand-edit `types/generated.ts`.
 - Don't open a second WebSocket connection to an endpoint another composable already subscribes to (e.g. `useNotifications` for `/api/v1/ws/notifications`) — share the existing connection instead of instantiating `useWebSocket` again.
-- i18n isn't set up (hardcoded French strings, `<html lang="fr">`, no `vue-i18n`) — don't half-introduce it for one component; that's a project-wide decision, not a local one.
+- Don't hardcode a user-facing string. Every one goes through `vue-i18n` (`t('<namespace>.<key>')`) with the text in **both** `src/locales/fr/*.json` and `src/locales/en/*.json` — `npm run lint:i18n` fails the build on hardcoded French in any `.vue` or `.ts` file, and `src/locales/locales.spec.ts` fails on a key present in one language but not the other.
 
 ## Design system
 
@@ -108,4 +108,8 @@ Destructive confirmation: `useConfirmDialog()` (a module-level singleton, `Confi
 
 ### Copy
 
-French, accented, sentence case, `…` (real ellipsis character, not three dots). Action labels are infinitive verbs. Don't half-introduce i18n for one component (see the "Don't" list above).
+All user-facing copy lives in `src/locales/{fr,en}/*.json`, keyed `<namespace>.<camelCaseKey>` — never inline in a template or a `.ts` toast/dialog. Both languages are required for every key.
+
+French copy is accented, sentence case, `…` (real ellipsis character, not three dots); action labels are infinitive verbs (`Supprimer`, not `SUPPRIMER`). English copy is sentence case too, with an imperative verb (`Delete`).
+
+Anything shown with a count uses a pluralized message (`'{count} hôte | {count} hôtes'`) and passes the count as the third `t()` argument, not string concatenation — French puts 0 in the singular, English does not, and `src/i18n.ts` carries the CLDR rule that makes that work. Dates, numbers and sort order go through `utils/formatters.ts`, never a hardcoded `'fr-FR'`.
