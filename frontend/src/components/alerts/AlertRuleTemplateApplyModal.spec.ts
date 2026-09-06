@@ -43,7 +43,8 @@ describe('AlertRuleTemplateApplyModal', () => {
 
   it('pluralizes the selected-hosts count and disables Apply until at least one is checked', async () => {
     const wrapper = mount(AlertRuleTemplateApplyModal, { props: { visible: true, template, hosts } })
-    expect(wrapper.text()).toContain('0 hôtes sélectionnés')
+    // French puts 0 in the singular category (CLDR `one` covers i = 0 and 1).
+    expect(wrapper.text()).toContain('0 hôte sélectionné')
     const applyButton = wrapper.findAll('button').find((b) => b.text() === 'Appliquer')
     expect(applyButton?.attributes('disabled')).toBeDefined()
 

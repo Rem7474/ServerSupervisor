@@ -86,7 +86,7 @@ func (s *Service) List(ctx context.Context) ([]models.AlertRule, error) {
 func (s *Service) Get(ctx context.Context, id int64) (*models.AlertRule, error) {
 	rule, err := s.repo.GetAlertRuleByID(ctx, id)
 	if err == sql.ErrNoRows {
-		return nil, apperr.NotFound("Alert rule not found")
+		return nil, apperr.NotFound("alert rule not found").I18n(apperr.CodeAlertRuleNotFound, nil)
 	}
 	if err != nil {
 		return nil, err
@@ -149,14 +149,14 @@ func (s *Service) Create(ctx context.Context, req models.AlertRuleCreate) (*mode
 func (s *Service) Update(ctx context.Context, id int64, req models.AlertRuleUpdate) error {
 	existing, err := s.repo.GetAlertRuleByID(ctx, id)
 	if err == sql.ErrNoRows {
-		return apperr.NotFound("Regle d'alerte introuvable.")
+		return apperr.NotFound("alert rule not found").I18n(apperr.CodeAlertRuleNotFound, nil)
 	}
 	if err != nil {
 		return err
 	}
 
 	if req.SourceType != nil && *req.SourceType != existing.SourceType {
-		return apperr.Validation("Le changement de source_type n'est pas autorise.")
+		return apperr.Validation("changing source_type is not allowed").I18n(apperr.CodeAlertSourceTypeImmutable, nil)
 	}
 
 	next := *existing
@@ -223,7 +223,7 @@ func (s *Service) Update(ctx context.Context, id int64, req models.AlertRuleUpda
 
 	if req.Enabled != nil && !next.Enabled {
 		if _, err := s.repo.ResolveOpenAlertIncidentsByRule(ctx, next.ID); err != nil {
-			return apperr.Failed("Regle mise a jour, mais echec de resolution des incidents ouverts.")
+			return apperr.Failed("rule updated, but resolving its open incidents failed").I18n(apperr.CodeAlertIncidentResolveFailed, nil)
 		}
 	} else if s.resolveStale != nil {
 		// Thresholds/hysteresis may have changed: resolve any open incident whose
@@ -236,7 +236,7 @@ func (s *Service) Update(ctx context.Context, id int64, req models.AlertRuleUpda
 // Delete removes a rule, returning apperr.NotFound when it does not exist.
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if _, err := s.repo.GetAlertRuleByID(ctx, id); err == sql.ErrNoRows {
-		return apperr.NotFound("Regle d'alerte introuvable.")
+		return apperr.NotFound("alert rule not found").I18n(apperr.CodeAlertRuleNotFound, nil)
 	} else if err != nil {
 		return err
 	}
@@ -306,21 +306,21 @@ func (s *Service) validateScope(ctx context.Context, rule *models.AlertRule) err
 
 func (s *Service) validateDockerScope(ctx context.Context, scope *models.DockerMetricScope) error {
 	if scope == nil {
-		return apperr.Validation("Le scope Docker est requis.")
+		return apperr.Validation("a Docker scope is required").I18n(apperr.CodeAlertDockerScopeRequired, nil)
 	}
 	if ok, _ := s.repo.HostExists(ctx, scope.HostID); !ok {
-		return apperr.Validation("Hôte introuvable pour ce scope Docker.")
+		return apperr.Validation("host not found for this Docker scope").I18n(apperr.CodeAlertDockerHostNotFound, nil)
 	}
 	if scope.ScopeMode == "container" {
 		for _, id := range scope.EffectiveContainerIDs() {
 			if ok, _ := s.repo.DockerContainerExists(ctx, id, scope.HostID); !ok {
-				return apperr.Validation("Container Docker introuvable pour ce scope.")
+				return apperr.Validation("Docker container not found for this scope").I18n(apperr.CodeAlertDockerContainerNotFound, nil)
 			}
 		}
 	}
 	if scope.ScopeMode == "compose_project" && scope.ProjectName != "" {
 		if ok, _ := s.repo.ComposeProjectExists(ctx, scope.ProjectName, scope.HostID); !ok {
-			return apperr.Validation("Projet Compose introuvable pour ce scope.")
+			return apperr.Validation("Compose project not found for this scope").I18n(apperr.CodeAlertComposeProjectNotFound, nil)
 		}
 	}
 	return nil
@@ -328,28 +328,28 @@ func (s *Service) validateDockerScope(ctx context.Context, scope *models.DockerM
 
 func (s *Service) validateProxmoxScope(ctx context.Context, scope *models.ProxmoxMetricScope) error {
 	if scope == nil {
-		return apperr.Validation("Le scope Proxmox est requis.")
+		return apperr.Validation("a Proxmox scope is required").I18n(apperr.CodeAlertProxmoxScopeRequired, nil)
 	}
 	switch scope.ScopeMode {
 	case "connection":
 		if ok, _ := s.repo.ProxmoxConnectionExists(ctx, scope.ConnectionID); !ok {
-			return apperr.Validation("Connexion Proxmox introuvable pour ce scope.")
+			return apperr.Validation("Proxmox connection not found for this scope").I18n(apperr.CodeAlertProxmoxConnNotFound, nil)
 		}
 	case "node":
 		if ok, _ := s.repo.ProxmoxNodeExists(ctx, scope.NodeID); !ok {
-			return apperr.Validation("Noeud Proxmox introuvable pour ce scope.")
+			return apperr.Validation("Proxmox node not found for this scope").I18n(apperr.CodeAlertProxmoxNodeNotFound, nil)
 		}
 	case "storage":
 		if ok, _ := s.repo.ProxmoxStorageExists(ctx, scope.StorageID); !ok {
-			return apperr.Validation("Stockage Proxmox introuvable pour ce scope.")
+			return apperr.Validation("Proxmox storage not found for this scope").I18n(apperr.CodeAlertProxmoxStorageNotFound, nil)
 		}
 	case "guest":
 		if ok, _ := s.repo.ProxmoxGuestExists(ctx, scope.GuestID); !ok {
-			return apperr.Validation("VM/LXC Proxmox introuvable pour ce scope.")
+			return apperr.Validation("Proxmox VM/LXC not found for this scope").I18n(apperr.CodeAlertProxmoxGuestNotFound, nil)
 		}
 	case "disk":
 		if ok, _ := s.repo.ProxmoxDiskExists(ctx, scope.DiskID); !ok {
-			return apperr.Validation("Disque physique Proxmox introuvable pour ce scope.")
+			return apperr.Validation("Proxmox physical disk not found for this scope").I18n(apperr.CodeAlertProxmoxDiskNotFound, nil)
 		}
 	}
 	return nil
@@ -396,10 +396,10 @@ var validAlertMetrics = map[string]bool{
 
 func validateAlertRuleMetricOperator(metric, operator string) error {
 	if !validAlertOperators[operator] {
-		return apperr.Validation("Operateur invalide.")
+		return apperr.Validation("invalid operator").I18n(apperr.CodeInvalidOperator, nil)
 	}
 	if !validAlertMetrics[metric] {
-		return apperr.Validation("Metrique invalide.")
+		return apperr.Validation("invalid metric").I18n(apperr.CodeInvalidMetric, nil)
 	}
 	return nil
 }
@@ -418,10 +418,10 @@ func validateBaselineWindow(metric string, windowSeconds *int) error {
 		return nil
 	}
 	if metric != "bandwidth_vs_rolling_avg" {
-		return apperr.Validation("La fenêtre de moyenne glissante n'est pas applicable à cette métrique.")
+		return apperr.Validation("the rolling-average window does not apply to this metric").I18n(apperr.CodeAlertRollingWindowNotAllowed, nil)
 	}
 	if !validBaselineWindowsSeconds[*windowSeconds] {
-		return apperr.Validation("Fenêtre de moyenne glissante invalide (valeurs autorisées : 1h, 6h, 24h).")
+		return apperr.Validation("invalid rolling-average window (allowed: 1h, 6h, 24h)").I18n(apperr.CodeAlertRollingWindowInvalid, nil)
 	}
 	return nil
 }
@@ -440,14 +440,14 @@ func validateAlertActions(actions *models.AlertActions) error {
 		return nil
 	}
 	if actions.Cooldown < 0 {
-		return apperr.Validation("La periode de silence doit etre positive ou nulle.")
+		return apperr.Validation("the silence period must be zero or positive").I18n(apperr.CodeAlertCooldownNegative, nil)
 	}
 	if actions.EscalateAfterMinutes < 0 {
-		return apperr.Validation("Le delai d'escalade doit etre positif ou nul.")
+		return apperr.Validation("the escalation delay must be zero or positive").I18n(apperr.CodeAlertEscalationNegative, nil)
 	}
 	for _, channel := range actions.Channels {
 		if !validAlertChannels[channel] {
-			return apperr.Validation(fmt.Sprintf("Canal de notification invalide: %s", channel))
+			return apperr.Validation(fmt.Sprintf("invalid notification channel: %s", channel)).I18n(apperr.CodeAlertChannelInvalid, map[string]string{"channel": channel})
 		}
 	}
 	if actions.CommandTrigger != nil {
@@ -456,17 +456,17 @@ func validateAlertActions(actions *models.AlertActions) error {
 		ct.Action = strings.TrimSpace(ct.Action)
 		ct.Target = strings.TrimSpace(ct.Target)
 		if ct.Module == "" || ct.Action == "" {
-			return apperr.Validation("Le declencheur de commande doit definir un module et une action.")
+			return apperr.Validation("a command trigger must define both a module and an action").I18n(apperr.CodeAlertCommandTriggerIncomplete, nil)
 		}
 		allowedActions, ok := commandModuleActions[ct.Module]
 		if !ok {
-			return apperr.Validation(fmt.Sprintf("Module de commande invalide: %s", ct.Module))
+			return apperr.Validation(fmt.Sprintf("invalid command module: %s", ct.Module)).I18n(apperr.CodeAlertCommandModuleInvalid, map[string]string{"module": ct.Module})
 		}
 		if !containsString(allowedActions, ct.Action) {
-			return apperr.Validation(fmt.Sprintf("Action invalide pour le module %s: %s", ct.Module, ct.Action))
+			return apperr.Validation(fmt.Sprintf("invalid action for module %s: %s", ct.Module, ct.Action)).I18n(apperr.CodeAlertCommandActionInvalid, map[string]string{"module": ct.Module, "action": ct.Action})
 		}
 		if commandModuleRequiresTarget[ct.Module] && ct.Target == "" {
-			return apperr.Validation(fmt.Sprintf("Le module %s requiert une cible.", ct.Module))
+			return apperr.Validation(fmt.Sprintf("module %s requires a target", ct.Module)).I18n(apperr.CodeAlertCommandTargetRequired, map[string]string{"module": ct.Module})
 		}
 		if !commandModuleRequiresTarget[ct.Module] {
 			ct.Target = ""

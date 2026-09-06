@@ -15,6 +15,7 @@ import { getApiErrorMessage } from '../api/client'
 import { getExecutionStateClass } from '../utils/statusClasses'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { i18n } from '../i18n'
+import { compareStrings } from '../utils/formatters'
 
 const DEFAULT_CRON = '0 3 * * *'
 const TASKS_REFRESH_SEC = 30
@@ -201,7 +202,7 @@ export function useGlobalScheduledTasks() {
       const key = sortKey.value
       const av = (a as Record<string, unknown>)[key] ?? ''
       const bv = (b as Record<string, unknown>)[key] ?? ''
-      const cmp = String(av).localeCompare(String(bv), 'fr', { numeric: true })
+      const cmp = compareStrings(String(av), String(bv), { numeric: true })
       return sortDir.value === 'asc' ? cmp : -cmp
     })
   })

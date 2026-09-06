@@ -154,5 +154,15 @@
   "testInProgress": "Test in progress...",
   "ntfyHint": "ntfy.sh URL for notifications",
   "githubTokenHint": "For tracking GitHub releases",
-  "testNtfy": "Test ntfy"
+  "testNtfy": "Test ntfy",
+  "settingsLoadErrorLog": "Settings load error:",
+  "smtpSavedMsg": "SMTP configuration saved",
+  "notificationsSavedMsg": "Notifications saved",
+  "retentionSavedMsg": "Retention saved",
+  "threatScoreSavedMsg": "Threat score saved",
+  "smtpTestSuccessMsg": "SMTP connection succeeded",
+  "ntfyTestSentMsg": "Test message sent",
+  "metricsCleanupDoneMsg": "Metrics cleanup finished",
+  "auditCleanupDoneMsg": "Audit log cleanup finished",
+  "saveErrorPrefix": "Error: {message}"
 }

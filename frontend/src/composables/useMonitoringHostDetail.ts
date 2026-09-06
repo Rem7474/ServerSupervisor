@@ -3,6 +3,7 @@ import { useRoute } from 'vue-router'
 import { npmApi } from '../api/npm'
 import { getApiErrorMessage } from '../api/client'
 import type { NPMProxyHostEnriched } from '../types/npm'
+import { i18n } from '../i18n'
 
 // No single-host GET endpoint exists (see api/npm.ts) — the list is small
 // (every proxy host across every connected NPM instance), same tradeoff
@@ -22,12 +23,12 @@ export function useMonitoringHostDetail() {
       const res = await npmApi.listAllProxyHosts()
       const found = (res.data.proxy_hosts ?? []).find((h) => h.id === hostId)
       if (!found) {
-        error.value = 'Proxy host introuvable.'
+        error.value = i18n.global.t('monitoring.proxyHostNotFound')
         return
       }
       host.value = found
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Impossible de charger le proxy host.')
+      error.value = getApiErrorMessage(e, i18n.global.t('monitoring.proxyHostLoadError'))
     } finally {
       loading.value = false
     }

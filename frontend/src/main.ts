@@ -34,8 +34,8 @@ function renderBootPlaceholder(): void {
               <div class="card-body py-5 d-flex align-items-center gap-3">
                 <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
                 <div>
-                  <div class="fw-semibold">Initialisation de l'application</div>
-                  <div class="text-secondary small">Chargement en cours...</div>
+                  <div class="fw-semibold">${escapeHtml(i18n.global.t('common.bootTitle'))}</div>
+                  <div class="text-secondary small">${escapeHtml(i18n.global.t('common.bootSubtitle'))}</div>
                 </div>
               </div>
             </div>
@@ -48,8 +48,8 @@ function renderBootPlaceholder(): void {
 
 function renderFatalFallback(detail: FatalDetail): void {
   if (!appRoot) return
-  const title = escapeHtml(detail.title || 'Erreur critique de l interface')
-  const message = escapeHtml(detail.message || 'Une erreur inattendue a interrompu le rendu de l application.')
+  const title = escapeHtml(detail.title || i18n.global.t('common.fatalTitle'))
+  const message = escapeHtml(detail.message || i18n.global.t('common.fatalMessage'))
   appRoot.innerHTML = `
     <div class="page">
       <div class="page-wrapper">
@@ -63,7 +63,7 @@ function renderFatalFallback(detail: FatalDetail): void {
                 <div class="flex-fill">
                   <h3 class="alert-title mb-1">${title}</h3>
                   <div class="text-secondary mb-3">${message}</div>
-                  <button type="button" class="btn btn-danger" id="fatal-reload-btn">Recharger l'application</button>
+                  <button type="button" class="btn btn-danger" id="fatal-reload-btn">${escapeHtml(i18n.global.t('common.fatalReload'))}</button>
                 </div>
               </div>
             </div>
@@ -84,7 +84,7 @@ function toErrorMessage(reason: unknown): string {
   if (typeof reason === 'string') {
     return reason
   }
-  return 'Erreur inconnue'
+  return i18n.global.t('common.unknownError')
 }
 
 renderBootPlaceholder()
@@ -110,7 +110,7 @@ window.addEventListener('error', (event: ErrorEvent) => {
     return
   }
   renderFatalFallback({
-    title: 'Erreur JavaScript non gérée',
+    title: i18n.global.t('common.fatalUnhandledError'),
     message: toErrorMessage(event.error ?? event.message),
   })
 })
@@ -170,7 +170,7 @@ window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => 
     return
   }
   renderFatalFallback({
-    title: 'Erreur asynchrone non gérée',
+    title: i18n.global.t('common.fatalUnhandledRejection'),
     message: toErrorMessage(event.reason),
   })
 })

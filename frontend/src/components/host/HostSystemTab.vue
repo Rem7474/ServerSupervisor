@@ -3,7 +3,7 @@
     <div class="card mb-4">
       <div class="card-header">
         <h3 class="card-title">
-          Logs systeme (journalctl)
+          {{ t('host.journalTitle') }}
         </h3>
       </div>
       <div class="card-body">
@@ -12,7 +12,7 @@
             v-model="journalService"
             type="text"
             class="form-control"
-            placeholder="Nom du service (ex: nginx, ssh, docker)"
+            :placeholder="t('host.journalServicePlaceholder')"
             style="max-width: 320px;"
             @keyup.enter="loadJournalLogs"
           >
@@ -26,7 +26,7 @@
               v-if="journalLoading"
               class="spinner-border spinner-border-sm me-1"
             />
-            {{ journalLoading ? 'Chargement...' : 'Charger les logs' }}
+            {{ journalLoading ? t('host.loadingLabel') : t('host.journalLoadLabel') }}
           </button>
         </div>
         <div
@@ -39,7 +39,7 @@
           v-if="journalCmdId"
           class="text-secondary small mt-2"
         >
-          Stream -> commande #{{ journalCmdId }} - les logs apparaissent dans la Console Live ->
+          {{ t('host.journalStreamHint', { id: journalCmdId }) }}
         </div>
       </div>
     </div>
@@ -55,9 +55,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import apiClient from '../../api'
 import HostSystemdPanel from './HostSystemdPanel.vue'
 import { getApiErrorMessage } from '../../api/client'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   (e: 'open-command', payload: Record<string, unknown>): void
@@ -98,7 +101,7 @@ async function loadJournalLogs(): Promise<void> {
     })
     emit('history-changed')
   } catch (e: unknown) {
-    journalError.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")
+    journalError.value = getApiErrorMessage(e, t('host.journalSendError'))
   } finally {
     journalLoading.value = false
   }

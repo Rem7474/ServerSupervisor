@@ -1,4 +1,7 @@
 # Files not yet migrated to vue-i18n — still allowed to contain hardcoded
-# French text. Remove a file's line here once its strings move to
-# src/locales/{fr,en}/*.json; scripts/check-i18n-strings.sh fails the build
+# French user-facing text. Remove a file's line here once its strings move to
+# src/locales/{fr,en}/*.json; scripts/check-i18n-strings.mjs fails the build
 # on any hardcoded French text found outside this list.
+#
+# Empty: every source file is migrated. A new entry here is a regression, not
+# a normal step — prefer extracting the strings.

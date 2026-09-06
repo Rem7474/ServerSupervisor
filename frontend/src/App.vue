@@ -167,7 +167,7 @@
               >
                 <span class="badge bg-danger-lt text-danger ms-2 py-2 hosts-down-badge">
                   <IconAlertTriangle class="icon icon-sm me-1" />
-                  {{ hostsDownCount }} HORS LIGNE
+                  {{ hostsDownCount }} {{ t('common.offlineBadge') }}
                 </span>
               </li>
 

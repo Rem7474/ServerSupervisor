@@ -7,7 +7,7 @@
       ref="worldMapSvg"
       class="world-map"
       role="img"
-      aria-label="Carte mondiale du trafic par pays"
+      :aria-label="t('security.worldMapAriaLabel')"
     />
     <div
       v-if="tooltip"
@@ -26,12 +26,16 @@
 
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { max as d3Max } from 'd3-array'
 import { geoNaturalEarth1, geoPath } from 'd3-geo'
 import { scaleSequential } from 'd3-scale'
 import { interpolateYlOrRd } from 'd3-scale-chromatic'
 import { select } from 'd3-selection'
 import { feature } from 'topojson-client'
+import { formatNumber } from '../../utils/formatters'
+
+const { t } = useI18n()
 
 type AnyRecord = Record<string, any>
 
@@ -43,7 +47,7 @@ const tooltip = ref<{ x: number; y: number; country: string; hits: number } | nu
 let resizeHandler: (() => void) | null = null
 
 function numberFormat(v: number): string {
-  return new Intl.NumberFormat('fr-FR').format(Number(v) || 0)
+  return formatNumber(v)
 }
 
 function normalizeCountryName(name: string): string {

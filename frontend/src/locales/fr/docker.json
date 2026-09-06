@@ -92,5 +92,11 @@
   "noNetworks": "Aucun réseau connecté",
   "cumulativeNetworkIO": "I/O réseau (cumulatif)",
   "receivedLabel": "Reçu",
-  "sentLabel": "Envoyé"
+  "sentLabel": "Envoyé",
+  "pageSubtitle": "Vue globale de tous les conteneurs sur l'infrastructure",
+  "containersTab": "Conteneurs",
+  "runningCountBadge": "{count} actif | {count} actifs",
+  "composeProjectsTab": "Projets Compose",
+  "liveConsoleTitle": "Console Live",
+  "liveConsoleEmptyText": "Aucune console active"
 }

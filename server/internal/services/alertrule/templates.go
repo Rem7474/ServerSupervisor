@@ -27,7 +27,7 @@ func validateTemplateRequest(req *models.AlertRuleTemplateRequest) error {
 		return err
 	}
 	if !isTemplatableMetric(req.Metric) {
-		return apperr.Validation("Les métriques Docker, Proxmox ou synthétiques ne peuvent pas être utilisées dans un template — elles ne s'appliquent pas hôte par hôte.")
+		return apperr.Validation("Docker, Proxmox and synthetic metrics cannot be used in a template").I18n(apperr.CodeAlertTemplateMetricNotHostScoped, nil)
 	}
 	if err := validateBaselineWindow(req.Metric, req.BaselineWindowSeconds); err != nil {
 		return err
@@ -71,7 +71,7 @@ func (s *Service) ListTemplates(ctx context.Context) ([]models.AlertRuleTemplate
 func (s *Service) GetTemplate(ctx context.Context, id int64) (*models.AlertRuleTemplate, error) {
 	t, err := s.repo.GetAlertRuleTemplateByID(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, apperr.NotFound("template not found")
+		return nil, apperr.NotFound("template not found").I18n(apperr.CodeAlertTemplateNotFound, nil)
 	}
 	if err != nil {
 		return nil, err

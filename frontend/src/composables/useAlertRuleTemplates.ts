@@ -3,6 +3,7 @@ import apiClient, { getApiErrorMessage } from '../api'
 import { addToast } from './useGlobalToast'
 import { useConfirmDialog } from './useConfirmDialog'
 import type { AlertRuleTemplate, AlertRuleTemplateRequest, ApplyAlertRuleTemplateResult } from '../types/generated'
+import { i18n } from '../i18n'
 
 interface UseAlertRuleTemplatesApi {
   templates: Ref<AlertRuleTemplate[]>
@@ -48,7 +49,7 @@ export function useAlertRuleTemplates(): UseAlertRuleTemplatesApi {
       templates.value = res.data || []
       fetched.value = true
     } catch (e) {
-      error.value = getApiErrorMessage(e, 'Impossible de charger les modèles de règles')
+      error.value = getApiErrorMessage(e, i18n.global.t('alerts.templatesLoadError'))
     } finally {
       loading.value = false
     }
@@ -62,7 +63,7 @@ export function useAlertRuleTemplates(): UseAlertRuleTemplatesApi {
       await loadTemplates()
       return true
     } catch (e) {
-      saveError.value = getApiErrorMessage(e, 'Impossible de créer le modèle')
+      saveError.value = getApiErrorMessage(e, i18n.global.t('alerts.templateCreateError'))
       return false
     } finally {
       saving.value = false
@@ -77,7 +78,7 @@ export function useAlertRuleTemplates(): UseAlertRuleTemplatesApi {
       await loadTemplates()
       return true
     } catch (e) {
-      saveError.value = getApiErrorMessage(e, 'Impossible de modifier le modèle')
+      saveError.value = getApiErrorMessage(e, i18n.global.t('alerts.templateUpdateError'))
       return false
     } finally {
       saving.value = false
@@ -86,19 +87,19 @@ export function useAlertRuleTemplates(): UseAlertRuleTemplatesApi {
 
   async function deleteTemplate(template: AlertRuleTemplate): Promise<void> {
     const ok = await confirm({
-      title: 'Supprimer le modèle',
-      message: `Supprimer le modèle "${template.name}" ? Les règles déjà créées à partir de ce modèle ne sont pas affectées.`,
+      title: i18n.global.t('alerts.templateDeleteConfirmTitle'),
+      message: i18n.global.t('alerts.templateDeleteConfirmMessage', { name: template.name }),
       variant: 'danger',
       destructive: true,
-      okLabel: 'Supprimer',
+      okLabel: i18n.global.t('common.delete'),
     })
     if (!ok) return
     try {
       await apiClient.deleteAlertRuleTemplate(template.id)
       templates.value = templates.value.filter((t) => t.id !== template.id)
-      addToast('Modèle supprimé', 'success')
+      addToast(i18n.global.t('alerts.templateDeletedToast'), 'success')
     } catch (e) {
-      addToast(getApiErrorMessage(e, 'Impossible de supprimer le modèle'), 'error')
+      addToast(getApiErrorMessage(e, i18n.global.t('alerts.templateDeleteError')), 'error')
     }
   }
 
@@ -111,13 +112,20 @@ export function useAlertRuleTemplates(): UseAlertRuleTemplatesApi {
       applyResult.value = res.data
       const failedCount = Object.keys(res.data.errors || {}).length
       if (failedCount > 0) {
-        addToast(`${res.data.created_rule_ids?.length || 0} règle(s) créée(s), ${failedCount} échec(s)`, 'error')
+        const created = res.data.created_rule_ids?.length || 0
+        // Two independent counts can't share one plural index, so each half is
+        // pluralized on its own and the wrapper only joins them.
+        addToast(i18n.global.t('alerts.templateApplyPartialToast', {
+          createdPart: i18n.global.t('alerts.templateApplySuccessToast', { created }, created),
+          failedPart: i18n.global.t('alerts.templateApplyFailedCount', { failed: failedCount }, failedCount),
+        }), 'error')
       } else {
-        addToast(`${res.data.created_rule_ids?.length || 0} règle(s) créée(s)`, 'success')
+        const created = res.data.created_rule_ids?.length || 0
+        addToast(i18n.global.t('alerts.templateApplySuccessToast', { created }, created), 'success')
       }
       return true
     } catch (e) {
-      applyError.value = getApiErrorMessage(e, "Impossible d'appliquer le modèle")
+      applyError.value = getApiErrorMessage(e, i18n.global.t('alerts.templateApplyError'))
       return false
     } finally {
       applying.value = false

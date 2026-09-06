@@ -3,9 +3,11 @@ package runbook
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -15,6 +17,24 @@ type fakeRepo struct {
 	executions map[string]*models.RunbookExecution
 	commands   map[string]*models.RemoteCommand
 	validHosts map[string]bool
+	// failOn names a repo method that should return failErr instead of doing
+	// its normal thing, so the service's degraded paths can be exercised.
+	// Empty (the default) leaves every method behaving as before.
+	failOn  string
+	failErr error
+}
+
+// errFakeRepo is the failure every failOn injection reports.
+var errFakeRepo = errors.New("fake repo failure")
+
+func (f *fakeRepo) fails(method string) error {
+	if f.failOn != method {
+		return nil
+	}
+	if f.failErr != nil {
+		return f.failErr
+	}
+	return errFakeRepo
 }
 
 func newFakeRepo() *fakeRepo {
@@ -39,6 +59,9 @@ func stepsFor(id string, steps []models.RunbookStepCreate) []models.RunbookStep 
 }
 
 func (f *fakeRepo) CreateRunbook(_ context.Context, name, description string, steps []models.RunbookStepCreate) (*models.Runbook, error) {
+	if err := f.fails("CreateRunbook"); err != nil {
+		return nil, err
+	}
 	id := fmt.Sprintf("rb-%d", len(f.runbooks)+1)
 	rb := &models.Runbook{ID: id, Name: name, Description: description, Steps: stepsFor(id, steps)}
 	f.runbooks[id] = rb
@@ -63,6 +86,9 @@ func (f *fakeRepo) ListRunbooks(context.Context) ([]models.Runbook, error) {
 }
 
 func (f *fakeRepo) UpdateRunbook(_ context.Context, id string, name, description *string, steps *[]models.RunbookStepCreate) error {
+	if err := f.fails("UpdateRunbook"); err != nil {
+		return err
+	}
 	rb, ok := f.runbooks[id]
 	if !ok {
 		return sql.ErrNoRows
@@ -85,10 +111,16 @@ func (f *fakeRepo) DeleteRunbook(_ context.Context, id string) error {
 }
 
 func (f *fakeRepo) HostExists(_ context.Context, id string) (bool, error) {
+	if err := f.fails("HostExists"); err != nil {
+		return false, err
+	}
 	return f.validHosts[id], nil
 }
 
 func (f *fakeRepo) CreateRunbookExecution(_ context.Context, runbookID, triggeredBy string) (*models.RunbookExecution, error) {
+	if err := f.fails("CreateRunbookExecution"); err != nil {
+		return nil, err
+	}
 	id := fmt.Sprintf("exec-%d", len(f.executions)+1)
 	exec := &models.RunbookExecution{ID: id, RunbookID: runbookID, Status: "running", TriggeredBy: triggeredBy}
 	f.executions[id] = exec
@@ -204,16 +236,21 @@ func twoStepRunbook(t *testing.T, svc *Service, secondContinueOnFailure bool) *m
 }
 
 func TestCreate_ValidatesSteps(t *testing.T) {
+	// wantCode is the apperr catalog key each rejection must carry — without it
+	// respondError renders the literal English message whatever the caller's
+	// language. Asserting the key rather than the wording keeps this test
+	// stable across rephrasing but failing if the .I18n() call is dropped.
 	cases := []struct {
-		name  string
-		steps []models.RunbookStepCreate
+		name     string
+		steps    []models.RunbookStepCreate
+		wantCode string
 	}{
-		{"no steps", nil},
-		{"missing host", []models.RunbookStepCreate{{Module: "docker", Action: "stop"}}},
-		{"unknown host", []models.RunbookStepCreate{{HostID: "nope", Module: "docker", Action: "stop"}}},
-		{"unknown module", []models.RunbookStepCreate{{HostID: "host-1", Module: "ssh", Action: "run"}}},
-		{"invalid action for module", []models.RunbookStepCreate{{HostID: "host-1", Module: "docker", Action: "delete"}}},
-		{"missing target for a target-requiring module", []models.RunbookStepCreate{{HostID: "host-1", Module: "systemd", Action: "restart"}}},
+		{"no steps", nil, apperr.CodeRunbookStepsRequired},
+		{"missing host", []models.RunbookStepCreate{{Module: "docker", Action: "stop"}}, apperr.CodeRunbookStepHostRequired},
+		{"unknown host", []models.RunbookStepCreate{{HostID: "nope", Module: "docker", Action: "stop"}}, apperr.CodeRunbookStepHostNotFound},
+		{"unknown module", []models.RunbookStepCreate{{HostID: "host-1", Module: "ssh", Action: "run"}}, apperr.CodeRunbookStepModuleInvalid},
+		{"invalid action for module", []models.RunbookStepCreate{{HostID: "host-1", Module: "docker", Action: "delete"}}, apperr.CodeRunbookStepActionInvalid},
+		{"missing target for a target-requiring module", []models.RunbookStepCreate{{HostID: "host-1", Module: "systemd", Action: "restart"}}, apperr.CodeRunbookStepTargetRequired},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -222,6 +259,17 @@ func TestCreate_ValidatesSteps(t *testing.T) {
 			_, err := svc.Create(context.Background(), models.RunbookCreate{Name: "x", Steps: tc.steps})
 			if err == nil {
 				t.Fatal("expected a validation error")
+			}
+			var ae *apperr.Error
+			if !errors.As(err, &ae) {
+				t.Fatalf("expected an *apperr.Error, got %T: %v", err, err)
+			}
+			if ae.I18nKey != tc.wantCode {
+				t.Errorf("i18n key = %q, want %q", ae.I18nKey, tc.wantCode)
+			}
+			// A parameterized message is only useful if the catalog can render it.
+			if rendered := apperr.GetMessage(ae.I18nKey, "fr", ae.Params); rendered == "error: "+ae.I18nKey {
+				t.Errorf("catalog has no FR entry for %q", ae.I18nKey)
 			}
 		})
 	}

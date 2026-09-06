@@ -210,7 +210,7 @@
                       <span
                         v-else-if="labelFor(talker).source === 'port'"
                         class="text-muted small heuristic-label"
-                        :title="PORT_GUESS_HINT"
+                        :title="portGuessHint()"
                       >≈ {{ labelFor(talker).text }}</span>
                     </div>
                   </td>
@@ -290,7 +290,7 @@ import { useNetworkFlows } from '../../composables/useNetworkFlows'
 import { useModalChrome } from '../../composables/useModalChrome'
 import { formatBytes } from '../../utils/formatters'
 import { compareValues } from '../../utils/sort'
-import { protocolLabelFor, PORT_GUESS_HINT, type ProtocolLabel } from '../../utils/portServices'
+import { protocolLabelFor, portGuessHint, type ProtocolLabel } from '../../utils/portServices'
 import { SERVICE_FILTER_PREFIX, type NetworkFlowFilterValue, type NetworkFlowMetric } from '../../types/networkFlows'
 
 const props = withDefaults(defineProps<{
