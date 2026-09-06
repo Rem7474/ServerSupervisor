@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { npmApi } from '../api/npm'
 import type { NPMProxyHostEnriched } from '../types/npm'
 import { getApiErrorMessage } from '../api/client'
@@ -9,6 +10,7 @@ export type NPMSortKey = 'connection_name' | 'domain' | 'forward' | 'npm_enabled
 const NPM_REFRESH_SEC = 30
 
 export function useNPM() {
+  const { t } = useI18n()
   const dialog = useConfirmDialog()
   const hosts = ref<NPMProxyHostEnriched[]>([])
   const loading = ref(true)
@@ -75,7 +77,7 @@ export function useNPM() {
       hosts.value = res.data.proxy_hosts ?? []
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
-      loadError.value = getApiErrorMessage(e, 'Impossible de charger les proxy hosts.')
+      loadError.value = getApiErrorMessage(e, t('npm.couldNotLoadProxyHostsError'))
     } finally {
       loading.value = false
     }
@@ -107,8 +109,8 @@ export function useNPM() {
       // Désactiver un proxy host coupe immédiatement son routage réel dans NPM —
       // seule direction de ce toggle qui mérite une confirmation.
       const confirmed = await dialog.confirm({
-        title: 'Désactiver le proxy host',
-        message: `Désactiver "${host.domain_names?.[0] || host.id}" dans NPM coupe immédiatement le routage réel vers ce service.`,
+        title: t('npm.disableProxyHostConfirmTitle'),
+        message: t('npm.disableProxyHostConfirmMessage', { name: host.domain_names?.[0] || host.id }),
         variant: 'warning',
       })
       if (!confirmed) {
@@ -136,7 +138,7 @@ export function useNPM() {
         host.uptime_monitoring_enabled = prev
         host.ssl_monitoring_enabled = prev
       }
-      actionError.value = getApiErrorMessage(e, `Impossible de ${value ? 'activer' : 'désactiver'} le proxy host dans NPM.`)
+      actionError.value = getApiErrorMessage(e, value ? t('npm.enableProxyHostFailedError') : t('npm.disableProxyHostFailedError'))
       setTimeout(() => { actionError.value = '' }, 5000)
     } finally {
       togglingNPM.value[host.id] = false
@@ -160,7 +162,7 @@ export function useNPM() {
       if (idx !== -1) hosts.value[idx] = res.data
     } catch (e: unknown) {
       host[field] = prev
-      actionError.value = getApiErrorMessage(e, 'Erreur lors de la mise à jour du monitoring.')
+      actionError.value = getApiErrorMessage(e, t('npm.updateMonitoringError'))
       setTimeout(() => { actionError.value = '' }, 5000)
     } finally {
       toggling.value[host.id] = false

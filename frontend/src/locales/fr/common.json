@@ -70,5 +70,16 @@
   "stateOk": "OK",
   "stateFailed": "Échoué",
   "stateSkipped": "Ignoré",
-  "stateCancelled": "Annulé"
+  "stateCancelled": "Annulé",
+  "moduleApt": "APT",
+  "moduleDocker": "Docker",
+  "moduleCompose": "Compose",
+  "moduleSystemd": "Systemd",
+  "moduleJournal": "Journal",
+  "moduleProcesses": "Processus",
+  "moduleCustom": "Custom",
+  "moduleCrowdsec": "CrowdSec",
+  "moduleRestic": "Restic",
+  "moduleAgent": "Agent",
+  "moduleProxmox": "Proxmox"
 }
