@@ -439,7 +439,7 @@
             :key="p.name"
             :value="p.name"
           >
-            {{ p.name }} ({{ t('alerts.sourceComposeProjectServiceCount', { n: p.services.length }, p.services.length) }})
+            {{ p.name }} ({{ t('alerts.sourceComposeProjectServiceCount', { count: p.services.length }, p.services.length) }})
           </option>
         </select>
       </div>

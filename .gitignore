@@ -1,6 +1,10 @@
 .env
 node_modules/
 frontend/node_modules/
+# Without these, a *symlink* named node_modules is not matched by the patterns
+# above (they only match directories) and can be committed by accident.
+node_modules
+frontend/node_modules
 frontend/dist/
 agent/build/
 agent/bin/

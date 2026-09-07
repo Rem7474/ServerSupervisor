@@ -95,7 +95,7 @@
                 </div>
               </td>
               <td>
-                <span class="badge bg-azure-lt text-azure">{{ t('runbooks.stepsCountBadge', { n: rb.steps.length }, rb.steps.length) }}</span>
+                <span class="badge bg-azure-lt text-azure">{{ t('runbooks.stepsCountBadge', { count: rb.steps.length }, rb.steps.length) }}</span>
                 <div class="text-muted small mt-1">
                   {{ hostNamesSummary(rb) }}
                 </div>

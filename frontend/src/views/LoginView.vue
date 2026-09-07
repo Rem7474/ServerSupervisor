@@ -6,6 +6,11 @@
         <div class="text-secondary">
           {{ t('auth.subtitle') }}
         </div>
+        <!-- The app shell's picker is behind auth, so this is the only place a
+             user whose browser language is neither FR nor EN can switch. -->
+        <div class="d-flex justify-content-center mt-3">
+          <LocaleSwitcher />
+        </div>
       </div>
 
       <form
@@ -147,6 +152,7 @@ import { ref, watch, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconKey } from '@tabler/icons-vue'
 import { useLogin } from '../composables/useLogin'
+import LocaleSwitcher from '../components/LocaleSwitcher.vue'
 
 const { t } = useI18n()
 

@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
-import { i18n } from './i18n'
+import { currentLocale, ensureLocaleMessages, i18n } from './i18n'
 import '@tabler/core/dist/css/tabler.min.css'
 import '@tabler/core/dist/css/tabler-flags.min.css'
 import './style.css'
@@ -184,7 +184,15 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(i18n)
 app.use(router)
-app.mount('#app')
+
+// The active locale's chunk must be registered before the first render, or the
+// UI paints in the fallback language and then swaps. French is the fallback and
+// ships in the entry chunk, so this only awaits anything for other locales; a
+// failed fetch still mounts (every key falls back to French) rather than
+// leaving the boot placeholder up forever.
+ensureLocaleMessages(currentLocale())
+  .catch((e) => console.warn('[i18n] could not load the active locale, falling back', e))
+  .finally(() => app.mount('#app'))
 
 // Register service worker for PWA support
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

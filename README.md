@@ -23,6 +23,7 @@ généré depuis le dossier [`wiki/`](wiki/) du dépôt :
 | [Two-Factor-Authentication](https://github.com/Rem7474/ServerSupervisor/wiki/Two-Factor-Authentication) | TOTP et clés de sécurité/passkeys (WebAuthn) |
 | [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery) | Scan de sous-réseau et ajout en masse |
 | [Custom-Tasks-Examples](https://github.com/Rem7474/ServerSupervisor/wiki/Custom-Tasks-Examples) | Exemples de `tasks.yaml` prêts à copier |
+| [Internationalization](https://github.com/Rem7474/ServerSupervisor/wiki/Internationalization) | Langues de l'interface, choix de la langue, ajout d'une traduction |
 
 ## Vision produit & roadmap
 
@@ -187,6 +188,12 @@ planifiée, fuseau horaire d'exécution du cron, dépannage) :
 - Streaming temps réel de la sortie des commandes longues (chunk par chunk)
 - Rapport de résultat des commandes autonomes au démarrage (ex: `apt update`)
 - Binaire unique sans dépendances, multi-architecture (amd64/arm64/armv7/armv6)
+
+### Interface multilingue
+- **Français et anglais**, sélecteur disponible sur la page de connexion et dans le menu utilisateur — voir [Internationalisation](https://github.com/Rem7474/ServerSupervisor/wiki/Internationalization)
+- Choix mémorisé par navigateur (`localStorage`), avec repli sur la langue du navigateur puis sur le français
+- Dates, heures, nombres et tri alphabétique suivent la locale, pas seulement les textes
+- Erreurs de l'API traduites côté interface via un code d'erreur stable, pour qu'elles suivent la langue choisie et non celle du navigateur
 
 ### Sécurité
 - Authentification JWT avec refresh tokens

@@ -11,13 +11,47 @@
 ```bash
 cd server   && go build ./... && go test -v -race ./... && golangci-lint run
 cd agent    && go build ./... && go test -v -race -coverprofile=coverage.out ./... && golangci-lint run
-cd frontend && npm run typecheck && npm run lint && npm run test && npm run build
+cd frontend && npm run typecheck && npm run lint && npm run lint:i18n && npm run test && npm run build
 ```
 
 CI bloque aussi sur `go mod tidy` (les deux modules Go) et sur la synchronisation
 de `frontend/src/types/generated.ts` avec les modèles Go (`ci-server.yml`
 régénère et diff ce fichier) — voir la note sur les types générés dans
 [CLAUDE.md](CLAUDE.md) avant de modifier un modèle.
+
+## Textes de l'interface
+
+Aucune chaîne visible par l'utilisateur ne s'écrit en dur : elle passe par
+`t('<domaine>.<clef>')` et son texte vit dans **les deux** langues, sous
+`frontend/src/locales/fr/` et `frontend/src/locales/en/`. Cela vaut aussi pour
+les toasts, les dialogues de confirmation et les messages d'erreur des
+composables — pas seulement les templates.
+
+```bash
+cd frontend && npm run lint:i18n     # texte français en dur, v-html sur une traduction
+cd frontend && npm run test          # parité des clés FR/EN, variables, formes de pluriel
+```
+
+Trois règles qui font échouer la CI si elles sont ignorées :
+
+- **Un compteur passe par un message au pluriel**, pas par une concaténation :
+  `t('dashboard.hostCount', { count: n }, n)` avec
+  `'{count} hôte | {count} hôtes'`. Le français met 0 au singulier, l'anglais
+  non — la règle est déclarée dans `frontend/src/i18n.ts`. La variable qui pilote
+  le pluriel se nomme `count` : vue-i18n la reconnaît d'elle-même, donc le
+  message reste correct même si le troisième argument est oublié. Une poignée de
+  messages gardent un nom plus parlant (`created`, `failed`, `total`) ; pour
+  ceux-là le troisième argument est obligatoire.
+- **Les dates, nombres et tris passent par `frontend/src/utils/formatters.ts`**,
+  jamais par un `'fr-FR'` écrit en dur : sinon un utilisateur anglophone lit
+  `06/09/2026` là où sa locale écrit `09/06/2026`.
+- **Une erreur serveur destinée à l'utilisateur porte un code de catalogue** :
+  `apperr.Validation("...").I18n(apperr.CodeXxx, params)`. Le message littéral
+  reste en anglais (c'est le repli côté logs), le texte affiché vient de
+  `server/internal/apperr/catalog.go` et de `errors.json` côté interface.
+
+Le guide [Internationalisation](https://github.com/Rem7474/ServerSupervisor/wiki/Internationalization)
+détaille la marche à suivre pour ajouter une langue.
 
 ## Tester son code via le vrai conteneur (stack racine, données réelles)
 

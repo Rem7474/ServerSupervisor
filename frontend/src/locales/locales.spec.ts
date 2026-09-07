@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { en, fr } from './index'
+import { fr, loadLocaleMessages } from './index'
 
 type Messages = Record<string, unknown>
 
@@ -17,8 +17,12 @@ function flatten(node: Messages, prefix = ''): Record<string, string> {
   return out
 }
 
+// The fallback is bundled eagerly; every other locale is a lazy chunk, so it
+// has to be pulled in explicitly here.
+const en = (await loadLocaleMessages('en')) as Messages
+
 const FR = flatten(fr as Messages)
-const EN = flatten(en as Messages)
+const EN = flatten(en)
 
 /**
  * Distinct `{name}` interpolation placeholders used by a message. Deduplicated
@@ -67,6 +71,24 @@ describe('locales', () => {
   })
 
   it('exposes the same namespaces in both languages', () => {
-    expect(Object.keys(fr as Messages).sort()).toEqual(Object.keys(en as Messages).sort())
+    expect(Object.keys(fr as Messages).sort()).toEqual(Object.keys(en).sort())
+  })
+})
+
+describe('loadLocaleMessages', () => {
+  it('returns the eagerly bundled fallback without a dynamic import', async () => {
+    // fr is statically imported, so this must resolve to the very same object
+    // rather than a second copy fetched over the network.
+    await expect(loadLocaleMessages('fr')).resolves.toBe(fr)
+  })
+
+  it('loads a lazy locale with the same namespaces as the fallback', async () => {
+    const messages = await loadLocaleMessages('en')
+    expect(Object.keys(messages).sort()).toEqual(Object.keys(fr as Messages).sort())
+  })
+
+  it('rejects a locale that has no bundled messages', async () => {
+    // Guards the "added to SUPPORTED_LOCALES but not to LOADERS" mistake.
+    await expect(loadLocaleMessages('de')).rejects.toThrow(/no messages bundled/)
   })
 })
