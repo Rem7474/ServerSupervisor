@@ -38,12 +38,34 @@ describe('ProxmoxNodeTasksTab', () => {
     expect(wrapper.text()).toContain('En cours')
   })
 
-  it('shows the raw exit_status text (with a danger badge) for a failed task', () => {
+  it('badges a failed task with the shared state vocabulary, keeping PVE wording alongside', () => {
+    // The badge used to be the raw PVE string, so the same failure read
+    // "unable to parse" here and "failed" in the live task panel.
     const wrapper = mount(ProxmoxNodeTasksTab, {
       props: { tasks: [task({ status: 'stopped', exit_status: 'unable to parse' })] },
     })
-    expect(wrapper.text()).toContain('unable to parse')
-    expect(wrapper.find('.task-status-badge').classes()).toContain('bg-danger-lt')
+    const badge = wrapper.find('.task-status-badge')
+    expect(badge.text()).toBe('Échoué')
+    expect(badge.classes()).toContain('bg-danger-lt')
+    // The reason stays visible — it is what tells the operator what broke.
+    expect(wrapper.find('.task-status-detail').text()).toBe('unable to parse')
+  })
+
+  it('badges a task that ended with warnings as a warning, not a failure', () => {
+    const wrapper = mount(ProxmoxNodeTasksTab, {
+      props: { tasks: [task({ status: 'stopped', exit_status: 'WARNINGS: 1' })] },
+    })
+    const badge = wrapper.find('.task-status-badge')
+    expect(badge.text()).toBe('Avertissements')
+    expect(badge.classes()).toContain('bg-warning-lt')
+  })
+
+  it('shows no redundant detail line under an OK badge', () => {
+    const wrapper = mount(ProxmoxNodeTasksTab, {
+      props: { tasks: [task({ status: 'stopped', exit_status: 'OK' })] },
+    })
+    expect(wrapper.find('.task-status-badge').text()).toBe('OK')
+    expect(wrapper.find('.task-status-detail').exists()).toBe(false)
   })
 
   it('falls back to the raw status (with a neutral badge) when neither running nor a known exit_status applies', () => {

@@ -72,6 +72,9 @@ const EXECUTION_STATE_MAP: Record<string, string> = {
   succeeded: 'badge bg-success-lt text-success',
   // Proxmox's own vzdump backup runs report "OK", not "completed"/"success".
   ok:        'badge bg-success-lt text-success',
+  // A vzdump job that skipped a guest still ran — neither a success nor a
+  // failure, and colouring it red would misreport a backup that completed.
+  warnings:  'badge bg-warning-lt text-warning',
   failed:    'badge bg-danger-lt text-danger',
   error:     'badge bg-danger-lt text-danger',
   skipped:   'badge bg-secondary-lt text-secondary',
@@ -94,6 +97,7 @@ function executionStateLabels(): Record<string, string> {
     success:   t('common.stateSuccess'),
     succeeded: t('common.stateSuccess'),
     ok:        t('common.stateOk'),
+    warnings:  t('common.stateWarnings'),
     failed:    t('common.stateFailed'),
     error:     t('common.error'),
     skipped:   t('common.stateSkipped'),

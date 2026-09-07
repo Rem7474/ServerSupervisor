@@ -214,5 +214,6 @@
   "errorTitle": "Error",
   "fieldInvalidEmail": "Invalid email",
   "fieldInvalidUrl": "Invalid URL",
-  "saveError": "Could not save"
+  "saveError": "Could not save",
+  "stateWarnings": "Warnings"
 }

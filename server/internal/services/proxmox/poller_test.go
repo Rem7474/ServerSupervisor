@@ -85,3 +85,29 @@ func TestTaskOutcome(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeBackupStatus(t *testing.T) {
+	// proxmox_backup_runs.status feeds a coloured, translated badge; the raw
+	// PVE string belongs in exit_status. Storing the raw string in both made a
+	// failure render as an unbounded grey badge quoting a storage error.
+	tests := []struct {
+		outcome string
+		want    string
+	}{
+		{"OK", BackupStatusOK},
+		{"ok", BackupStatusOK},
+		{"", BackupStatusRunning},
+		{"   ", BackupStatusRunning},
+		{"job errors", BackupStatusFailed},
+		{"could not activate storage 'pbs-immich': error fetching datastores - 500", BackupStatusFailed},
+		// A job that skipped a guest still ran; reporting it as failed would be
+		// wrong.
+		{"WARNINGS: 1", BackupStatusWarnings},
+		{"warnings: 3", BackupStatusWarnings},
+	}
+	for _, tc := range tests {
+		if got := normalizeBackupStatus(tc.outcome); got != tc.want {
+			t.Errorf("normalizeBackupStatus(%q) = %q, want %q", tc.outcome, got, tc.want)
+		}
+	}
+}

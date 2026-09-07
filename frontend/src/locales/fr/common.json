@@ -214,5 +214,6 @@
   "errorTitle": "Erreur",
   "fieldInvalidEmail": "Email invalide",
   "fieldInvalidUrl": "URL invalide",
-  "saveError": "Erreur lors de l'enregistrement"
+  "saveError": "Erreur lors de l'enregistrement",
+  "stateWarnings": "Avertissements"
 }
