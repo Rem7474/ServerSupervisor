@@ -118,6 +118,7 @@ que toutes les deux minutes, même si le poller global tourne plus souvent).
 - **Guests** : VMs QEMU et conteneurs LXC (statut, ressources allouées)
 - **Stockage** : pools et leur usage
 - **Disques physiques** : modèle, type (SSD/HDD/NVMe), santé S.M.A.R.T., usure SSD (nécessite `Sys.Audit`)
+- **Tâches et sauvegardes** : nécessite `Sys.Audit` sur `/nodes/{nœud}`. Sans ce privilège PVE ne renvoie pas d'erreur — il renvoie uniquement les tâches du token lui-même, donc une liste vide et, par ricochet, aucun résultat de sauvegarde
 - **Tâches** : 50 dernières tâches par nœud (vzdump, migration, création VM…)
 - **Sauvegardes** : jobs vzdump configurés + dernier résultat par VM
 
@@ -264,7 +265,8 @@ appliqué au caractère tapé juste après.
 | Bouton **Console** actif mais triangle d'avertissement à côté | Identifiants console PVE absents sur cette connexion — Paramètres → Proxmox VE (voir [§1](#identifiants-console-pve-optionnel-pour-la-console-lxc)) |
 | La console renvoie « admin only » | L'ouverture de console est admin-only côté ServerSupervisor, indépendamment des droits PVE (voir [§6](#6-actions-en-écriture--posture-de-permissions)) |
 | La console se connecte puis se ferme immédiatement | Le compte PVE s'authentifie mais n'a pas `VM.Console` sur ce conteneur — **Tester la connexion** ne peut pas le détecter, il ne valide que le login |
-| Sauvegardes : "Dernier résultat par VM" vide alors que des vzdump tournent | Aucune tâche vzdump n'a encore été vue par un cycle de poll depuis la création de la connexion — le résultat est dérivé des tâches PVE, pas d'une lecture directe du planning de sauvegarde |
+| Sauvegardes : "Dernier résultat par VM" vide alors que des vzdump tournent | Aucun cycle de poll n'a encore eu lieu depuis la création de la connexion. Le résultat vient des tâches vzdump qui nomment une VM, complété par les fichiers présents sur les stockages de type `backup` — un job couvrant plusieurs VMs s'exécute comme une tâche unique sans VMID, ce sont alors les fichiers qui font foi |
+| Un onglet est vide et un bandeau « Collecte partielle » s'affiche | Un appel à l'API PVE a échoué au dernier cycle ; le bandeau donne l'endpoint et l'erreur. Le plus souvent un privilège manquant sur le token — comparer avec le rôle décrit en [§1](#1-prérequis-côté-proxmox--créer-un-token-api) |
 
 ## Pour aller plus loin
 
