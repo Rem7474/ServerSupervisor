@@ -1511,6 +1511,13 @@ export interface ProxmoxNode {
   vm_count?: number /* int */;
   lxc_count?: number /* int */;
   /**
+   * ConnectionError is the owning connection's last_error, surfaced on the
+   * node detail so a PVE call the poller could not make (a missing token
+   * privilege, typically) is visible where its data is missing instead of
+   * only in the connection list.
+   */
+  connection_error?: string;
+  /**
    * Detail view (populated on single-node fetch)
    */
   guests?: ProxmoxGuest[];
@@ -1601,6 +1608,37 @@ export interface ProxmoxBackupRun {
    * Joined from proxmox_guests
    */
   guest_name?: string;
+}
+/**
+ * ProxmoxTaskLogLine is one line of a PVE task log.
+ */
+export interface ProxmoxTaskLogLine {
+  n: number /* int */; // 1-based line number within the whole log
+  t: string; // text
+}
+/**
+ * ProxmoxTaskLog is the response of GET /proxmox/nodes/{id}/tasks/{upid}/log.
+ * It carries the task's lifecycle alongside the lines because the two cannot
+ * be derived from each other: PVE paginates the log, so the closing
+ * "TASK OK"/"TASK ERROR" marker is absent from any page but the last, and a
+ * client that infers "still running" from its absence would never stop
+ * polling a finished task.
+ */
+export interface ProxmoxTaskLog {
+  lines: ProxmoxTaskLogLine[];
+  /**
+   * Total is the number of lines the task produced; len(Lines) is capped at
+   * one page, taken from the end of the log.
+   */
+  total: number /* int */;
+  truncated: boolean;
+  /**
+   * Status is PVE's lifecycle value ("running" | "stopped"), ExitStatus its
+   * outcome once stopped ("OK" or an error string).
+   */
+  status: string;
+  exit_status: string;
+  finished: boolean;
 }
 /**
  * ProxmoxDisk represents a physical disk in a Proxmox node (GET /nodes/{node}/disks/list).

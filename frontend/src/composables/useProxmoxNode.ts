@@ -411,13 +411,20 @@ export function useProxmoxNode() {
       const poll = async (): Promise<void> => {
         try {
           const res = await api.getProxmoxTaskLog(String(route.params.id), upid)
-          const lines = (res.data ?? []).map((l: any) => l.t).join('\n')
-          const lastLine = res.data?.[res.data.length - 1]?.t ?? ''
-          const done = lastLine.startsWith('TASK OK') || lastLine.startsWith('TASK ERROR')
+          const log = res.data
+          // The server reports PVE's own task state. Inferring it from a
+          // "TASK OK"/"TASK ERROR" marker in the log does not work: PVE
+          // paginates the log, so that marker is absent from every page but
+          // the last and a finished task would poll forever.
+          const done = log.finished
           const status = done
-            ? (lastLine.startsWith('TASK OK') ? 'completed' : 'failed')
+            ? (log.exit_status === 'OK' ? 'completed' : 'failed')
             : 'running'
-          liveTask.value = { ...liveTask.value, output: lines, status }
+          const body = (log.lines ?? []).map((l) => l.t).join('\n')
+          const output = log.truncated
+            ? `${t('proxmox.taskLogTruncated', { shown: log.lines?.length ?? 0, total: log.total })}\n\n${body}`
+            : body
+          liveTask.value = { ...liveTask.value, output, status }
           if (!done) {
             pollTimer = setTimeout(poll, 2000)
           } else if (pollResolve) {

@@ -248,5 +248,8 @@
   "taskLogsEmptyText": "Click 'Logs' on a task to follow its execution",
   "migrateModalTitle": "Migrate {name}",
   "targetNodeLabel": "Target node",
-  "liveMigrationLabel": "Live migration (no downtime)"
+  "liveMigrationLabel": "Live migration (no downtime)",
+  "taskLogTruncated": "— last {shown} of {total} lines; the start of the log is truncated —",
+  "partialCollectionTitle": "Partial collection",
+  "partialCollectionHint": "A Proxmox API call failed during the last cycle — some tabs may be empty. Check the API token privileges."
 }

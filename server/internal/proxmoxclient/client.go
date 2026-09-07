@@ -65,23 +65,33 @@ func New(baseURL, tokenID, tokenSecret string, insecureSkipVerify bool) *Client 
 
 // get performs a GET request and unmarshals the Proxmox {"data": ...} envelope into result.
 func (c *Client) get(path string, result interface{}) error {
+	_, err := c.getWithTotal(path, result)
+	return err
+}
+
+// getWithTotal is get plus the envelope's `total`, which PVE sets on paginated
+// endpoints to the number of records available beyond the returned page. The
+// task log needs it: without it a caller cannot tell a 50-line log from the
+// first 50 lines of a 5 000-line one. Endpoints that don't paginate simply
+// report 0, which every caller but the log reader ignores.
+func (c *Client) getWithTotal(path string, result interface{}) (int, error) {
 	url := c.baseURL + path
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return fmt.Errorf("build request: %w", err)
+		return 0, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("request to %s: %w", path, err)
+		return 0, fmt.Errorf("request to %s: %w", path, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("read response from %s: %w", path, err)
+		return 0, fmt.Errorf("read response from %s: %w", path, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -89,19 +99,20 @@ func (c *Client) get(path string, result interface{}) error {
 		if len(snippet) > 300 {
 			snippet = snippet[:300]
 		}
-		return fmt.Errorf("API %s returned HTTP %d: %s", path, resp.StatusCode, snippet)
+		return 0, fmt.Errorf("API %s returned HTTP %d: %s", path, resp.StatusCode, snippet)
 	}
 
 	var envelope struct {
-		Data json.RawMessage `json:"data"`
+		Data  json.RawMessage `json:"data"`
+		Total int             `json:"total"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
-		return fmt.Errorf("parse envelope from %s: %w", path, err)
+		return 0, fmt.Errorf("parse envelope from %s: %w", path, err)
 	}
 	if err := json.Unmarshal(envelope.Data, result); err != nil {
-		return fmt.Errorf("parse data from %s: %w", path, err)
+		return 0, fmt.Errorf("parse data from %s: %w", path, err)
 	}
-	return nil
+	return envelope.Total, nil
 }
 
 // ─── Proxmox API response structs ────────────────────────────────────────────
@@ -147,6 +158,20 @@ type PVEStorage struct {
 	Enabled int    `json:"enabled"` // 0 or 1
 	Active  int    `json:"active"`  // 0 or 1
 	Shared  int    `json:"shared"`  // 0 or 1
+	// Content is PVE's comma-separated list of what the storage may hold
+	// ("images,rootdir,backup,iso,..."). Only backup-capable storages are worth
+	// listing content for.
+	Content string `json:"content,omitempty"`
+}
+
+// SupportsBackup reports whether this storage is declared to hold backups.
+func (s PVEStorage) SupportsBackup() bool {
+	for _, part := range strings.Split(s.Content, ",") {
+		if strings.TrimSpace(part) == "backup" {
+			return true
+		}
+	}
+	return false
 }
 
 // PVEClusterStatus is an element from GET /cluster/status.
@@ -215,6 +240,39 @@ func (c *Client) GetNodeStorage(node string) ([]PVEStorage, error) {
 		return nil, err
 	}
 	return storages, nil
+}
+
+// PVEStorageContent is an entry from
+// GET /nodes/{node}/storage/{storage}/content.
+type PVEStorageContent struct {
+	VolID  string `json:"volid"`
+	Format string `json:"format,omitempty"`
+	Size   int64  `json:"size,omitempty"`
+	// CTime is the creation time in Unix seconds.
+	CTime int64 `json:"ctime,omitempty"`
+	// VMID is the guest the volume belongs to. PVE has returned it as both a
+	// JSON number and a string across versions, so it is decoded leniently.
+	VMID json.Number `json:"vmid,omitempty"`
+}
+
+// GuestID returns VMID as an int, or 0 when absent/unparseable.
+func (e PVEStorageContent) GuestID() int {
+	v, err := e.VMID.Int64()
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return int(v)
+}
+
+// GetStorageBackups lists the backup volumes held by one storage on a node.
+func (c *Client) GetStorageBackups(node, storage string) ([]PVEStorageContent, error) {
+	var entries []PVEStorageContent
+	path := fmt.Sprintf("/nodes/%s/storage/%s/content?content=backup",
+		url.PathEscape(node), url.PathEscape(storage))
+	if err := c.get(path, &entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
 }
 
 // GetNodeVersion returns the PVE version string for the given node.
@@ -419,13 +477,65 @@ type PVESyslogLine struct {
 	Msg   string `json:"msg,omitempty"`
 }
 
-// GetNodeTaskLog returns the log lines for a given task UPID.
-func (c *Client) GetNodeTaskLog(node, upid string) ([]PVETaskLogLine, error) {
-	var lines []PVETaskLogLine
-	if err := c.get(fmt.Sprintf("/nodes/%s/tasks/%s/log", node, upid), &lines); err != nil {
-		return nil, err
+// PVETaskStatus is GET /nodes/{node}/tasks/{upid}/status. Unlike the task
+// *list*, this endpoint reports the lifecycle in `status` ("running" |
+// "stopped") and the outcome separately in `exitstatus`.
+type PVETaskStatus struct {
+	UPID       string `json:"upid"`
+	Node       string `json:"node,omitempty"`
+	Type       string `json:"type,omitempty"`
+	ID         string `json:"id,omitempty"`
+	User       string `json:"user,omitempty"`
+	Status     string `json:"status"`               // running | stopped
+	ExitStatus string `json:"exitstatus,omitempty"` // only once stopped
+	StartTime  int64  `json:"starttime,omitempty"`
+}
+
+// Finished reports whether PVE considers the task done.
+func (s PVETaskStatus) Finished() bool { return s.Status != "" && s.Status != "running" }
+
+// GetNodeTaskStatus returns one task's lifecycle state. Callers use this to
+// decide whether a task is still running instead of sniffing the tail of its
+// log for a "TASK OK"/"TASK ERROR" marker, which is only correct when the
+// whole log happens to have been fetched.
+func (c *Client) GetNodeTaskStatus(node, upid string) (PVETaskStatus, error) {
+	var st PVETaskStatus
+	err := c.get(fmt.Sprintf("/nodes/%s/tasks/%s/status", node, url.PathEscape(upid)), &st)
+	return st, err
+}
+
+// taskLogPageSize is how many log lines are fetched per request. PVE's own
+// default is 50, which silently truncates any real backup or migration log.
+const taskLogPageSize = 500
+
+// GetNodeTaskLog returns the *last* taskLogPageSize lines of a task's log,
+// plus the total number of lines available.
+//
+// PVE paginates this endpoint and defaults to the first 50 lines. For a long
+// task that hides exactly the part that matters — the errors and the closing
+// "TASK OK"/"TASK ERROR" marker are at the end, not the start — so this reads
+// `total` from a probe request and then fetches the trailing window.
+func (c *Client) GetNodeTaskLog(node, upid string) ([]PVETaskLogLine, int, error) {
+	escaped := url.PathEscape(upid)
+	base := fmt.Sprintf("/nodes/%s/tasks/%s/log", node, escaped)
+
+	// limit=1 is the cheapest way to learn `total`; PVE reports the full line
+	// count regardless of how small the requested page is.
+	var probe []PVETaskLogLine
+	total, err := c.getWithTotal(base+"?start=0&limit=1", &probe)
+	if err != nil {
+		return nil, 0, err
 	}
-	return lines, nil
+
+	start := total - taskLogPageSize
+	if start < 0 {
+		start = 0
+	}
+	var lines []PVETaskLogLine
+	if _, err := c.getWithTotal(fmt.Sprintf("%s?start=%d&limit=%d", base, start, taskLogPageSize), &lines); err != nil {
+		return nil, 0, err
+	}
+	return lines, total, nil
 }
 
 // GetNodeSyslog returns recent syslog lines for a node.

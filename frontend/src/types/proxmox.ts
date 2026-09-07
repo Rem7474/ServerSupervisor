@@ -6,6 +6,8 @@ export type {
   ProxmoxGuest,
   ProxmoxStorage,
   ProxmoxTask,
+  ProxmoxTaskLog,
+  ProxmoxTaskLogLine,
   ProxmoxDisk,
   ProxmoxBackupJob,
   ProxmoxBackupRun,

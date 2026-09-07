@@ -26,7 +26,11 @@ const {
   getProxmoxNodeServices: vi.fn(),
   proxmoxNodeServiceAction: vi.fn(),
   migrateProxmoxGuest: vi.fn(),
-  getProxmoxTaskLog: vi.fn(async () => ({ data: [{ t: 'TASK OK' }] })),
+  // The endpoint reports PVE's own task state alongside the lines; the client
+  // no longer infers "finished" from a marker in the log (see ProxmoxTaskLog).
+  getProxmoxTaskLog: vi.fn(async () => ({
+    data: { lines: [{ n: 1, t: 'TASK OK' }], total: 1, truncated: false, status: 'stopped', exit_status: 'OK', finished: true },
+  })),
 }))
 
 let routeQuery: Record<string, string> = {}
@@ -95,7 +99,9 @@ describe('useProxmoxNode — RRD/temperature/fan chart building', () => {
     getProxmoxNodeServices.mockResolvedValue({ data: [] })
     proxmoxNodeServiceAction.mockResolvedValue({ data: {} })
     migrateProxmoxGuest.mockResolvedValue({ data: {} })
-    getProxmoxTaskLog.mockResolvedValue({ data: [{ t: 'TASK OK' }] })
+    getProxmoxTaskLog.mockResolvedValue({
+      data: { lines: [{ n: 1, t: 'TASK OK' }], total: 1, truncated: false, status: 'stopped', exit_status: 'OK', finished: true },
+    })
   })
 
   afterEach(() => {
@@ -385,6 +391,54 @@ describe('useProxmoxNode — RRD/temperature/fan chart building', () => {
 
     expect(api.svcActionMsg.value).toBe('restart sshd lancé.')
     expect(api.svcActionOk.value).toBe(true)
+  })
+
+  it('stops polling a task PVE reports as finished, whatever the log contains', async () => {
+    // The regression this guards: terminal state used to be inferred from a
+    // "TASK OK"/"TASK ERROR" marker in the log. PVE paginates the log, so for
+    // any long task that marker is never in the fetched page and a finished
+    // backup stayed "running" forever, re-polling every 2s.
+    getProxmoxTaskLog.mockResolvedValue({
+      data: {
+        lines: [{ n: 900, t: 'INFO: processed 4.859 GiB in 16m' }],
+        total: 1200, truncated: true, status: 'stopped', exit_status: 'job errors', finished: true,
+      },
+    })
+    const { api } = mountUseProxmoxNode()
+    await flushPromises()
+
+    await api.startPollingTask('UPID:pve1:VZDUMP', { action: 'vzdump', label: 'VM 200' })
+
+    expect(api.liveTask.value?.status).toBe('failed')
+    expect(getProxmoxTaskLog).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks a task completed only when PVE reports an OK exit status', async () => {
+    getProxmoxTaskLog.mockResolvedValue({
+      data: { lines: [{ n: 1, t: 'done' }], total: 1, truncated: false, status: 'stopped', exit_status: 'OK', finished: true },
+    })
+    const { api } = mountUseProxmoxNode()
+    await flushPromises()
+
+    await api.startPollingTask('UPID:pve1:X')
+
+    expect(api.liveTask.value?.status).toBe('completed')
+  })
+
+  it('flags a truncated log so the missing beginning is not mistaken for the whole task', async () => {
+    getProxmoxTaskLog.mockResolvedValue({
+      data: {
+        lines: [{ n: 700, t: 'INFO: still going' }],
+        total: 1200, truncated: true, status: 'stopped', exit_status: 'OK', finished: true,
+      },
+    })
+    const { api } = mountUseProxmoxNode()
+    await flushPromises()
+
+    await api.startPollingTask('UPID:pve1:X')
+
+    expect(api.liveTask.value?.output).toContain('1200')
+    expect(api.liveTask.value?.output).toContain('INFO: still going')
   })
 
   it('shows the translated "logs in progress" message when a service action dispatches with a upid', async () => {
