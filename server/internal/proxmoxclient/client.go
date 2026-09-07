@@ -250,18 +250,33 @@ type PVEStorageContent struct {
 	Size   int64  `json:"size,omitempty"`
 	// CTime is the creation time in Unix seconds.
 	CTime int64 `json:"ctime,omitempty"`
-	// VMID is the guest the volume belongs to. PVE has returned it as both a
-	// JSON number and a string across versions, so it is decoded leniently.
-	VMID json.Number `json:"vmid,omitempty"`
+	// VMID is the guest the volume belongs to.
+	VMID lenientVMID `json:"vmid,omitempty"`
 }
 
-// GuestID returns VMID as an int, or 0 when absent/unparseable.
+// lenientVMID decodes PVE's vmid whether it arrives as a JSON number or as a
+// string — both have been seen across versions — and yields 0 for anything
+// else instead of failing. One odd entry must not sink the whole listing:
+// these volumes are the only backup evidence for guests a multi-VM job
+// swallowed, so losing the batch would empty the tab again.
+type lenientVMID int
+
+func (v *lenientVMID) UnmarshalJSON(b []byte) error {
+	n, err := strconv.Atoi(strings.Trim(string(b), `"`))
+	if err != nil {
+		*v = 0
+		return nil
+	}
+	*v = lenientVMID(n)
+	return nil
+}
+
+// GuestID returns the volume's guest id, or 0 when absent or unusable.
 func (e PVEStorageContent) GuestID() int {
-	v, err := e.VMID.Int64()
-	if err != nil || v <= 0 {
+	if e.VMID <= 0 {
 		return 0
 	}
-	return int(v)
+	return int(e.VMID)
 }
 
 // GetStorageBackups lists the backup volumes held by one storage on a node.
