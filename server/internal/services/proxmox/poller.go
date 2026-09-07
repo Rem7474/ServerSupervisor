@@ -62,6 +62,37 @@ func taskOutcome(t proxmoxclient.PVETask) string {
 	return ""
 }
 
+// Backup run statuses. proxmox_backup_runs.status is a small vocabulary the UI
+// can colour and translate; the raw PVE outcome is kept in exit_status.
+//
+// Storing the raw string in both meant a failure rendered as an untranslated,
+// unbounded badge ("could not activate storage 'pbs-immich': …") in neutral
+// grey, while the same task showed a red "failed" in the log panel.
+const (
+	BackupStatusOK       = "OK"
+	BackupStatusFailed   = "failed"
+	BackupStatusWarnings = "warnings"
+	BackupStatusRunning  = "running"
+)
+
+// normalizeBackupStatus maps a PVE task outcome onto that vocabulary.
+//
+// vzdump reports "OK", "WARNINGS: n" when guests were skipped but the job
+// completed, or an arbitrary error string. Only the last is a failure —
+// collapsing warnings into it would report a backup that ran as broken.
+func normalizeBackupStatus(outcome string) string {
+	switch trimmed := strings.TrimSpace(outcome); {
+	case trimmed == "":
+		return BackupStatusRunning
+	case strings.EqualFold(trimmed, "OK"):
+		return BackupStatusOK
+	case strings.HasPrefix(strings.ToUpper(trimmed), "WARNINGS"):
+		return BackupStatusWarnings
+	default:
+		return BackupStatusFailed
+	}
+}
+
 // mergeTasksByUPID appends extra tasks not already present in base (keyed by
 // UPID, PVE's unique task identifier) — used to fold a type-filtered task
 // fetch (e.g. "vzdump") into the plain top-N task window without duplicating
@@ -277,7 +308,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 					if vmid := parseVMID(t.ID); vmid > 0 {
 						outcome := taskOutcome(t)
 						if err := s.db.UpsertProxmoxBackupRun(ctx,
-							conn.ID, n.Node, vmid, t.UPID, outcome,
+							conn.ID, n.Node, vmid, t.UPID, normalizeBackupStatus(outcome),
 							startTime, endTime, outcome,
 						); err != nil {
 							slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert backup run vmid=%d: %v", conn.Name, n.Node, vmid, err))
@@ -404,7 +435,7 @@ func (s *Poller) pollBackupVolumes(
 		// A retained volume is proof the backup completed; a failed run leaves
 		// no file (or a .tmp PVE does not list as backup content).
 		if err := s.db.UpsertProxmoxBackupRunFromStorage(
-			ctx, conn.ID, node, vmid, "OK", time.Unix(ctime, 0).UTC(),
+			ctx, conn.ID, node, vmid, BackupStatusOK, time.Unix(ctime, 0).UTC(),
 		); err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert backup volume vmid=%d: %v", conn.Name, node, vmid, err))
 		}

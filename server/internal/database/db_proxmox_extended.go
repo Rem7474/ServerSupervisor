@@ -251,7 +251,9 @@ func (db *DB) UpsertProxmoxBackupRunFromStorage(ctx context.Context, connectionI
 		    $1,
 		    COALESCE((SELECT g.node_name FROM proxmox_guests g
 		              WHERE g.connection_id = $1 AND g.vmid = $3 LIMIT 1), $2),
-		    $3,'',$4,NULL,$5,$4,NOW())
+		    -- exit_status stays empty: the evidence here is a retained file, not
+		    -- a PVE task with an outcome string to quote.
+		    $3,'',$4,NULL,$5,'',NOW())
 		ON CONFLICT (connection_id, vmid) DO UPDATE SET
 		    node_name    = EXCLUDED.node_name,
 		    task_upid    = '',

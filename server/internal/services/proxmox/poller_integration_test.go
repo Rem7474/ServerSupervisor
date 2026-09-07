@@ -200,8 +200,13 @@ func TestPollOne_RecordsBackupRunsFromListShapeAndStorage(t *testing.T) {
 	if !ok {
 		t.Fatalf("no run recorded for vmid 200, got %+v", runs)
 	}
-	if run200.Status != "job errors" {
-		t.Errorf("vmid 200 status = %q, want %q", run200.Status, "job errors")
+	// status is the normalized vocabulary the UI colours; the raw PVE string
+	// is kept alongside it.
+	if run200.Status != BackupStatusFailed {
+		t.Errorf("vmid 200 status = %q, want %q", run200.Status, BackupStatusFailed)
+	}
+	if run200.ExitStatus != "job errors" {
+		t.Errorf("vmid 200 exit_status = %q, want the raw PVE outcome", run200.ExitStatus)
 	}
 	if run200.TaskUPID != "UPID:pve1:VM200" {
 		t.Errorf("vmid 200 lost its task link: %q", run200.TaskUPID)
