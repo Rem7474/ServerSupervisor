@@ -104,3 +104,41 @@ func TestUpsertProxmoxBackupRunFromStorage(t *testing.T) {
 		}
 	})
 }
+
+// GetProxmoxNode carries the owning connection's last_error so the node page
+// can explain an empty tab, rather than the message living only in the
+// connection list the user has no reason to open.
+func TestGetProxmoxNodeCarriesTheConnectionError(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	connID, err := db.CreateProxmoxConnection(ctx, baseConnRequest("node-conn-error"))
+	if err != nil {
+		t.Fatalf("create connection: %v", err)
+	}
+	if err := db.UpsertProxmoxNode(ctx, connID, "pve1", "online", 4, 0.1, 2000, 1000, 100, "", "", ""); err != nil {
+		t.Fatalf("upsert node: %v", err)
+	}
+	nodes, err := db.ListProxmoxNodesByConnection(ctx, connID)
+	if err != nil || len(nodes) != 1 {
+		t.Fatalf("list nodes: %v %+v", err, nodes)
+	}
+
+	if node, err := db.GetProxmoxNode(ctx, nodes[0].ID); err != nil || node == nil {
+		t.Fatalf("get node: %v", err)
+	} else if node.ConnectionError != "" {
+		t.Errorf("connection_error = %q, want empty for a healthy connection", node.ConnectionError)
+	}
+
+	if err := db.UpdateProxmoxConnectionError(ctx, connID, "disks: HTTP 403"); err != nil {
+		t.Fatalf("set error: %v", err)
+	}
+
+	node, err := db.GetProxmoxNode(ctx, nodes[0].ID)
+	if err != nil || node == nil {
+		t.Fatalf("get node: %v", err)
+	}
+	if node.ConnectionError != "disks: HTTP 403" {
+		t.Errorf("connection_error = %q, want the connection's message", node.ConnectionError)
+	}
+}
