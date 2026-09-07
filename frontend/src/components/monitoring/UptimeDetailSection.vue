@@ -200,7 +200,7 @@
             {{ t('monitoring.recentHistoryTitle') }}
           </h3>
           <small class="text-secondary">
-            {{ t('monitoring.sequencesOfChecksCount', { seq: groupedResults.length, total: results.length }, groupedResults.length) }}
+            {{ t('monitoring.sequencesOfChecksCount', { count: groupedResults.length, total: results.length }, groupedResults.length) }}
           </small>
         </div>
         <div class="table-responsive scroll-table">

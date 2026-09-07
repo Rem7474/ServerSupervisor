@@ -66,7 +66,7 @@
   "cleanupOrphanImagesLabel": "Nettoyer images orphelines",
   "projectServiceColumn": "Projet / Service",
   "creatingLabel": "Création...",
-  "createTrackersButton": "Créer {n} tracker | Créer {n} trackers",
+  "createTrackersButton": "Créer {count} tracker | Créer {count} trackers",
   "couldNotLoadContainersError": "Impossible de charger les conteneurs détectés.",
   "bulkCreationFailedError": "La création groupée a échoué.",
   "trackersCreatedSummary": "{created} tracker(s) créé(s), {failed} en échec : {names}",

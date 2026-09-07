@@ -179,7 +179,7 @@
           <h3 class="card-title mb-0">
             {{ t('monitoring.renewalHistoryTitle') }}
           </h3>
-          <small class="text-secondary">{{ t('monitoring.versionsDetectedCount', { n: events.length }, events.length) }}</small>
+          <small class="text-secondary">{{ t('monitoring.versionsDetectedCount', { count: events.length }, events.length) }}</small>
         </div>
 
         <div

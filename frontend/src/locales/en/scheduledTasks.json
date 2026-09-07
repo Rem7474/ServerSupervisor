@@ -45,7 +45,7 @@
   "durationColumn": "Duration",
   "triggeredByColumn": "Triggered by",
   "viewLogsTooltip": "View logs",
-  "executionCountLabel": "{n} execution (last 20) | {n} executions (last 20)",
+  "executionCountLabel": "{count} execution (last 20) | {count} executions (last 20)",
   "executionLogsTitle": "Execution logs",
   "noActiveConsoleTitle": "No active console",
   "createTaskError": "Error while creating",

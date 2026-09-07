@@ -32,7 +32,7 @@
           :size="16"
           class="icon me-1"
         />
-        {{ t('npm.certificatesExpiringLabel', { n: expiringCerts.length }, expiringCerts.length) }}
+        {{ t('npm.certificatesExpiringLabel', { count: expiringCerts.length }, expiringCerts.length) }}
       </div>
       <div class="d-flex flex-wrap gap-2">
         <router-link

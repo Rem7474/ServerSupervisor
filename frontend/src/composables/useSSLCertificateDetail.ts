@@ -74,7 +74,7 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
     const d = cert.value.days_remaining
     if (d == null) return t('monitoring.sslCertStatusUnknown')
     if (d < 0) return t('monitoring.sslDaysExpiredWithCount', { days: Math.abs(d) })
-    return t('monitoring.sslDaysRemaining', { d }, d)
+    return t('monitoring.sslDaysRemaining', { count: d }, d)
   })
 
   async function fetchCert(): Promise<void> {

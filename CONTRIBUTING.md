@@ -37,7 +37,11 @@ Trois règles qui font échouer la CI si elles sont ignorées :
 - **Un compteur passe par un message au pluriel**, pas par une concaténation :
   `t('dashboard.hostCount', { count: n }, n)` avec
   `'{count} hôte | {count} hôtes'`. Le français met 0 au singulier, l'anglais
-  non — la règle est déclarée dans `frontend/src/i18n.ts`.
+  non — la règle est déclarée dans `frontend/src/i18n.ts`. La variable qui pilote
+  le pluriel se nomme `count` : vue-i18n la reconnaît d'elle-même, donc le
+  message reste correct même si le troisième argument est oublié. Une poignée de
+  messages gardent un nom plus parlant (`created`, `failed`, `total`) ; pour
+  ceux-là le troisième argument est obligatoire.
 - **Les dates, nombres et tris passent par `frontend/src/utils/formatters.ts`**,
   jamais par un `'fr-FR'` écrit en dur : sinon un utilisateur anglophone lit
   `06/09/2026` là où sa locale écrit `09/06/2026`.

@@ -96,7 +96,7 @@
             placeholder="1"
           >
           <small class="form-hint">
-            {{ t('alerts.conditionsComposeWarnThresholdHint', { n: form.threshold_warn ?? 1 }, form.threshold_warn ?? 1) }}
+            {{ t('alerts.conditionsComposeWarnThresholdHint', { count: form.threshold_warn ?? 1 }, form.threshold_warn ?? 1) }}
           </small>
         </div>
         <div class="col-md-6 mb-3">
@@ -114,7 +114,7 @@
             placeholder="1"
           >
           <small class="form-hint">
-            {{ t('alerts.conditionsComposeCritThresholdHint', { n: form.threshold_crit ?? 1 }, form.threshold_crit ?? 1) }}
+            {{ t('alerts.conditionsComposeCritThresholdHint', { count: form.threshold_crit ?? 1 }, form.threshold_crit ?? 1) }}
           </small>
         </div>
       </div>
@@ -622,7 +622,7 @@ function formatTestValue(value: number): string {
       if (value >= 1) return t('alerts.conditionsDockerStateWarn')
       return t('alerts.conditionsDockerStateOk')
     case 'docker_compose_degraded_services':
-      return t('alerts.degradedServicesCount', { n: Math.round(value) }, Math.round(value))
+      return t('alerts.degradedServicesCount', { count: Math.round(value) }, Math.round(value))
     default:
       return `${value.toFixed(1)}${unitLabel.value}`
   }

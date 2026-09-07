@@ -2,7 +2,7 @@
   "dashboardBreadcrumb": "Dashboard",
   "nginxProxyManagerLabel": "Nginx Proxy Manager",
   "proxyHostsTitle": "Proxy Hosts NPM",
-  "certificatesExpiringLabel": "{n} certificat expirant sous 30 jours | {n} certificats expirant sous 30 jours",
+  "certificatesExpiringLabel": "{count} certificat expirant sous 30 jours | {count} certificats expirant sous 30 jours",
   "allProxyHostsTitle": "Tous les proxy hosts",
   "noProxyHostFoundTitle": "Aucun proxy host trouvé",
   "configureNpmConnectionHint": "Configurez une connexion NPM — les hosts apparaîtront automatiquement après le premier sync.",

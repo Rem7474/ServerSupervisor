@@ -126,19 +126,25 @@ autant de variantes séparées par `|` dans chaque message concerné.
 
 ### 6. Ajouter les messages d'erreur du serveur
 
-Les codes d'erreur vivent dans `server/internal/apperr/catalog.go`, dans une
-structure à un champ par langue :
+Les codes d'erreur vivent dans `server/internal/apperr/catalog.go`. Déclarez la
+langue, puis ajoutez sa traduction à chaque entrée :
 
 ```go
-type ErrorMessage struct {
-	EN string
-	FR string
-	ES string
+var SupportedLanguages = []string{"en", "fr", "es"}
+
+var ErrorCatalog = map[string]ErrorMessage{
+	CodeAdminRequired: {
+		"en": "admin access required",
+		"fr": "accès administrateur requis",
+		"es": "se requiere acceso de administrador",
+	},
+	// …
 }
 ```
 
-Chaque entrée de `ErrorCatalog` doit alors fournir les trois. `GetMessage`
-choisit la langue à partir de l'en-tête `Accept-Language`.
+`GetMessage` choisit la langue à partir de l'en-tête `Accept-Language` (en
+respectant les facteurs de qualité `q=`) et se rabat sur l'anglais pour une
+langue qu'une entrée ne couvre pas.
 
 ### 7. Lancer les vérifications
 
@@ -164,7 +170,10 @@ Ces vérifications tournent en CI et bloquent la fusion :
   serveur, celles en `snake_case` un identifiant de métrique ou de module.
 - Un texte qui affiche un nombre utilise un message au pluriel
   (`'{count} hôte | {count} hôtes'`) et passe le compteur en troisième argument
-  de `t()`, jamais une concaténation.
+  de `t()`, jamais une concaténation. La variable qui pilote le pluriel se nomme
+  `count` — vue-i18n la reconnaît d'elle-même, donc le message reste correct même
+  si le troisième argument est oublié. Quelques messages gardent un nom plus
+  parlant (`created`, `failed`, `total`) et dépendent alors de cet argument.
 - Deux compteurs indépendants dans un même message ne fonctionnent pas :
   vue-i18n ne résout qu'une seule forme de pluriel par message. Composez à
   partir de deux messages.

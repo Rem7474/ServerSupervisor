@@ -701,7 +701,7 @@
               </div>
             </div>
             <div class="modal-footer">
-              <span class="text-muted small me-auto">{{ t('scheduledTasks.executionCountLabel', { n: executions.length }, executions.length) }}</span>
+              <span class="text-muted small me-auto">{{ t('scheduledTasks.executionCountLabel', { count: executions.length }, executions.length) }}</span>
               <button
                 type="button"
                 class="btn btn-secondary"
