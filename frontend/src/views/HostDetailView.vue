@@ -938,9 +938,10 @@ const linkDiskPct = computed(() => {
   return (link.disk_usage / link.disk_alloc) * 100
 })
 
-// Fed by HostExposureTab's @loaded emit — the tab mounts eagerly (Host's
-// tabs use v-show, not lazy), so this is already populated before the user
-// ever clicks "Exposition".
+// Fed by HostExposureTab's @loaded emit. The tab is one of the few that stay
+// eager precisely because of this: the count is its own tab's badge, and a
+// lazy tab would leave the badge empty until the user clicked it — which is
+// the one thing the badge exists to save them from.
 const exposureDomainCount = ref(0)
 
 // Incidents' `host_name` is `hosts.name` (see db_notifications.go), so this
@@ -959,6 +960,15 @@ const hostAlertsLink = computed(() => ({
   query: { tab: 'incidents', host: host.value?.name || host.value?.hostname || '' },
 }))
 
+// `lazy` is set on every tab that fetches its own data from a `host-id` prop
+// and feeds nothing back to the view — mounting those eagerly meant one page
+// load issued their requests too, whether or not the user ever opened them
+// (Timeline alone is a ~1.4 MB response). The eager ones are eager for a
+// reason: `overview` is the default tab, `metrics`/`docker`/`apt` render data
+// the view already holds from the WS snapshot (no request to save), and
+// `exposition`/`taches-personnalisees`/`planifiees` each emit a count the
+// view renders as a badge or a KPI, so deferring them would blank that count
+// until first visit.
 const hostTabs = computed<EntityTab[]>(() => {
   const securityUpdates = aptStatus.value?.security_updates || 0
   const pendingPackages = aptStatus.value?.pending_packages || 0
@@ -986,7 +996,7 @@ const hostTabs = computed<EntityTab[]>(() => {
           ? [{ value: pendingPackages, badgeClass: 'badge bg-warning-lt text-warning ms-1' }]
           : [],
     },
-    { key: 'backup', label: t('host.backupTabLabel') },
+    { key: 'backup', label: t('host.backupTabLabel'), lazy: true },
     { key: 'reseau-flux', label: t('host.networkTrafficTabLabel'), lazy: true },
     {
       key: 'exposition',
@@ -999,8 +1009,8 @@ const hostTabs = computed<EntityTab[]>(() => {
 
   if (canRunApt.value) {
     tabs.push(
-      { key: 'systeme', label: t('host.systemTabLabel') },
-      { key: 'processus', label: t('host.processesTabLabel') }
+      { key: 'systeme', label: t('host.systemTabLabel'), lazy: true },
+      { key: 'processus', label: t('host.processesTabLabel'), lazy: true }
     )
   }
 
@@ -1018,7 +1028,7 @@ const hostTabs = computed<EntityTab[]>(() => {
     label: t('host.scheduledTasksTabLabel'),
     badges: tasksCount.value ? [{ value: tasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
   })
-  tabs.push({ key: 'timeline', label: 'Timeline' })
+  tabs.push({ key: 'timeline', label: 'Timeline', lazy: true })
 
   return tabs
 })

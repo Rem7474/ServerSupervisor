@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/config"
@@ -58,6 +59,21 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	r.Use(RequestLogger())
 	r.Use(SecurityHeadersMiddleware())
 	r.Use(CORSMiddleware(cfg.BaseURL, cfg.AllowedOrigins))
+	// The SPA bundle and the JSON API are both served straight from this
+	// process (registerStaticFiles below, plus every /api route), so without
+	// this they go out uncompressed: a single host-detail page load transfers
+	// ~7 MB of JS/CSS/JSON that gzip takes down to roughly a tenth of that.
+	// A deployment fronted by a reverse proxy that already compresses gets a
+	// no-op here (the proxy strips Accept-Encoding: gzip or compresses the
+	// already-compressed body only if misconfigured), so this is safe to
+	// enable unconditionally rather than behind a flag.
+	//
+	// WebSocket upgrades are skipped by the library itself: shouldCompress
+	// returns false as soon as the request carries `Connection: Upgrade`, so
+	// /api/v1/ws/* and /api/agent/ws keep their raw frames. MinLength avoids
+	// spending CPU on tiny payloads where the gzip header costs more than it
+	// saves, and images are excluded by the library's own defaults.
+	r.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithMinLength(1024)))
 
 	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.TrustedProxyCIDRs)
 	r.Use(RateLimiterMiddleware(ipRateLimiter))
