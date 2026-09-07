@@ -40,3 +40,48 @@ func TestMergeTasksByUPIDNoExtra(t *testing.T) {
 		t.Fatalf("len(got) = %d, want 1", len(got))
 	}
 }
+
+func TestTaskFinished(t *testing.T) {
+	// The task *list* endpoint reports the outcome in `status` and leaves
+	// `exitstatus` empty; the per-task status endpoint uses "stopped" plus a
+	// separate `exitstatus`. Both shapes have to be recognised, or backup runs
+	// are silently dropped — which is exactly what testing status == "stopped"
+	// alone did.
+	tests := []struct {
+		name string
+		task proxmoxclient.PVETask
+		want bool
+	}{
+		{"list shape, success", proxmoxclient.PVETask{Status: "OK"}, true},
+		{"list shape, failure", proxmoxclient.PVETask{Status: "job errors"}, true},
+		{"status-endpoint shape", proxmoxclient.PVETask{Status: "stopped", ExitStatus: "OK"}, true},
+		{"still running", proxmoxclient.PVETask{Status: "running"}, false},
+		{"no data at all", proxmoxclient.PVETask{}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := taskFinished(tc.task); got != tc.want {
+				t.Errorf("taskFinished(%+v) = %v, want %v", tc.task, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTaskOutcome(t *testing.T) {
+	tests := []struct {
+		name string
+		task proxmoxclient.PVETask
+		want string
+	}{
+		{"prefers the dedicated field", proxmoxclient.PVETask{Status: "stopped", ExitStatus: "OK"}, "OK"},
+		{"falls back to the overloaded status", proxmoxclient.PVETask{Status: "job errors"}, "job errors"},
+		{"running has no outcome yet", proxmoxclient.PVETask{Status: "running"}, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := taskOutcome(tc.task); got != tc.want {
+				t.Errorf("taskOutcome(%+v) = %q, want %q", tc.task, got, tc.want)
+			}
+		})
+	}
+}
