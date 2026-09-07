@@ -56,15 +56,34 @@ func (db *DB) InsertNetworkFlowMetrics(ctx context.Context, hostID string, repor
 }
 
 // GetLatestNetworkFlowMetrics returns the most recent report cycle's talkers
-// for a host (the "others" row, if any, sorted last), busiest first.
+// for a host (the "others" row, if any, sorted last), busiest first. Bounded to
+// latestSampleWindow first — network_flow_metrics deliberately carries no
+// retention policy (see migration 092), so it is the one hypertable here that
+// grows without bound and the unbounded variant gets more expensive over time.
 func (db *DB) GetLatestNetworkFlowMetrics(ctx context.Context, hostID string) ([]models.NetworkFlowMetric, error) {
+	metrics, err := db.latestNetworkFlowMetricsForHost(ctx, hostID, true)
+	if err != nil {
+		return nil, err
+	}
+	if len(metrics) == 0 {
+		return db.latestNetworkFlowMetricsForHost(ctx, hostID, false)
+	}
+	return metrics, nil
+}
+
+func (db *DB) latestNetworkFlowMetricsForHost(ctx context.Context, hostID string, recentOnly bool) ([]models.NetworkFlowMetric, error) {
+	recent := ``
+	if recentOnly {
+		recent = ` AND timestamp > NOW() - ` + latestSampleWindow
+	}
+
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT id, host_id, timestamp, is_others, remote_ip, remote_port, protocol, direction,
 			process_name, pid, server_name, rx_bytes, tx_bytes, packets, connections
 		FROM network_flow_metrics
-		WHERE host_id = $1
+		WHERE host_id = $1`+recent+`
 		  AND timestamp = (
-			SELECT MAX(timestamp) FROM network_flow_metrics WHERE host_id = $1
+			SELECT MAX(timestamp) FROM network_flow_metrics WHERE host_id = $1`+recent+`
 		  )
 		ORDER BY is_others ASC, (rx_bytes + tx_bytes) DESC`,
 		hostID,

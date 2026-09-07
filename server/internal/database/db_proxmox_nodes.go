@@ -243,10 +243,15 @@ func (db *DB) GetEffectiveHostCPUTemperature(ctx context.Context, hostID string,
 	if sourceHostID.Valid {
 		var temp float64
 		var ts time.Time
+		// The 10-minute predicate mirrors the time.Since check below: the sample
+		// is discarded either way, so pushing it into SQL keeps the result
+		// identical while letting the planner exclude chunks instead of scanning
+		// the whole retention window.
 		err = db.conn.QueryRowContext(ctx, `
 			SELECT cpu_temperature, timestamp
 			FROM system_metrics
 			WHERE host_id = $1
+			  AND timestamp > NOW() - `+proxmoxSensorFreshness+`
 			ORDER BY timestamp DESC
 			LIMIT 1`, sourceHostID.String).Scan(&temp, &ts)
 		if err == nil && temp > 0 && time.Since(ts) <= 10*time.Minute {
@@ -283,10 +288,13 @@ func (db *DB) GetEffectiveHostFanRPM(ctx context.Context, hostID string, fallbac
 	if sourceHostID.Valid {
 		var rpm float64
 		var ts time.Time
+		// Same reasoning as GetEffectiveHostCPUTemperature: the SQL predicate and
+		// the time.Since check below express the same 10-minute cutoff.
 		err = db.conn.QueryRowContext(ctx, `
 			SELECT COALESCE(fan_rpm, 0), timestamp
 			FROM system_metrics
 			WHERE host_id = $1
+			  AND timestamp > NOW() - `+proxmoxSensorFreshness+`
 			ORDER BY timestamp DESC
 			LIMIT 1`, sourceHostID.String).Scan(&rpm, &ts)
 		if err == nil && rpm > 0 && time.Since(ts) <= 10*time.Minute {
