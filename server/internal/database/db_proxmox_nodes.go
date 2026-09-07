@@ -111,6 +111,14 @@ func (db *DB) GetProxmoxNode(ctx context.Context, id string) (*models.ProxmoxNod
 		n.LastUpdateCheckAt = &t
 	}
 
+	// Surfaced on the detail view only; the node list has its own status column.
+	var connErr sql.NullString
+	if err := db.conn.QueryRowContext(ctx,
+		`SELECT last_error FROM proxmox_connections WHERE id=$1`, n.ConnectionID,
+	).Scan(&connErr); err == nil && connErr.Valid {
+		n.ConnectionError = connErr.String
+	}
+
 	// Load guests
 	guests, err := db.ListProxmoxGuestsByNode(ctx, n.ConnectionID, n.NodeName)
 	if err != nil {

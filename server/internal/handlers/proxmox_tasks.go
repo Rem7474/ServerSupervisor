@@ -59,12 +59,12 @@ func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, apperr.NewErrorResponse(apperr.CodeMissingParameter, lang, nil))
 		return
 	}
-	lines, err := h.svc.TaskLog(c.Request.Context(), c.Param("id"), upid)
+	log, err := h.svc.TaskLog(c.Request.Context(), c.Param("id"), upid)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, lines)
+	c.JSON(http.StatusOK, log)
 }
 
 // GetNodeSyslog proxies GET /nodes/{node}/syslog from PVE.

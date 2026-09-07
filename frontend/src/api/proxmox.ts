@@ -6,6 +6,7 @@ import type {
   ProxmoxGuest,
   ProxmoxSummary,
   ProxmoxTask,
+  ProxmoxTaskLog,
   ProxmoxDisk,
   ProxmoxBackupJob,
   ProxmoxBackupRun,
@@ -84,7 +85,7 @@ export const proxmoxApi = {
   // Node live data
   getProxmoxNodeStatus: (nodeId: string) => api.get(`/v1/proxmox/nodes/${nodeId}/status`),
   getProxmoxTaskLog: (nodeId: string, upid: string) =>
-    api.get(`/v1/proxmox/nodes/${nodeId}/tasks/${encodeURIComponent(upid)}/log`),
+    api.get<ProxmoxTaskLog>(`/v1/proxmox/nodes/${nodeId}/tasks/${encodeURIComponent(upid)}/log`),
   getProxmoxNodeRRD: (nodeId: string, timeframe?: string) =>
     api.get(`/v1/proxmox/nodes/${nodeId}/rrd`, { params: { timeframe: timeframe ?? 'hour' } }),
   getProxmoxNodeSyslog: (nodeId: string, params?: JsonObject) =>

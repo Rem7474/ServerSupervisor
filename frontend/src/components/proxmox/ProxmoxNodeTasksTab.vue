@@ -85,8 +85,15 @@
             <span
               class="badge task-status-badge"
               :class="taskStatusBadgeClass(task)"
-              :title="taskStatusLabel(task)"
+              :title="taskStatusDetail(task) || taskStatusLabel(task)"
             >{{ taskStatusLabel(task) }}</span>
+            <div
+              v-if="taskStatusDetail(task)"
+              class="text-secondary small task-status-detail"
+              :title="taskStatusDetail(task)"
+            >
+              {{ taskStatusDetail(task) }}
+            </div>
           </td>
           <td>
             <button
@@ -183,28 +190,54 @@ function taskDuration(task: ProxmoxTask): string {
   return `${h}h ${m % 60}m`
 }
 
+// PVE reports a task's outcome in `exit_status` on the per-task endpoint and
+// in `status` on the list endpoint, which is why both are consulted. A status
+// that is merely a lifecycle word is not an outcome — treating it as one would
+// report a queued task as failed.
+const LIFECYCLE_STATUSES = new Set(['running', 'stopped', 'queued', 'pending'])
+
+function taskOutcome(task: ProxmoxTask): string {
+  if (task.exit_status) return String(task.exit_status)
+  const status = String(task.status ?? '')
+  return LIFECYCLE_STATUSES.has(status.toLowerCase()) ? '' : status
+}
+
+// The badge carries the state, in the same vocabulary as the backups table and
+// the live task panel; the raw PVE wording goes underneath and in the tooltip
+// rather than becoming an untranslated, unbounded badge of its own.
 function taskStatusLabel(task: ProxmoxTask): string {
   if (task.status === 'running') return t('proxmox.runningStatusLabel')
-  if (task.exit_status === 'OK' || task.status === 'OK') return 'OK'
-  if (task.exit_status) return String(task.exit_status)
-  return String(task.status || '—')
+  const outcome = taskOutcome(task)
+  // No outcome yet: show the lifecycle word PVE gave rather than inventing one.
+  if (!outcome) return String(task.status || '—')
+  if (outcome === 'OK') return 'OK'
+  if (outcome.toUpperCase().startsWith('WARNINGS')) return t('common.stateWarnings')
+  return t('common.stateFailed')
 }
 
 function taskStatusBadgeClass(task: ProxmoxTask): string {
   if (task.status === 'running') return 'bg-primary-lt text-primary'
-  if (task.exit_status === 'OK' || task.status === 'OK') return 'bg-success-lt text-success'
-  if (task.exit_status) return 'bg-danger-lt text-danger'
-  return 'bg-secondary-lt text-secondary'
+  const outcome = taskOutcome(task)
+  if (!outcome) return 'bg-secondary-lt text-secondary'
+  if (outcome === 'OK') return 'bg-success-lt text-success'
+  if (outcome.toUpperCase().startsWith('WARNINGS')) return 'bg-warning-lt text-warning'
+  return 'bg-danger-lt text-danger'
+}
+
+// Only worth showing when it says more than the badge already does.
+function taskStatusDetail(task: ProxmoxTask): string {
+  const outcome = taskOutcome(task)
+  return outcome === 'OK' ? '' : outcome
 }
 </script>
 
 <style scoped>
-.task-status-badge {
-  max-width: 11rem;
-  display: inline-block;
-  white-space: nowrap;
+/* The badge now holds a short state; the raw PVE outcome sits below it and is
+   what needs capping — it can be a full storage error. */
+.task-status-detail {
+  max-width: 22rem;
   overflow: hidden;
   text-overflow: ellipsis;
-  vertical-align: bottom;
+  white-space: nowrap;
 }
 </style>

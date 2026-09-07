@@ -494,16 +494,34 @@ func (s *Service) NodeServices(ctx context.Context, nodeID string) (any, error) 
 	return services, nil
 }
 
-func (s *Service) TaskLog(ctx context.Context, nodeID, upid string) (any, error) {
+func (s *Service) TaskLog(ctx context.Context, nodeID, upid string) (models.ProxmoxTaskLog, error) {
 	node, client, err := s.nodeClient(ctx, nodeID)
 	if err != nil {
-		return nil, err
+		return models.ProxmoxTaskLog{}, err
 	}
-	lines, err := client.GetNodeTaskLog(node.NodeName, upid)
+	lines, total, err := client.GetNodeTaskLog(node.NodeName, upid)
 	if err != nil {
-		return nil, apperr.BadGateway(err.Error())
+		return models.ProxmoxTaskLog{}, apperr.BadGateway(err.Error())
 	}
-	return lines, nil
+
+	out := models.ProxmoxTaskLog{
+		Lines:     make([]models.ProxmoxTaskLogLine, 0, len(lines)),
+		Total:     total,
+		Truncated: total > len(lines),
+	}
+	for _, l := range lines {
+		out.Lines = append(out.Lines, models.ProxmoxTaskLogLine{N: l.N, T: l.T})
+	}
+
+	// A task whose status can't be read still returns its log — the console is
+	// more useful with an unknown lifecycle than not at all. Finished stays
+	// false, so the caller keeps polling rather than declaring a live task done.
+	if st, err := client.GetNodeTaskStatus(node.NodeName, upid); err == nil {
+		out.Status = st.Status
+		out.ExitStatus = st.ExitStatus
+		out.Finished = st.Finished()
+	}
+	return out, nil
 }
 
 func (s *Service) NodeSyslog(ctx context.Context, nodeID string, limit int, service, search string) ([]proxmoxclient.PVESyslogLine, error) {

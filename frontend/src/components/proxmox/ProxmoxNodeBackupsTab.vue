@@ -128,7 +128,17 @@
                   <span
                     class="badge"
                     :class="getExecutionStateClass(r.status)"
+                    :title="r.exit_status || undefined"
                   >{{ getExecutionStateLabel(r.status) }}</span>
+                  <!-- PVE's own wording, kept visible but subordinate to the
+                       state: it is what tells the operator *why* it failed. -->
+                  <div
+                    v-if="showsDetail(r)"
+                    class="text-secondary small run-detail"
+                    :title="r.exit_status"
+                  >
+                    {{ r.exit_status }}
+                  </div>
                 </td>
                 <td class="text-secondary small">
                   {{ formatDate(r.end_time) }}
@@ -203,8 +213,26 @@ const sortedRuns = computed(() => {
   return list
 })
 
+// The raw outcome is only worth a line of its own when it says more than the
+// badge already does ("OK" under an OK badge is noise).
+function showsDetail(run: ProxmoxBackupRun): boolean {
+  const raw = (run.exit_status ?? '').trim()
+  return raw !== '' && raw.toLowerCase() !== (run.status ?? '').toLowerCase()
+}
+
 function formatDate(iso?: string): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 </script>
+
+<style scoped>
+/* A PVE outcome can be a full storage error; without a cap it stretches the
+   table and forces horizontal scrolling. The full text stays in the title. */
+.run-detail {
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>

@@ -248,5 +248,8 @@
   "taskLogsEmptyText": "Cliquez sur 'Logs' dans une tâche pour suivre l'exécution",
   "migrateModalTitle": "Migrer {name}",
   "targetNodeLabel": "Nœud cible",
-  "liveMigrationLabel": "Migration à chaud (sans arrêt)"
+  "liveMigrationLabel": "Migration à chaud (sans arrêt)",
+  "taskLogTruncated": "— {shown} dernières lignes sur {total} ; le début du journal est tronqué —",
+  "partialCollectionTitle": "Collecte partielle",
+  "partialCollectionHint": "Un appel à l'API Proxmox a échoué lors du dernier cycle — certains onglets peuvent être vides. Vérifiez les privilèges du token API."
 }

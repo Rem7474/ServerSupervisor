@@ -315,6 +315,28 @@
         @timeframe-changed="loadRRD"
       />
 
+      <!-- Degraded collection: a PVE call the poller could not make, most often
+           a privilege the API token is missing. Without this the affected tab
+           is simply empty, with nothing anywhere saying why. -->
+      <div
+        v-if="node.connection_error"
+        class="alert alert-warning mb-4"
+      >
+        <div class="d-flex align-items-start gap-2">
+          <IconAlertTriangle
+            :size="16"
+            class="icon icon-sm mt-1 flex-shrink-0"
+          />
+          <div>
+            <strong>{{ t('proxmox.partialCollectionTitle') }}</strong>
+            <div class="small">
+              {{ t('proxmox.partialCollectionHint') }}
+            </div>
+            <code class="d-block mt-1 small">{{ node.connection_error }}</code>
+          </div>
+        </div>
+      </div>
+
       <!-- Updates banner (only shown when pending updates exist) -->
       <div
         v-if="node.pending_updates > 0"
@@ -546,6 +568,7 @@ import ProxmoxNodeStorageTab from '../components/proxmox/ProxmoxNodeStorageTab.v
 import ProxmoxNodeTasksTab from '../components/proxmox/ProxmoxNodeTasksTab.vue'
 import ProxmoxNodeUpdatesTab from '../components/proxmox/ProxmoxNodeUpdatesTab.vue'
 import ProxmoxNodeServicesTab from '../components/proxmox/ProxmoxNodeServicesTab.vue'
+import { IconAlertTriangle } from '@tabler/icons-vue'
 import ProxmoxNodeBackupsTab from '../components/proxmox/ProxmoxNodeBackupsTab.vue'
 import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab.vue'
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
