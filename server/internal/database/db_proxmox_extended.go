@@ -101,7 +101,7 @@ func (db *DB) GetRecentFailedTaskCount(ctx context.Context, since time.Time) (in
 
 // DeleteStaleProxmoxTasks removes tasks not seen since the cutoff for a connection.
 func (db *DB) DeleteStaleProxmoxTasks(ctx context.Context, connectionID string, cutoff time.Time) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`DELETE FROM proxmox_tasks WHERE connection_id=$1 AND last_seen_at < $2`,
 		connectionID, cutoff)
 	return err
@@ -198,7 +198,7 @@ func (db *DB) ListProxmoxBackupJobs(ctx context.Context, connectionID string) ([
 
 // DeleteStaleProxmoxBackupJobs removes jobs not seen since the cutoff.
 func (db *DB) DeleteStaleProxmoxBackupJobs(ctx context.Context, connectionID string, cutoff time.Time) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`DELETE FROM proxmox_backup_jobs WHERE connection_id=$1 AND last_seen_at < $2`,
 		connectionID, cutoff)
 	return err
@@ -226,6 +226,46 @@ func (db *DB) UpsertProxmoxBackupRun(ctx context.Context, connectionID, nodeName
 	return err
 }
 
+// UpsertProxmoxBackupRunFromStorage records a backup inferred from a volume
+// sitting on a backup storage, rather than from a vzdump task.
+//
+// It exists because a vzdump *job* covering several guests produces a single
+// PVE task with no vmid attached, so the per-guest outcome is unavailable from
+// the task list — but the resulting files are, one per guest, each carrying
+// its creation time. The row it writes has no task_upid (there is no per-guest
+// task to link a log to).
+//
+// It never overwrites a more recent row, so a task-derived result — which does
+// carry a UPID — always wins while it is the freshest thing known about that
+// guest.
+//
+// nodeName is only a fallback: a backup storage is usually shared, so the node
+// that happened to list the volume is not necessarily the one running the
+// guest. The owning node is resolved from proxmox_guests where known, because
+// the UI filters this table by node.
+func (db *DB) UpsertProxmoxBackupRunFromStorage(ctx context.Context, connectionID, nodeName string, vmid int, status string, endTime time.Time) error {
+	_, err := db.conn.ExecContext(ctx, `
+		INSERT INTO proxmox_backup_runs
+		    (connection_id, node_name, vmid, task_upid, status, start_time, end_time, exit_status, last_seen_at)
+		VALUES (
+		    $1,
+		    COALESCE((SELECT g.node_name FROM proxmox_guests g
+		              WHERE g.connection_id = $1 AND g.vmid = $3 LIMIT 1), $2),
+		    $3,'',$4,NULL,$5,$4,NOW())
+		ON CONFLICT (connection_id, vmid) DO UPDATE SET
+		    node_name    = EXCLUDED.node_name,
+		    task_upid    = '',
+		    status       = EXCLUDED.status,
+		    end_time     = EXCLUDED.end_time,
+		    exit_status  = EXCLUDED.exit_status,
+		    last_seen_at = NOW()
+		WHERE proxmox_backup_runs.end_time IS NULL
+		   OR proxmox_backup_runs.end_time < EXCLUDED.end_time`,
+		connectionID, nodeName, vmid, status, endTime,
+	)
+	return err
+}
+
 // ListProxmoxBackupRuns returns the latest backup run per VM for a connection.
 // Guest name is joined from proxmox_guests when available.
 func (db *DB) ListProxmoxBackupRuns(ctx context.Context, connectionID string) ([]models.ProxmoxBackupRun, error) {
@@ -243,7 +283,7 @@ func (db *DB) ListProxmoxBackupRuns(ctx context.Context, connectionID string) ([
 	if connectionID != "" {
 		rows, err = db.conn.QueryContext(ctx, q+` WHERE r.connection_id=$1 ORDER BY r.start_time DESC NULLS LAST`, connectionID)
 	} else {
-		rows, err = db.conn.QueryContext(ctx, q + ` ORDER BY r.start_time DESC NULLS LAST`)
+		rows, err = db.conn.QueryContext(ctx, q+` ORDER BY r.start_time DESC NULLS LAST`)
 	}
 	if err != nil {
 		return nil, err
@@ -335,7 +375,7 @@ func (db *DB) ListProxmoxDisksByHost(ctx context.Context, hostID string) ([]mode
 
 // DeleteStaleProxmoxDisks removes disks not seen since the cutoff for a connection + node.
 func (db *DB) DeleteStaleProxmoxDisks(ctx context.Context, connectionID string, cutoff time.Time) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`DELETE FROM proxmox_disks WHERE connection_id=$1 AND last_seen_at < $2`,
 		connectionID, cutoff)
 	return err
