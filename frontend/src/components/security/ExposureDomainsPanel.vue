@@ -258,7 +258,11 @@ function openDomain(domain: string): void {
 // blind to whether the domain it's reporting traffic for is actually up.
 // Domains with no monitoring configured just show "—" — this never creates
 // anything, only reads what already exists.
-const { probes, probeBadge, probeStatusLabel, probeHistory } = useUptimeProbes()
+// withStats: false — this panel shows a status badge and a heartbeat bar, and
+// never reads probeStats. Leaving it on made every mount fan out one extra
+// request per probe in the whole fleet (~50 on a mid-size install) for a value
+// nothing here renders.
+const { probes, probeBadge, probeStatusLabel, probeHistory } = useUptimeProbes({ withStats: false })
 const { certs, daysLabel, daysBadge } = useSslCertificates()
 
 const probeByProxyHost = computed(() => {

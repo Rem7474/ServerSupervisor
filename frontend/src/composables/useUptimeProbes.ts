@@ -36,7 +36,19 @@ interface ProbeForm {
 const REFRESH_SEC = 30
 const PAGE_SIZE = 25
 
-export function useUptimeProbes() {
+export interface UseUptimeProbesOptions {
+  /**
+   * Fetch each probe's 24h uptime percentage (`probeStats`). Costs one request
+   * per probe on top of the list, so consumers that never read `probeStats`
+   * must opt out: `ExposureDomainsPanel` renders a status badge and a
+   * heartbeat bar only, and on a fleet with ~50 probes the stats fan-out it
+   * used to trigger was 50 requests whose results were discarded.
+   */
+  withStats?: boolean
+}
+
+export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
+  const { withStats = true } = options
   const { t } = useI18n()
   const dialog = useConfirmDialog()
 
@@ -131,7 +143,7 @@ export function useUptimeProbes() {
       probes.value = data?.probes || []
       lastUpdatedAt.value = new Date()
       error.value = ''
-      fetchAllProbeStats()
+      if (withStats) fetchAllProbeStats()
       fetchAllProbeHistory()
     } catch (e: unknown) {
       error.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
