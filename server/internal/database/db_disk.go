@@ -33,21 +33,56 @@ func (db *DB) InsertDiskMetrics(ctx context.Context, metrics []models.DiskMetric
 	return nil
 }
 
+// GetLatestDiskMetrics returns every mount point from the host's most recent
+// report cycle. Bounded to latestSampleWindow first, widening to the full
+// retention window only when that finds nothing — both the outer query and the
+// MAX(timestamp) subquery have to carry the predicate, otherwise the subquery
+// alone still scans the whole hypertable.
 func (db *DB) GetLatestDiskMetrics(ctx context.Context, hostID string) ([]models.DiskMetrics, error) {
-	rows, err := db.conn.QueryContext(ctx,
-		`SELECT id, host_id, timestamp, mount_point, filesystem,
-			size_gb, used_gb, avail_gb, used_percent,
-			inodes_total, inodes_used, inodes_free, inodes_percent
-		FROM disk_metrics
-		WHERE host_id = $1
-		  AND timestamp = (
-			SELECT MAX(timestamp)
+	metrics, err := db.latestDiskMetricsForHost(ctx, hostID, true)
+	if err != nil {
+		return nil, err
+	}
+	if len(metrics) == 0 {
+		return db.latestDiskMetricsForHost(ctx, hostID, false)
+	}
+	return metrics, nil
+}
+
+func (db *DB) latestDiskMetricsForHost(ctx context.Context, hostID string, recentOnly bool) ([]models.DiskMetrics, error) {
+	var rows *sql.Rows
+	var err error
+	if recentOnly {
+		rows, err = db.conn.QueryContext(ctx,
+			`SELECT id, host_id, timestamp, mount_point, filesystem,
+				size_gb, used_gb, avail_gb, used_percent,
+				inodes_total, inodes_used, inodes_free, inodes_percent
+			FROM disk_metrics
+			WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			  AND timestamp = (
+				SELECT MAX(timestamp)
+				FROM disk_metrics
+				WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			  )
+			ORDER BY mount_point ASC`,
+			hostID,
+		)
+	} else {
+		rows, err = db.conn.QueryContext(ctx,
+			`SELECT id, host_id, timestamp, mount_point, filesystem,
+				size_gb, used_gb, avail_gb, used_percent,
+				inodes_total, inodes_used, inodes_free, inodes_percent
 			FROM disk_metrics
 			WHERE host_id = $1
-		  )
-		ORDER BY mount_point ASC`,
-		hostID,
-	)
+			  AND timestamp = (
+				SELECT MAX(timestamp)
+				FROM disk_metrics
+				WHERE host_id = $1
+			  )
+			ORDER BY mount_point ASC`,
+			hostID,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -277,17 +312,48 @@ func (db *DB) InsertDiskHealth(ctx context.Context, healthData []models.DiskHeal
 	return nil
 }
 
+// GetLatestDiskHealth returns the freshest SMART reading per device for a host.
+// SMART is collected on the same cycle as the rest of the report (see the
+// agent's reporter), so a host with SMART enabled always has a sample inside
+// latestSampleWindow; the unbounded retry covers hosts that stopped reporting
+// and those where smartctl is unavailable but historical rows exist.
 func (db *DB) GetLatestDiskHealth(ctx context.Context, hostID string) ([]models.DiskHealth, error) {
-	rows, err := db.conn.QueryContext(ctx,
-		`SELECT DISTINCT ON (device)
-			id, host_id, timestamp, device, model, serial_number,
-			smart_status, temperature, power_on_hours, power_cycles,
-			realloc_sectors, pending_sectors, uncorrectable_sectors, percentage_used
-		FROM disk_health
-		WHERE host_id = $1
-		ORDER BY device, timestamp DESC`,
-		hostID,
-	)
+	healthData, err := db.latestDiskHealthForHost(ctx, hostID, true)
+	if err != nil {
+		return nil, err
+	}
+	if len(healthData) == 0 {
+		return db.latestDiskHealthForHost(ctx, hostID, false)
+	}
+	return healthData, nil
+}
+
+func (db *DB) latestDiskHealthForHost(ctx context.Context, hostID string, recentOnly bool) ([]models.DiskHealth, error) {
+	var rows *sql.Rows
+	var err error
+	if recentOnly {
+		rows, err = db.conn.QueryContext(ctx,
+			`SELECT DISTINCT ON (device)
+				id, host_id, timestamp, device, model, serial_number,
+				smart_status, temperature, power_on_hours, power_cycles,
+				realloc_sectors, pending_sectors, uncorrectable_sectors, percentage_used
+			FROM disk_health
+			WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			ORDER BY device, timestamp DESC`,
+			hostID,
+		)
+	} else {
+		rows, err = db.conn.QueryContext(ctx,
+			`SELECT DISTINCT ON (device)
+				id, host_id, timestamp, device, model, serial_number,
+				smart_status, temperature, power_on_hours, power_cycles,
+				realloc_sectors, pending_sectors, uncorrectable_sectors, percentage_used
+			FROM disk_health
+			WHERE host_id = $1
+			ORDER BY device, timestamp DESC`,
+			hostID,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}

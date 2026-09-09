@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -40,21 +41,55 @@ func (db *DB) InsertUptimeMetrics(ctx context.Context, hostID string, uptime uin
 	return err
 }
 
+// GetLatestMetrics returns the most recent SystemMetrics row for one host.
+// It looks inside latestSampleWindow first and only widens to the full
+// retention window when that comes back empty, so the unbounded scan is
+// reserved for hosts that have genuinely stopped reporting and their detail
+// page keeps showing the last sample it ever received.
 func (db *DB) GetLatestMetrics(ctx context.Context, hostID string) (*models.SystemMetrics, error) {
+	m, err := db.latestMetricsForHost(ctx, hostID, true)
+	if errors.Is(err, sql.ErrNoRows) {
+		return db.latestMetricsForHost(ctx, hostID, false)
+	}
+	return m, err
+}
+
+func (db *DB) latestMetricsForHost(ctx context.Context, hostID string, recentOnly bool) (*models.SystemMetrics, error) {
 	var m models.SystemMetrics
-	err := db.conn.QueryRowContext(ctx, 
-		`SELECT id, host_id, timestamp,
-		 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
-		 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
-		 COALESCE(load_avg_1, 0), COALESCE(load_avg_5, 0), COALESCE(load_avg_15, 0),
-		 COALESCE(memory_total, 0), COALESCE(memory_used, 0), COALESCE(memory_free, 0), COALESCE(memory_percent, 0),
-		 COALESCE(swap_total, 0), COALESCE(swap_used, 0),
-		 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
-		 COALESCE(uptime, 0), COALESCE(hostname, '')
-		 FROM system_metrics WHERE host_id = $1 ORDER BY timestamp DESC LIMIT 1`, hostID,
-	).Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
-		&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
-		&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime, &m.Hostname)
+	var err error
+	if recentOnly {
+		err = db.conn.QueryRowContext(ctx,
+			`SELECT id, host_id, timestamp,
+			 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
+			 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
+			 COALESCE(load_avg_1, 0), COALESCE(load_avg_5, 0), COALESCE(load_avg_15, 0),
+			 COALESCE(memory_total, 0), COALESCE(memory_used, 0), COALESCE(memory_free, 0), COALESCE(memory_percent, 0),
+			 COALESCE(swap_total, 0), COALESCE(swap_used, 0),
+			 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
+			 COALESCE(uptime, 0), COALESCE(hostname, '')
+			 FROM system_metrics
+			 WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			 ORDER BY timestamp DESC LIMIT 1`, hostID,
+		).Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
+			&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
+			&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime, &m.Hostname)
+	} else {
+		err = db.conn.QueryRowContext(ctx,
+			`SELECT id, host_id, timestamp,
+			 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
+			 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
+			 COALESCE(load_avg_1, 0), COALESCE(load_avg_5, 0), COALESCE(load_avg_15, 0),
+			 COALESCE(memory_total, 0), COALESCE(memory_used, 0), COALESCE(memory_free, 0), COALESCE(memory_percent, 0),
+			 COALESCE(swap_total, 0), COALESCE(swap_used, 0),
+			 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
+			 COALESCE(uptime, 0), COALESCE(hostname, '')
+			 FROM system_metrics
+			 WHERE host_id = $1
+			 ORDER BY timestamp DESC LIMIT 1`, hostID,
+		).Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
+			&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
+			&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime, &m.Hostname)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +101,15 @@ func (db *DB) GetLatestMetrics(ctx context.Context, hostID string) (*models.Syst
 // GetLatestMetricsAll returns the most recent SystemMetrics row for every host
 // in a single query, avoiding N+1 lookups on the dashboard.
 // Disk details are intentionally omitted (dashboard only needs CPU/mem/net).
+//
+// Unlike the per-host GetLatestMetrics this has no unbounded fallback: the
+// result is one map covering the whole fleet, so widening it for a single
+// silent host would mean re-reading the full retention window for all of them.
+// A host with no sample in latestSampleWindow is therefore absent from the map
+// and the dashboard renders no live CPU/RAM for it — which is what its
+// `offline` status already says.
 func (db *DB) GetLatestMetricsAll(ctx context.Context) (map[string]*models.SystemMetrics, error) {
-	rows, err := db.conn.QueryContext(ctx, 
+	rows, err := db.conn.QueryContext(ctx,
 		`SELECT DISTINCT ON (host_id) id, host_id, timestamp,
 		 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
 		 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
@@ -77,6 +119,7 @@ func (db *DB) GetLatestMetricsAll(ctx context.Context) (map[string]*models.Syste
 		 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
 		 COALESCE(uptime, 0), COALESCE(hostname, '')
 		 FROM system_metrics
+		 WHERE timestamp > NOW() - INTERVAL '30 minutes'
 		 ORDER BY host_id, timestamp DESC`,
 	)
 	if err != nil {
@@ -106,11 +149,16 @@ func (db *DB) GetLatestMetricsAll(ctx context.Context) (map[string]*models.Syste
 // each host, based on the most recent disk_metrics row. Uses disk_metrics (not
 // disk_info) so the value is always current even when Proxmox is the metrics source
 // and InsertMetrics is skipped. Hosts with no disk_metrics row for "/" are omitted.
+//
+// Bounded to latestSampleWindow with no unbounded fallback, for the same reason
+// as GetLatestMetricsAll: this is one fleet-wide map, and disk_metrics carries a
+// row per mount point per report, making it the largest hypertable of the set.
 func (db *DB) GetRootDiskPercentAll(ctx context.Context) map[string]float64 {
-	rows, err := db.conn.QueryContext(ctx, 
+	rows, err := db.conn.QueryContext(ctx,
 		`SELECT DISTINCT ON (host_id) host_id, used_percent
 		 FROM disk_metrics
 		 WHERE mount_point = '/'
+		   AND timestamp > NOW() - INTERVAL '30 minutes'
 		 ORDER BY host_id, timestamp DESC`,
 	)
 	if err != nil {

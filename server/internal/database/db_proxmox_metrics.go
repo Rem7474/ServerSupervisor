@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -176,18 +177,43 @@ func (db *DB) proxmoxGuestSummaryFromCAGG(ctx context.Context, guestID string, h
 
 // GetLatestProxmoxGuestMetricPercent returns the freshest guest CPU% and RAM% sample.
 // cpu_usage is stored as 0-1 ratio in DB and is converted to 0-100 percentage.
+// Bounded to latestSampleWindow first, widening only for a guest the poller has
+// stopped seeing — callers get the sample timestamp back and decide for
+// themselves whether it is fresh enough to use.
 func (db *DB) GetLatestProxmoxGuestMetricPercent(ctx context.Context, guestID string) (cpuPercent float64, memoryPercent float64, ts time.Time, err error) {
-	err = db.conn.QueryRowContext(ctx, `
-		SELECT
-			cpu_usage * 100,
-			CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END,
-			timestamp
-		FROM proxmox_guest_metrics
-		WHERE guest_id = $1
-		ORDER BY timestamp DESC
-		LIMIT 1`,
-		guestID,
-	).Scan(&cpuPercent, &memoryPercent, &ts)
+	cpuPercent, memoryPercent, ts, err = db.latestProxmoxGuestMetricPercent(ctx, guestID, true)
+	if errors.Is(err, sql.ErrNoRows) {
+		return db.latestProxmoxGuestMetricPercent(ctx, guestID, false)
+	}
+	return cpuPercent, memoryPercent, ts, err
+}
+
+func (db *DB) latestProxmoxGuestMetricPercent(ctx context.Context, guestID string, recentOnly bool) (cpuPercent float64, memoryPercent float64, ts time.Time, err error) {
+	if recentOnly {
+		err = db.conn.QueryRowContext(ctx, `
+			SELECT
+				cpu_usage * 100,
+				CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END,
+				timestamp
+			FROM proxmox_guest_metrics
+			WHERE guest_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			ORDER BY timestamp DESC
+			LIMIT 1`,
+			guestID,
+		).Scan(&cpuPercent, &memoryPercent, &ts)
+	} else {
+		err = db.conn.QueryRowContext(ctx, `
+			SELECT
+				cpu_usage * 100,
+				CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END,
+				timestamp
+			FROM proxmox_guest_metrics
+			WHERE guest_id = $1
+			ORDER BY timestamp DESC
+			LIMIT 1`,
+			guestID,
+		).Scan(&cpuPercent, &memoryPercent, &ts)
+	}
 	return cpuPercent, memoryPercent, ts, err
 }
 
@@ -231,6 +257,17 @@ func (db *DB) getMaxLatestProxmoxGuestMetricPercent(ctx context.Context, metricE
 		}
 	}
 
+	// Callers pass either nothing, a bare `WHERE ...`, or a `JOIN ... WHERE ...`
+	// — every non-empty form ends in a WHERE predicate, so appending ` AND ...`
+	// is valid for both; only the empty case has to introduce the WHERE itself.
+	freshness := `WHERE gm.timestamp > NOW() - INTERVAL '30 minutes'`
+	if whereClause != "" {
+		freshness = whereClause + ` AND gm.timestamp > NOW() - INTERVAL '30 minutes'`
+	}
+
+	// No unbounded fallback: this is a live "worst guest right now" value feeding
+	// alert evaluation, so a guest the poller has not seen for latestSampleWindow
+	// must not keep contributing a stale maximum.
 	query := `
 		SELECT COALESCE(MAX(latest.metric_value), 0)
 		FROM (
@@ -239,7 +276,7 @@ func (db *DB) getMaxLatestProxmoxGuestMetricPercent(ctx context.Context, metricE
 				` + metricExpr + ` AS metric_value
 			FROM proxmox_guest_metrics gm
 			JOIN proxmox_guests g ON g.id = gm.guest_id
-			` + whereClause + `
+			` + freshness + `
 			ORDER BY gm.guest_id, gm.timestamp DESC
 		) latest`
 
