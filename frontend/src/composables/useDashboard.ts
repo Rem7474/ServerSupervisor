@@ -1,4 +1,4 @@
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import type { ApexOptions } from 'apexcharts'
@@ -110,7 +110,7 @@ export function useDashboard() {
   const showDockerVersions = ref(false)
 
   const summaryHours = ref(24)
-  const summaryChartSeries = ref<SummaryChartSeries | null>(null)
+  const summaryChartSeries = shallowRef<SummaryChartSeries | null>(null)
   const summaryLoading = ref(false)
   const chartSource = ref('agents')
   const chartSources = computed(() => [
@@ -290,8 +290,9 @@ export function useDashboard() {
 
   const proxmoxAutoSwitched = ref(false)
 
-  const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<WSDashboardSnapshot>('/api/v1/ws/dashboard', (payload) => {
-    if (payload.type !== 'dashboard') return
+  /** Shared logic: applies a dashboard snapshot to all reactive state.
+   *  Called from both the REST hydration path and the WS callback. */
+  function applySnapshot(payload: WSDashboardSnapshot): void {
     hostsStore.setHosts((payload.hosts || []) as Host[])
     hostMetrics.value = payload.host_metrics || {}
     dashboardStore.setVersionComparisons(payload.version_comparisons || [])
@@ -308,6 +309,11 @@ export function useDashboard() {
       chartSource.value = 'proxmox'
       fetchSummary()
     }
+  }
+
+  const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<WSDashboardSnapshot>('/api/v1/ws/dashboard', (payload) => {
+    if (payload.type !== 'dashboard') return
+    applySnapshot(payload)
   }, { debounceMs: 200 })
 
   let cveRefreshTimer: ReturnType<typeof setInterval> | null = null
@@ -486,6 +492,17 @@ export function useDashboard() {
 
   onMounted(() => {
     loading.value = true
+
+    // REST hydration: serves the same payload as the first WS frame, from the
+    // server-side cache. Whichever path (REST or WS) lands first populates the
+    // dashboard; the other is absorbed by applySnapshot() idempotently.
+    apiClient
+      .getDashboardInit()
+      .then((r) => {
+        if (loading.value && r.data) applySnapshot(r.data)
+      })
+      .catch(() => {}) // WS is the nominal path — REST is best-effort
+
     fetchSummary()
     fetchProxmoxSummary()
     apiClient

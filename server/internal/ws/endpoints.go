@@ -19,6 +19,16 @@ func (h *WSHandler) Dashboard(c *gin.Context) {
 	})
 }
 
+func (h *WSHandler) DashboardInit(c *gin.Context) {
+	ctx := c.Request.Context()
+	payload, err := h.dashboardPayload(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build dashboard"})
+		return
+	}
+	c.JSON(http.StatusOK, payload)
+}
+
 func (h *WSHandler) HostDetail(c *gin.Context) {
 	hostID := c.Param("id")
 	if hostID == "" {

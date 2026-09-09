@@ -184,6 +184,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerBackupRoutes(v1, backupH)
 	registerNPMRoutes(v1, npmH)
 	registerDashboardRoutes(v1, dashboardH)
+	v1.GET("/dashboard/init", wsH.DashboardInit)
 
 	registerStaticFiles(r)
 

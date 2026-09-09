@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -224,6 +225,55 @@ func (db *DB) SetAlertIncidentCorrelation(ctx context.Context, id, correlatedWit
 		id, correlatedWith,
 	)
 	return err
+}
+
+func (db *DB) ListAllOpenAlertIncidents(ctx context.Context) (map[string]*models.AlertIncident, error) {
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value, command_id,
+		 acknowledged_at, acknowledged_by, last_escalated_at, correlated_with
+		 FROM alert_incidents
+		 WHERE resolved_at IS NULL`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[string]*models.AlertIncident)
+	for rows.Next() {
+		var inc models.AlertIncident
+		var nullableRuleID sql.NullInt64
+		var nullableCommandID sql.NullString
+		var ackAt, lastEscalatedAt sql.NullTime
+		var ackBy sql.NullString
+		var correlatedWith sql.NullInt64
+
+		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value, &nullableCommandID,
+			&ackAt, &ackBy, &lastEscalatedAt, &correlatedWith); err == nil {
+			if nullableRuleID.Valid {
+				inc.RuleID = &nullableRuleID.Int64
+			}
+			if nullableCommandID.Valid {
+				inc.CommandID = &nullableCommandID.String
+			}
+			if ackAt.Valid {
+				inc.AcknowledgedAt = &ackAt.Time
+			}
+			if ackBy.Valid {
+				inc.AcknowledgedBy = &ackBy.String
+			}
+			if lastEscalatedAt.Valid {
+				inc.LastEscalatedAt = &lastEscalatedAt.Time
+			}
+			if correlatedWith.Valid {
+				inc.CorrelatedWith = &correlatedWith.Int64
+			}
+			if inc.RuleID != nil {
+				key := fmt.Sprintf("%d|%s", *inc.RuleID, inc.HostID)
+				res[key] = &inc
+			}
+		}
+	}
+	return res, nil
 }
 
 // ListOpenAlertIncidentsByRule returns all unresolved incidents for a rule.

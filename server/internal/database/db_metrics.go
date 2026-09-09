@@ -546,6 +546,9 @@ func (db *DB) UpdateMetricsRetentionPolicy(ctx context.Context, days int) error 
 // CountMetrics returns the total number of metrics records.
 func (db *DB) CountMetrics(ctx context.Context) (int64, error) {
 	var count int64
-	err := db.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM system_metrics`).Scan(&count)
+	err := db.conn.QueryRowContext(ctx, `SELECT * FROM hypertable_approximate_row_count('system_metrics')`).Scan(&count)
+	if err != nil {
+		err = db.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM system_metrics`).Scan(&count)
+	}
 	return count, err
 }

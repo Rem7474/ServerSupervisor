@@ -288,3 +288,107 @@ func (db *DB) GetUURuns(ctx context.Context, hostID string, limit int) ([]models
 	return runs, nil
 }
 
+func (db *DB) GetAptStatusAll(ctx context.Context) (map[string]*models.AptStatus, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT id, host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at, cve_updated_at
+		FROM apt_status`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[string]*models.AptStatus)
+	for rows.Next() {
+		var s models.AptStatus
+		var cveUpdatedAt sql.NullTime
+		if err := rows.Scan(&s.ID, &s.HostID, &s.LastUpdate, &s.LastUpgrade, &s.PendingPackages, &s.PackageList, &s.SecurityUpdates, &s.CVEList, &s.UpdatedAt, &cveUpdatedAt); err == nil {
+			if cveUpdatedAt.Valid {
+				s.CVEUpdatedAt = &cveUpdatedAt.Time
+			}
+			res[s.HostID] = &s
+		}
+	}
+	return res, nil
+}
+
+func (db *DB) GetUUStatusAll(ctx context.Context) (map[string]*models.UnattendedUpgradesDB, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT s.host_id, s.installed, s.enabled, s.reboot_required, s.last_run_at, s.last_run_packages, s.config,
+		       r.run_at, r.packages
+		FROM unattended_upgrades_status s
+		LEFT JOIN (
+			SELECT DISTINCT ON (host_id) host_id, run_at, packages
+			FROM unattended_upgrades_runs
+			ORDER BY host_id, run_at DESC
+		) r ON s.host_id = r.host_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[string]*models.UnattendedUpgradesDB)
+	for rows.Next() {
+		var hostID string
+		var s models.UnattendedUpgradesDB
+		var cfgRaw []byte
+		var lastRunAt sql.NullTime
+		var rRunAt sql.NullTime
+		var rPkgsRaw []byte
+
+		if err := rows.Scan(&hostID, &s.Installed, &s.Enabled, &s.RebootRequired, &lastRunAt, &s.LastRunPackages, &cfgRaw, &rRunAt, &rPkgsRaw); err == nil {
+			if lastRunAt.Valid {
+				t := lastRunAt.Time
+				s.LastRunAt = &t
+			}
+			if len(cfgRaw) > 0 {
+				_ = json.Unmarshal(cfgRaw, &s.Config)
+			}
+			if rRunAt.Valid {
+				if s.LastRunAt == nil || rRunAt.Time.After(*s.LastRunAt) {
+					var pkgs []string
+					_ = json.Unmarshal(rPkgsRaw, &pkgs)
+					t := rRunAt.Time
+					s.LastRunAt = &t
+					s.LastRunPackages = len(pkgs)
+				}
+			}
+			res[hostID] = &s
+		}
+	}
+	return res, nil
+}
+
+func (db *DB) GetAptHistoryAll(ctx context.Context, limit int) (map[string][]models.RemoteCommand, error) {
+	// Uses lateral join to get top limit rows per host
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT rc.id, rc.host_id, rc.module, rc.action, rc.target, rc.payload, rc.status, rc.output, rc.triggered_by, rc.audit_log_id, rc.created_at, rc.started_at, rc.ended_at
+		FROM hosts h
+		CROSS JOIN LATERAL (
+			SELECT *
+			FROM remote_commands
+			WHERE host_id = h.id AND module = 'apt'
+			ORDER BY created_at DESC
+			LIMIT $1
+		) rc`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[string][]models.RemoteCommand)
+	for rows.Next() {
+		var cmd models.RemoteCommand
+		var startedAt, endedAt sql.NullTime
+		if err := rows.Scan(&cmd.ID, &cmd.HostID, &cmd.Module, &cmd.Action, &cmd.Target, &cmd.Payload,
+			&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt); err == nil {
+			if startedAt.Valid {
+				cmd.StartedAt = &startedAt.Time
+			}
+			if endedAt.Valid {
+				cmd.EndedAt = &endedAt.Time
+			}
+			res[cmd.HostID] = append(res[cmd.HostID], cmd)
+		}
+	}
+	return res, nil
+}

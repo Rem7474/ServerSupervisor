@@ -1,9 +1,11 @@
 package ws
 
 import (
+	"context"
 	"testing"
 
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/testutil"
 )
 
 func byImage(rows []models.VersionComparison) map[string]models.VersionComparison {
@@ -167,3 +169,66 @@ func TestComparisonStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildVersionComparisons_Integration(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	h1 := &models.Host{ID: "host-vc-1", Name: "Host 1", Status: "online"}
+	if err := db.RegisterHost(ctx, h1); err != nil {
+		t.Fatalf("failed to create host 1: %v", err)
+	}
+	h2 := &models.Host{ID: "host-vc-2", Name: "Host 2", Status: "online"}
+	if err := db.RegisterHost(ctx, h2); err != nil {
+		t.Fatalf("failed to create host 2: %v", err)
+	}
+
+	_, err := db.CreateReleaseTracker(ctx, models.ReleaseTracker{
+		Name:           "nginx",
+		TrackerType:    "docker",
+		HostID:         h1.ID,
+		DockerImage:    "nginx",
+		LastReleaseTag: "1.25",
+	})
+	if err != nil {
+		t.Fatalf("failed to create tracker 1: %v", err)
+	}
+
+	_, err = db.CreateReleaseTracker(ctx, models.ReleaseTracker{
+		Name:           "redis",
+		TrackerType:    "docker",
+		HostID:         h2.ID,
+		DockerImage:    "redis",
+		LastReleaseTag: "7.0",
+	})
+	if err != nil {
+		t.Fatalf("failed to create tracker 2: %v", err)
+	}
+
+	err = db.UpsertDockerContainers(ctx, h1.ID, []models.DockerContainer{
+		{ID: "c1", ContainerID: "cid1", HostID: h1.ID, Name: "web", Image: "nginx", ImageTag: "latest", State: "running"},
+	})
+	if err != nil {
+		t.Fatalf("failed to upsert containers: %v", err)
+	}
+
+	h := &WSHandler{db: db}
+
+	all, err := h.buildVersionComparisons(ctx)
+	if err != nil {
+		t.Fatalf("buildVersionComparisons error: %v", err)
+	}
+	if len(all) == 0 {
+		t.Errorf("expected comparisons, got 0")
+	}
+
+	forHost, err := h.buildVersionComparisonsForHost(ctx, h1.ID)
+	if err != nil {
+		t.Fatalf("buildVersionComparisonsForHost error: %v", err)
+	}
+	if len(forHost) == 0 {
+		t.Errorf("expected comparisons for host 1, got 0")
+	}
+}
+
+

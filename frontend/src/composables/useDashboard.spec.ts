@@ -5,7 +5,7 @@ import { ref } from 'vue'
 
 const {
   getAptCVESummary, getMetricsSummary, getProxmoxNodeMetrics,
-  getProxmoxSummary, getSettings, sendAptCommand,
+  getProxmoxSummary, getSettings, sendAptCommand, getDashboardInit,
 } = vi.hoisted(() => ({
   getAptCVESummary: vi.fn(),
   getMetricsSummary: vi.fn(),
@@ -13,12 +13,13 @@ const {
   getProxmoxSummary: vi.fn(),
   getSettings: vi.fn(),
   sendAptCommand: vi.fn(),
+  getDashboardInit: vi.fn().mockRejectedValue(new Error('not wired')),
 }))
 
 vi.mock('../api', () => ({
   default: {
     getAptCVESummary, getMetricsSummary, getProxmoxNodeMetrics,
-    getProxmoxSummary, getSettings, sendAptCommand,
+    getProxmoxSummary, getSettings, sendAptCommand, getDashboardInit,
   },
 }))
 
@@ -245,5 +246,42 @@ describe('useDashboard — sendBulkApt', () => {
     expect(confirmDialog.message.value).toBe('Boom')
     confirmDialog.onConfirm()
     await applyPromise
+  })
+})
+
+describe('useDashboard — REST hydration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setActivePinia(createPinia())
+    getAptCVESummary.mockResolvedValue({ data: null })
+    getProxmoxSummary.mockResolvedValue({ data: {} })
+    getSettings.mockResolvedValue({ data: { settings: {} } })
+    getMetricsSummary.mockResolvedValue({ data: [] })
+    getProxmoxNodeMetrics.mockResolvedValue({ data: [] })
+  })
+
+  it('hydrates dashboard state immediately when getDashboardInit resolves', async () => {
+    const mockSnapshot = {
+      type: 'dashboard',
+      hosts: [{ id: 'host-1', name: 'Server 1', status: 'online' }],
+      host_metrics: { 'host-1': { cpu_usage_percent: 42, memory_percent: 50, uptime: 3600 } },
+      apt_pending: 3,
+      disk_usage: { 'host-1': 55 },
+      proxmox_nodes: [{ id: 'pve1', name: 'pve1' }],
+      proxmox_links: [],
+    }
+    getDashboardInit.mockResolvedValueOnce({ data: mockSnapshot })
+
+    const { api } = mountUseDashboard()
+    expect(api.loading.value).toBe(true)
+
+    await flushPromises()
+
+    expect(api.loading.value).toBe(false)
+    expect(api.hosts.value.length).toBe(1)
+    expect(api.hosts.value[0].name).toBe('Server 1')
+    expect(api.hostMetrics.value['host-1']?.cpu_usage_percent).toBe(42)
+    expect(api.diskUsage.value['host-1']).toBe(55)
+    expect(api.proxmoxNodes.value.length).toBe(1)
   })
 })
