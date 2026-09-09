@@ -24,6 +24,7 @@ import runbooks from './fr/runbooks.json'
 import scheduledTasks from './fr/scheduledTasks.json'
 import security from './fr/security.json'
 import settings from './fr/settings.json'
+import config from './fr/config.json'
 import webhooks from './fr/webhooks.json'
 
 export default {
@@ -32,6 +33,7 @@ export default {
   apt,
   auth,
   common,
+  config,
   dashboard,
   docker,
   errors,

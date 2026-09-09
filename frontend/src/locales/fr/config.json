@@ -1,0 +1,74 @@
+{
+  "pageTitle": "Configuration Docker & Système",
+  "pageSubtitle": "Gestion centralisée des paramètres conteneurisés et variables d'environnement",
+  "categories": {
+    "all": "Toutes les catégories",
+    "server": "Serveur & Général",
+    "logging": "Journalisation & Logs",
+    "network": "Réseau & Proxies",
+    "database": "Base de données",
+    "auth": "Authentification & Sécurité",
+    "oidc": "OpenID Connect / SSO",
+    "notifications": "Alertes & Notifications",
+    "integrations": "Intégrations & Registres",
+    "retention": "Rétention des données",
+    "threats": "Détection de menaces"
+  },
+  "metrics": {
+    "total": "Paramètres totaux",
+    "env": "Configurés via ENV",
+    "ui": "Configurés via UI",
+    "default": "Valeurs par défaut",
+    "conflicts": "Conflits détectés"
+  },
+  "sources": {
+    "env": "ENV Docker",
+    "ui": "Base de données (UI)",
+    "default": "Défaut"
+  },
+  "badges": {
+    "restartRequired": "Redémarrage requis",
+    "secret": "Secret",
+    "readOnly": "Lecture seule (ENV)",
+    "conflict": "Conflit ENV vs UI"
+  },
+  "table": {
+    "parameter": "Paramètre",
+    "source": "Source",
+    "value": "Valeur",
+    "actions": "Actions",
+    "items": "éléments"
+  },
+  "values": {
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "notSet": "Non défini"
+  },
+  "actions": {
+    "save": "Enregistrer",
+    "saveCategory": "Enregistrer la catégorie",
+    "reset": "Réinitialiser",
+    "revealSecrets": "Afficher les secrets",
+    "hideSecrets": "Masquer les secrets",
+    "refresh": "Actualiser",
+    "searchPlaceholder": "Rechercher par clé technique, variable d'environnement ou description...",
+    "filterCategory": "Catégorie",
+    "filterSource": "Source",
+    "allSources": "Toutes les sources"
+  },
+  "warnings": {
+    "conflictMessage": "Conflit détecté : La valeur UI en base ({uiVal}) est différente de la variable d'environnement active ({envVal}).",
+    "envNotice": "Ce paramètre est forcé par une variable d'environnement Docker au démarrage du conteneur. La valeur ENV est prioritaire et restera active.",
+    "restartNotice": "La modification de ce paramètre nécessite un redémarrage du conteneur pour prendre effet.",
+    "priorityNotice": "Règle de priorité : 1. ENV Docker (Prioritaire) > 2. UI / Base de données > 3. Valeur par défaut codée en dur."
+  },
+  "messages": {
+    "loading": "Chargement de la configuration...",
+    "error": "Une erreur est survenue",
+    "updateSuccess": "Paramètre {key} mis à jour avec succès",
+    "resetSuccess": "Paramètre {key} réinitialisé",
+    "bulkSuccess": "Modifications enregistrées avec succès",
+    "confirmReset": "Êtes-vous sûr de vouloir réinitialiser {key} ? La surcharge UI sera supprimée.",
+    "noResults": "Aucun paramètre de configuration ne correspond à votre recherche."
+  }
+}

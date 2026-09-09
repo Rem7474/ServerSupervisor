@@ -1,0 +1,74 @@
+{
+  "pageTitle": "Docker & System Configuration",
+  "pageSubtitle": "Centralized management of container parameters and environment variables",
+  "categories": {
+    "all": "All categories",
+    "server": "Server & General",
+    "logging": "Logging & Logs",
+    "network": "Network & Proxies",
+    "database": "Database",
+    "auth": "Authentication & Security",
+    "oidc": "OpenID Connect / SSO",
+    "notifications": "Alertes & Notifications",
+    "integrations": "Integrations & Registries",
+    "retention": "Data Retention",
+    "threats": "Threat Detection"
+  },
+  "metrics": {
+    "total": "Total parameters",
+    "env": "Configured via ENV",
+    "ui": "Configured via UI",
+    "default": "Default values",
+    "conflicts": "Conflicts detected"
+  },
+  "sources": {
+    "env": "Docker ENV",
+    "ui": "Database (UI)",
+    "default": "Default"
+  },
+  "badges": {
+    "restartRequired": "Restart required",
+    "secret": "Secret",
+    "readOnly": "Read only (ENV)",
+    "conflict": "ENV vs UI Conflict"
+  },
+  "table": {
+    "parameter": "Parameter",
+    "source": "Source",
+    "value": "Value",
+    "actions": "Actions",
+    "items": "items"
+  },
+  "values": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "notSet": "Not set"
+  },
+  "actions": {
+    "save": "Save",
+    "saveCategory": "Save category",
+    "reset": "Reset",
+    "revealSecrets": "Reveal secrets",
+    "hideSecrets": "Hide secrets",
+    "refresh": "Refresh",
+    "searchPlaceholder": "Search by technical key, env variable, or description...",
+    "filterCategory": "Category",
+    "filterSource": "Source",
+    "allSources": "All sources"
+  },
+  "warnings": {
+    "conflictMessage": "Conflict detected: The UI value in database ({uiVal}) differs from active environment variable ({envVal}).",
+    "envNotice": "This parameter is forced by a Docker environment variable at container boot. The ENV value is authoritative and remains active.",
+    "restartNotice": "Changing this parameter requires a container restart to take effect.",
+    "priorityNotice": "Priority rule: 1. Docker ENV (Authoritative) > 2. UI / Database > 3. Hardcoded default value."
+  },
+  "messages": {
+    "loading": "Loading configuration...",
+    "error": "An error occurred",
+    "updateSuccess": "Parameter {key} updated successfully",
+    "resetSuccess": "Parameter {key} reset",
+    "bulkSuccess": "Changes saved successfully",
+    "confirmReset": "Are you sure you want to reset {key}? The custom UI override will be removed.",
+    "noResults": "No configuration parameter matches your search."
+  }
+}

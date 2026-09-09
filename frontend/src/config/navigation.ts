@@ -100,6 +100,7 @@ const navigationSections: NavSectionDef[] = [
     icon: IconAdjustments,
     items: [
       { key: 'settings', to: '/settings', icon: IconSettings, adminOnly: true },
+      { key: 'configuration', to: '/admin/configuration', icon: IconBrandDocker, adminOnly: true },
       { key: 'users', to: '/users', icon: IconUsers, adminOnly: true },
       { key: 'audit', to: '/audit', icon: IconClipboardList, adminOnly: true },
     ],

@@ -39,11 +39,21 @@
         </div>
       </div>
     </div>
+    <div class="card-footer bg-transparent border-top py-2">
+      <router-link
+        to="/admin/configuration"
+        class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+      >
+        <IconBrandDocker :size="16" />
+        {{ t('config.pageTitle') }}
+      </router-link>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { IconBrandDocker } from '@tabler/icons-vue'
 
 const { t } = useI18n()
 

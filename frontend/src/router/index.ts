@@ -103,6 +103,16 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/admin/configuration',
+    name: 'AdminConfiguration',
+    component: () => import('../views/AdminConfigurationView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/config',
+    redirect: '/admin/configuration',
+  },
+  {
     path: '/account',
     name: 'Account',
     component: () => import('../views/AccountView.vue'),

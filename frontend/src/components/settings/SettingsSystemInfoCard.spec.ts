@@ -16,6 +16,7 @@ describe('SettingsSystemInfoCard', () => {
           tlsEnabled: true, latestAgentVersion: '7.6.5',
         },
       },
+      global: { stubs: { 'router-link': true } },
     })
     expect(wrapper.text()).toContain('https://ss.example.com')
     expect(wrapper.text()).toContain('Activé')
@@ -25,6 +26,7 @@ describe('SettingsSystemInfoCard', () => {
   it('falls back to "not configured" for a missing base URL and shows a disabled TLS badge', () => {
     const wrapper = mount(SettingsSystemInfoCard, {
       props: { settings: { tlsEnabled: false } },
+      global: { stubs: { 'router-link': true } },
     })
     expect(wrapper.text()).toContain('Non configuré')
     expect(wrapper.text()).toContain('Désactivé')
@@ -35,6 +37,7 @@ describe('SettingsSystemInfoCard', () => {
     setLocale('en')
     const wrapper = mount(SettingsSystemInfoCard, {
       props: { settings: { tlsEnabled: true } },
+      global: { stubs: { 'router-link': true } },
     })
     expect(wrapper.text()).toContain('System')
     expect(wrapper.text()).toContain('Enabled')
