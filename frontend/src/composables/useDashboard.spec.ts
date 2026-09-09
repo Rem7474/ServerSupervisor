@@ -264,7 +264,7 @@ describe('useDashboard — REST hydration', () => {
     const mockSnapshot = {
       type: 'dashboard',
       hosts: [{ id: 'host-1', name: 'Server 1', status: 'online' }],
-      host_metrics: { 'host-1': { cpu_percent: 42 } },
+      host_metrics: { 'host-1': { cpu_usage_percent: 42, memory_percent: 50, uptime: 3600 } },
       apt_pending: 3,
       disk_usage: { 'host-1': 55 },
       proxmox_nodes: [{ id: 'pve1', name: 'pve1' }],
@@ -280,7 +280,7 @@ describe('useDashboard — REST hydration', () => {
     expect(api.loading.value).toBe(false)
     expect(api.hosts.value.length).toBe(1)
     expect(api.hosts.value[0].name).toBe('Server 1')
-    expect(api.hostMetrics.value['host-1']?.cpu_percent).toBe(42)
+    expect(api.hostMetrics.value['host-1']?.cpu_usage_percent).toBe(42)
     expect(api.diskUsage.value['host-1']).toBe(55)
     expect(api.proxmoxNodes.value.length).toBe(1)
   })
