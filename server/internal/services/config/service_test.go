@@ -81,6 +81,9 @@ func TestConfigService_UpdateParam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if warn != "" {
+		t.Errorf("expected no warning when ENV is not set, got: %s", warn)
+	}
 	if entry == nil {
 		t.Fatalf("expected entry returned")
 	}
