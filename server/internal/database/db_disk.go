@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -156,8 +157,10 @@ func (db *DB) GetDiskMetricsAggregated(ctx context.Context, hostID, mountPoint s
 		if m, err := db.diskMetricsHourFromCAGG(ctx, hostID, mountPoint, hours); err == nil && len(m) > 0 {
 			return m, "hour", nil
 		} else if err != nil {
+			safeHost := strings.ReplaceAll(strings.ReplaceAll(hostID, "\n", ""), "\r", "")
+			safeMount := strings.ReplaceAll(strings.ReplaceAll(mountPoint, "\n", ""), "\r", "")
 			slog.WarnContext(ctx, "disk metrics hourly continuous aggregate query failed, falling back to raw",
-				slog.String("host_id", hostID), slog.String("mount_point", mountPoint), slog.Int("hours", hours), slog.Any("err", err))
+				slog.String("host_id", safeHost), slog.String("mount_point", safeMount), slog.Int("hours", hours), slog.Any("err", err))
 		}
 		m, err := db.diskMetricsHourFromRaw(ctx, hostID, mountPoint, hours)
 		return m, "hour", err
@@ -165,8 +168,10 @@ func (db *DB) GetDiskMetricsAggregated(ctx context.Context, hostID, mountPoint s
 		if m, err := db.diskMetricsDayFromCAGG(ctx, hostID, mountPoint, hours); err == nil && len(m) > 0 {
 			return m, "day", nil
 		} else if err != nil {
+			safeHost := strings.ReplaceAll(strings.ReplaceAll(hostID, "\n", ""), "\r", "")
+			safeMount := strings.ReplaceAll(strings.ReplaceAll(mountPoint, "\n", ""), "\r", "")
 			slog.WarnContext(ctx, "disk metrics daily continuous aggregate query failed, falling back to raw",
-				slog.String("host_id", hostID), slog.String("mount_point", mountPoint), slog.Int("hours", hours), slog.Any("err", err))
+				slog.String("host_id", safeHost), slog.String("mount_point", safeMount), slog.Int("hours", hours), slog.Any("err", err))
 		}
 		m, err := db.diskMetricsDayFromRaw(ctx, hostID, mountPoint, hours)
 		return m, "day", err

@@ -176,10 +176,12 @@ func RateLimiterMiddleware(rl *IPRateLimiter) gin.HandlerFunc {
 		clientIP := rl.getClientIP(c)
 
 		if !rl.Allow(clientIP) {
+			safePath := strings.ReplaceAll(strings.ReplaceAll(c.Request.URL.Path, "\n", ""), "\r", "")
+			safeIP := strings.ReplaceAll(strings.ReplaceAll(clientIP, "\n", ""), "\r", "")
 			slog.WarnContext(c.Request.Context(), "rate limit blocked",
 				slog.String("method", c.Request.Method),
-				slog.String("path", c.Request.URL.Path),
-				slog.String("client_ip", clientIP))
+				slog.String("path", safePath),
+				slog.String("client_ip", safeIP))
 			c.JSON(429, gin.H{"error": "rate limit exceeded"})
 			c.Abort()
 			return
@@ -212,10 +214,11 @@ func RequestIDMiddleware() gin.HandlerFunc {
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		path := c.Request.URL.Path
+		path := strings.ReplaceAll(strings.ReplaceAll(c.Request.URL.Path, "\n", ""), "\r", "")
+		clientIP := strings.ReplaceAll(strings.ReplaceAll(c.ClientIP(), "\n", ""), "\r", "")
 		query := c.Request.URL.RawQuery
 		if query != "" {
-			query = maskSensitiveParams(query)
+			query = strings.ReplaceAll(strings.ReplaceAll(maskSensitiveParams(query), "\n", ""), "\r", "")
 		}
 
 		c.Next()
@@ -226,7 +229,7 @@ func RequestLogger() gin.HandlerFunc {
 			slog.String("method", c.Request.Method),
 			slog.String("path", path),
 			slog.Duration("latency", time.Since(start)),
-			slog.String("client_ip", c.ClientIP()),
+			slog.String("client_ip", clientIP),
 		}
 		if query != "" {
 			attrs = append(attrs, slog.String("query", query))

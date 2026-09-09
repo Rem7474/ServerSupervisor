@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -127,8 +128,9 @@ func (db *DB) GetProxmoxGuestMetricsSummary(ctx context.Context, guestID string,
 		case err == nil && len(summary) > 0:
 			return summary, nil
 		case err != nil:
+			safeGuest := strings.ReplaceAll(strings.ReplaceAll(guestID, "\n", ""), "\r", "")
 			slog.WarnContext(ctx, "proxmox guest metrics summary continuous aggregate query failed, falling back to raw",
-				slog.String("guest_id", guestID), slog.Int("hours", hours), slog.Int("bucket_minutes", bucketMinutes), slog.Any("err", err))
+				slog.String("guest_id", safeGuest), slog.Int("hours", hours), slog.Int("bucket_minutes", bucketMinutes), slog.Any("err", err))
 		}
 	}
 
