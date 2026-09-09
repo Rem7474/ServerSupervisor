@@ -189,22 +189,31 @@ func (db *DB) GetLatestProxmoxGuestMetricPercent(ctx context.Context, guestID st
 }
 
 func (db *DB) latestProxmoxGuestMetricPercent(ctx context.Context, guestID string, recentOnly bool) (cpuPercent float64, memoryPercent float64, ts time.Time, err error) {
-	recent := ``
 	if recentOnly {
-		recent = ` AND timestamp > NOW() - ` + latestSampleWindow
+		err = db.conn.QueryRowContext(ctx, `
+			SELECT
+				cpu_usage * 100,
+				CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END,
+				timestamp
+			FROM proxmox_guest_metrics
+			WHERE guest_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			ORDER BY timestamp DESC
+			LIMIT 1`,
+			guestID,
+		).Scan(&cpuPercent, &memoryPercent, &ts)
+	} else {
+		err = db.conn.QueryRowContext(ctx, `
+			SELECT
+				cpu_usage * 100,
+				CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END,
+				timestamp
+			FROM proxmox_guest_metrics
+			WHERE guest_id = $1
+			ORDER BY timestamp DESC
+			LIMIT 1`,
+			guestID,
+		).Scan(&cpuPercent, &memoryPercent, &ts)
 	}
-
-	err = db.conn.QueryRowContext(ctx, `
-		SELECT
-			cpu_usage * 100,
-			CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END,
-			timestamp
-		FROM proxmox_guest_metrics
-		WHERE guest_id = $1`+recent+`
-		ORDER BY timestamp DESC
-		LIMIT 1`,
-		guestID,
-	).Scan(&cpuPercent, &memoryPercent, &ts)
 	return cpuPercent, memoryPercent, ts, err
 }
 
@@ -251,9 +260,9 @@ func (db *DB) getMaxLatestProxmoxGuestMetricPercent(ctx context.Context, metricE
 	// Callers pass either nothing, a bare `WHERE ...`, or a `JOIN ... WHERE ...`
 	// — every non-empty form ends in a WHERE predicate, so appending ` AND ...`
 	// is valid for both; only the empty case has to introduce the WHERE itself.
-	freshness := `WHERE gm.timestamp > NOW() - ` + latestSampleWindow
+	freshness := `WHERE gm.timestamp > NOW() - INTERVAL '30 minutes'`
 	if whereClause != "" {
-		freshness = whereClause + ` AND gm.timestamp > NOW() - ` + latestSampleWindow
+		freshness = whereClause + ` AND gm.timestamp > NOW() - INTERVAL '30 minutes'`
 	}
 
 	// No unbounded fallback: this is a live "worst guest right now" value feeding

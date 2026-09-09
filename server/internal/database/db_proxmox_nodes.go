@@ -251,7 +251,7 @@ func (db *DB) GetEffectiveHostCPUTemperature(ctx context.Context, hostID string,
 			SELECT cpu_temperature, timestamp
 			FROM system_metrics
 			WHERE host_id = $1
-			  AND timestamp > NOW() - `+proxmoxSensorFreshness+`
+			  AND timestamp > NOW() - INTERVAL '10 minutes'
 			ORDER BY timestamp DESC
 			LIMIT 1`, sourceHostID.String).Scan(&temp, &ts)
 		if err == nil && temp > 0 && time.Since(ts) <= 10*time.Minute {
@@ -294,7 +294,7 @@ func (db *DB) GetEffectiveHostFanRPM(ctx context.Context, hostID string, fallbac
 			SELECT COALESCE(fan_rpm, 0), timestamp
 			FROM system_metrics
 			WHERE host_id = $1
-			  AND timestamp > NOW() - `+proxmoxSensorFreshness+`
+			  AND timestamp > NOW() - INTERVAL '10 minutes'
 			ORDER BY timestamp DESC
 			LIMIT 1`, sourceHostID.String).Scan(&rpm, &ts)
 		if err == nil && rpm > 0 && time.Since(ts) <= 10*time.Minute {

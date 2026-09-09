@@ -55,26 +55,41 @@ func (db *DB) GetLatestMetrics(ctx context.Context, hostID string) (*models.Syst
 }
 
 func (db *DB) latestMetricsForHost(ctx context.Context, hostID string, recentOnly bool) (*models.SystemMetrics, error) {
-	where := `WHERE host_id = $1`
-	if recentOnly {
-		where += ` AND timestamp > NOW() - ` + latestSampleWindow
-	}
-
 	var m models.SystemMetrics
-	err := db.conn.QueryRowContext(ctx,
-		`SELECT id, host_id, timestamp,
-		 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
-		 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
-		 COALESCE(load_avg_1, 0), COALESCE(load_avg_5, 0), COALESCE(load_avg_15, 0),
-		 COALESCE(memory_total, 0), COALESCE(memory_used, 0), COALESCE(memory_free, 0), COALESCE(memory_percent, 0),
-		 COALESCE(swap_total, 0), COALESCE(swap_used, 0),
-		 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
-		 COALESCE(uptime, 0), COALESCE(hostname, '')
-		 FROM system_metrics `+where+`
-		 ORDER BY timestamp DESC LIMIT 1`, hostID,
-	).Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
-		&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
-		&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime, &m.Hostname)
+	var err error
+	if recentOnly {
+		err = db.conn.QueryRowContext(ctx,
+			`SELECT id, host_id, timestamp,
+			 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
+			 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
+			 COALESCE(load_avg_1, 0), COALESCE(load_avg_5, 0), COALESCE(load_avg_15, 0),
+			 COALESCE(memory_total, 0), COALESCE(memory_used, 0), COALESCE(memory_free, 0), COALESCE(memory_percent, 0),
+			 COALESCE(swap_total, 0), COALESCE(swap_used, 0),
+			 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
+			 COALESCE(uptime, 0), COALESCE(hostname, '')
+			 FROM system_metrics
+			 WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			 ORDER BY timestamp DESC LIMIT 1`, hostID,
+		).Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
+			&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
+			&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime, &m.Hostname)
+	} else {
+		err = db.conn.QueryRowContext(ctx,
+			`SELECT id, host_id, timestamp,
+			 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
+			 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
+			 COALESCE(load_avg_1, 0), COALESCE(load_avg_5, 0), COALESCE(load_avg_15, 0),
+			 COALESCE(memory_total, 0), COALESCE(memory_used, 0), COALESCE(memory_free, 0), COALESCE(memory_percent, 0),
+			 COALESCE(swap_total, 0), COALESCE(swap_used, 0),
+			 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
+			 COALESCE(uptime, 0), COALESCE(hostname, '')
+			 FROM system_metrics
+			 WHERE host_id = $1
+			 ORDER BY timestamp DESC LIMIT 1`, hostID,
+		).Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
+			&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
+			&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime, &m.Hostname)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +119,7 @@ func (db *DB) GetLatestMetricsAll(ctx context.Context) (map[string]*models.Syste
 		 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
 		 COALESCE(uptime, 0), COALESCE(hostname, '')
 		 FROM system_metrics
-		 WHERE timestamp > NOW() - `+latestSampleWindow+`
+		 WHERE timestamp > NOW() - INTERVAL '30 minutes'
 		 ORDER BY host_id, timestamp DESC`,
 	)
 	if err != nil {
@@ -143,7 +158,7 @@ func (db *DB) GetRootDiskPercentAll(ctx context.Context) map[string]float64 {
 		`SELECT DISTINCT ON (host_id) host_id, used_percent
 		 FROM disk_metrics
 		 WHERE mount_point = '/'
-		   AND timestamp > NOW() - `+latestSampleWindow+`
+		   AND timestamp > NOW() - INTERVAL '30 minutes'
 		 ORDER BY host_id, timestamp DESC`,
 	)
 	if err != nil {

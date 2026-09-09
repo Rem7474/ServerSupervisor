@@ -1,7 +1,7 @@
 package database
 
-// latestSampleWindow is the time predicate every "most recent sample" lookup on
-// a hypertable must carry, appended as `WHERE ... timestamp > NOW() - ` + it.
+// LatestSampleWindow is the time window (30 minutes) applied to "most recent sample"
+// lookups on metric hypertables (via `timestamp > NOW() - INTERVAL '30 minutes'`).
 //
 // A hypertable has no global index: each chunk carries its own. Without a
 // predicate on the partitioning column the planner cannot exclude a single
@@ -18,10 +18,15 @@ package database
 // predicate when the bounded lookup comes back empty; that unbounded path is
 // then only ever taken for entities that genuinely have no recent data, never
 // for a live one.
-const latestSampleWindow = `INTERVAL '30 minutes'`
+//
+// Note: queries embed `INTERVAL '30 minutes'` directly as static SQL string literals
+// rather than dynamic concatenation to satisfy static analysis and linters.
+const LatestSampleWindow = `INTERVAL '30 minutes'`
 
-// proxmoxSensorFreshness bounds the mapped-node sensor lookups
-// (GetEffectiveHostCPUTemperature / GetEffectiveHostFanRPM). Those already
-// discard any sample older than 10 minutes in Go; expressing the same cutoff in
-// SQL keeps the result identical while letting the planner exclude chunks.
-const proxmoxSensorFreshness = `INTERVAL '10 minutes'`
+// ProxmoxSensorFreshness bounds the mapped-node sensor lookups
+// (GetEffectiveHostCPUTemperature / GetEffectiveHostFanRPM) to 10 minutes.
+// Those already discard any sample older than 10 minutes in Go; expressing
+// the same cutoff in SQL keeps the result identical while letting the planner
+// exclude chunks.
+const ProxmoxSensorFreshness = `INTERVAL '10 minutes'`
+

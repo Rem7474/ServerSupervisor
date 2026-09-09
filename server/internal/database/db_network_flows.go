@@ -72,22 +72,33 @@ func (db *DB) GetLatestNetworkFlowMetrics(ctx context.Context, hostID string) ([
 }
 
 func (db *DB) latestNetworkFlowMetricsForHost(ctx context.Context, hostID string, recentOnly bool) ([]models.NetworkFlowMetric, error) {
-	recent := ``
+	var rows *sql.Rows
+	var err error
 	if recentOnly {
-		recent = ` AND timestamp > NOW() - ` + latestSampleWindow
+		rows, err = db.conn.QueryContext(ctx,
+			`SELECT id, host_id, timestamp, is_others, remote_ip, remote_port, protocol, direction,
+				process_name, pid, server_name, rx_bytes, tx_bytes, packets, connections
+			FROM network_flow_metrics
+			WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			  AND timestamp = (
+				SELECT MAX(timestamp) FROM network_flow_metrics WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '30 minutes'
+			  )
+			ORDER BY is_others ASC, (rx_bytes + tx_bytes) DESC`,
+			hostID,
+		)
+	} else {
+		rows, err = db.conn.QueryContext(ctx,
+			`SELECT id, host_id, timestamp, is_others, remote_ip, remote_port, protocol, direction,
+				process_name, pid, server_name, rx_bytes, tx_bytes, packets, connections
+			FROM network_flow_metrics
+			WHERE host_id = $1
+			  AND timestamp = (
+				SELECT MAX(timestamp) FROM network_flow_metrics WHERE host_id = $1
+			  )
+			ORDER BY is_others ASC, (rx_bytes + tx_bytes) DESC`,
+			hostID,
+		)
 	}
-
-	rows, err := db.conn.QueryContext(ctx,
-		`SELECT id, host_id, timestamp, is_others, remote_ip, remote_port, protocol, direction,
-			process_name, pid, server_name, rx_bytes, tx_bytes, packets, connections
-		FROM network_flow_metrics
-		WHERE host_id = $1`+recent+`
-		  AND timestamp = (
-			SELECT MAX(timestamp) FROM network_flow_metrics WHERE host_id = $1`+recent+`
-		  )
-		ORDER BY is_others ASC, (rx_bytes + tx_bytes) DESC`,
-		hostID,
-	)
 	if err != nil {
 		return nil, err
 	}
