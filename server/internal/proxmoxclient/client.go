@@ -28,7 +28,7 @@ func (f *FlexInt) UnmarshalJSON(b []byte) error {
 		*f = 0
 		return nil
 	}
-	v, err := strconv.ParseInt(s, 10, 64)
+	v, err := strconv.Atoi(s)
 	if err != nil {
 		// Non-numeric string (e.g. "N/A") — treat as 0.
 		*f = 0
@@ -75,8 +75,22 @@ func (c *Client) get(path string, result interface{}) error {
 // first 50 lines of a 5 000-line one. Endpoints that don't paginate simply
 // report 0, which every caller but the log reader ignores.
 func (c *Client) getWithTotal(path string, result interface{}) (int, error) {
-	url := c.baseURL + path
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	baseURL, err := url.Parse(c.baseURL)
+	if err != nil {
+		return 0, fmt.Errorf("parse base URL: %w", err)
+	}
+
+	relURL, err := url.Parse(path)
+	if err != nil {
+		return 0, fmt.Errorf("parse request path: %w", err)
+	}
+
+	targetURL := baseURL.ResolveReference(relURL)
+	if targetURL.Host != baseURL.Host || targetURL.Scheme != baseURL.Scheme {
+		return 0, fmt.Errorf("request host or scheme does not match base URL: %s", targetURL.String())
+	}
+
+	req, err := http.NewRequest(http.MethodGet, targetURL.String(), nil)
 	if err != nil {
 		return 0, fmt.Errorf("build request: %w", err)
 	}
@@ -531,8 +545,9 @@ const taskLogPageSize = 500
 // "TASK OK"/"TASK ERROR" marker are at the end, not the start — so this reads
 // `total` from a probe request and then fetches the trailing window.
 func (c *Client) GetNodeTaskLog(node, upid string) ([]PVETaskLogLine, int, error) {
-	escaped := url.PathEscape(upid)
-	base := fmt.Sprintf("/nodes/%s/tasks/%s/log", node, escaped)
+	escapedNode := url.PathEscape(node)
+	escapedUPID := url.PathEscape(upid)
+	base := fmt.Sprintf("/nodes/%s/tasks/%s/log", escapedNode, escapedUPID)
 
 	// limit=1 is the cheapest way to learn `total`; PVE reports the full line
 	// count regardless of how small the requested page is.

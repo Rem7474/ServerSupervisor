@@ -54,7 +54,7 @@ func (h *ProxmoxHandler) ListBackupRuns(c *gin.Context) {
 // GetTaskLog proxies GET /nodes/{node}/tasks/{upid}/log from PVE.
 func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 	upid := c.Param("upid")
-	if upid == "" {
+	if upid == "" || strings.ContainsAny(upid, "/\\?# \r\n\t") {
 		lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
 		c.JSON(http.StatusBadRequest, apperr.NewErrorResponse(apperr.CodeMissingParameter, lang, nil))
 		return
