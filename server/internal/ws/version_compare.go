@@ -24,8 +24,16 @@ import (
 // The pure version logic still lives in the releasetracker package — this
 // method owns only the WS-handler-side DB orchestration.
 func (h *WSHandler) buildVersionComparisons(ctx context.Context) ([]models.VersionComparison, error) {
+	return h.buildVersionComparisonsInternal(ctx, "")
+}
+
+func (h *WSHandler) buildVersionComparisonsForHost(ctx context.Context, hostID string) ([]models.VersionComparison, error) {
+	return h.buildVersionComparisonsInternal(ctx, hostID)
+}
+
+func (h *WSHandler) buildVersionComparisonsInternal(ctx context.Context, hostID string) ([]models.VersionComparison, error) {
 	// The four reads are independent — fetch them concurrently so the slowest
-	// (GetAllDockerContainers) dominates instead of the sum.
+	// (GetAllDockerContainers / GetDockerContainers) dominates instead of the sum.
 	var (
 		trackers      []models.ReleaseTracker
 		trackersErr   error
@@ -39,12 +47,28 @@ func (h *WSHandler) buildVersionComparisons(ctx context.Context) ([]models.Versi
 	go func() {
 		defer wg.Done()
 		defer safego.Recover(ctx, "ws.buildVersionComparisons.trackers")
-		trackers, trackersErr = h.db.ListReleaseTrackers(ctx)
+		allTrackers, err := h.db.ListReleaseTrackers(ctx)
+		trackersErr = err
+		if err == nil {
+			if hostID == "" {
+				trackers = allTrackers
+			} else {
+				for _, t := range allTrackers {
+					if t.HostID == hostID {
+						trackers = append(trackers, t)
+					}
+				}
+			}
+		}
 	}()
 	go func() {
 		defer wg.Done()
 		defer safego.Recover(ctx, "ws.buildVersionComparisons.containers")
-		containers, containersErr = h.db.GetAllDockerContainers(ctx)
+		if hostID == "" {
+			containers, containersErr = h.db.GetAllDockerContainers(ctx)
+		} else {
+			containers, containersErr = h.db.GetDockerContainers(ctx, hostID)
+		}
 	}()
 	go func() {
 		defer wg.Done()
@@ -68,76 +92,9 @@ func (h *WSHandler) buildVersionComparisons(ctx context.Context) ([]models.Versi
 		digestTagMap = make(map[string]string)
 	}
 
-	// Index containers by host so each tracker scans only its own host's
-	// containers (was O(trackers × all containers)).
 	containersByHost := make(map[string][]models.DockerContainer, len(containers))
 	for _, c := range containers {
 		containersByHost[c.HostID] = append(containersByHost[c.HostID], c)
-	}
-
-	// Container groups already explained by a tracker row, so the ambient pass
-	// below doesn't emit a second, conflicting row for them.
-	covered := make(map[string]struct{})
-
-	comparisons := buildTrackerComparisons(trackers, containersByHost, digestTagMap, covered)
-	comparisons = append(comparisons, buildAmbientComparisons(containers, imageVersions, covered)...)
-	return comparisons, nil
-}
-
-func (h *WSHandler) buildVersionComparisonsForHost(ctx context.Context, hostID string) ([]models.VersionComparison, error) {
-	var (
-		trackers      []models.ReleaseTracker
-		trackersErr   error
-		containers    []models.DockerContainer
-		containersErr error
-		digestTagMap  map[string]string
-		imageVersions []models.DockerImageVersion
-	)
-	var wg sync.WaitGroup
-	wg.Add(4)
-	go func() {
-		defer wg.Done()
-		defer safego.Recover(ctx, "ws.buildVersionComparisonsForHost.trackers")
-		// Could filter at DB level, but memory filter is cheap here
-		allTrackers, err := h.db.ListReleaseTrackers(ctx)
-		trackersErr = err
-		if err == nil {
-			for _, t := range allTrackers {
-				if t.HostID == hostID {
-					trackers = append(trackers, t)
-				}
-			}
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		defer safego.Recover(ctx, "ws.buildVersionComparisonsForHost.containers")
-		containers, containersErr = h.db.GetDockerContainers(ctx, hostID)
-	}()
-	go func() {
-		defer wg.Done()
-		defer safego.Recover(ctx, "ws.buildVersionComparisonsForHost.digestTagMap")
-		digestTagMap, _ = h.db.GetAllTrackerTagDigests(ctx)
-	}()
-	go func() {
-		defer wg.Done()
-		defer safego.Recover(ctx, "ws.buildVersionComparisonsForHost.imageVersions")
-		imageVersions, _ = h.db.ListDockerImageVersions(ctx)
-	}()
-	wg.Wait()
-
-	if trackersErr != nil {
-		return nil, trackersErr
-	}
-	if containersErr != nil {
-		return nil, containersErr
-	}
-	if digestTagMap == nil {
-		digestTagMap = make(map[string]string)
-	}
-
-	containersByHost := map[string][]models.DockerContainer{
-		hostID: containers,
 	}
 
 	covered := make(map[string]struct{})
