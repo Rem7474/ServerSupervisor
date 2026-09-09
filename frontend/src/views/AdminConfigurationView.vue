@@ -182,18 +182,22 @@
                 <IconSearch :size="16" />
               </span>
               <input
+                id="config-search-input"
                 v-model="searchQuery"
                 type="text"
                 class="form-control"
                 :placeholder="t('config.actions.searchPlaceholder')"
+                :aria-label="t('config.actions.searchPlaceholder')"
               >
             </div>
           </div>
 
           <div class="col-6 col-md-4">
             <select
+              id="config-category-filter"
               v-model="selectedCategory"
               class="form-select"
+              :aria-label="t('config.categories.all')"
             >
               <option value="all">
                 {{ t('config.categories.all') }}
@@ -210,8 +214,10 @@
 
           <div class="col-6 col-md-3">
             <select
+              id="config-source-filter"
               v-model="selectedSource"
               class="form-select"
+              :aria-label="t('config.actions.allSources')"
             >
               <option value="all">
                 {{ t('config.actions.allSources') }}
@@ -408,13 +414,18 @@
                     class="form-check form-switch mb-0"
                   >
                     <input
+                      :id="`input-${entry.key}`"
                       class="form-check-input"
                       type="checkbox"
                       :checked="formValues[entry.key] === 'true' || formValues[entry.key] === '1'"
                       :disabled="!entry.is_editable"
+                      :aria-label="entry.label || entry.key"
                       @change="onBoolChange(entry.key, ($event.target as HTMLInputElement).checked)"
                     >
-                    <label class="form-check-label text-muted small ms-1">
+                    <label
+                      :for="`input-${entry.key}`"
+                      class="form-check-label text-muted small ms-1"
+                    >
                       {{ formValues[entry.key] === 'true' || formValues[entry.key] === '1' ? t('config.values.enabled') : t('config.values.disabled') }}
                     </label>
                   </div>
@@ -422,9 +433,11 @@
                   <!-- Select Dropdown -->
                   <div v-else-if="entry.type === 'select'">
                     <select
+                      :id="`input-${entry.key}`"
                       v-model="formValues[entry.key]"
                       class="form-select form-select-sm"
                       :disabled="!entry.is_editable"
+                      :aria-label="entry.label || entry.key"
                     >
                       <option
                         v-for="opt in entry.options"
@@ -442,15 +455,18 @@
                     class="input-group input-group-sm"
                   >
                     <input
+                      :id="`input-${entry.key}`"
                       v-model="formValues[entry.key]"
                       :type="showLocalPassword[entry.key] ? 'text' : 'password'"
                       class="form-control"
                       :placeholder="entry.effective_value ? '••••••••' : t('config.values.notSet')"
                       :disabled="!entry.is_editable"
+                      :aria-label="entry.label || entry.key"
                     >
                     <button
                       type="button"
                       class="btn btn-outline-secondary"
+                      :aria-label="showLocalPassword[entry.key] ? t('config.actions.hideSecrets') : t('config.actions.revealSecrets')"
                       @click="toggleLocalPassword(entry.key)"
                     >
                       <component
@@ -463,11 +479,13 @@
                   <!-- Number / Duration / String / CSV Text Input -->
                   <div v-else>
                     <input
+                      :id="`input-${entry.key}`"
                       v-model="formValues[entry.key]"
                       type="text"
                       class="form-control form-control-sm font-monospace"
                       :placeholder="entry.default_value || '-'"
                       :disabled="!entry.is_editable"
+                      :aria-label="entry.label || entry.key"
                     >
                   </div>
 

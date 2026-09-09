@@ -175,4 +175,38 @@ func TestConfigHandler_UpdateConfigBulk(t *testing.T) {
 	if repo.settings["smtp_port"] != "2525" {
 		t.Errorf("expected smtp_port in repo")
 	}
+
+	// Bad json bulk
+	reqBad := httptest.NewRequest(http.MethodPut, "/api/v1/config", bytes.NewReader([]byte("{invalid-json")))
+	reqBad.Header.Set("Content-Type", "application/json")
+	wBad := httptest.NewRecorder()
+	r.ServeHTTP(wBad, reqBad)
+	if wBad.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request on malformed JSON, got %d", wBad.Code)
+	}
+
+	// Bad json single update
+	reqBadSingle := httptest.NewRequest(http.MethodPut, "/api/v1/config/SERVER_PORT", bytes.NewReader([]byte("{invalid-json")))
+	reqBadSingle.Header.Set("Content-Type", "application/json")
+	wBadSingle := httptest.NewRecorder()
+	r.ServeHTTP(wBadSingle, reqBadSingle)
+	if wBadSingle.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 Bad Request on malformed JSON, got %d", wBadSingle.Code)
+	}
+
+	// Reset unknown param
+	reqResetUnknown := httptest.NewRequest(http.MethodDelete, "/api/v1/config/NONEXISTENT_XYZ", nil)
+	wResetUnknown := httptest.NewRecorder()
+	r.ServeHTTP(wResetUnknown, reqResetUnknown)
+	if wResetUnknown.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for unknown param in reset, got %d", wResetUnknown.Code)
+	}
+
+	// GetConfig with reveal_secrets
+	reqReveal := httptest.NewRequest(http.MethodGet, "/api/v1/config?reveal_secrets=true", nil)
+	wReveal := httptest.NewRecorder()
+	r.ServeHTTP(wReveal, reqReveal)
+	if wReveal.Code != http.StatusOK {
+		t.Errorf("expected 200 with reveal_secrets, got %d", wReveal.Code)
+	}
 }

@@ -144,6 +144,18 @@ func TestConfigService_ResetParam(t *testing.T) {
 	if _, exists := repo.settings["smtp_host"]; exists {
 		t.Errorf("expected setting to be deleted from repo")
 	}
+
+	// Reset unknown param
+	_, err = svc.ResetParam(context.Background(), "UNKNOWN_KEY", "admin", "127.0.0.1")
+	if err == nil {
+		t.Errorf("expected error for unknown key in ResetParam")
+	}
+
+	// Reset non-editable param
+	_, err = svc.ResetParam(context.Background(), "DEMO_MODE", "admin", "127.0.0.1")
+	if err == nil {
+		t.Errorf("expected error for non-editable key in ResetParam")
+	}
 }
 
 func TestConfigService_UpdateBulk(t *testing.T) {
@@ -168,5 +180,11 @@ func TestConfigService_UpdateBulk(t *testing.T) {
 	}
 	if repo.settings["smtp_port"] != "587" {
 		t.Errorf("expected smtp_port updated")
+	}
+
+	// Bulk with invalid value
+	_, _, err = svc.UpdateBulk(context.Background(), map[string]string{"SERVER_PORT": "not-a-port"}, "admin", "127.0.0.1")
+	if err == nil {
+		t.Errorf("expected error when bulk updating with invalid value")
 	}
 }
