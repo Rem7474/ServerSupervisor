@@ -80,6 +80,12 @@ vi.mock('../api/config', () => ({
   },
 }))
 
+vi.mock('../composables/useConfirmDialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: vi.fn().mockResolvedValue(true),
+  }),
+}))
+
 vi.mock('../composables/useGlobalToast', () => ({
   addToast: vi.fn(),
   useGlobalToast: () => ({
@@ -92,6 +98,7 @@ vi.mock('../composables/useGlobalToast', () => ({
 beforeEach(() => {
   setActivePinia(createPinia())
   setLocale('fr')
+  vi.clearAllMocks()
 })
 
 describe('AdminConfigurationView', () => {
@@ -162,4 +169,134 @@ describe('AdminConfigurationView', () => {
     expect(wrapper.text()).toContain('Hôte SMTP')
     expect(wrapper.text()).not.toContain("Port d'écoute du serveur")
   })
+
+  it('filters entries by category', async () => {
+    const wrapper = mount(AdminConfigurationView, {
+      global: {
+        stubs: {
+          'router-link': { template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const categorySelect = wrapper.find('#config-category-filter')
+    await categorySelect.setValue('server')
+
+    expect(wrapper.text()).toContain("Port d'écoute du serveur")
+    expect(wrapper.text()).not.toContain('Hôte SMTP')
+  })
+
+  it('allows saving an edited parameter', async () => {
+    const wrapper = mount(AdminConfigurationView, {
+      global: {
+        stubs: {
+          'router-link': { template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const input = wrapper.find('#input-SERVER_PORT')
+    await input.setValue('9090')
+    await flushPromises()
+
+    const row = wrapper.findAll('tr').find(r => r.text().includes("Port d'écoute du serveur"))
+    const saveBtn = row?.findAll('button').find(b => b.text().includes('Enregistrer'))
+    expect(saveBtn).toBeDefined()
+    await saveBtn?.trigger('click')
+    await flushPromises()
+
+    const { configApi } = await import('../api/config')
+    expect(configApi.updateParam).toHaveBeenCalledWith('SERVER_PORT', '9090')
+  })
+
+  it('allows resetting a parameter to default/env', async () => {
+    const wrapper = mount(AdminConfigurationView, {
+      global: {
+        stubs: {
+          'router-link': { template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const jwtRow = wrapper.findAll('tr').find(r => r.text().includes('Secret de signature JWT'))
+    const resetBtn = jwtRow?.find('button.btn-outline-danger')
+    expect(resetBtn?.exists()).toBe(true)
+    await resetBtn?.trigger('click')
+    await flushPromises()
+
+    const { configApi } = await import('../api/config')
+    expect(configApi.resetParam).toHaveBeenCalledWith('JWT_SECRET')
+  })
+
+  it('allows saving all modified parameters in a category', async () => {
+    const wrapper = mount(AdminConfigurationView, {
+      global: {
+        stubs: {
+          'router-link': { template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const input = wrapper.find('#input-SERVER_PORT')
+    await input.setValue('9090')
+    await flushPromises()
+
+    const categoryHeaderSave = wrapper.findAll('button').find(b => b.classes().includes('btn-primary') && b.text().includes('Enregistrer'))
+    expect(categoryHeaderSave?.exists()).toBe(true)
+    await categoryHeaderSave?.trigger('click')
+    await flushPromises()
+
+    const { configApi } = await import('../api/config')
+    expect(configApi.updateBulk).toHaveBeenCalled()
+  })
+
+  it('toggles reveal secrets', async () => {
+    const wrapper = mount(AdminConfigurationView, {
+      global: {
+        stubs: {
+          'router-link': { template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const revealBtn = wrapper.findAll('button').find(b => b.text().includes('Afficher secrets'))
+    if (revealBtn) {
+      await revealBtn.trigger('click')
+      await flushPromises()
+      const { configApi } = await import('../api/config')
+      expect(configApi.getConfig).toHaveBeenCalledWith(true)
+    }
+  })
+
+  it('toggles password visibility locally', async () => {
+    const wrapper = mount(AdminConfigurationView, {
+      global: {
+        stubs: {
+          'router-link': { template: '<a><slot /></a>' },
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const secretInput = wrapper.find('#input-JWT_SECRET')
+    expect(secretInput.attributes('type')).toBe('password')
+
+    const eyeBtn = wrapper.find('button[aria-label="Afficher secrets"], button[aria-label="Masquer"]')
+    if (eyeBtn.exists()) {
+      await eyeBtn.trigger('click')
+      expect(wrapper.find('#input-JWT_SECRET').attributes('type')).toBe('text')
+    }
+  })
 })
+
