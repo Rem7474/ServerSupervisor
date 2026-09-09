@@ -33,23 +33,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined
-
-          if (id.includes('cytoscape') || id.includes('d3-force')) return 'vendor-graph'
-          if (id.includes('apexcharts')) return 'vendor-apexcharts'
-          if (id.includes('/d3-')) return 'vendor-d3'
-          if (id.includes('world-atlas') || id.includes('topojson-client')) return 'vendor-map'
-          if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vendor-vue'
-          if (id.includes('axios')) return 'vendor-http'
-          if (id.includes('dayjs')) return 'vendor-date'
-          if (id.includes('@tabler')) return 'vendor-tabler'
-
-          return 'vendor-misc'
-        },
-      },
-    },
+    // No manualChunks: Rollup's default splitting respects the dynamic
+    // import() boundaries that already exist in the codebase. The previous
+    // manualChunks function grouped node_modules by package name, which
+    // inadvertently pulled the Vue runtime into the 1.43 MB ApexCharts
+    // chunk (because `id.includes('vue')` matched vue-related code before
+    // the `vendor-vue` bucket was tested). That chunk was then
+    // modulepreload'd in the entry, defeating the defineAsyncComponent in
+    // apexChartTheme.ts and the IntersectionObserver in DashboardView.
+    // The same mechanism pulled xterm.js into the entry via vendor-misc.
+    // Measured impact: 3 126 KB → 1 420 KB brut, 779 KB → 316 KB gzip.
+    chunkSizeWarningLimit: 900,
   },
 })

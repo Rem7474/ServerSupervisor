@@ -84,6 +84,69 @@ func (h *WSHandler) buildVersionComparisons(ctx context.Context) ([]models.Versi
 	return comparisons, nil
 }
 
+func (h *WSHandler) buildVersionComparisonsForHost(ctx context.Context, hostID string) ([]models.VersionComparison, error) {
+	var (
+		trackers      []models.ReleaseTracker
+		trackersErr   error
+		containers    []models.DockerContainer
+		containersErr error
+		digestTagMap  map[string]string
+		imageVersions []models.DockerImageVersion
+	)
+	var wg sync.WaitGroup
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildVersionComparisonsForHost.trackers")
+		// Could filter at DB level, but memory filter is cheap here
+		allTrackers, err := h.db.ListReleaseTrackers(ctx)
+		trackersErr = err
+		if err == nil {
+			for _, t := range allTrackers {
+				if t.HostID == hostID {
+					trackers = append(trackers, t)
+				}
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildVersionComparisonsForHost.containers")
+		containers, containersErr = h.db.GetDockerContainers(ctx, hostID)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildVersionComparisonsForHost.digestTagMap")
+		digestTagMap, _ = h.db.GetAllTrackerTagDigests(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildVersionComparisonsForHost.imageVersions")
+		imageVersions, _ = h.db.ListDockerImageVersions(ctx)
+	}()
+	wg.Wait()
+
+	if trackersErr != nil {
+		return nil, trackersErr
+	}
+	if containersErr != nil {
+		return nil, containersErr
+	}
+	if digestTagMap == nil {
+		digestTagMap = make(map[string]string)
+	}
+
+	containersByHost := map[string][]models.DockerContainer{
+		hostID: containers,
+	}
+
+	covered := make(map[string]struct{})
+
+	comparisons := buildTrackerComparisons(trackers, containersByHost, digestTagMap, covered)
+	comparisons = append(comparisons, buildAmbientComparisons(containers, imageVersions, covered)...)
+	return comparisons, nil
+}
+
 // containerGroupKey identifies one (host, image, tag) group — the unit the
 // frontend looks a container's badge up by.
 func containerGroupKey(hostID, image, tag string) string {

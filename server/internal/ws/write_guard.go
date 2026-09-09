@@ -30,3 +30,10 @@ func safeWriteMessage(conn *websocket.Conn, messageType int, data []byte) error 
 	defer guard.Unlock()
 	return conn.WriteMessage(messageType, data)
 }
+
+func safeWriteRaw(conn *websocket.Conn, raw []byte) error {
+	guard := writeGuardFor(conn)
+	guard.Lock()
+	defer guard.Unlock()
+	return conn.WriteMessage(websocket.TextMessage, raw)
+}

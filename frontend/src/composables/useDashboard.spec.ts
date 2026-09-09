@@ -5,7 +5,7 @@ import { ref } from 'vue'
 
 const {
   getAptCVESummary, getMetricsSummary, getProxmoxNodeMetrics,
-  getProxmoxSummary, getSettings, sendAptCommand,
+  getProxmoxSummary, getSettings, sendAptCommand, getDashboardInit,
 } = vi.hoisted(() => ({
   getAptCVESummary: vi.fn(),
   getMetricsSummary: vi.fn(),
@@ -13,12 +13,13 @@ const {
   getProxmoxSummary: vi.fn(),
   getSettings: vi.fn(),
   sendAptCommand: vi.fn(),
+  getDashboardInit: vi.fn().mockRejectedValue(new Error('not wired')),
 }))
 
 vi.mock('../api', () => ({
   default: {
     getAptCVESummary, getMetricsSummary, getProxmoxNodeMetrics,
-    getProxmoxSummary, getSettings, sendAptCommand,
+    getProxmoxSummary, getSettings, sendAptCommand, getDashboardInit,
   },
 }))
 

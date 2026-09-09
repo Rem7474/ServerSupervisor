@@ -26,18 +26,18 @@ import (
 
 // snapshotChanged returns true (and updates *lastHash) when payload differs from the
 // previously sent snapshot. It allows the caller to skip WriteJSON when nothing changed.
-func snapshotChanged(payload any, lastHash *string) bool {
+func snapshotChanged(payload any, lastHash *string) ([]byte, bool) {
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		return true
+		return raw, true
 	}
 	sum := sha256.Sum256(raw)
 	hash := fmt.Sprintf("%x", sum)
 	if hash == *lastHash {
-		return false
+		return raw, false
 	}
 	*lastHash = hash
-	return true
+	return raw, true
 }
 
 const wsMaxConnsPerIP = 20
@@ -50,7 +50,7 @@ const (
 	// the N concurrent rebuilds that happen when many dashboards react to the same
 	// write event (or connect at once) into a single ~8-query build. It is kept
 	// short so an event-driven refresh stays effectively instant.
-	dashboardCacheTTL = 1 * time.Second
+	dashboardCacheTTL = 3 * time.Second
 	// snapshotDebounce coalesces a burst of write events (e.g. one agent report
 	// fans out to several topics, or several agents report at once) into a single
 	// snapshot rebuild per connection.

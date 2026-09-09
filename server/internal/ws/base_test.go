@@ -36,7 +36,7 @@ func TestIsAllowedOrigin(t *testing.T) {
 func TestSnapshotChanged(t *testing.T) {
 	var lastHash string
 
-	if !snapshotChanged(map[string]int{"a": 1}, &lastHash) {
+	if _, changed := snapshotChanged(map[string]int{"a": 1}, &lastHash); !changed {
 		t.Error("first call should always report a change")
 	}
 	firstHash := lastHash
@@ -44,14 +44,14 @@ func TestSnapshotChanged(t *testing.T) {
 		t.Error("expected lastHash to be set after the first call")
 	}
 
-	if snapshotChanged(map[string]int{"a": 1}, &lastHash) {
+	if _, changed := snapshotChanged(map[string]int{"a": 1}, &lastHash); changed {
 		t.Error("identical payload should not report a change")
 	}
 	if lastHash != firstHash {
 		t.Error("lastHash should not change when the payload is identical")
 	}
 
-	if !snapshotChanged(map[string]int{"a": 2}, &lastHash) {
+	if _, changed := snapshotChanged(map[string]int{"a": 2}, &lastHash); !changed {
 		t.Error("different payload should report a change")
 	}
 	if lastHash == firstHash {

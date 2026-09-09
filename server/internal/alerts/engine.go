@@ -2,7 +2,6 @@ package alerts
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -115,6 +114,9 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 		hostByID[h.ID] = h
 	}
 
+	maintenanceSet, _ := db.GetHostsInMaintenance(ctx)
+	openIncidents, _ := db.ListAllOpenAlertIncidents(ctx)
+
 	for _, rule := range rules {
 		if !rule.Enabled {
 			staleIncidents, _ := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
@@ -152,20 +154,21 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 				continue
 			}
 
-			if inMaintenance, err := db.IsHostInMaintenance(ctx, host.ID); err != nil {
-				slog.ErrorContext(ctx, "alerts: failed to check maintenance window", slog.String("host", host.ID), slog.Any("err", err))
-			} else if inMaintenance {
+			inMaintenance := maintenanceSet["*"] || maintenanceSet[host.ID]
+			if inMaintenance {
 				// Same shape as the disabled-rule branch above: silently resolve
 				// any already-open incident (UI refresh ping only, no loud
 				// notification channel) and skip evaluation entirely, so a
 				// planned intervention produces zero alert noise in either
 				// direction — no new incidents, no "resolved" emails either.
-				if inc, err := db.GetOpenAlertIncident(ctx, rule.ID, host.ID); err == nil && inc != nil {
+				incKey := fmt.Sprintf("%d|%s", rule.ID, host.ID)
+				if inc, ok := openIncidents[incKey]; ok {
 					if err := db.ResolveAlertIncident(ctx, inc.ID); err != nil {
 						slog.ErrorContext(ctx, "alerts: failed to resolve incident for host in maintenance", slog.Int64("incident_id", inc.ID), slog.Any("err", err))
 					} else {
 						slog.InfoContext(ctx, "alerts: incident silently resolved — host in maintenance", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Int64("incident_id", inc.ID))
 						broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
+						delete(openIncidents, incKey)
 					}
 				}
 				continue
@@ -180,15 +183,12 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 			currentSeveration := DetermineSeverity(rule, host, value)
 
 			// Get any open incident (regardless of severity)
-			inc, err := db.GetOpenAlertIncident(ctx, rule.ID, host.ID)
-			if err != nil && err != sql.ErrNoRows {
-				slog.ErrorContext(ctx, "alerts: failed to check incidents", slog.Any("err", err))
-				continue
-			}
+			incKey := fmt.Sprintf("%d|%s", rule.ID, host.ID)
+			inc, hasInc := openIncidents[incKey]
 
 			if currentSeveration != SeverityNone {
 				// Alert is triggered at current severity level
-				if err == sql.ErrNoRows || inc == nil {
+				if !hasInc {
 					// No existing incident - create new one with current severity
 					incID, err := db.CreateAlertIncident(ctx, rule.ID, host.ID, value, string(currentSeveration))
 					if err != nil {
