@@ -1,6 +1,7 @@
 package proxmoxclient
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -123,5 +124,27 @@ func TestGetNodeTaskStatusFinished(t *testing.T) {
 				t.Errorf("Finished() = %v, want %v (status %q)", st.Finished(), tc.want, st.Status)
 			}
 		})
+	}
+}
+
+func TestGetWithTotal_SSRFPrevention(t *testing.T) {
+	c := New("https://pve.example.com:8006/api2/json", "u!t", "s", false)
+	var res any
+	err := c.get("//evil.com/malicious", &res)
+	if err == nil {
+		t.Fatal("expected error on SSRF attempt, got nil")
+	}
+}
+
+func TestFlexInt_UnmarshalJSON(t *testing.T) {
+	var f FlexInt
+	if err := json.Unmarshal([]byte(`"100"`), &f); err != nil || int(f) != 100 {
+		t.Fatalf("expected 100, got %d, err: %v", f, err)
+	}
+	if err := json.Unmarshal([]byte(`"N/A"`), &f); err != nil || int(f) != 0 {
+		t.Fatalf("expected 0 on non-numeric, got %d", f)
+	}
+	if err := json.Unmarshal([]byte(`""`), &f); err != nil || int(f) != 0 {
+		t.Fatalf("expected 0 on empty, got %d", f)
 	}
 }
