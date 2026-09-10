@@ -105,6 +105,84 @@ func TestUpsertProxmoxBackupRunFromStorage(t *testing.T) {
 	})
 }
 
+// UpsertProxmoxBackupRun is fed by the poller from two merged,
+// independently-ordered task fetches (the general top-N window plus a
+// vzdump-type-filtered one folded in to recover a task the general window
+// pushed out — see proxmox.Poller.PollOne) — so a stale task for a vmid can
+// be processed after a fresher one already recorded it, in the same or a
+// later poll cycle. Unlike the storage-derived upsert above, this path had no
+// guard against that until now: a busy node meant "Dernier résultat par VM"
+// could get stuck showing an old failure days after a real successful run.
+func TestUpsertProxmoxBackupRunMonotonic(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	connID, err := db.CreateProxmoxConnection(ctx, baseConnRequest("backup-runs-monotonic"))
+	if err != nil {
+		t.Fatalf("create connection: %v", err)
+	}
+
+	older := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)
+
+	runFor := func(vmid int) models.ProxmoxBackupRun {
+		t.Helper()
+		runs, err := db.ListProxmoxBackupRuns(ctx, connID)
+		if err != nil {
+			t.Fatalf("list backup runs: %v", err)
+		}
+		for _, r := range runs {
+			if r.VMID == vmid {
+				return r
+			}
+		}
+		t.Fatalf("no run for vmid %d in %+v", vmid, runs)
+		return models.ProxmoxBackupRun{}
+	}
+
+	t.Run("a stale task processed after a fresher one does not win", func(t *testing.T) {
+		if err := db.UpsertProxmoxBackupRun(ctx, connID, "pve1", 200, "UPID:new", "OK", &newer, &newer, "OK"); err != nil {
+			t.Fatalf("upsert newer: %v", err)
+		}
+		if err := db.UpsertProxmoxBackupRun(ctx, connID, "pve1", 200, "UPID:old", "failed", &older, &older, "job errors"); err != nil {
+			t.Fatalf("upsert older: %v", err)
+		}
+
+		got := runFor(200)
+		if got.TaskUPID != "UPID:new" || got.Status != "OK" {
+			t.Errorf("stale task clobbered the fresher one: task_upid=%q status=%q", got.TaskUPID, got.Status)
+		}
+	})
+
+	t.Run("a genuinely newer task still replaces the stored one", func(t *testing.T) {
+		if err := db.UpsertProxmoxBackupRun(ctx, connID, "pve1", 201, "UPID:old2", "failed", &older, &older, "job errors"); err != nil {
+			t.Fatalf("upsert older: %v", err)
+		}
+		if err := db.UpsertProxmoxBackupRun(ctx, connID, "pve1", 201, "UPID:new2", "OK", &newer, &newer, "OK"); err != nil {
+			t.Fatalf("upsert newer: %v", err)
+		}
+
+		got := runFor(201)
+		if got.TaskUPID != "UPID:new2" || got.Status != "OK" {
+			t.Errorf("newer task wasn't applied: task_upid=%q status=%q", got.TaskUPID, got.Status)
+		}
+	})
+
+	t.Run("a task with no start_time never overwrites a known one", func(t *testing.T) {
+		if err := db.UpsertProxmoxBackupRun(ctx, connID, "pve1", 202, "UPID:known", "OK", &newer, &newer, "OK"); err != nil {
+			t.Fatalf("upsert known: %v", err)
+		}
+		if err := db.UpsertProxmoxBackupRun(ctx, connID, "pve1", 202, "UPID:unknown", "failed", nil, nil, "job errors"); err != nil {
+			t.Fatalf("upsert nil start_time: %v", err)
+		}
+
+		got := runFor(202)
+		if got.TaskUPID != "UPID:known" || got.Status != "OK" {
+			t.Errorf("nil-start_time task clobbered the known one: task_upid=%q status=%q", got.TaskUPID, got.Status)
+		}
+	})
+}
+
 // GetProxmoxNode carries the owning connection's last_error so the node page
 // can explain an empty tab, rather than the message living only in the
 // connection list the user has no reason to open.

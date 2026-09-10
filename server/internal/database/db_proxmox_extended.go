@@ -208,6 +208,13 @@ func (db *DB) DeleteStaleProxmoxBackupJobs(ctx context.Context, connectionID str
 
 // UpsertProxmoxBackupRun upserts the latest backup result for a VM.
 // UNIQUE on (connection_id, vmid) — one row per VM, always the most recent run.
+// The poller feeds this from two merged, independently-ordered task sources
+// (see proxmox.Poller's general + vzdump-filtered fetch), so a given vmid can
+// be seen more than once per cycle in no particular chronological order — the
+// WHERE guard makes the write monotonic on start_time instead of trusting
+// call order, so a task discovered late (e.g. only via the vzdump-type
+// fetch because a busier general window pushed it out) can never clobber an
+// already-stored more recent result.
 func (db *DB) UpsertProxmoxBackupRun(ctx context.Context, connectionID, nodeName string, vmid int, taskUPID, status string, startTime, endTime *time.Time, exitStatus string) error {
 	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_backup_runs
@@ -220,7 +227,9 @@ func (db *DB) UpsertProxmoxBackupRun(ctx context.Context, connectionID, nodeName
 		    start_time  = EXCLUDED.start_time,
 		    end_time    = EXCLUDED.end_time,
 		    exit_status = EXCLUDED.exit_status,
-		    last_seen_at = NOW()`,
+		    last_seen_at = NOW()
+		WHERE proxmox_backup_runs.start_time IS NULL
+		   OR (EXCLUDED.start_time IS NOT NULL AND EXCLUDED.start_time >= proxmox_backup_runs.start_time)`,
 		connectionID, nodeName, vmid, taskUPID, status, startTime, endTime, exitStatus,
 	)
 	return err
