@@ -46,6 +46,39 @@ describe('HostTimelineTab', () => {
     expect(wrapper.find('tbody tr').text()).toContain('—')
   })
 
+  it('shows a translated, colored badge for an active incident and a resolved one', async () => {
+    getHostTimeline.mockResolvedValue({
+      data: {
+        events: [
+          { id: 'inc-1', type: 'incident', timestamp: new Date().toISOString(), title: 'CPU élevé', severity: 'warn', status: 'active' },
+          { id: 'inc-2', type: 'incident', timestamp: new Date(Date.now() - 1000).toISOString(), title: 'RAM élevée', severity: 'warn', status: 'resolved' },
+        ],
+      },
+    })
+
+    const wrapper = mount(HostTimelineTab, { props: { hostId: 'h1' } })
+    await flushPromises()
+
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows[0].find('.badge.bg-danger-lt').text()).toBe('Actif')
+    expect(rows[1].find('.badge.bg-success-lt').text()).toBe('Terminé')
+  })
+
+  it('routes a command event status through the shared execution-state helper', async () => {
+    getHostTimeline.mockResolvedValue({
+      data: {
+        events: [
+          { id: 'cmd-1', type: 'command', timestamp: new Date().toISOString(), title: 'apt upgrade', status: 'failed', user: 'bob' },
+        ],
+      },
+    })
+
+    const wrapper = mount(HostTimelineTab, { props: { hostId: 'h1' } })
+    await flushPromises()
+
+    expect(wrapper.find('.badge.bg-danger-lt').text()).toBe('Échoué')
+  })
+
   it('renders events as table rows', async () => {
     getHostTimeline.mockResolvedValue({
       data: {
