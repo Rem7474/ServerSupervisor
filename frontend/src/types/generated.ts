@@ -1627,8 +1627,10 @@ export interface ProxmoxTaskLogLine {
 export interface ProxmoxTaskLog {
   lines: ProxmoxTaskLogLine[];
   /**
-   * Total is the number of lines the task produced; len(Lines) is capped at
-   * one page, taken from the end of the log.
+   * Total is how many lines were read from the task; len(Lines) is capped at
+   * one page, taken from the end. It is counted rather than taken from PVE's
+   * `total`, which at least one version reports as something other than a
+   * line count.
    */
   total: number /* int */;
   truncated: boolean;

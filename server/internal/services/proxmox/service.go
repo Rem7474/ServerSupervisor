@@ -499,6 +499,7 @@ func (s *Service) TaskLog(ctx context.Context, nodeID, upid string) (models.Prox
 	if err != nil {
 		return models.ProxmoxTaskLog{}, err
 	}
+	// total is the number of lines actually read; lines is the trailing page.
 	lines, total, err := client.GetNodeTaskLog(node.NodeName, upid)
 	if err != nil {
 		return models.ProxmoxTaskLog{}, apperr.BadGateway(err.Error())
