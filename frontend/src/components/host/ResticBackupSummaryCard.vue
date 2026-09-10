@@ -4,7 +4,7 @@
       <span
         class="badge"
         :class="summary.status === 'ok' ? 'bg-success-lt text-success' : 'bg-danger-lt text-danger'"
-      >{{ summary.status }}</span>
+      >{{ getExecutionStateLabel(summary.status) }}</span>
       <span class="text-secondary small">{{ summary.profile || t('host.defaultProfileLabel') }}</span>
     </div>
 
@@ -68,6 +68,7 @@
 </template>
 
 <script setup lang="ts">
+import { getExecutionStateLabel } from '../../utils/statusClasses'
 import { useI18n } from 'vue-i18n'
 
 // Mirrors agent/internal/collector.ResticBackupSummary — the terminal Output

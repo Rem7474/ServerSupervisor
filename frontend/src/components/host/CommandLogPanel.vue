@@ -135,7 +135,7 @@
                 <span
                   :class="statusClass(command.status)"
                   class="ms-2"
-                >{{ command.status }}</span>
+                >{{ statusLabel(command.status) }}</span>
               </div>
             </div>
             <div
@@ -239,7 +239,7 @@ defineEmits<{
 }>()
 
 const { t } = useI18n()
-const { getStatusBadgeClass } = useStatusBadge()
+const { getStatusBadgeClass, getStatusBadgeLabel } = useStatusBadge()
 const { formatRelativeTime } = useDateFormatter()
 
 const displayTitle = computed(() => props.title || t('common.commandLogTitle'))
@@ -254,6 +254,10 @@ function cmdLabel(cmd: CommandRecord): string {
 
 function statusClass(status: string | undefined): string {
   return getStatusBadgeClass(status, 'badge bg-warning-lt text-warning')
+}
+
+function statusLabel(status: string | undefined): string {
+  return getStatusBadgeLabel(status)
 }
 
 function processCarriageReturns(text: string): string {

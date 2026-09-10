@@ -199,7 +199,7 @@
                   <span
                     class="badge"
                     :class="runBadgeClass(run.status)"
-                  >{{ run.status }}</span>
+                  >{{ getExecutionStateLabel(run.status) }}</span>
                 </td>
                 <td class="small">
                   {{ run.duration_sec != null ? formatDuration(run.duration_sec) : '—' }}
@@ -248,6 +248,7 @@
 </template>
 
 <script setup lang="ts">
+import { getExecutionStateLabel } from '../../utils/statusClasses'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconExternalLink, IconList } from '@tabler/icons-vue'

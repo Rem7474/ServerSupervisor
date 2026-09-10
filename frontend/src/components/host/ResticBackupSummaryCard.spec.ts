@@ -21,7 +21,8 @@ describe('ResticBackupSummaryCard', () => {
       repo_size_bytes: 1024 * 1024,
     }
     const wrapper = mount(ResticBackupSummaryCard, { props: { summary } })
-    expect(wrapper.find('.badge').text()).toBe('ok')
+    // Translated through the shared execution-state vocabulary, not echoed raw.
+    expect(wrapper.find('.badge').text()).toBe('OK')
     expect(wrapper.text()).toContain('files')
     expect(wrapper.text()).toContain('2min')
     expect(wrapper.text()).toContain('3 nouveau')
@@ -38,7 +39,7 @@ describe('ResticBackupSummaryCard', () => {
       error_message: 'resticconf not readable',
     }
     const wrapper = mount(ResticBackupSummaryCard, { props: { summary } })
-    expect(wrapper.find('.badge').text()).toBe('error')
+    expect(wrapper.find('.badge').text()).toBe('Erreur')
     expect(wrapper.find('.alert-danger').text()).toContain('resticconf not readable')
   })
 

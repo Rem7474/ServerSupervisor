@@ -1,4 +1,4 @@
-import { getExecutionStateClass } from '../utils/statusClasses'
+import { getExecutionStateClass, getExecutionStateLabel } from '../utils/statusClasses'
 
 interface UseStatusBadgeOptions {
   map?: Record<string, string>
@@ -6,6 +6,7 @@ interface UseStatusBadgeOptions {
 
 interface UseStatusBadgeApi {
   getStatusBadgeClass: (status: string | null | undefined, fallback?: string) => string
+  getStatusBadgeLabel: (status: string | null | undefined, fallback?: string) => string
 }
 
 export function useStatusBadge(options: UseStatusBadgeOptions = {}): UseStatusBadgeApi {
@@ -21,5 +22,16 @@ export function useStatusBadge(options: UseStatusBadgeOptions = {}): UseStatusBa
     return getExecutionStateClass(status, fallback)
   }
 
-  return { getStatusBadgeClass }
+  // Handed out alongside the class so a badge's colour and text cannot drift
+  // apart — the same reasoning statusClasses.ts records for entity states.
+  // Without it a caller has nothing to render but the raw value, which is how
+  // an untranslated "failed" ended up in the task console.
+  function getStatusBadgeLabel(
+    status: string | null | undefined,
+    fallback?: string
+  ): string {
+    return getExecutionStateLabel(status, fallback)
+  }
+
+  return { getStatusBadgeClass, getStatusBadgeLabel }
 }

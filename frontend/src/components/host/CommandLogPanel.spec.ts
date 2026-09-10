@@ -16,6 +16,29 @@ const baseCommand = {
 }
 
 describe('CommandLogPanel', () => {
+  // The status badge used to render command.status verbatim, so the PVE task
+  // console showed an untranslated "failed" next to tables that said "Échoué".
+  it.each([
+    ['failed', 'Échoué'],
+    ['running', 'En cours'],
+    ['completed', 'Terminé'],
+    ['pending', 'En attente'],
+  ])('translates the %s status badge', (status, expected) => {
+    const wrapper = mount(CommandLogPanel, {
+      props: { show: true, command: { ...baseCommand, status } },
+    })
+    expect(wrapper.findAll('.badge').some((b) => b.text() === expected)).toBe(true)
+    expect(wrapper.text()).not.toContain(status)
+  })
+
+  it('falls back to the raw value for a status outside the shared vocabulary', () => {
+    // Degrading to the server's own word beats rendering nothing.
+    const wrapper = mount(CommandLogPanel, {
+      props: { show: true, command: { ...baseCommand, status: 'queued-upstream' } },
+    })
+    expect(wrapper.text()).toContain('queued-upstream')
+  })
+
   it('renders the processes table for a completed module=processes/action=list command', () => {
     const wrapper = mount(CommandLogPanel, {
       props: {
@@ -67,7 +90,7 @@ describe('CommandLogPanel', () => {
     })
     expect(wrapper.text()).toContain('abc123')
     const badges = wrapper.findAll('.badge')
-    expect(badges[badges.length - 1].text()).toBe('ok')
+    expect(badges[badges.length - 1].text()).toBe('OK')
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.find('pre.console-output').exists()).toBe(false)
   })

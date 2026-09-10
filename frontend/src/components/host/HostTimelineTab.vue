@@ -115,7 +115,7 @@
                   v-if="ev.status"
                   class="badge"
                   :class="statusBadge(ev.status)"
-                >{{ ev.status }}</span>
+                >{{ getExecutionStateLabel(ev.status) }}</span>
                 <span v-if="!ev.severity && !ev.status">—</span>
               </td>
               <td class="text-secondary small">
@@ -145,6 +145,7 @@
 </template>
 
 <script setup lang="ts">
+import { getExecutionStateLabel } from '../../utils/statusClasses'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconClipboard, IconTerminal2, IconAlertTriangle, IconList } from '@tabler/icons-vue'
