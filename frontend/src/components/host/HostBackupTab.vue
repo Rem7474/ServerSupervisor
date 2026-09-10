@@ -198,8 +198,8 @@
                 <td>
                   <span
                     class="badge"
-                    :class="runBadgeClass(run.status)"
-                  >{{ run.status }}</span>
+                    :class="getExecutionStateClass(run.status)"
+                  >{{ getExecutionStateLabel(run.status) }}</span>
                 </td>
                 <td class="small">
                   {{ run.duration_sec != null ? formatDuration(run.duration_sec) : '—' }}
@@ -258,6 +258,7 @@ import type { OptionGroup } from '../RestrictedSelect.vue'
 import { useBackup } from '../../composables/useBackup'
 import type { BackupRun } from '../../composables/useBackup'
 import { RESTIC_BACKUP_DOC_URL as configDocURL } from '../../utils/docLinks'
+import { getExecutionStateClass, getExecutionStateLabel } from '../../utils/statusClasses'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -300,23 +301,8 @@ const passiveState = computed(() => backupStatus.value?.passive_state || null)
 const statusBadge = computed(() => {
   const status = latestRun.value?.status || passiveState.value?.last_status
   if (!status) return null
-  return { label: status, badgeClass: runBadgeClass(status) }
+  return { label: getExecutionStateLabel(status), badgeClass: getExecutionStateClass(status) }
 })
-
-function runBadgeClass(status: string): string {
-  switch (status) {
-    case 'ok':
-      return 'bg-success-lt text-success'
-    case 'running':
-      return 'bg-primary-lt text-primary'
-    case 'warning':
-      return 'bg-warning-lt text-warning'
-    case 'error':
-      return 'bg-danger-lt text-danger'
-    default:
-      return 'bg-secondary-lt text-secondary'
-  }
-}
 
 function onRunBackup(): void {
   void handleRunBackup(runProfile.value.trim() || undefined)

@@ -63,8 +63,8 @@
               >—</span>
             </td>
             <td>
-              <span :class="c.state === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
-                {{ stateLabels[c.state || ''] || c.state }}
+              <span :class="getEntityStateClass(c.state)">
+                {{ getEntityStateLabel(c.state) }}
               </span>
             </td>
             <td class="text-secondary small">
@@ -188,6 +188,7 @@ import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { addToast } from '../../composables/useGlobalToast'
 import apiClient, { getApiErrorMessage } from '../../api'
 import type { VersionComparisonStatus } from '../../types/docker'
+import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
 
 interface Container {
   id: string
@@ -234,15 +235,6 @@ const dialog = useConfirmDialog()
 const actionLoading = ref<Record<string, string | null>>({})
 
 const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
-
-const stateLabels = computed<Record<string, string>>(() => ({
-  running: t('host.dockerStateRunning'),
-  exited: t('host.dockerStateExited'),
-  paused: t('host.dockerStatePaused'),
-  created: t('host.dockerStateCreated'),
-  restarting: t('host.dockerStateRestarting'),
-  dead: t('host.dockerStateDead'),
-}))
 
 // This tab is already host-scoped, so rows are keyed by image[+tag] only.
 // Ambient rows (one per image+tag group) carry image_tag and win over the

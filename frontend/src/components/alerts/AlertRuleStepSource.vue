@@ -406,7 +406,7 @@
             >
             <span class="form-check-label">
               {{ c.name }} <template v-if="c.state !== 'running'">
-                ({{ c.state }})
+                ({{ getEntityStateLabel(c.state) }})
               </template>
             </span>
           </label>
@@ -483,6 +483,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AlertRuleFormData, DockerScope } from '../../composables/useAlertRuleForm'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
+import { getEntityStateLabel } from '../../utils/statusClasses'
 
 interface ScopeOption { id: string; label: string }
 interface MetricCard { value: string; label: string; icon: string }

@@ -31,7 +31,7 @@
         </div>
         <span :class="host.status === 'online' ? 'status status-success' : 'status status-danger'">
           <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
-          <span>{{ host.status === 'online' ? t('apt.online') : t('apt.offline') }}</span>
+          <span>{{ getEntityStateLabel(host.status) }}</span>
         </span>
         <span
           v-if="activeCommand"
@@ -336,6 +336,7 @@ import { IconChevronDown, IconList, IconCalendar } from '@tabler/icons-vue'
 import CVEList from './CVEList.vue'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useStatusBadge } from '../../composables/useStatusBadge'
+import { getEntityStateLabel, getExecutionStateLabel } from '../../utils/statusClasses'
 import AptPendingPackagesList from './AptPendingPackagesList.vue'
 import type { Host } from '../../types/host'
 import type { UnattendedUpgradesDB } from '../../types/ws'
@@ -407,16 +408,8 @@ function formatDate(date: string | undefined): string {
   return formatRelativeDate(date)
 }
 
-const STATUS_LABEL_KEYS: Record<string, string> = {
-  pending: 'apt.statusPending',
-  running: 'apt.statusRunning',
-  completed: 'apt.statusCompleted',
-  failed: 'apt.statusFailed',
-}
-
 function statusLabel(status?: string): string {
-  const key = status && STATUS_LABEL_KEYS[status]
-  return key ? t(key) : status ?? ''
+  return getExecutionStateLabel(status)
 }
 
 function statusClass(status: string | undefined): string {

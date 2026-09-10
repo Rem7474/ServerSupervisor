@@ -135,7 +135,7 @@
                 <span
                   :class="statusClass(command.status)"
                   class="ms-2"
-                >{{ command.status }}</span>
+                >{{ getExecutionStateLabel(command.status) }}</span>
               </div>
             </div>
             <div
@@ -191,6 +191,7 @@ import { useI18n } from 'vue-i18n'
 import { IconCheck, IconChevronRight, IconCopy, IconDownload, IconTrash, IconX } from '@tabler/icons-vue'
 import { copyConsoleOutput, downloadConsoleOutput } from '../../utils/consoleOutput'
 import { moduleLabel, moduleClass } from '../../utils/moduleMeta'
+import { getExecutionStateLabel } from '../../utils/statusClasses'
 import { useStatusBadge } from '../../composables/useStatusBadge'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { resolveStructuredOutput } from '../../utils/structuredCommandOutput'

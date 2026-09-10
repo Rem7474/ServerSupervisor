@@ -35,6 +35,15 @@ export function getEntityStateClass(
   return ENTITY_STATE_MAP[state.toLowerCase()] ?? fallback
 }
 
+// Exposed only so a test can assert every colored entity state also has a
+// translated label (see statusClasses.spec.ts) — the color map and the label
+// map below are two independently-written object literals that happen to
+// share keys today; nothing enforces that they still will after the next
+// edit to either one.
+export function knownEntityStates(): string[] {
+  return Object.keys(ENTITY_STATE_MAP)
+}
+
 // Labels for the same entity states — kept alongside the class map so a
 // badge's color and text can't drift apart the way they previously did
 // (Docker showed "running" translated for a running container, Proxmox
@@ -87,6 +96,11 @@ export function getExecutionStateClass(
 ): string {
   if (!status) return fallback
   return EXECUTION_STATE_MAP[status.toLowerCase()] ?? fallback
+}
+
+// See knownEntityStates's doc comment above — same rationale, execution side.
+export function knownExecutionStates(): string[] {
+  return Object.keys(EXECUTION_STATE_MAP)
 }
 
 function executionStateLabels(): Record<string, string> {

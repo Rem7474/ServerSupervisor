@@ -115,7 +115,7 @@
                   v-if="ev.status"
                   class="badge"
                   :class="statusBadge(ev.status)"
-                >{{ ev.status }}</span>
+                >{{ statusLabel(ev.status) }}</span>
                 <span v-if="!ev.severity && !ev.status">—</span>
               </td>
               <td class="text-secondary small">
@@ -156,6 +156,7 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 import { moduleClass, moduleLabel } from '../../utils/moduleMeta'
+import { getExecutionStateClass, getExecutionStateLabel } from '../../utils/statusClasses'
 
 const props = defineProps<{ hostId: string }>()
 
@@ -229,17 +230,22 @@ function severityBadge(severity: string): string {
   return severity === 'crit' ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'
 }
 
+// Incident status ("active"/"resolved") is a lifecycle concept distinct from
+// the execution-state vocabulary getExecutionStateClass/Label cover (see
+// utils/statusClasses.ts's own audit-vs-execution split) — audit/command
+// events (pending/running/completed/failed/cancelled) delegate to it, the two
+// incident-only values stay local, reusing AlertIncidentList's own wording
+// (alerts.notificationStateActive/Resolved) rather than a third copy of it.
 function statusBadge(status: string): string {
-  const map: Record<string, string> = {
-    completed: 'bg-success-lt text-success',
-    failed: 'bg-danger-lt text-danger',
-    running: 'bg-primary-lt text-primary',
-    pending: 'bg-secondary-lt text-secondary',
-    cancelled: 'bg-secondary-lt text-secondary',
-    active: 'bg-danger-lt text-danger',
-    resolved: 'bg-success-lt text-success',
-  }
-  return map[status] || 'bg-secondary-lt text-secondary'
+  if (status === 'active') return 'bg-danger-lt text-danger'
+  if (status === 'resolved') return 'bg-success-lt text-success'
+  return getExecutionStateClass(status)
+}
+
+function statusLabel(status: string): string {
+  if (status === 'active') return t('alerts.notificationStateActive')
+  if (status === 'resolved') return t('alerts.notificationStateResolved')
+  return getExecutionStateLabel(status)
 }
 
 onMounted(() => {

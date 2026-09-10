@@ -67,7 +67,7 @@ describe('CommandLogPanel', () => {
     })
     expect(wrapper.text()).toContain('abc123')
     const badges = wrapper.findAll('.badge')
-    expect(badges[badges.length - 1].text()).toBe('ok')
+    expect(badges[badges.length - 1].text()).toBe('OK')
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.find('pre.console-output').exists()).toBe(false)
   })
