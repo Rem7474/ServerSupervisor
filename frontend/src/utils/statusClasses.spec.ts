@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setLocale } from '../i18n'
-import { getEntityStateClass, getEntityStateLabel, getExecutionStateClass, getExecutionStateLabel } from './statusClasses'
+import {
+  getEntityStateClass, getEntityStateLabel, getExecutionStateClass, getExecutionStateLabel,
+  knownEntityStates, knownExecutionStates,
+} from './statusClasses'
 
 beforeEach(() => {
   setLocale('fr')
@@ -46,6 +49,27 @@ describe('getExecutionStateLabel / getExecutionStateClass — "ok" alias', () =>
   it('is case-insensitive and falls back to the raw status for an unknown value', () => {
     expect(getExecutionStateLabel('ok')).toBe('OK')
     expect(getExecutionStateLabel('weird-status')).toBe('weird-status')
+  })
+})
+
+describe('label/class parity — a color with no matching translated text', () => {
+  // ENTITY_STATE_MAP/EXECUTION_STATE_MAP (color) and entityStateLabels()/
+  // executionStateLabels() (text) are two independently-written object
+  // literals that currently share the same keys. Nothing but this test
+  // enforces that: a state added to one map and not the other would render a
+  // correctly-colored badge with the raw backend string as its text — the
+  // same class of bug this module exists to prevent at every call site,
+  // just one level deeper, inside the module itself.
+  it('has a translated label for every entity state that has a color', () => {
+    for (const state of knownEntityStates()) {
+      expect(getEntityStateLabel(state), `entity state "${state}" has a color but no label`).not.toBe(state)
+    }
+  })
+
+  it('has a translated label for every execution state that has a color', () => {
+    for (const status of knownExecutionStates()) {
+      expect(getExecutionStateLabel(status), `execution state "${status}" has a color but no label`).not.toBe(status)
+    }
   })
 })
 

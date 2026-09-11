@@ -225,11 +225,11 @@ describe('HostBackupTab', () => {
     expect(wrapper.emitted('watch-run')?.[0]?.[0]).toMatchObject({ id: 'run-1' })
   })
 
-  it('shows a warning badge for a "warning" status and formats an hours-long duration and large byte counts', async () => {
+  it('shows a warning badge for a "warnings" status and formats an hours-long duration and large byte counts', async () => {
     getBackupStatus.mockResolvedValue({
       data: {
         latest_run: {
-          id: 'run-1', host_id: 'h1', status: 'warning', profile: 'files',
+          id: 'run-1', host_id: 'h1', status: 'warnings', profile: 'files',
           started_at: new Date().toISOString(), finished_at: new Date().toISOString(),
           duration_sec: 7384, snapshot_id: 'abc123',
         },
