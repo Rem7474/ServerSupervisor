@@ -1,6 +1,9 @@
 package config
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -27,6 +30,47 @@ func TestRegistryFindParam(t *testing.T) {
 	_, ok = FindParam("UNKNOWN_PARAM_XYZ")
 	if ok {
 		t.Fatalf("expected unknown key to return false")
+	}
+}
+
+// TestEveryParamHasAFrontendTranslation mirrors
+// apperr/catalog_test.go's TestEveryCodeHasAFrontendTranslation: AllParams's
+// Label/Description are plain French strings with no i18n awareness of
+// their own (unlike apperr's catalog, which is bilingual in Go) — the SPA
+// translates them through config.json's params.<KEY>.label/.description
+// (SettingsAdvancedConfigCard.vue's paramLabel/paramDescription), falling
+// back to the raw Go text only for a key that predates its translation.
+// Without this test, that fallback silently masks a forgotten translation
+// instead of failing a build.
+func TestEveryParamHasAFrontendTranslation(t *testing.T) {
+	for _, lang := range []string{"en", "fr"} {
+		path := filepath.Join("..", "..", "..", "frontend", "src", "locales", lang, "config.json")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Skipf("frontend locales not available (%v)", err)
+		}
+		var doc struct {
+			Params map[string]struct {
+				Label       string `json:"label"`
+				Description string `json:"description"`
+			} `json:"params"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		for _, p := range AllParams {
+			entry, ok := doc.Params[p.Key]
+			if !ok {
+				t.Errorf("key %q has no entry in frontend/src/locales/%s/config.json's params", p.Key, lang)
+				continue
+			}
+			if entry.Label == "" {
+				t.Errorf("key %q has an empty label in frontend/src/locales/%s/config.json", p.Key, lang)
+			}
+			if entry.Description == "" {
+				t.Errorf("key %q has an empty description in frontend/src/locales/%s/config.json", p.Key, lang)
+			}
+		}
 	}
 }
 

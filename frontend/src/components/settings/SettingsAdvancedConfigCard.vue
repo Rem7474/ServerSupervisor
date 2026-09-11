@@ -1,55 +1,38 @@
 <template>
   <div>
-    <!-- Page Header -->
-    <div class="page-header d-print-none mb-4">
-      <div class="row align-items-center">
-        <div class="col">
-          <div class="page-pretitle">
-            <router-link
-              to="/"
-              class="text-decoration-none"
-            >
-              Dashboard
-            </router-link>
-            <span class="text-muted mx-1">/</span>
-            <span>{{ t('config.pageTitle') }}</span>
-          </div>
-          <h2 class="page-title d-flex align-items-center gap-2">
-            <IconBrandDocker
-              :size="28"
-              class="text-primary"
-            />
-            {{ t('config.pageTitle') }}
-          </h2>
-          <div class="text-secondary mt-1">
-            {{ t('config.pageSubtitle') }}
-          </div>
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-4">
+      <div>
+        <h3 class="mb-1">
+          {{ t('config.pageTitle') }}
+        </h3>
+        <div class="text-secondary">
+          {{ t('config.pageSubtitle') }}
         </div>
-        <div class="col-auto ms-auto d-flex align-items-center gap-2">
-          <button
-            type="button"
-            class="btn btn-outline-secondary d-flex align-items-center gap-1"
-            @click="toggleRevealSecrets"
-          >
-            <component
-              :is="revealSecrets ? IconEyeOff : IconEye"
-              :size="16"
-            />
-            {{ revealSecrets ? t('config.actions.hideSecrets') : t('config.actions.revealSecrets') }}
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-primary d-flex align-items-center gap-1"
-            :disabled="loading"
-            @click="loadConfig"
-          >
-            <IconRefresh
-              :size="16"
-              :class="{ 'rotate-spinner': loading }"
-            />
-            {{ t('config.actions.refresh') }}
-          </button>
-        </div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <button
+          type="button"
+          class="btn btn-outline-secondary d-flex align-items-center gap-1"
+          @click="toggleRevealSecrets"
+        >
+          <component
+            :is="revealSecrets ? IconEyeOff : IconEye"
+            :size="16"
+          />
+          {{ revealSecrets ? t('config.actions.hideSecrets') : t('config.actions.revealSecrets') }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-primary d-flex align-items-center gap-1"
+          :disabled="loading"
+          @click="loadConfig"
+        >
+          <IconRefresh
+            :size="16"
+            :class="{ 'rotate-spinner': loading }"
+          />
+          {{ t('config.actions.refresh') }}
+        </button>
       </div>
     </div>
 
@@ -66,7 +49,7 @@
               </div>
               <div class="col">
                 <div class="font-weight-medium">
-                  {{ summary?.total_params ?? 0 }}
+                  {{ localMetrics.total }}
                 </div>
                 <div class="text-secondary small">
                   {{ t('config.metrics.total') }}
@@ -88,7 +71,7 @@
               </div>
               <div class="col">
                 <div class="font-weight-medium">
-                  {{ summary?.env_count ?? 0 }}
+                  {{ localMetrics.env }}
                 </div>
                 <div class="text-secondary small">
                   {{ t('config.metrics.env') }}
@@ -110,7 +93,7 @@
               </div>
               <div class="col">
                 <div class="font-weight-medium">
-                  {{ summary?.ui_count ?? 0 }}
+                  {{ localMetrics.ui }}
                 </div>
                 <div class="text-secondary small">
                   {{ t('config.metrics.ui') }}
@@ -124,13 +107,13 @@
       <div class="col-sm-6 col-lg-3">
         <div
           class="card card-sm"
-          :class="{ 'border-danger': (summary?.conflict_count ?? 0) > 0 }"
+          :class="{ 'border-danger': localMetrics.conflict > 0 }"
         >
           <div class="card-body">
             <div class="row align-items-center">
               <div class="col-auto">
                 <span
-                  :class="(summary?.conflict_count ?? 0) > 0 ? 'bg-danger text-white' : 'bg-secondary text-white'"
+                  :class="localMetrics.conflict > 0 ? 'bg-danger text-white' : 'bg-secondary text-white'"
                   class="avatar"
                 >
                   <IconAlertTriangle :size="20" />
@@ -139,9 +122,9 @@
               <div class="col">
                 <div
                   class="font-weight-medium"
-                  :class="{ 'text-danger': (summary?.conflict_count ?? 0) > 0 }"
+                  :class="{ 'text-danger': localMetrics.conflict > 0 }"
                 >
-                  {{ summary?.conflict_count ?? 0 }}
+                  {{ localMetrics.conflict }}
                 </div>
                 <div class="text-secondary small">
                   {{ t('config.metrics.conflicts') }}
@@ -203,7 +186,7 @@
                 {{ t('config.categories.all') }}
               </option>
               <option
-                v-for="cat in availableCategories"
+                v-for="cat in RELEVANT_CATEGORIES"
                 :key="cat"
                 :value="cat"
               >
@@ -334,11 +317,11 @@
                 <!-- Parameter Info -->
                 <td>
                   <div class="d-flex align-items-baseline gap-2 flex-wrap mb-1">
-                    <span class="fw-bold">{{ entry.label }}</span>
+                    <span class="fw-bold">{{ paramLabel(entry) }}</span>
                     <code class="text-muted small">{{ entry.key }}</code>
                   </div>
                   <div class="text-secondary small mb-2">
-                    {{ entry.description }}
+                    {{ paramDescription(entry) }}
                   </div>
                   <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span
@@ -419,7 +402,7 @@
                       type="checkbox"
                       :checked="formValues[entry.key] === 'true' || formValues[entry.key] === '1'"
                       :disabled="!entry.is_editable"
-                      :aria-label="entry.label || entry.key"
+                      :aria-label="paramLabel(entry) || entry.key"
                       @change="onBoolChange(entry.key, ($event.target as HTMLInputElement).checked)"
                     >
                     <label
@@ -437,7 +420,7 @@
                       v-model="formValues[entry.key]"
                       class="form-select form-select-sm"
                       :disabled="!entry.is_editable"
-                      :aria-label="entry.label || entry.key"
+                      :aria-label="paramLabel(entry) || entry.key"
                     >
                       <option
                         v-for="opt in entry.options"
@@ -461,7 +444,7 @@
                       class="form-control"
                       :placeholder="entry.effective_value ? '••••••••' : t('config.values.notSet')"
                       :disabled="!entry.is_editable"
-                      :aria-label="entry.label || entry.key"
+                      :aria-label="paramLabel(entry) || entry.key"
                     >
                     <button
                       type="button"
@@ -485,7 +468,7 @@
                       class="form-control form-control-sm font-monospace"
                       :placeholder="entry.default_value || '-'"
                       :disabled="!entry.is_editable"
-                      :aria-label="entry.label || entry.key"
+                      :aria-label="paramLabel(entry) || entry.key"
                     >
                   </div>
 
@@ -576,17 +559,38 @@ import {
   IconLock,
   IconServer,
   IconShieldLock,
-  IconBell,
   IconPlugConnected,
-  IconClock,
-  IconShieldSearch,
 } from '@tabler/icons-vue'
-import { configApi } from '../api/config'
-import type { ConfigEntry, ConfigSummary } from '../types/config'
-import { addToast } from '../composables/useGlobalToast'
-import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { configApi } from '../../api/config'
+import type { ConfigEntry, ConfigSummary } from '../../types/config'
+import { addToast } from '../../composables/useGlobalToast'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
-const { t } = useI18n()
+// Only the categories with no dedicated Settings card of their own —
+// notifications/retention/threats stay exclusively owned by
+// SettingsSmtpCard/SettingsNotificationsCard/SettingsRetentionCard/
+// SettingsThreatDetectionCard so a given setting is never editable from two
+// screens at once (see docs/admin-configuration.md's "Coexistence avec
+// /settings" section for why).
+const RELEVANT_CATEGORIES = ['server', 'logging', 'network', 'database', 'auth', 'oidc', 'integrations'] as const
+
+const { t, te } = useI18n()
+
+// The backend registry only carries French label/description strings (no
+// i18n awareness — see docs/admin-configuration.md) — this translates them
+// through config.json's `params.<KEY>.*` keys authored for every registry
+// entry, falling back to the raw Go-sent text for a param added server-side
+// before its translation lands (same pattern as utils/alertMetrics.ts's
+// metricLabelFor).
+function paramLabel(entry: ConfigEntry): string {
+  const key = `config.params.${entry.key}.label`
+  return te(key) ? t(key) : entry.label
+}
+
+function paramDescription(entry: ConfigEntry): string {
+  const key = `config.params.${entry.key}.description`
+  return te(key) ? t(key) : entry.description
+}
 const { confirm } = useConfirmDialog()
 
 const summary = ref<ConfigSummary | null>(null)
@@ -604,21 +608,6 @@ const savingKey = ref<string | null>(null)
 const resettingKey = ref<string | null>(null)
 const savingCategories = ref<Record<string, boolean>>({})
 
-const availableCategories = computed(() => {
-  return summary.value?.categories || [
-    'server',
-    'logging',
-    'network',
-    'database',
-    'auth',
-    'oidc',
-    'notifications',
-    'integrations',
-    'retention',
-    'threats',
-  ]
-})
-
 function categoryIcon(category: string) {
   switch (category) {
     case 'server':
@@ -633,14 +622,8 @@ function categoryIcon(category: string) {
       return IconShieldLock
     case 'oidc':
       return IconShieldLock
-    case 'notifications':
-      return IconBell
     case 'integrations':
       return IconPlugConnected
-    case 'retention':
-      return IconClock
-    case 'threats':
-      return IconShieldSearch
     default:
       return IconAdjustments
   }
@@ -696,9 +679,25 @@ function hasDirtyInCategory(category: string): boolean {
   return entries.some((e) => isDirty(e.key))
 }
 
+// Only the params belonging to this card's own categories — the ~2/3 of the
+// backend catalog covered by other Settings cards never surfaces here.
+const relevantEntries = computed(() => {
+  const cats: readonly string[] = RELEVANT_CATEGORIES
+  return summary.value?.entries.filter((e) => cats.includes(e.category)) || []
+})
+
+const localMetrics = computed(() => {
+  let env = 0, ui = 0, conflict = 0
+  for (const e of relevantEntries.value) {
+    if (e.source === 'env') env++
+    else if (e.source === 'ui') ui++
+    if (e.has_conflict) conflict++
+  }
+  return { total: relevantEntries.value.length, env, ui, conflict }
+})
+
 const filteredEntries = computed(() => {
-  if (!summary.value) return []
-  return summary.value.entries.filter((entry) => {
+  return relevantEntries.value.filter((entry) => {
     // Category filter
     if (selectedCategory.value !== 'all' && entry.category !== selectedCategory.value) {
       return false
@@ -716,8 +715,8 @@ const filteredEntries = computed(() => {
       const q = searchQuery.value.toLowerCase().trim()
       const matchKey = entry.key.toLowerCase().includes(q)
       const matchEnv = entry.env_var.toLowerCase().includes(q)
-      const matchLabel = entry.label.toLowerCase().includes(q)
-      const matchDesc = entry.description.toLowerCase().includes(q)
+      const matchLabel = paramLabel(entry).toLowerCase().includes(q)
+      const matchDesc = paramDescription(entry).toLowerCase().includes(q)
       if (!matchKey && !matchEnv && !matchLabel && !matchDesc) return false
     }
 
@@ -734,8 +733,7 @@ const groupedEntries = computed(() => {
     groups[entry.category].push(entry)
   }
 
-  const order = availableCategories.value
-  return order
+  return RELEVANT_CATEGORIES
     .filter((cat) => groups[cat] && groups[cat].length > 0)
     .map((cat) => ({
       category: cat,

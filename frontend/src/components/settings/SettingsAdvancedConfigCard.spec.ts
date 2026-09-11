@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import AdminConfigurationView from './AdminConfigurationView.vue'
-import { setLocale } from '../i18n'
+import SettingsAdvancedConfigCard from './SettingsAdvancedConfigCard.vue'
+import { setLocale } from '../../i18n'
 
 const { mockSummary } = vi.hoisted(() => ({
   mockSummary: {
-    total_params: 3,
+    total_params: 4,
     env_count: 1,
     ui_count: 1,
-    default_count: 1,
+    default_count: 2,
     conflict_count: 1,
-    categories: ['server', 'notifications', 'auth'],
+    categories: ['server', 'network', 'auth', 'notifications'],
     entries: [
       {
         key: 'SERVER_PORT',
@@ -31,22 +31,29 @@ const { mockSummary } = vi.hoisted(() => ({
         has_conflict: false,
       },
       {
-        key: 'SMTP_HOST',
-        setting_key: 'smtp_host',
-        env_var: 'SMTP_HOST',
-        label: 'Hôte SMTP',
-        description: 'Serveur de messagerie',
-        category: 'notifications',
-        type: 'string',
+        // A key deliberately absent from config.json's params.* catalog —
+        // exercises paramLabel/paramDescription's fallback to the raw
+        // Go-sent text for a param added server-side before its translation
+        // lands. Category "network" (relevant) rather than "notifications"
+        // so the conflict/source/save-flow assertions below stay meaningful
+        // — SMTP itself lives in "notifications", covered by the dedicated
+        // "entry excluded" test instead.
+        key: 'SOME_FUTURE_PARAM',
+        setting_key: 'some_future_param',
+        env_var: 'SOME_FUTURE_PARAM',
+        label: 'Origines autorisées',
+        description: 'CORS WebSocket',
+        category: 'network',
+        type: 'csv',
         default_value: '',
-        effective_value: 'smtp.env.corp',
+        effective_value: 'https://env.corp',
         source: 'env',
         is_secret: false,
         is_editable: true,
         requires_restart: false,
         has_env_override: true,
-        env_value: 'smtp.env.corp',
-        ui_value: 'smtp.ui.corp',
+        env_value: 'https://env.corp',
+        ui_value: 'https://ui.corp',
         has_conflict: true,
       },
       {
@@ -67,11 +74,29 @@ const { mockSummary } = vi.hoisted(() => ({
         ui_value: 'my-custom-jwt-secret-key',
         has_conflict: false,
       },
+      {
+        // Owned exclusively by SettingsSmtpCard — must never appear here.
+        key: 'SMTP_HOST',
+        setting_key: 'smtp_host',
+        env_var: 'SMTP_HOST',
+        label: 'Hôte SMTP',
+        description: 'Serveur de messagerie',
+        category: 'notifications',
+        type: 'string',
+        default_value: '',
+        effective_value: '',
+        source: 'default',
+        is_secret: false,
+        is_editable: true,
+        requires_restart: false,
+        has_env_override: false,
+        has_conflict: false,
+      },
     ],
   },
 }))
 
-vi.mock('../api/config', () => ({
+vi.mock('../../api/config', () => ({
   configApi: {
     getConfig: vi.fn().mockResolvedValue({ data: mockSummary }),
     updateParam: vi.fn().mockResolvedValue({ data: { success: true, message: 'Updated' } }),
@@ -80,13 +105,13 @@ vi.mock('../api/config', () => ({
   },
 }))
 
-vi.mock('../composables/useConfirmDialog', () => ({
+vi.mock('../../composables/useConfirmDialog', () => ({
   useConfirmDialog: () => ({
     confirm: vi.fn().mockResolvedValue(true),
   }),
 }))
 
-vi.mock('../composables/useGlobalToast', () => ({
+vi.mock('../../composables/useGlobalToast', () => ({
   addToast: vi.fn(),
   useGlobalToast: () => ({
     toasts: [],
@@ -101,32 +126,55 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('AdminConfigurationView', () => {
-  it('renders page title and summary metrics', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+describe('SettingsAdvancedConfigCard', () => {
+  it('translates a known param label/description instead of showing the raw Go-sent French', async () => {
+    setLocale('en')
+    const wrapper = mount(SettingsAdvancedConfigCard)
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Server listen port')
+    expect(wrapper.text()).toContain('TCP port the server listens for HTTP requests on.')
+    expect(wrapper.text()).not.toContain("Port d'écoute du serveur")
+  })
+
+  it('falls back to the raw Go-sent label/description for a param with no translation yet', async () => {
+    setLocale('en')
+    const wrapper = mount(SettingsAdvancedConfigCard)
+
+    await flushPromises()
+
+    // SOME_FUTURE_PARAM has no config.json entry in either language.
+    expect(wrapper.text()).toContain('Origines autorisées')
+    expect(wrapper.text()).toContain('CORS WebSocket')
+  })
+
+  it('renders title and only the categories not already owned by a dedicated Settings card', async () => {
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
     expect(wrapper.text()).toContain('Configuration Docker & Système')
     expect(wrapper.text()).toContain("Port d'écoute du serveur")
-    expect(wrapper.text()).toContain('Hôte SMTP')
+    expect(wrapper.text()).toContain('Origines autorisées')
     expect(wrapper.text()).toContain('Secret de signature JWT')
+    // SMTP_HOST is in "notifications", owned by SettingsSmtpCard — excluded.
+    expect(wrapper.text()).not.toContain('Hôte SMTP')
+  })
+
+  it('excludes an entry from a non-relevant category from the metrics too', async () => {
+    const wrapper = mount(SettingsAdvancedConfigCard)
+
+    await flushPromises()
+
+    // 3 relevant entries (server/network/auth), not the backend's raw
+    // total_params of 4 — the "Paramètres totaux" metric is the first one.
+    const totalMetric = wrapper.findAll('.font-weight-medium')[0]
+    expect(totalMetric.text()).toBe('3')
   })
 
   it('displays conflict badge for conflicting entries', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
@@ -134,31 +182,19 @@ describe('AdminConfigurationView', () => {
   })
 
   it('filters entries by search query', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
     const searchInput = wrapper.find('input[type="text"]')
-    await searchInput.setValue('SMTP')
+    await searchInput.setValue('Origines')
 
-    expect(wrapper.text()).toContain('Hôte SMTP')
+    expect(wrapper.text()).toContain('Origines autorisées')
     expect(wrapper.text()).not.toContain("Port d'écoute du serveur")
   })
 
   it('filters entries by source', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
@@ -166,36 +202,25 @@ describe('AdminConfigurationView', () => {
     const sourceSelect = selects[selects.length - 1]
     await sourceSelect.setValue('conflict')
 
-    expect(wrapper.text()).toContain('Hôte SMTP')
+    expect(wrapper.text()).toContain('Origines autorisées')
     expect(wrapper.text()).not.toContain("Port d'écoute du serveur")
   })
 
-  it('filters entries by category', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+  it('filters entries by category, offering only the relevant ones', async () => {
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
     const categorySelect = wrapper.find('#config-category-filter')
+    expect(categorySelect.text()).not.toContain('Alertes')
     await categorySelect.setValue('server')
 
     expect(wrapper.text()).toContain("Port d'écoute du serveur")
-    expect(wrapper.text()).not.toContain('Hôte SMTP')
+    expect(wrapper.text()).not.toContain('Origines autorisées')
   })
 
   it('allows saving an edited parameter', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
@@ -209,18 +234,12 @@ describe('AdminConfigurationView', () => {
     await saveBtn?.trigger('click')
     await flushPromises()
 
-    const { configApi } = await import('../api/config')
+    const { configApi } = await import('../../api/config')
     expect(configApi.updateParam).toHaveBeenCalledWith('SERVER_PORT', '9090')
   })
 
   it('allows resetting a parameter to default/env', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
@@ -230,18 +249,12 @@ describe('AdminConfigurationView', () => {
     await resetBtn?.trigger('click')
     await flushPromises()
 
-    const { configApi } = await import('../api/config')
+    const { configApi } = await import('../../api/config')
     expect(configApi.resetParam).toHaveBeenCalledWith('JWT_SECRET')
   })
 
   it('allows saving all modified parameters in a category', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
@@ -254,18 +267,12 @@ describe('AdminConfigurationView', () => {
     await categoryHeaderSave?.trigger('click')
     await flushPromises()
 
-    const { configApi } = await import('../api/config')
+    const { configApi } = await import('../../api/config')
     expect(configApi.updateBulk).toHaveBeenCalled()
   })
 
   it('toggles reveal secrets', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
@@ -273,19 +280,13 @@ describe('AdminConfigurationView', () => {
     if (revealBtn) {
       await revealBtn.trigger('click')
       await flushPromises()
-      const { configApi } = await import('../api/config')
+      const { configApi } = await import('../../api/config')
       expect(configApi.getConfig).toHaveBeenCalledWith(true)
     }
   })
 
   it('toggles password visibility locally', async () => {
-    const wrapper = mount(AdminConfigurationView, {
-      global: {
-        stubs: {
-          'router-link': { template: '<a><slot /></a>' },
-        },
-      },
-    })
+    const wrapper = mount(SettingsAdvancedConfigCard)
 
     await flushPromises()
 
@@ -299,4 +300,3 @@ describe('AdminConfigurationView', () => {
     }
   })
 })
-

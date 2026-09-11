@@ -142,6 +142,14 @@
           />
         </div>
 
+        <!-- Advanced configuration (Docker/system env vars, server/logging/
+             network/database/auth/oidc/integrations — categories with no
+             dedicated card above; see SettingsAdvancedConfigCard.vue's own
+             comment on why notifications/retention/threats stay out) -->
+        <div v-show="tab === 'advanced'">
+          <SettingsAdvancedConfigCard />
+        </div>
+
         <!-- Maintenance -->
         <div v-show="tab === 'maintenance'">
           <SettingsMaintenanceCard
@@ -165,8 +173,9 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  IconAdjustments, IconAlertTriangle, IconBell, IconDatabase, IconPlugConnected, IconShieldSearch,
+  IconAdjustments, IconAlertTriangle, IconBell, IconBrandDocker, IconDatabase, IconPlugConnected, IconShieldSearch,
 } from '@tabler/icons-vue'
+import SettingsAdvancedConfigCard from '../components/settings/SettingsAdvancedConfigCard.vue'
 import SettingsDatabaseCard from '../components/settings/SettingsDatabaseCard.vue'
 import SettingsMaintenanceCard from '../components/settings/SettingsMaintenanceCard.vue'
 import SettingsNotificationsCard from '../components/settings/SettingsNotificationsCard.vue'
@@ -187,6 +196,7 @@ const SETTINGS_TABS = computed(() => [
   { key: 'integrations', label: t('settings.tabs.integrations'), icon: IconPlugConnected },
   { key: 'retention', label: t('settings.tabs.retention'), icon: IconDatabase },
   { key: 'threats', label: t('settings.tabs.threats'), icon: IconShieldSearch },
+  { key: 'advanced', label: t('settings.tabs.advanced'), icon: IconBrandDocker },
 ])
 
 const {

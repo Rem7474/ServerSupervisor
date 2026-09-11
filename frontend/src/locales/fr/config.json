@@ -9,10 +9,7 @@
     "database": "Base de données",
     "auth": "Authentification & Sécurité",
     "oidc": "OpenID Connect / SSO",
-    "notifications": "Alertes & Notifications",
-    "integrations": "Intégrations & Registres",
-    "retention": "Rétention des données",
-    "threats": "Détection de menaces"
+    "integrations": "Intégrations & Registres"
   },
   "metrics": {
     "total": "Paramètres totaux",
@@ -70,5 +67,259 @@
     "bulkSuccess": "Modifications enregistrées avec succès",
     "confirmReset": "Êtes-vous sûr de vouloir réinitialiser {key} ? La surcharge UI sera supprimée.",
     "noResults": "Aucun paramètre de configuration ne correspond à votre recherche."
+  },
+  "params": {
+    "SERVER_PORT": {
+      "label": "Port d'écoute du serveur",
+      "description": "Port TCP sur lequel le serveur écoute les requêtes HTTP."
+    },
+    "BASE_URL": {
+      "label": "URL de base publique",
+      "description": "URL racine utilisée pour générer les liens absolus et redirections d'authentification."
+    },
+    "TLS_ENABLED": {
+      "label": "HTTPS / TLS activé",
+      "description": "Indique si l'application est servie directement derrière une terminaison TLS."
+    },
+    "DEMO_MODE": {
+      "label": "Mode démonstration",
+      "description": "Désactive tout appel réseau sortant (probes, git, proxmox). Modifiable uniquement via ENV."
+    },
+    "TZ": {
+      "label": "Fuseau horaire (Timezone)",
+      "description": "Fuseau horaire utilisé pour les plannings cron et l'affichage des dates."
+    },
+    "LOG_LEVEL": {
+      "label": "Niveau de journalisation",
+      "description": "Niveau minimal des messages enregistrés dans les logs du serveur."
+    },
+    "LOG_FORMAT": {
+      "label": "Format des journaux",
+      "description": "Format de sérialisation des logs applicatifs (json pour conteneur, text pour debug)."
+    },
+    "TRUSTED_PROXIES": {
+      "label": "Proxies de confiance (CIDRs)",
+      "description": "Liste séparée par virgules des plages IP / reverse proxies autorisés à relayer les en-têtes X-Forwarded-For."
+    },
+    "ALLOWED_ORIGINS": {
+      "label": "Origines WebSocket autorisées (CORS)",
+      "description": "Liste des origines web autorisées pour la connexion au flux WebSocket en direct."
+    },
+    "DB_HOST": {
+      "label": "Hôte de la base de données",
+      "description": "Nom d'hôte ou adresse IP du serveur PostgreSQL / TimescaleDB."
+    },
+    "DB_PORT": {
+      "label": "Port de la base de données",
+      "description": "Port TCP du service PostgreSQL."
+    },
+    "DB_USER": {
+      "label": "Utilisateur de la base de données",
+      "description": "Identifiant de connexion au serveur de base de données."
+    },
+    "DB_PASSWORD": {
+      "label": "Mot de passe de la base de données",
+      "description": "Mot de passe associé à l'utilisateur PostgreSQL."
+    },
+    "DB_NAME": {
+      "label": "Nom de la base de données",
+      "description": "Base de données de ServerSupervisor."
+    },
+    "DB_SSLMODE": {
+      "label": "Mode SSL de la base de données",
+      "description": "Mode de chiffrement SSL pour la liaison PostgreSQL."
+    },
+    "JWT_SECRET": {
+      "label": "Secret de signature JWT",
+      "description": "Clé cryptographique secrète pour signer les jetons d'accès JWT (minimum 32 caractères)."
+    },
+    "JWT_EXPIRATION": {
+      "label": "Durée de validité des jetons JWT",
+      "description": "Durée de validité d'une session utilisateur avant renouvellement."
+    },
+    "REFRESH_TOKEN_EXPIRATION": {
+      "label": "Durée de validité du jeton de rafraîchissement",
+      "description": "Durée maximale avant obligation de reconnexion complète (par défaut 7 jours)."
+    },
+    "ADMIN_USER": {
+      "label": "Nom d'utilisateur administrateur par défaut",
+      "description": "Nom du compte administrateur initial créé lors du premier démarrage."
+    },
+    "ADMIN_PASSWORD": {
+      "label": "Mot de passe initial administrateur",
+      "description": "Mot de passe temporaire pour le bootstrap du compte admin (optionnel si défini au boot)."
+    },
+    "RATE_LIMIT_RPS": {
+      "label": "Limite de requêtes globales (RPS)",
+      "description": "Nombre maximal de requêtes par seconde autorisées par IP."
+    },
+    "RATE_LIMIT_BURST": {
+      "label": "Capacité de rafale requêtes (Burst)",
+      "description": "Pic de requêtes admissible au-delà de la limite standard."
+    },
+    "OIDC_ENABLED": {
+      "label": "Activer OpenID Connect / SSO",
+      "description": "Active l'authentification unique d'entreprise via un fournisseur d'identité OIDC."
+    },
+    "OIDC_DISPLAY_NAME": {
+      "label": "Nom affiché du fournisseur OIDC",
+      "description": "Texte affiché sur le bouton de connexion de la page de login."
+    },
+    "OIDC_ISSUER_URL": {
+      "label": "URL de l'émetteur OIDC (Issuer URL)",
+      "description": "URL racine du fournisseur d'identité OIDC (ex: https://auth.example.com)."
+    },
+    "OIDC_CLIENT_ID": {
+      "label": "Identifiant client OIDC (Client ID)",
+      "description": "Client ID fourni par votre serveur d'identité OIDC."
+    },
+    "OIDC_CLIENT_SECRET": {
+      "label": "Secret client OIDC (Client Secret)",
+      "description": "Secret partagé du client OIDC."
+    },
+    "OIDC_REDIRECT_URL": {
+      "label": "URL de redirection OIDC (Callback)",
+      "description": "URL de retour après authentification (ex: https://supervisor.example.com/api/v1/auth/oidc/callback)."
+    },
+    "OIDC_SCOPES": {
+      "label": "Portées OIDC (Scopes)",
+      "description": "Scopes demandés au fournisseur (séparés par des virgules)."
+    },
+    "OIDC_USERNAME_CLAIM": {
+      "label": "Revendication du nom d'utilisateur (Username Claim)",
+      "description": "Champ du token ID à utiliser comme nom d'utilisateur."
+    },
+    "OIDC_EMAIL_CLAIM": {
+      "label": "Revendication de l'email (Email Claim)",
+      "description": "Champ du token ID contenant l'adresse email."
+    },
+    "OIDC_GROUPS_CLAIM": {
+      "label": "Revendication des groupes (Groups Claim)",
+      "description": "Champ du token contenant la liste des groupes de l'utilisateur."
+    },
+    "OIDC_ADMIN_GROUP": {
+      "label": "Groupe administrateurs OIDC",
+      "description": "Groupe accordant le rôle 'admin'."
+    },
+    "OIDC_OPERATOR_GROUP": {
+      "label": "Groupe opérateurs OIDC",
+      "description": "Groupe accordant le rôle 'operator'."
+    },
+    "OIDC_VIEWER_GROUP": {
+      "label": "Groupe observateurs OIDC",
+      "description": "Groupe accordant le rôle 'viewer'."
+    },
+    "OIDC_DEFAULT_ROLE": {
+      "label": "Rôle OIDC par défaut",
+      "description": "Rôle attribué à un utilisateur sans correspondance de groupe spécifique."
+    },
+    "OIDC_AUTO_CREATE_USER": {
+      "label": "Création automatique des comptes",
+      "description": "Créer automatiquement un compte local lors de la première connexion OIDC réussie."
+    },
+    "OIDC_ALLOW_LOCAL_LOGIN": {
+      "label": "Autoriser l'authentification locale",
+      "description": "Garde actif le formulaire login/mot de passe classique même si OIDC est activé."
+    },
+    "OIDC_INSECURE_SKIP_VERIFY": {
+      "label": "Ignorer la vérification SSL OIDC",
+      "description": "Désactive la vérification des certificats TLS de l'émetteur OIDC (déconseillé en production)."
+    },
+    "NOTIFY_URL": {
+      "label": "URL du topic ntfy.sh",
+      "description": "URL complète du topic ntfy pour les alertes push instantanées (ex: https://ntfy.sh/mon-serveur)."
+    },
+    "NTFY_AUTH_TOKEN": {
+      "label": "Jeton d'authentification ntfy",
+      "description": "Token d'accès optionnel pour les topics ntfy privés."
+    },
+    "SMTP_HOST": {
+      "label": "Hôte SMTP",
+      "description": "Adresse du serveur de messagerie sortant pour l'envoi d'emails d'alerte."
+    },
+    "SMTP_PORT": {
+      "label": "Port SMTP",
+      "description": "Port de connexion SMTP (généralement 587 pour STARTTLS, 465 pour SMTPS)."
+    },
+    "SMTP_USER": {
+      "label": "Utilisateur SMTP",
+      "description": "Identifiant d'authentification auprès du serveur SMTP."
+    },
+    "SMTP_PASS": {
+      "label": "Mot de passe SMTP",
+      "description": "Mot de passe du compte SMTP pour l'envoi d'emails."
+    },
+    "SMTP_FROM": {
+      "label": "Adresse expéditeur (From)",
+      "description": "Adresse affichée comme expéditeur des notifications email."
+    },
+    "SMTP_TO": {
+      "label": "Adresse destinataire par défaut (To)",
+      "description": "Adresse recevant par défaut les alertes et rapports par email."
+    },
+    "SMTP_TLS": {
+      "label": "Activer TLS pour SMTP",
+      "description": "Chiffre la communication avec le serveur SMTP via STARTTLS ou TLS direct."
+    },
+    "GITHUB_TOKEN": {
+      "label": "Token d'accès personnel GitHub",
+      "description": "Jeton GitHub pour surveiller les nouvelles versions et éviter le rate-limiting de l'API publique."
+    },
+    "GITHUB_POLL_INTERVAL": {
+      "label": "Intervalle de scrutation GitHub",
+      "description": "Cadence de vérification des releases et tags GitHub distants."
+    },
+    "DOCKER_IMAGE_POLL_INTERVAL": {
+      "label": "Intervalle de scrutation des images Docker",
+      "description": "Cadence de vérification des nouveaux digests de conteneurs sur les registres distants."
+    },
+    "METRICS_RETENTION_DAYS": {
+      "label": "Rétention des métriques (jours)",
+      "description": "Nombre de jours pendant lesquels les séries temporelles de métriques sont conservées."
+    },
+    "AUDIT_RETENTION_DAYS": {
+      "label": "Rétention des journaux d'audit (jours)",
+      "description": "Durée de conservation des traces d'audit de sécurité et d'actions d'administration."
+    },
+    "WEB_LOGS_RETENTION_DAYS": {
+      "label": "Rétention des logs d'accès web (jours)",
+      "description": "Durée de conservation des requêtes HTTP capturées pour l'analyse de trafic et sécurité."
+    },
+    "NETWORK_FLOWS_RETENTION_DAYS": {
+      "label": "Rétention des flux réseau (jours)",
+      "description": "Durée de conservation des métriques de connexions réseau (top talkers)."
+    },
+    "THREAT_WEIGHT_WORDPRESS": {
+      "label": "Pondération des scans WordPress",
+      "description": "Poids attribué aux sondes ciblant wp-login, xmlrpc ou des chemins WordPress."
+    },
+    "THREAT_WEIGHT_ADMIN_PANEL": {
+      "label": "Pondération panneaux d'admin",
+      "description": "Poids des tentatives d'accès aux interfaces administratives non autorisées."
+    },
+    "THREAT_WEIGHT_PATH_TRAVERSAL": {
+      "label": "Pondération traversée de répertoires",
+      "description": "Poids des requêtes contenant ../ ou des patterns d'évasion de chemin."
+    },
+    "THREAT_WEIGHT_KNOWN_SCANNER": {
+      "label": "Pondération scanners connus",
+      "description": "Poids des User-Agents identifiés comme outils de scan de vulnérabilités."
+    },
+    "THREAT_WEIGHT_SUSPICIOUS_METHOD": {
+      "label": "Pondération méthodes HTTP suspectes",
+      "description": "Poids des méthodes HTTP inhabituelles ou dangereuses (CONNECT, PROPFIND, etc.)."
+    },
+    "THREAT_THRESHOLD_MEDIUM": {
+      "label": "Seuil de menace : Modéré",
+      "description": "Score total à partir duquel une adresse IP est classée comme menace modérée."
+    },
+    "THREAT_THRESHOLD_HIGH": {
+      "label": "Seuil de menace : Élevé",
+      "description": "Score total à partir duquel une adresse IP est classée comme menace élevée."
+    },
+    "THREAT_THRESHOLD_CRITICAL": {
+      "label": "Seuil de menace : Critique",
+      "description": "Score total à partir duquel une adresse IP est classée comme menace critique."
+    }
   }
 }

@@ -43,7 +43,6 @@
       "label": "Settings",
       "items": {
         "settings": "Settings",
-        "configuration": "Docker / Env Configuration",
         "users": "Users",
         "audit": "Audit"
       }

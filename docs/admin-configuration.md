@@ -2,6 +2,12 @@
 
 Ce document décrit l'architecture, le fonctionnement et l'utilisation du système de configuration centralisé de **ServerSupervisor**. Il permet de configurer l'ensemble des paramètres applicatifs depuis une interface d'administration dédiée dans l'UI web, tout en garantissant une compatibilité totale avec les variables d'environnement Docker.
 
+### Emplacement dans l'UI et coexistence avec `/settings`
+
+Le catalogue déclaratif (`registry.go`) n'a **pas** sa propre page : il est intégré comme l'onglet **« Configuration avancée »** de `/settings` (`SettingsAdvancedConfigCard.vue`), aux côtés des onglets Général/Notifications/Intégrations/Rétention/Détection de menaces déjà en place. C'est un choix délibéré, pas une limitation temporaire : `/settings` a des cartes dédiées et déjà éprouvées pour les catégories `notifications` (SMTP, ntfy), `retention` (dont une répartition par catégorie d'audit que le catalogue ne peut pas représenter — c'est une map, pas une valeur scalaire) et `threats` (12 poids/seuils, dont 7 n'ont jamais été portés dans `registry.go`). Plutôt que de dupliquer ces trois domaines dans le catalogue générique, l'onglet « Configuration avancée » **n'affiche que les catégories sans carte dédiée** : `server`, `logging`, `network`, `database`, `auth`, `oidc`, `integrations`. Un paramètre n'est donc jamais éditable depuis deux écrans à la fois. Les anciennes routes `/admin/configuration` et `/admin/config` redirigent vers `/settings?tab=advanced` pour tout lien ou favori existant.
+
+Si un paramètre `notifications`/`retention`/`threats` est ajouté à `registry.go` à l'avenir, il restera invisible dans cet onglet tant qu'il n'est pas explicitement ajouté à `RELEVANT_CATEGORIES` (`SettingsAdvancedConfigCard.vue`) — un garde-fou volontaire contre la réapparition d'un doublon, pas un oubli.
+
 ---
 
 ## 1. Vue d'Ensemble de l'Architecture
@@ -203,7 +209,7 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
 2. **Protection du Journal d'Audit** :
    - Lors de la modification d'un secret, le journal d'audit enregistre automatiquement la mention caviardée `[REDACTED]`. Aucun mot de passe ou jeton en clair n'est écrit dans la table `audit_logs`.
 3. **Contrôle d'Accès** :
-   - Seuls les utilisateurs disposant du rôle `admin` peuvent accéder à l'API ou à la route UI `/admin/configuration`. Les rôles `operator` ou `viewer` reçoivent une réponse HTTP `403 Forbidden`.
+   - Seuls les utilisateurs disposant du rôle `admin` peuvent accéder à l'API ou à l'onglet « Configuration avancée » de `/settings`. Les rôles `operator` ou `viewer` reçoivent une réponse HTTP `403 Forbidden`.
 
 ---
 
@@ -238,9 +244,10 @@ L'architecture est entièrement déclarative et extensible. Pour ajouter un nouv
          c.SlackWebhookURL = v
      }
      ```
-4. C'est terminé ! Le paramètre apparaît automatiquement dans :
+4. Ajoutez sa traduction dans `frontend/src/locales/{fr,en}/config.json`, sous `params.SLACK_WEBHOOK_URL.label`/`.description` — sans ça, `TestEveryParamHasAFrontendTranslation` (`server/internal/config/registry_test.go`) échoue, et l'UI n'a que le texte français brut envoyé par le backend en repli.
+5. Si la catégorie choisie est `notifications`, `retention` ou `threats`, le paramètre est géré par la carte Settings dédiée (`SettingsSmtpCard`/`SettingsNotificationsCard`/`SettingsRetentionCard`/`SettingsThreatDetectionCard`), pas par le catalogue générique — étendez cette carte plutôt que `SettingsAdvancedConfigCard.vue`, pour ne pas recréer le doublon que ce document décrit plus haut. Pour toute autre catégorie, il apparaît automatiquement dans :
    - L'API `GET /api/v1/config`.
-   - L'interface web dans la catégorie sélectionnée avec champ adapté, validation et gestion des secrets.
+   - L'onglet « Configuration avancée » de `/settings`, avec champ adapté, validation et gestion des secrets.
 
 ---
 
@@ -276,32 +283,32 @@ services:
 
 ---
 
-## 7. Description Visuelle de l'Interface UI Admin (`/admin/configuration`)
+## 7. Description Visuelle de l'Onglet « Configuration avancée » (`/settings?tab=advanced`)
 
 ```
 +-----------------------------------------------------------------------------------------------+
-| Dashboard / Configuration Docker & Système                                                    |
-| [Icon] Configuration Docker & Système                       [Afficher secrets]  [Actualiser]  |
-| Gestion centralisée des paramètres conteneurisés et variables d'environnement                 |
+| [Sidebar Paramètres]        | Configuration Docker & Système    [Afficher secrets] [Actualiser]|
+| Général                     | Gestion centralisée des paramètres conteneurisés et variables    |
+| Notifications               | d'environnement                                                  |
+| Intégrations                +-------------------------------------------------------------------+
+| Rétention                   | [ 42 Paramètres ] [ 8 via ENV ] [ 3 via UI (DB) ] [ 31 Défaut ] [ 0 Conflit(s) ] |
+| Détection de menaces        +-------------------------------------------------------------------+
+| > Configuration avancée <   | (i) Règle de priorité : 1. ENV Docker (Prioritaire) > 2. UI / Base > 3. Défaut |
+| ------ Zone sensible ------ +-------------------------------------------------------------------+
+| Maintenance                 | [ Rechercher... ] [ Catégorie: Toutes v ] [ Source: Toutes v ]   |
+|                             +-------------------------------------------------------------------+
+|                             |                                                                   |
+|                             | [Icon] Base de données (6 éléments)          [Enregistrer section]|
+|                             | +-------------------------+------------+---------------+---------+ |
+|                             | | Paramètre               | Source     | Valeur        | Actions | |
+|                             | +-------------------------+------------+---------------+---------+ |
+|                             | | Hôte de la base de      | [ENV       | [ postgres  ] | [Enreg.]| |
+|                             | | données / DB_HOST       |  Docker]   |               |         | |
+|                             | +-------------------------+------------+---------------+---------+ |
+|                             | | Mot de passe de la base | [Défaut]   | [ •••••• [Eye]] | [Enreg]| |
+|                             | | de données / DB_PASSWORD|            |               |         | |
+|                             | +-------------------------+------------+---------------+---------+ |
 +-----------------------------------------------------------------------------------------------+
-| [ 52 Paramètres ]   [ 12 via ENV ]   [ 4 via UI (DB) ]   [ 36 Défaut ]   [ 0 Conflit(s) ]     |
-+-----------------------------------------------------------------------------------------------+
-| (i) Règle de priorité : 1. ENV Docker (Prioritaire) > 2. UI / Base > 3. Valeur par défaut    |
-+-----------------------------------------------------------------------------------------------+
-| [ Rechercher paramètre ou variable... ]    [ Catégorie: Toutes v ]    [ Source: Toutes v ]    |
-+-----------------------------------------------------------------------------------------------+
-|                                                                                               |
-| [Icon] Notifications & Alertes (7 éléments)                              [Enregistrer section]|
-| +-------------------------+--------------------+-------------------------+------------------+ |
-| | Paramètre               | Source             | Valeur                  | Actions          | |
-| +-------------------------+--------------------+-------------------------+------------------+ |
-| | Hôte SMTP               | [UI (vert)]        | [ mail.entreprise.fr  ] | [Enregistrer]    | |
-| | SMTP_HOST               |                    |                         | [Réinitialiser]  | |
-| +-------------------------+--------------------+-------------------------+------------------+ |
-| | Port SMTP               | [ENV Docker (bleu)]| [ 587                 ] | [Enregistrer]    | |
-| | SMTP_PORT               |                    | (i) Forcé via Docker    |                  | |
-| +-------------------------+--------------------+-------------------------+------------------+ |
-| | Mot de passe SMTP       | [Défaut (gris)]    | [ ••••••••        [Eye] ] | [Enregistrer]  | |
-| | SMTP_PASS [Secret]      |                    |                         |                  | |
-| +-------------------------+--------------------+-------------------------+------------------+ |
 ```
+
+Les catégories `notifications`/`retention`/`threats` — et leurs paramètres (SMTP, rétentions, poids de menace) — n'apparaissent **jamais** dans cet onglet ni dans son sélecteur de catégorie : ils restent exclusivement sur les onglets « Notifications », « Rétention » et « Détection de menaces » à gauche.

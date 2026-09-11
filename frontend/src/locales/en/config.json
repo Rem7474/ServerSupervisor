@@ -9,10 +9,7 @@
     "database": "Database",
     "auth": "Authentication & Security",
     "oidc": "OpenID Connect / SSO",
-    "notifications": "Alertes & Notifications",
-    "integrations": "Integrations & Registries",
-    "retention": "Data Retention",
-    "threats": "Threat Detection"
+    "integrations": "Integrations & Registries"
   },
   "metrics": {
     "total": "Total parameters",
@@ -70,5 +67,259 @@
     "bulkSuccess": "Changes saved successfully",
     "confirmReset": "Are you sure you want to reset {key}? The custom UI override will be removed.",
     "noResults": "No configuration parameter matches your search."
+  },
+  "params": {
+    "SERVER_PORT": {
+      "label": "Server listen port",
+      "description": "TCP port the server listens for HTTP requests on."
+    },
+    "BASE_URL": {
+      "label": "Public base URL",
+      "description": "Root URL used to generate absolute links and authentication redirects."
+    },
+    "TLS_ENABLED": {
+      "label": "HTTPS / TLS enabled",
+      "description": "Whether the application is served directly behind a TLS termination."
+    },
+    "DEMO_MODE": {
+      "label": "Demo mode",
+      "description": "Disables every outbound network call (probes, git, proxmox). Only changeable via ENV."
+    },
+    "TZ": {
+      "label": "Timezone",
+      "description": "Timezone used for cron schedules and date display."
+    },
+    "LOG_LEVEL": {
+      "label": "Log level",
+      "description": "Minimum severity of messages recorded in the server logs."
+    },
+    "LOG_FORMAT": {
+      "label": "Log format",
+      "description": "Serialization format for application logs (json for containers, text for debugging)."
+    },
+    "TRUSTED_PROXIES": {
+      "label": "Trusted proxies (CIDRs)",
+      "description": "Comma-separated list of IP ranges / reverse proxies allowed to relay X-Forwarded-For headers."
+    },
+    "ALLOWED_ORIGINS": {
+      "label": "Allowed WebSocket origins (CORS)",
+      "description": "List of web origins allowed to connect to the live WebSocket stream."
+    },
+    "DB_HOST": {
+      "label": "Database host",
+      "description": "Hostname or IP address of the PostgreSQL / TimescaleDB server."
+    },
+    "DB_PORT": {
+      "label": "Database port",
+      "description": "TCP port of the PostgreSQL service."
+    },
+    "DB_USER": {
+      "label": "Database user",
+      "description": "Login used to connect to the database server."
+    },
+    "DB_PASSWORD": {
+      "label": "Database password",
+      "description": "Password associated with the PostgreSQL user."
+    },
+    "DB_NAME": {
+      "label": "Database name",
+      "description": "ServerSupervisor's database."
+    },
+    "DB_SSLMODE": {
+      "label": "Database SSL mode",
+      "description": "SSL encryption mode for the PostgreSQL connection."
+    },
+    "JWT_SECRET": {
+      "label": "JWT signing secret",
+      "description": "Secret cryptographic key used to sign JWT access tokens (32 characters minimum)."
+    },
+    "JWT_EXPIRATION": {
+      "label": "JWT token lifetime",
+      "description": "How long a user session stays valid before renewal."
+    },
+    "REFRESH_TOKEN_EXPIRATION": {
+      "label": "Refresh token lifetime",
+      "description": "Maximum duration before a full re-login is required (7 days by default)."
+    },
+    "ADMIN_USER": {
+      "label": "Default administrator username",
+      "description": "Name of the initial administrator account created on first startup."
+    },
+    "ADMIN_PASSWORD": {
+      "label": "Initial administrator password",
+      "description": "Temporary password for bootstrapping the admin account (optional if set at boot)."
+    },
+    "RATE_LIMIT_RPS": {
+      "label": "Global rate limit (RPS)",
+      "description": "Maximum number of requests per second allowed per IP."
+    },
+    "RATE_LIMIT_BURST": {
+      "label": "Request burst capacity",
+      "description": "Peak request burst allowed above the standard limit."
+    },
+    "OIDC_ENABLED": {
+      "label": "Enable OpenID Connect / SSO",
+      "description": "Enables enterprise single sign-on via an OIDC identity provider."
+    },
+    "OIDC_DISPLAY_NAME": {
+      "label": "OIDC provider display name",
+      "description": "Text shown on the login page's sign-in button."
+    },
+    "OIDC_ISSUER_URL": {
+      "label": "OIDC issuer URL",
+      "description": "Root URL of the OIDC identity provider (e.g. https://auth.example.com)."
+    },
+    "OIDC_CLIENT_ID": {
+      "label": "OIDC client ID",
+      "description": "Client ID provided by your OIDC identity server."
+    },
+    "OIDC_CLIENT_SECRET": {
+      "label": "OIDC client secret",
+      "description": "Shared secret for the OIDC client."
+    },
+    "OIDC_REDIRECT_URL": {
+      "label": "OIDC redirect URL (callback)",
+      "description": "Return URL after authentication (e.g. https://supervisor.example.com/api/v1/auth/oidc/callback)."
+    },
+    "OIDC_SCOPES": {
+      "label": "OIDC scopes",
+      "description": "Scopes requested from the provider (comma-separated)."
+    },
+    "OIDC_USERNAME_CLAIM": {
+      "label": "Username claim",
+      "description": "ID token field to use as the username."
+    },
+    "OIDC_EMAIL_CLAIM": {
+      "label": "Email claim",
+      "description": "ID token field containing the email address."
+    },
+    "OIDC_GROUPS_CLAIM": {
+      "label": "Groups claim",
+      "description": "Token field containing the user's list of groups."
+    },
+    "OIDC_ADMIN_GROUP": {
+      "label": "OIDC admin group",
+      "description": "Group granting the 'admin' role."
+    },
+    "OIDC_OPERATOR_GROUP": {
+      "label": "OIDC operator group",
+      "description": "Group granting the 'operator' role."
+    },
+    "OIDC_VIEWER_GROUP": {
+      "label": "OIDC viewer group",
+      "description": "Group granting the 'viewer' role."
+    },
+    "OIDC_DEFAULT_ROLE": {
+      "label": "Default OIDC role",
+      "description": "Role assigned to a user with no matching group."
+    },
+    "OIDC_AUTO_CREATE_USER": {
+      "label": "Automatic account creation",
+      "description": "Automatically create a local account on a user's first successful OIDC login."
+    },
+    "OIDC_ALLOW_LOCAL_LOGIN": {
+      "label": "Allow local authentication",
+      "description": "Keeps the classic login/password form active even when OIDC is enabled."
+    },
+    "OIDC_INSECURE_SKIP_VERIFY": {
+      "label": "Skip OIDC SSL verification",
+      "description": "Disables TLS certificate verification for the OIDC issuer (not recommended in production)."
+    },
+    "NOTIFY_URL": {
+      "label": "ntfy.sh topic URL",
+      "description": "Full ntfy topic URL for instant push alerts (e.g. https://ntfy.sh/my-server)."
+    },
+    "NTFY_AUTH_TOKEN": {
+      "label": "ntfy authentication token",
+      "description": "Optional access token for private ntfy topics."
+    },
+    "SMTP_HOST": {
+      "label": "SMTP host",
+      "description": "Outgoing mail server address for sending alert emails."
+    },
+    "SMTP_PORT": {
+      "label": "SMTP port",
+      "description": "SMTP connection port (typically 587 for STARTTLS, 465 for SMTPS)."
+    },
+    "SMTP_USER": {
+      "label": "SMTP user",
+      "description": "Authentication login for the SMTP server."
+    },
+    "SMTP_PASS": {
+      "label": "SMTP password",
+      "description": "Password for the SMTP account used to send emails."
+    },
+    "SMTP_FROM": {
+      "label": "Sender address (From)",
+      "description": "Address shown as the sender of email notifications."
+    },
+    "SMTP_TO": {
+      "label": "Default recipient address (To)",
+      "description": "Address that receives alerts and reports by email by default."
+    },
+    "SMTP_TLS": {
+      "label": "Enable TLS for SMTP",
+      "description": "Encrypts the SMTP connection via STARTTLS or direct TLS."
+    },
+    "GITHUB_TOKEN": {
+      "label": "GitHub personal access token",
+      "description": "GitHub token for watching new releases and avoiding public API rate limiting."
+    },
+    "GITHUB_POLL_INTERVAL": {
+      "label": "GitHub polling interval",
+      "description": "How often remote GitHub releases and tags are checked."
+    },
+    "DOCKER_IMAGE_POLL_INTERVAL": {
+      "label": "Docker image polling interval",
+      "description": "How often new container digests are checked on remote registries."
+    },
+    "METRICS_RETENTION_DAYS": {
+      "label": "Metrics retention (days)",
+      "description": "Number of days metric time series are kept."
+    },
+    "AUDIT_RETENTION_DAYS": {
+      "label": "Audit log retention (days)",
+      "description": "How long security audit and administration action traces are kept."
+    },
+    "WEB_LOGS_RETENTION_DAYS": {
+      "label": "Web access log retention (days)",
+      "description": "How long captured HTTP requests are kept for traffic and security analysis."
+    },
+    "NETWORK_FLOWS_RETENTION_DAYS": {
+      "label": "Network flow retention (days)",
+      "description": "How long network connection metrics (top talkers) are kept."
+    },
+    "THREAT_WEIGHT_WORDPRESS": {
+      "label": "WordPress scan weight",
+      "description": "Weight assigned to probes targeting wp-login, xmlrpc or other WordPress paths."
+    },
+    "THREAT_WEIGHT_ADMIN_PANEL": {
+      "label": "Admin panel weight",
+      "description": "Weight of unauthorized attempts to access administrative interfaces."
+    },
+    "THREAT_WEIGHT_PATH_TRAVERSAL": {
+      "label": "Path traversal weight",
+      "description": "Weight of requests containing ../ or other path-escape patterns."
+    },
+    "THREAT_WEIGHT_KNOWN_SCANNER": {
+      "label": "Known scanner weight",
+      "description": "Weight of User-Agents identified as vulnerability scanning tools."
+    },
+    "THREAT_WEIGHT_SUSPICIOUS_METHOD": {
+      "label": "Suspicious HTTP method weight",
+      "description": "Weight of unusual or dangerous HTTP methods (CONNECT, PROPFIND, etc.)."
+    },
+    "THREAT_THRESHOLD_MEDIUM": {
+      "label": "Threat threshold: Medium",
+      "description": "Total score above which an IP address is classified as a medium threat."
+    },
+    "THREAT_THRESHOLD_HIGH": {
+      "label": "Threat threshold: High",
+      "description": "Total score above which an IP address is classified as a high threat."
+    },
+    "THREAT_THRESHOLD_CRITICAL": {
+      "label": "Threat threshold: Critical",
+      "description": "Total score above which an IP address is classified as a critical threat."
+    }
   }
 }

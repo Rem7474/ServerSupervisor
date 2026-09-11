@@ -103,14 +103,17 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    // The Docker/system env var catalog used to be its own page; it's now
+    // the "Configuration avancée" tab on /settings (see
+    // SettingsAdvancedConfigCard.vue) so a given setting is never editable
+    // from two separate screens. Both old paths redirect rather than 404
+    // for anyone with an existing bookmark or deep link.
     path: '/admin/configuration',
-    name: 'AdminConfiguration',
-    component: () => import('../views/AdminConfigurationView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true },
+    redirect: { path: '/settings', query: { tab: 'advanced' } },
   },
   {
     path: '/admin/config',
-    redirect: '/admin/configuration',
+    redirect: { path: '/settings', query: { tab: 'advanced' } },
   },
   {
     path: '/account',
