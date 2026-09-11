@@ -24,6 +24,7 @@ import (
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
 	backupsvc "github.com/serversupervisor/server/internal/services/backup"
+	configsvc "github.com/serversupervisor/server/internal/services/config"
 	dashboardsvc "github.com/serversupervisor/server/internal/services/dashboard"
 	discoverysvc "github.com/serversupervisor/server/internal/services/discovery"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
@@ -125,6 +126,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
+	configH := handlers.NewConfigHandler(configsvc.NewService(db, cfg))
 	notifH := handlers.NewNotificationsHandler(notifssvc.NewService(db, func(ctx context.Context, rule models.AlertRule, hostID string) (float64, bool) {
 		return alerts.CurrentIncidentValue(ctx, db, rule, hostID)
 	}), db)
@@ -171,6 +173,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerNotifRoutes(v1, notifH)
 	registerPushRoutes(v1, pushH)
 	registerSettingsRoutes(v1, settingsH)
+	registerConfigRoutes(v1, configH)
 	registerTaskRoutes(v1, scheduledTaskH)
 	registerMaintenanceRoutes(v1, maintenanceH)
 	registerUserRoutes(v1, userH)
@@ -413,6 +416,13 @@ func registerSettingsRoutes(g *gin.RouterGroup, h *handlers.SettingsHandler) {
 	g.POST("/settings/test-ntfy", h.TestNtfy)
 	g.POST("/settings/cleanup-metrics", h.CleanupMetrics)
 	g.POST("/settings/cleanup-audit", h.CleanupAuditLogs)
+}
+
+func registerConfigRoutes(g *gin.RouterGroup, h *handlers.ConfigHandler) {
+	g.GET("/config", h.GetConfig)
+	g.PUT("/config", h.UpdateConfigBulk)
+	g.PUT("/config/:key", h.UpdateConfigKey)
+	g.DELETE("/config/:key", h.ResetConfigKey)
 }
 
 func registerTaskRoutes(g *gin.RouterGroup, h *handlers.ScheduledTaskHandler) {

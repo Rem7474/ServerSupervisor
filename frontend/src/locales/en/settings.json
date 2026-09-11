@@ -108,6 +108,7 @@
     "integrations": "Integrations",
     "retention": "Retention",
     "threats": "Threat detection",
+    "advanced": "Advanced configuration",
     "maintenance": "Maintenance"
   },
   "databaseTitle": "Database",

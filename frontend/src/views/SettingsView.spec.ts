@@ -33,6 +33,7 @@ function mountView() {
         SettingsRegistryCredentialsCard: true,
         SettingsRetentionCard: true,
         SettingsThreatDetectionCard: true,
+        SettingsAdvancedConfigCard: true,
         SettingsMaintenanceCard: true,
         'router-link': { template: '<a><slot /></a>' },
       },
@@ -50,6 +51,7 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('Paramètres')
     expect(wrapper.text()).toContain('Général')
     expect(wrapper.text()).toContain('Détection de menaces')
+    expect(wrapper.text()).toContain('Configuration avancée')
     expect(wrapper.text()).toContain('Zone sensible')
   })
 
@@ -66,6 +68,7 @@ describe('SettingsView', () => {
     const wrapper = mountView()
     expect(wrapper.text()).toContain('Settings')
     expect(wrapper.text()).toContain('Threat detection')
+    expect(wrapper.text()).toContain('Advanced configuration')
     expect(wrapper.text()).toContain('Danger zone')
   })
 })
