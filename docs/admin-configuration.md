@@ -32,13 +32,25 @@ Le système résout la configuration selon un modèle hiérarchique à trois sou
 
 ### Règles de Priorité et Comportement en Cas de Conflit
 
+Le schéma ci-dessus décrit la résolution par défaut, celle qui s'applique à la
+majorité des paramètres du registre (`server`, `logging`, `network`,
+`database`, la plupart de `auth`, ...). Elle **ne s'applique pas** à un
+sous-ensemble de clés historiques que `config.OverrideFromDB` (dans
+`server/internal/config/config.go`, antérieur à cette page d'administration)
+laisse la base de données écraser sans condition dès qu'une valeur y est
+enregistrée — SMTP, ntfy, le token GitHub, toutes les rétentions en jours,
+les durées JWT/refresh token, et l'intégralité des paramètres `oidc_*` et
+`threat_*`. Pour ces clés-là, une valeur enregistrée via cette UI est
+**immédiatement active et prend le pas sur une variable d'environnement**
+Docker déjà définie, pas l'inverse.
+
 1. **Priorité 1 — Variable d'Environnement Docker (`ENV`)** :
-   - Lorsque l'opérateur Docker définit explicitement une variable d'environnement (ex: `SMTP_PORT=587`), celle-ci est **autoritaire et prioritaire**.
-   - Le système applique cette valeur effective pour tous les services applicatifs.
+   - Pour un paramètre **hors du sous-ensemble ci-dessus** (ex : `SERVER_PORT`, `TZ`, `TLS_ENABLED`), une variable d'environnement définie explicitement par l'opérateur Docker est **autoritaire et prioritaire**.
    - Dans l'interface utilisateur, le paramètre arbore le badge **`ENV Docker`**.
 
 2. **Priorité 2 — Interface Utilisateur (`UI / DB`)** :
    - Si aucune variable d'environnement n'est injectée dans le conteneur, toute valeur configurée et sauvegardée par un administrateur dans la table `settings` prend effet immédiatement.
+   - C'est également le badge affiché pour une clé du sous-ensemble historique décrit plus haut (ex : `SMTP_HOST`) dès qu'une valeur est enregistrée en base — **y compris si une variable d'environnement différente reste définie sur le conteneur**.
    - Dans l'interface, le paramètre affiche le badge **`Base de données (UI)`**.
 
 3. **Priorité 3 — Valeur par Défaut (`Défaut`)** :
@@ -46,13 +58,11 @@ Le système résout la configuration selon un modèle hiérarchique à trois sou
    - Dans l'interface, le paramètre affiche le badge neutre **`Défaut`**.
 
 4. **Détection et Signalement des Conflits** :
-   - Un **conflit** survient lorsqu'un administrateur a enregistré une valeur via l'UI en base, mais que l'opérateur a également défini la variable d'environnement dans Docker avec une valeur distincte.
-   - Dans ce cas :
-     - La variable d'environnement Docker **continue de primer** (garantie d'inviolabilité pour l'opérateur d'infrastructure).
-     - La valeur saisie par l'admin reste conservée en base pour mémoire.
-     - L'UI affiche un badge rouge **`Conflit ENV vs UI`** et une alerte explicite :  
-       *« Conflit détecté : La valeur UI en base (X) est différente de la variable d'environnement active (Y). »*
-     - Le compteur de conflits de la vue admin s'incrémente pour attirer l'attention de l'administrateur.
+   - Un **conflit** survient lorsqu'un administrateur a enregistré une valeur via l'UI en base, mais que l'opérateur a également défini la variable d'environnement dans Docker avec une valeur distincte — quel que soit celui des deux qui gagne réellement.
+   - L'UI affiche un badge rouge **`Conflit ENV vs UI`** et une alerte explicite, dont le sens dépend de la clé :
+     - Hors du sous-ensemble historique : *« La valeur a été enregistrée en base, mais la variable d'environnement Docker X reste active et prioritaire. »* — la variable d'environnement Docker continue de primer.
+     - Dans le sous-ensemble historique : *« La valeur enregistrée est active, mais diffère de la variable d'environnement Docker X toujours définie sur le conteneur. »* — la valeur UI est ce qui tourne réellement ; la variable d'environnement, elle, ne sera relue que si l'enregistrement en base est supprimé (`DELETE /api/v1/config/:key`).
+     - Le compteur de conflits de la vue admin s'incrémente dans les deux cas pour attirer l'attention de l'administrateur.
 
 ---
 
@@ -103,8 +113,8 @@ Le système résout la configuration selon un modèle hiérarchique à trois sou
 | `SMTP_TO` | `SMTP_TO` | Notifications | string | `""` | Non | Non | Destinataire par défaut des alertes |
 | `SMTP_TLS` | `SMTP_TLS` | Notifications | bool | `true` | Non | Non | Activation du chiffrement TLS |
 | `GITHUB_TOKEN` | `GITHUB_TOKEN` | Intégrations | string | `""` | Oui | Non | Jeton d'accès GitHub pour les releases |
-| `GITHUB_POLL_INTERVAL` | `GITHUB_POLL_INTERVAL` | Intégrations | duration | `15m` | Non | Non | Fréquence de vérification GitHub |
-| `DOCKER_IMAGE_POLL_INTERVAL` | `DOCKER_IMAGE_POLL_INTERVAL` | Intégrations | duration | `6h` | Non | Non | Fréquence de vérification images Docker |
+| `GITHUB_POLL_INTERVAL` | `GITHUB_POLL_INTERVAL` | Intégrations | duration | `15m` | Non | Oui | Fréquence de vérification GitHub |
+| `DOCKER_IMAGE_POLL_INTERVAL` | `DOCKER_IMAGE_POLL_INTERVAL` | Intégrations | duration | `6h` | Non | Oui | Fréquence de vérification images Docker |
 | `METRICS_RETENTION_DAYS` | `METRICS_RETENTION_DAYS` | Rétention | int | `30` | Non | Non | Rétention des métriques (jours) |
 | `AUDIT_RETENTION_DAYS` | `AUDIT_RETENTION_DAYS` | Rétention | int | `90` | Non | Non | Rétention des logs d'audit (jours) |
 | `WEB_LOGS_RETENTION_DAYS`| `WEB_LOGS_RETENTION_DAYS`| Rétention | int | `30` | Non | Non | Rétention des logs HTTP (jours) |
@@ -118,7 +128,7 @@ Le système résout la configuration selon un modèle hiérarchique à trois sou
 
 Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
 
-### `GET /api/v1/config` (ou `/api/config`)
+### `GET /api/v1/config`
 - **Query Params** : `reveal=true` (optionnel, pour renvoyer les secrets en clair au lieu du caviardage `••••••••`).
 - **Réponse** :
   ```json
@@ -151,24 +161,25 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
   }
   ```
 
-### `PUT /api/v1/config/:key` (ou `/api/config/:key`)
+### `PUT /api/v1/config/:key`
 - **Body** :
   ```json
   { "value": "465" }
   ```
 - **Validation** : Vérification de type, options, ports (1-65535), durées Go (`15m`, `24h`), URLs valides.
-- **Réponse** :
+- **Réponse** — `warning` n'est présent qu'en cas de conflit ENV/UI, et sa formulation dépend de qui gagne réellement (voir la section 1 ci-dessus) :
   ```json
   {
     "success": true,
     "entry": { ... },
-    "warning": "La valeur a été enregistrée en base, mais la variable d'environnement Docker SMTP_PORT reste active et prioritaire.",
+    "warning": "La valeur enregistrée est active, mais diffère de la variable d'environnement Docker SMTP_PORT toujours définie sur le conteneur.",
     "message": "Paramètre mis à jour"
   }
   ```
 
-### `DELETE /api/v1/config/:key` (ou `/api/config/:key`)
-- Supprime la surcharge UI stockée dans la table `settings`. Le paramètre retourne instantanément à sa valeur issue de l'ENV Docker (s'il existe) ou à sa valeur par défaut.
+### `DELETE /api/v1/config/:key`
+- Supprime la surcharge UI stockée dans la table `settings`. Pour la majorité des paramètres, la valeur ENV Docker (si présente) ou par défaut est active immédiatement.
+- **Exception** : pour une clé du sous-ensemble historique décrit plus haut, la suppression est bien immédiate en base, mais le processus actuellement en cours d'exécution continue d'utiliser l'ancienne valeur jusqu'à son prochain redémarrage — `config.OverrideFromDB` ne fait qu'appliquer une valeur DB par-dessus la précédente, il ne sait pas la « retirer » a posteriori. La réponse porte alors un champ `"warning"` explicite.
 
 ### `PUT /api/v1/config` (Mise à jour groupée)
 - **Body** :

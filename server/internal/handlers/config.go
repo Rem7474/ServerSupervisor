@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
+	"github.com/serversupervisor/server/internal/models"
 	configsvc "github.com/serversupervisor/server/internal/services/config"
 )
 
@@ -19,7 +20,7 @@ func NewConfigHandler(svc *configsvc.Service) *ConfigHandler {
 
 // GetConfig returns the full list of system parameters with effective values and origins.
 func (h *ConfigHandler) GetConfig(c *gin.Context) {
-	if c.GetString("role") != "admin" {
+	if c.GetString("role") != models.RoleAdmin {
 		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
@@ -40,7 +41,7 @@ type updateConfigKeyRequest struct {
 
 // UpdateConfigKey updates a single configuration parameter by key.
 func (h *ConfigHandler) UpdateConfigKey(c *gin.Context) {
-	if c.GetString("role") != "admin" {
+	if c.GetString("role") != models.RoleAdmin {
 		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
@@ -68,13 +69,13 @@ func (h *ConfigHandler) UpdateConfigKey(c *gin.Context) {
 
 // ResetConfigKey removes any UI override for the parameter, returning to ENV or default.
 func (h *ConfigHandler) ResetConfigKey(c *gin.Context) {
-	if c.GetString("role") != "admin" {
+	if c.GetString("role") != models.RoleAdmin {
 		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 
 	key := c.Param("key")
-	entry, err := h.svc.ResetParam(c.Request.Context(), key, c.GetString("username"), c.ClientIP())
+	entry, warning, err := h.svc.ResetParam(c.Request.Context(), key, c.GetString("username"), c.ClientIP())
 	if err != nil {
 		respondError(c, err)
 		return
@@ -83,6 +84,7 @@ func (h *ConfigHandler) ResetConfigKey(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"entry":   entry,
+		"warning": warning,
 		"message": "Paramètre réinitialisé",
 	})
 }
@@ -93,7 +95,7 @@ type updateBulkRequest struct {
 
 // UpdateConfigBulk updates multiple parameters simultaneously.
 func (h *ConfigHandler) UpdateConfigBulk(c *gin.Context) {
-	if c.GetString("role") != "admin" {
+	if c.GetString("role") != models.RoleAdmin {
 		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}

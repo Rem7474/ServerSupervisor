@@ -163,8 +163,13 @@ var AllParams = []ConfigParamDef{
 
 	// ==================== Integrations ====================
 	strParam("GITHUB_TOKEN", "github_token", "integrations", "", "Token d'accès personnel GitHub", "Jeton GitHub pour surveiller les nouvelles versions et éviter le rate-limiting de l'API publique.", true, false),
-	durationParam("GITHUB_POLL_INTERVAL", "github_poll_interval", "integrations", "15m", "Intervalle de scrutation GitHub", "Cadence de vérification des releases et tags GitHub distants.", false),
-	durationParam("DOCKER_IMAGE_POLL_INTERVAL", "docker_image_poll_interval", "integrations", "6h", "Intervalle de scrutation des images Docker", "Cadence de vérification des nouveaux digests de conteneurs sur les registres distants.", false),
+	// Both poll intervals are read once at startup to size a fixed
+	// time.Ticker (poller.Every, called from main.go) — changing the
+	// in-memory Config value afterwards doesn't reach an already-running
+	// ticker, so this genuinely needs a restart, unlike most other
+	// duration/secret settings in this catalog.
+	durationParam("GITHUB_POLL_INTERVAL", "github_poll_interval", "integrations", "15m", "Intervalle de scrutation GitHub", "Cadence de vérification des releases et tags GitHub distants.", true),
+	durationParam("DOCKER_IMAGE_POLL_INTERVAL", "docker_image_poll_interval", "integrations", "6h", "Intervalle de scrutation des images Docker", "Cadence de vérification des nouveaux digests de conteneurs sur les registres distants.", true),
 
 	// ==================== Retention ====================
 	intParam("METRICS_RETENTION_DAYS", "metrics_retention_days", "retention", "30", "Rétention des métriques (jours)", "Nombre de jours pendant lesquels les séries temporelles de métriques sont conservées.", false, validatePositiveInt),

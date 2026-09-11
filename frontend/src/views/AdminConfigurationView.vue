@@ -773,8 +773,12 @@ async function resetParam(entry: ConfigEntry) {
 
   resettingKey.value = entry.key
   try {
-    await configApi.resetParam(entry.key)
-    addToast(t('config.messages.resetSuccess', { key: entry.key }), 'success')
+    const res = await configApi.resetParam(entry.key)
+    if (res.data.warning) {
+      addToast(res.data.warning, 'warning')
+    } else {
+      addToast(t('config.messages.resetSuccess', { key: entry.key }), 'success')
+    }
     await loadConfig()
   } catch {
     addToast(t('config.messages.error'), 'error')

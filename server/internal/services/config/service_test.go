@@ -107,6 +107,48 @@ func TestConfigService_UpdateParam(t *testing.T) {
 	}
 }
 
+// TestConfigService_UpdateParam_DBOverridableKeyReportsTruth guards the fix
+// for a bug where saving a key config.OverrideFromDB lets the DB win for
+// unconditionally (SMTP, ntfy, GitHub, retention days, JWT/refresh
+// durations, every OIDC_*/threat_* setting) told the admin their save was
+// ignored in favor of a conflicting ENV var — when OverrideFromDB had, two
+// lines earlier in the same call, actually just applied it. The entry
+// returned must say "ui" won (matching what's really running), not "env".
+func TestConfigService_UpdateParam_DBOverridableKeyReportsTruth(t *testing.T) {
+	repo := newMockRepo()
+	cfg := config.Load()
+	svc := NewService(repo, cfg)
+
+	_ = os.Setenv("SMTP_HOST", "env.smtp.corp")
+	defer func() { _ = os.Unsetenv("SMTP_HOST") }()
+
+	entry, warn, err := svc.UpdateParam(context.Background(), "SMTP_HOST", "mail.example.com", "admin", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entry == nil {
+		t.Fatalf("expected entry returned")
+	}
+	if entry.Source != "ui" {
+		t.Errorf("expected source ui (the saved value is what's actually live), got %q", entry.Source)
+	}
+	if entry.EffectiveValue != "mail.example.com" {
+		t.Errorf("expected effective value to be the just-saved one, got %q", entry.EffectiveValue)
+	}
+	if cfg.SMTPHost != "mail.example.com" {
+		t.Errorf("expected cfg.SMTPHost to reflect the saved value, got %q", cfg.SMTPHost)
+	}
+	if !entry.HasConflict {
+		t.Errorf("expected HasConflict=true (env var still set to a different value)")
+	}
+	if warn == "" {
+		t.Errorf("expected an informational warning about the differing env var")
+	}
+	if strings.Contains(warn, "reste active et prioritaire") {
+		t.Errorf("warning must not claim ENV is authoritative when the DB value just won: %q", warn)
+	}
+}
+
 func TestConfigService_SecretAuditMasking(t *testing.T) {
 	repo := newMockRepo()
 	cfg := config.Load()
@@ -134,7 +176,7 @@ func TestConfigService_ResetParam(t *testing.T) {
 	cfg := config.Load()
 	svc := NewService(repo, cfg)
 
-	entry, err := svc.ResetParam(context.Background(), "SMTP_HOST", "admin", "127.0.0.1")
+	entry, warning, err := svc.ResetParam(context.Background(), "SMTP_HOST", "admin", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -144,17 +186,45 @@ func TestConfigService_ResetParam(t *testing.T) {
 	if _, exists := repo.settings["smtp_host"]; exists {
 		t.Errorf("expected setting to be deleted from repo")
 	}
+	// SMTP_HOST was actively live via the DB (OverrideFromDB applied it,
+	// see TestConfigService_UpdateParam_DBOverridableKeyReportsTruth) — the
+	// running process can't un-apply it without a restart, so resetting it
+	// must say so rather than implying an instant revert.
+	if warning == "" {
+		t.Errorf("expected a restart-needed warning for a key that was live via DB")
+	}
+	if cfg.SMTPHost != "mail.mycorp.com" {
+		t.Errorf("expected cfg.SMTPHost to remain the stale DB value until restart, got %q", cfg.SMTPHost)
+	}
 
 	// Reset unknown param
-	_, err = svc.ResetParam(context.Background(), "UNKNOWN_KEY", "admin", "127.0.0.1")
+	_, _, err = svc.ResetParam(context.Background(), "UNKNOWN_KEY", "admin", "127.0.0.1")
 	if err == nil {
 		t.Errorf("expected error for unknown key in ResetParam")
 	}
 
 	// Reset non-editable param
-	_, err = svc.ResetParam(context.Background(), "DEMO_MODE", "admin", "127.0.0.1")
+	_, _, err = svc.ResetParam(context.Background(), "DEMO_MODE", "admin", "127.0.0.1")
 	if err == nil {
 		t.Errorf("expected error for non-editable key in ResetParam")
+	}
+}
+
+// TestConfigService_ResetParam_NoWarningWhenNeverLive guards the other side:
+// resetting a key that was never actually applied (nothing was ever saved
+// for it) must not claim a restart is needed — there's nothing stale to
+// clear.
+func TestConfigService_ResetParam_NoWarningWhenNeverLive(t *testing.T) {
+	repo := newMockRepo()
+	cfg := config.Load()
+	svc := NewService(repo, cfg)
+
+	_, warning, err := svc.ResetParam(context.Background(), "SMTP_HOST", "admin", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if warning != "" {
+		t.Errorf("expected no warning when the key was never live, got: %s", warning)
 	}
 }
 

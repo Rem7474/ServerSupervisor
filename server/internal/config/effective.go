@@ -55,7 +55,19 @@ func MaskValue(val string) string {
 //  3. Default (hardcoded fallback) -> Source = "default"
 //
 // A conflict is detected when BOTH ENV and UI have non-empty values that differ.
-func ResolveEffectiveConfig(dbSettings map[string]string, revealSecrets bool) ConfigSummary {
+//
+// That priority order is this package's own resolution, used to decide what
+// *this admin UI* should treat as effective — it is not automatically what
+// the running server actually uses. Config.OverrideFromDB (in this same
+// package) is the one function that mutates the live *Config, and for a
+// long-standing set of keys (SMTP, ntfy, GitHub, retention days, the JWT/
+// refresh durations, every OIDC_* and threat_* setting) it lets a DB value
+// win unconditionally, regardless of ENV. Reporting "env" as the source for
+// one of those keys whenever both are set would tell the admin their saved
+// value is being ignored, when OverrideFromDB has actually just applied it —
+// dbOverridable (the map OverrideFromDB itself returns) is how this function
+// tells the two apart instead of assuming ENV always wins.
+func ResolveEffectiveConfig(dbSettings map[string]string, dbOverridable map[string]bool, revealSecrets bool) ConfigSummary {
 	entries := make([]ConfigEntry, 0, len(AllParams))
 	categorySet := make(map[string]bool)
 	var envCount, uiCount, defaultCount, conflictCount int
@@ -86,7 +98,17 @@ func ResolveEffectiveConfig(dbSettings map[string]string, revealSecrets bool) Co
 		var rawEffective string
 		var hasConflict bool
 
-		if hasEnv {
+		if hasEnv && hasUI && dbOverridable[param.SettingKey] {
+			// OverrideFromDB actually applies this key's DB value over ENV —
+			// the UI value is what the running server is using right now.
+			source = "ui"
+			rawEffective = uiRaw
+			uiCount++
+			if strings.TrimSpace(uiRaw) != strings.TrimSpace(envRaw) {
+				hasConflict = true
+				conflictCount++
+			}
+		} else if hasEnv {
 			source = "env"
 			rawEffective = envRaw
 			envCount++

@@ -188,11 +188,6 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerNPMRoutes(v1, npmH)
 	registerDashboardRoutes(v1, dashboardH)
 	v1.GET("/dashboard/init", wsH.DashboardInit)
- 
-	apiDirect := r.Group("/api")
-	apiDirect.Use(JWTMiddleware(cfg))
-	apiDirect.Use(cookies.CSRFMiddleware())
-	registerConfigRoutes(apiDirect, configH)
 
 	registerStaticFiles(r)
 

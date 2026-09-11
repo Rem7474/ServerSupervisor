@@ -18,8 +18,13 @@ func TestEffectiveConfigPriorities(t *testing.T) {
 
 	_ = os.Unsetenv("SMTP_HOST")
 
+	// SMTP_HOST is one of the legacy keys OverrideFromDB lets a DB value win
+	// over ENV for unconditionally — dbOverridable mirrors that here instead
+	// of assuming every key behaves like a plain env>DB>default cascade.
+	smtpDBOverridable := map[string]bool{"smtp_host": true}
+
 	// 1. Default fallback
-	summary := ResolveEffectiveConfig(map[string]string{}, false)
+	summary := ResolveEffectiveConfig(map[string]string{}, smtpDBOverridable, false)
 	var smtpHostEntry *ConfigEntry
 	for i := range summary.Entries {
 		if summary.Entries[i].Key == "SMTP_HOST" {
@@ -44,7 +49,7 @@ func TestEffectiveConfigPriorities(t *testing.T) {
 	dbSettings := map[string]string{
 		"smtp_host": "mail.example.com",
 	}
-	summary = ResolveEffectiveConfig(dbSettings, false)
+	summary = ResolveEffectiveConfig(dbSettings, smtpDBOverridable, false)
 	for i := range summary.Entries {
 		if summary.Entries[i].Key == "SMTP_HOST" {
 			smtpHostEntry = &summary.Entries[i]
@@ -64,25 +69,28 @@ func TestEffectiveConfigPriorities(t *testing.T) {
 		t.Errorf("expected HasConflict=false")
 	}
 
-	// 3. ENV override (Priority 1)
+	// 3. ENV also set, but SMTP_HOST is DB-overridable: OverrideFromDB lets
+	// the DB value win unconditionally, so the UI value is what's actually
+	// live — reporting "env" here would tell the admin their save was
+	// ignored when it wasn't (the bug this dbOverridable param fixed).
 	_ = os.Setenv("SMTP_HOST", "env.smtp.corp")
-	summary = ResolveEffectiveConfig(dbSettings, false)
+	summary = ResolveEffectiveConfig(dbSettings, smtpDBOverridable, false)
 	for i := range summary.Entries {
 		if summary.Entries[i].Key == "SMTP_HOST" {
 			smtpHostEntry = &summary.Entries[i]
 			break
 		}
 	}
-	if smtpHostEntry.Source != "env" {
-		t.Errorf("expected source env, got %s", smtpHostEntry.Source)
+	if smtpHostEntry.Source != "ui" {
+		t.Errorf("expected source ui (DB-overridable key), got %s", smtpHostEntry.Source)
 	}
-	if smtpHostEntry.EffectiveValue != "env.smtp.corp" {
-		t.Errorf("expected EffectiveValue 'env.smtp.corp', got '%s'", smtpHostEntry.EffectiveValue)
+	if smtpHostEntry.EffectiveValue != "mail.example.com" {
+		t.Errorf("expected EffectiveValue 'mail.example.com', got '%s'", smtpHostEntry.EffectiveValue)
 	}
 	if !smtpHostEntry.HasEnvOverride {
 		t.Errorf("expected HasEnvOverride=true")
 	}
-	// Conflict since UI is mail.example.com and ENV is env.smtp.corp
+	// Still worth flagging: both are set and differ, even though DB wins.
 	if !smtpHostEntry.HasConflict {
 		t.Errorf("expected HasConflict=true")
 	}
@@ -90,9 +98,39 @@ func TestEffectiveConfigPriorities(t *testing.T) {
 		t.Errorf("expected ConflictCount=1, got %d", summary.ConflictCount)
 	}
 
-	// 4. Same value in ENV and UI -> no conflict
+	// 4. A key ENV genuinely wins for — one OverrideFromDB never touches —
+	// still reports "env" when both are set and differ.
+	origTZ, hadTZ := os.LookupEnv("TZ")
+	defer func() {
+		if hadTZ {
+			_ = os.Setenv("TZ", origTZ)
+		} else {
+			_ = os.Unsetenv("TZ")
+		}
+	}()
+	tzDBSettings := map[string]string{"tz": "Europe/Paris"}
+	_ = os.Setenv("TZ", "UTC")
+	summary = ResolveEffectiveConfig(tzDBSettings, nil, false)
+	var tzEntry *ConfigEntry
+	for i := range summary.Entries {
+		if summary.Entries[i].Key == "TZ" {
+			tzEntry = &summary.Entries[i]
+			break
+		}
+	}
+	if tzEntry == nil {
+		t.Fatalf("TZ parameter not found")
+	}
+	if tzEntry.Source != "env" {
+		t.Errorf("expected source env for a non-DB-overridable key, got %s", tzEntry.Source)
+	}
+	if !tzEntry.HasConflict {
+		t.Errorf("expected HasConflict=true")
+	}
+
+	// 5. Same value in ENV and UI -> no conflict
 	dbSettings["smtp_host"] = "env.smtp.corp"
-	summary = ResolveEffectiveConfig(dbSettings, false)
+	summary = ResolveEffectiveConfig(dbSettings, smtpDBOverridable, false)
 	for i := range summary.Entries {
 		if summary.Entries[i].Key == "SMTP_HOST" {
 			smtpHostEntry = &summary.Entries[i]
@@ -110,7 +148,7 @@ func TestSecretMasking(t *testing.T) {
 	}
 
 	// Masked
-	summary := ResolveEffectiveConfig(dbSettings, false)
+	summary := ResolveEffectiveConfig(dbSettings, nil, false)
 	var passEntry *ConfigEntry
 	for i := range summary.Entries {
 		if summary.Entries[i].Key == "SMTP_PASS" {
@@ -126,7 +164,7 @@ func TestSecretMasking(t *testing.T) {
 	}
 
 	// Revealed
-	summaryRevealed := ResolveEffectiveConfig(dbSettings, true)
+	summaryRevealed := ResolveEffectiveConfig(dbSettings, nil, true)
 	for i := range summaryRevealed.Entries {
 		if summaryRevealed.Entries[i].Key == "SMTP_PASS" {
 			passEntry = &summaryRevealed.Entries[i]
