@@ -525,14 +525,39 @@ func scanMetricsSummary(rows *sql.Rows) ([]models.SystemMetricsSummary, error) {
 	return summary, rows.Err()
 }
 
+// isHypertable reports whether table is currently a TimescaleDB hypertable.
+// Any error (timescaledb_information itself unresolvable — extension not
+// installed, or installed into a schema outside search_path) is treated as
+// "not a hypertable" rather than propagated: every caller already has a
+// plain-table fallback, and the point of this check is precisely to avoid
+// ever issuing a hypertable-only function call (approximate_row_count,
+// add/remove_retention_policy, ...) that would otherwise fail with a noisy
+// "function does not exist" at the Postgres log level on an install where
+// migration 064's hypertable conversion never ran (timescaledb wasn't
+// available at the time) or the extension has since become unreachable.
+func (db *DB) isHypertable(ctx context.Context, table string) bool {
+	var exists bool
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = $1)`, table).Scan(&exists)
+	if err != nil {
+		return false
+	}
+	return exists
+}
+
 // UpdateMetricsRetentionPolicy updates the TimescaleDB retention policies for
 // system_metrics and disk_metrics to the given number of days. The existing
 // policy is replaced atomically so the change takes effect on the next
-// scheduled policy run.
+// scheduled policy run. A table that isn't a hypertable has no retention
+// policy to set — skipped rather than attempted, see isHypertable.
 func (db *DB) UpdateMetricsRetentionPolicy(ctx context.Context, days int) error {
 	for _, table := range []string{"system_metrics", "disk_metrics"} {
+		if !db.isHypertable(ctx, table) {
+			slog.Warn("skipping retention policy update: table is not a TimescaleDB hypertable", "table", table)
+			continue
+		}
 		if _, err := db.conn.ExecContext(ctx,
-			`SELECT remove_retention_policy($1, if_not_exists => true)`, table); err != nil {
+			`SELECT remove_retention_policy($1::regclass, if_exists => true)`, table); err != nil {
 			return fmt.Errorf("remove retention policy for %s: %w", table, err)
 		}
 		if _, err := db.conn.ExecContext(ctx,
@@ -546,9 +571,12 @@ func (db *DB) UpdateMetricsRetentionPolicy(ctx context.Context, days int) error 
 // CountMetrics returns the total number of metrics records.
 func (db *DB) CountMetrics(ctx context.Context) (int64, error) {
 	var count int64
-	err := db.conn.QueryRowContext(ctx, `SELECT * FROM hypertable_approximate_row_count('system_metrics')`).Scan(&count)
-	if err != nil {
-		err = db.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM system_metrics`).Scan(&count)
+	if db.isHypertable(ctx, "system_metrics") {
+		if err := db.conn.QueryRowContext(ctx,
+			`SELECT approximate_row_count('system_metrics'::regclass)`).Scan(&count); err == nil {
+			return count, nil
+		}
 	}
+	err := db.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM system_metrics`).Scan(&count)
 	return count, err
 }
