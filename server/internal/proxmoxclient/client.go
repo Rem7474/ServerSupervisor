@@ -75,17 +75,25 @@ func (c *Client) get(path string, result interface{}) error {
 // first 50 lines of a 5 000-line one. Endpoints that don't paginate simply
 // report 0, which every caller but the log reader ignores.
 func (c *Client) getWithTotal(path string, result interface{}) (int, error) {
+	// path is always an absolute reference (leading "/", e.g. "/nodes"), and
+	// c.baseURL already carries the API prefix (e.g. ".../api2/json") with no
+	// trailing slash — resolving path via baseURL.ResolveReference(relURL)
+	// discards that whole prefix per RFC 3986 (an absolute-path reference
+	// replaces the base's entire path), silently turning every request into
+	// one PVE's web server can't route (e.g. "/nodes" instead of
+	// "/api2/json/nodes", which pveproxy reports as a static-file 404/500
+	// rather than a real API error). Plain concatenation is what every other
+	// method in this file already does successfully; the URL is still parsed
+	// and its host/scheme re-verified against baseURL afterward so a
+	// caller-supplied path segment can never redirect the request elsewhere.
+	targetURL, err := url.Parse(c.baseURL + path)
+	if err != nil {
+		return 0, fmt.Errorf("parse request URL: %w", err)
+	}
 	baseURL, err := url.Parse(c.baseURL)
 	if err != nil {
 		return 0, fmt.Errorf("parse base URL: %w", err)
 	}
-
-	relURL, err := url.Parse(path)
-	if err != nil {
-		return 0, fmt.Errorf("parse request path: %w", err)
-	}
-
-	targetURL := baseURL.ResolveReference(relURL)
 	if targetURL.Host != baseURL.Host || targetURL.Scheme != baseURL.Scheme {
 		return 0, fmt.Errorf("request host or scheme does not match base URL: %s", targetURL.String())
 	}
