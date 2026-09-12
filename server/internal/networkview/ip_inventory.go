@@ -11,10 +11,21 @@ import (
 	"github.com/serversupervisor/server/internal/proxmoxclient"
 )
 
-// ethInterfaceName matches the standard "ethX" guest interface (eth0, eth1, …).
-// Other interfaces the guest agent reports — docker0, veth*, br-*, tailscale0,
-// lo, ens18, ... — are noise for this correlation feature and are excluded.
-var ethInterfaceName = regexp.MustCompile(`^eth\d+$`)
+// noiseInterfaceName matches virtual/overlay interfaces the guest agent
+// reports that are never useful correlation targets on the Network page:
+// container/VPN/bridge interfaces created *inside* the guest (Docker, LXC
+// veth pairs, libvirt, Tailscale/WireGuard, Kubernetes CNI overlays) rather
+// than its real, routable NIC.
+//
+// This used to be an allowlist of literal "ethX" names, which silently
+// dropped every guest whose primary NIC uses systemd's predictable network
+// interface naming (ens18, enp0s3, eno1, ...) instead of the legacy
+// eth0/eth1 scheme — ens18 in particular is Proxmox's own default interface
+// name for most Debian/Ubuntu cloud-init templates, so that allowlist
+// silently excluded a large share of real guests. A denylist of known-noise
+// names generalizes correctly across every real NIC naming convention
+// instead of trying to enumerate them all.
+var noiseInterfaceName = regexp.MustCompile(`^(lo|docker\d*|br-[0-9a-f]+|veth.*|virbr\d*|tailscale\d*|wg\d*|tun\d*|tap\d*|cni\d*|flannel.*|cali.*|zt[a-z0-9]*)$`)
 
 // GuestNetworksProvider is the subset of proxmox.Service's live-fetch
 // capability BuildIPInventory needs. Defined here (consumer side) so it can
@@ -145,13 +156,14 @@ func BuildIPInventory(ctx context.Context, db *database.DB, proxmoxSvc GuestNetw
 	}, nil
 }
 
-// extractRoutableIPs keeps only the "ethX" interface(s), strips the CIDR
-// mask from their IPs, and drops loopback/link-local addresses — none of
-// which are useful correlation targets on the Network page.
+// extractRoutableIPs excludes known-noise interfaces (see noiseInterfaceName),
+// strips the CIDR mask from the remaining IPs, and drops loopback/link-local
+// addresses — none of which are useful correlation targets on the Network
+// page.
 func extractRoutableIPs(ifaces []proxmoxclient.GuestNetworkIface) []string {
 	var ips []string
 	for _, iface := range ifaces {
-		if !ethInterfaceName.MatchString(iface.Name) {
+		if noiseInterfaceName.MatchString(iface.Name) {
 			continue
 		}
 		for _, cidr := range iface.IPs {
