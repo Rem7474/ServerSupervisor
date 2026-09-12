@@ -1,4 +1,5 @@
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { i18n } from '../i18n'
 
 export async function confirmBulkAction(
   action: string,
@@ -6,14 +7,15 @@ export async function confirmBulkAction(
   warningMessage?: string
 ): Promise<boolean> {
   const { confirm } = useConfirmDialog()
+  const { t } = i18n.global
 
   return await confirm({
-    title: `${action} sur ${count} élément${count > 1 ? 's' : ''} ?`,
-    message: warningMessage || 'Cette action ne peut pas être annulée',
+    title: t('common.bulkConfirmTitle', { action }, count),
+    message: warningMessage || t('common.cannotBeUndone'),
     destructive: true,
     variant: 'danger',
-    okLabel: `Oui, ${action}`,
-    cancelLabel: 'Annuler',
+    okLabel: t('common.yesAction', { action }),
+    cancelLabel: t('common.cancel'),
   })
 }
 

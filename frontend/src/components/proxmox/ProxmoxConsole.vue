@@ -2,7 +2,7 @@
   <CommandLogPanel
     mode="custom"
     :show="show"
-    :title="`Console — ${guestName || guestId}`"
+    :title="t('proxmox.consoleTitle', { name: guestName || guestId })"
     wrapper-class="side-panel side-panel-terminal"
     @close="handleClose"
     @open="$emit('open')"
@@ -20,7 +20,7 @@
         class="btn btn-sm btn-ghost-secondary"
         @click="connect"
       >
-        Rouvrir
+        {{ t('proxmox.reopenButton') }}
       </button>
     </template>
 
@@ -47,7 +47,7 @@
           type="button"
           :class="ctrlArmed ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost-secondary'"
           :disabled="!inputEnabled"
-          title="Touche Ctrl — s'applique au caractère suivant"
+          :title="t('proxmox.ctrlKeyTooltip')"
           @click="toggleCtrl"
         >
           Ctrl
@@ -56,7 +56,7 @@
           type="button"
           class="btn btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
-          title="Interrompre (Ctrl+C)"
+          :title="t('proxmox.interruptTooltip')"
           @click="sendKey('\u0003')"
         >
           ^C
@@ -65,16 +65,16 @@
           type="button"
           class="btn btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
-          title="Échap"
+          :title="t('proxmox.escapeLabel')"
           @click="sendKey('\u001b')"
         >
-          Échap
+          {{ t('proxmox.escapeLabel') }}
         </button>
         <button
           type="button"
           class="btn btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
-          title="Tabulation (complétion)"
+          :title="t('proxmox.tabTooltip')"
           @click="sendKey('\t')"
         >
           Tab
@@ -83,7 +83,7 @@
           type="button"
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
-          title="Haut (historique)"
+          :title="t('proxmox.upArrowTooltip')"
           @click="sendArrow('\u001b[A')"
         >
           <IconArrowUp
@@ -95,7 +95,7 @@
           type="button"
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
-          title="Bas (historique)"
+          :title="t('proxmox.downArrowTooltip')"
           @click="sendArrow('\u001b[B')"
         >
           <IconArrowDown
@@ -107,7 +107,7 @@
           type="button"
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
-          title="Gauche"
+          :title="t('proxmox.leftArrowTooltip')"
           @click="sendArrow('\u001b[D')"
         >
           <IconArrowLeft
@@ -119,7 +119,7 @@
           type="button"
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
-          title="Droite"
+          :title="t('proxmox.rightArrowTooltip')"
           @click="sendArrow('\u001b[C')"
         >
           <IconArrowRight
@@ -134,6 +134,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconArrowDown, IconArrowLeft, IconArrowRight, IconArrowUp } from '@tabler/icons-vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -157,6 +158,8 @@ const emit = defineEmits<{
   (e: 'open'): void
 }>()
 
+const { t } = useI18n()
+
 const containerEl = ref<HTMLElement | null>(null)
 const { status, errorMessage, open, sendInput, resize, close: closeSocket } = useProxmoxConsole()
 
@@ -171,14 +174,16 @@ const { getStatusBadgeClass } = useStatusBadge({
 })
 const statusBadgeClass = computed(() => getStatusBadgeClass(status.value))
 
-const statusLabels: Record<string, string> = {
-  idle: 'Inactif',
-  connecting: 'Connexion…',
-  connected: 'Connecté',
-  disconnected: 'Déconnecté',
-  error: 'Erreur',
-}
-const statusLabel = computed(() => statusLabels[status.value] ?? status.value)
+const statusLabel = computed(() => {
+  switch (status.value) {
+    case 'idle': return t('proxmox.consoleStatusIdle')
+    case 'connecting': return t('proxmox.consoleStatusConnecting')
+    case 'connected': return t('proxmox.consoleStatusConnected')
+    case 'disconnected': return t('proxmox.consoleStatusDisconnected')
+    case 'error': return t('common.error')
+    default: return status.value
+  }
+})
 
 // Below 991px (style.css's .side-panel-terminal breakpoint) the panel
 // becomes a `position: fixed` full-viewport overlay instead of the desktop

@@ -13,10 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
-	errs "github.com/serversupervisor/server/internal/errors"
 	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/safego"
 	"golang.org/x/time/rate"
@@ -176,10 +176,12 @@ func RateLimiterMiddleware(rl *IPRateLimiter) gin.HandlerFunc {
 		clientIP := rl.getClientIP(c)
 
 		if !rl.Allow(clientIP) {
+			safePath := strings.ReplaceAll(strings.ReplaceAll(c.Request.URL.Path, "\n", ""), "\r", "")
+			safeIP := strings.ReplaceAll(strings.ReplaceAll(clientIP, "\n", ""), "\r", "")
 			slog.WarnContext(c.Request.Context(), "rate limit blocked",
 				slog.String("method", c.Request.Method),
-				slog.String("path", c.Request.URL.Path),
-				slog.String("client_ip", clientIP))
+				slog.String("path", safePath),
+				slog.String("client_ip", safeIP))
 			c.JSON(429, gin.H{"error": "rate limit exceeded"})
 			c.Abort()
 			return
@@ -212,10 +214,11 @@ func RequestIDMiddleware() gin.HandlerFunc {
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		path := c.Request.URL.Path
+		path := strings.ReplaceAll(strings.ReplaceAll(c.Request.URL.Path, "\n", ""), "\r", "")
+		clientIP := strings.ReplaceAll(strings.ReplaceAll(c.ClientIP(), "\n", ""), "\r", "")
 		query := c.Request.URL.RawQuery
 		if query != "" {
-			query = maskSensitiveParams(query)
+			query = strings.ReplaceAll(strings.ReplaceAll(maskSensitiveParams(query), "\n", ""), "\r", "")
 		}
 
 		c.Next()
@@ -226,10 +229,20 @@ func RequestLogger() gin.HandlerFunc {
 			slog.String("method", c.Request.Method),
 			slog.String("path", path),
 			slog.Duration("latency", time.Since(start)),
-			slog.String("client_ip", c.ClientIP()),
+			slog.String("client_ip", clientIP),
 		}
 		if query != "" {
 			attrs = append(attrs, slog.String("query", query))
+		}
+		// respondError (internal/handlers/httperr.go) records the underlying
+		// error detail via c.Error — for an apperr.Internal that's the real
+		// cause behind the generic "internal server error" the client sees;
+		// for anything else (e.g. a Proxmox/SMTP/ntfy 502) it's simply the
+		// detail the access log never carried before. Only the last matters:
+		// a handler can only ever reach one respondError call per request.
+		if len(c.Errors) > 0 {
+			detail := strings.ReplaceAll(strings.ReplaceAll(c.Errors.Last().Error(), "\n", ""), "\r", "")
+			attrs = append(attrs, slog.String("error_detail", detail))
 		}
 		if status >= 500 {
 			slog.LogAttrs(c.Request.Context(), slog.LevelError, "request", toLogAttrs(attrs)...)
@@ -424,8 +437,8 @@ func AdminOnlyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get("role")
 		if role != "admin" {
-			lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeAdminRequired, lang)})
+			lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+			c.JSON(http.StatusForbidden, gin.H{"error": apperr.GetMessage(apperr.CodeAdminRequired, lang, nil)})
 			c.Abort()
 			return
 		}
@@ -455,8 +468,8 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 		username := c.GetString("username")
 		restricted, level, err := db.GetHostAccess(c.Request.Context(), username, hostID)
 		if err != nil {
-			lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errs.GetMessage(errs.CodePermissionFailed, lang)})
+			lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": apperr.GetMessage(apperr.CodePermissionFailed, lang, nil)})
 			c.Abort()
 			return
 		}
@@ -467,16 +480,16 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 			return
 		}
 
-		lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
 
 		if level == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeHostAccessDenied, lang)})
+			c.JSON(http.StatusForbidden, gin.H{"error": apperr.GetMessage(apperr.CodeHostAccessDenied, lang, nil)})
 			c.Abort()
 			return
 		}
 
 		if requiredLevel == "operator" && level != "operator" {
-			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeOperatorRequired, lang)})
+			c.JSON(http.StatusForbidden, gin.H{"error": apperr.GetMessage(apperr.CodeOperatorRequired, lang, nil)})
 			c.Abort()
 			return
 		}

@@ -18,7 +18,7 @@
       class="card-body py-4"
     >
       <p class="text-muted text-center mb-0 small">
-        Aucun incident {{ title.toLowerCase() }} actif.
+        {{ t('alerts.warRoomNoneOfSeverityActive', { severity: title.toLowerCase() }) }}
       </p>
     </div>
     <div
@@ -46,23 +46,23 @@
               >{{ notificationTitle(item) }}</span>
               <BadgePill
                 v-if="notificationAcknowledged(item)"
-                text="En cours"
+                :text="t('alerts.warRoomInProgressBadge')"
                 tone="warning"
                 compact
               />
               <BadgePill
                 v-if="correlatedCount(item) > 0"
-                :text="`+${correlatedCount(item)} corrélée${correlatedCount(item) > 1 ? 's' : ''}`"
+                :text="t('alerts.warRoomCorrelatedCountBadge', { count: correlatedCount(item) }, correlatedCount(item))"
                 tone="secondary"
                 compact
-                :title="`${correlatedCount(item)} incident(s) sur des containers/VM de cet hôte, corrélés à celui-ci — pas de notification séparée`"
+                :title="t('alerts.warRoomCorrelatedCountTitle', { count: correlatedCount(item) })"
               />
             </div>
             <div class="text-muted small text-truncate">
-              {{ item.host_name || 'Source inconnue' }} · {{ formatIncidentValue({ value: item.value, metric: item.metric, value_label: item.value_label }) }}
+              {{ item.host_name || t('alerts.warRoomUnknownSource') }} · {{ formatIncidentValue({ value: item.value, metric: item.metric, value_label: item.value_label }) }}
             </div>
             <div class="text-muted small">
-              Depuis {{ incidentDuration(item) }}
+              {{ t('alerts.warRoomSinceLabel', { duration: incidentDuration(item) }) }}
               <span v-if="resolveHint(item)">· {{ resolveHint(item) }}</span>
             </div>
           </div>
@@ -75,8 +75,8 @@
               type="button"
               class="btn btn-icon btn-sm btn-ghost-warning"
               :disabled="acknowledgingId === item.id"
-              title="Accuser réception — je m'en occupe"
-              aria-label="Accuser réception de l'incident"
+              :title="t('alerts.warRoomAckTooltip')"
+              :aria-label="t('alerts.warRoomAckAriaLabel')"
               @click="$emit('acknowledge', item)"
             >
               <span
@@ -92,8 +92,8 @@
               type="button"
               class="btn btn-icon btn-sm btn-ghost-success"
               :disabled="resolvingId === item.id"
-              title="Clôturer manuellement"
-              aria-label="Clôturer l'incident"
+              :title="t('alerts.warRoomCloseTooltip')"
+              :aria-label="t('alerts.warRoomCloseAriaLabel')"
               @click="$emit('resolve', item)"
             >
               <span
@@ -113,6 +113,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { IconCheck, IconEye } from '@tabler/icons-vue'
 import BadgePill from '../common/BadgePill.vue'
 import {
@@ -125,6 +126,8 @@ import {
   resolvableIncidentId,
 } from '../../utils/incidentFormat'
 import type { NotificationItem } from '../../types/generated'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   title: string

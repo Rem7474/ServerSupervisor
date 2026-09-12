@@ -33,12 +33,12 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Événement</th>
-              <th>Détail</th>
-              <th>Statut</th>
-              <th>Utilisateur</th>
+              <th>{{ t('host.dateColumn') }}</th>
+              <th>{{ t('host.typeColumn') }}</th>
+              <th>{{ t('host.eventColumn') }}</th>
+              <th>{{ t('host.detailColumn') }}</th>
+              <th>{{ t('host.statusColumn') }}</th>
+              <th>{{ t('host.userColumn') }}</th>
               <th class="text-end" />
             </tr>
           </thead>
@@ -56,7 +56,7 @@
             </tr>
             <tr v-else-if="filteredEvents.length === 0">
               <td colspan="7">
-                <EmptyState title="Aucun événement." />
+                <EmptyState :title="t('host.noEventsTitle')" />
               </td>
             </tr>
             <tr
@@ -115,7 +115,7 @@
                   v-if="ev.status"
                   class="badge"
                   :class="statusBadge(ev.status)"
-                >{{ ev.status }}</span>
+                >{{ statusLabel(ev.status) }}</span>
                 <span v-if="!ev.severity && !ev.status">—</span>
               </td>
               <td class="text-secondary small">
@@ -126,8 +126,8 @@
                   v-if="ev.type === 'command'"
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Voir les logs"
-                  aria-label="Voir les logs"
+                  :title="t('host.viewLogsTooltip')"
+                  :aria-label="t('host.viewLogsTooltip')"
                   @click="emit('watch-command', ev)"
                 >
                   <IconList
@@ -146,6 +146,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconClipboard, IconTerminal2, IconAlertTriangle, IconList } from '@tabler/icons-vue'
 import api from '../../api'
 import type { HostTimelineEvent } from '../../types/audit'
@@ -155,6 +156,7 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 import { moduleClass, moduleLabel } from '../../utils/moduleMeta'
+import { getExecutionStateClass, getExecutionStateLabel } from '../../utils/statusClasses'
 
 const props = defineProps<{ hostId: string }>()
 
@@ -162,18 +164,20 @@ const emit = defineEmits<{
   (e: 'watch-command', ev: HostTimelineEvent): void
 }>()
 
-const TYPE_FILTERS = [
-  { value: '', label: 'Tout' },
-  { value: 'audit', label: 'Audit' },
-  { value: 'command', label: 'Commandes' },
-  { value: 'incident', label: 'Incidents' },
-]
+const { t } = useI18n()
 
-const TYPE_LABELS: Record<string, string> = {
-  audit: 'Audit',
-  command: 'Commande',
-  incident: 'Incident',
-}
+const TYPE_FILTERS = computed(() => [
+  { value: '', label: t('host.timelineFilterAll') },
+  { value: 'audit', label: t('host.timelineFilterAudit') },
+  { value: 'command', label: t('host.timelineFilterCommands') },
+  { value: 'incident', label: t('host.timelineFilterIncidents') },
+])
+
+const TYPE_LABELS = computed<Record<string, string>>(() => ({
+  audit: t('host.timelineTypeAudit'),
+  command: t('host.timelineTypeCommand'),
+  incident: t('host.timelineTypeIncident'),
+}))
 
 const TIMELINE_REFRESH_SEC = 60
 
@@ -197,7 +201,7 @@ async function load(): Promise<void> {
     events.value = res.data.events || []
     lastUpdatedAt.value = new Date()
   } catch (err: unknown) {
-    error.value = getApiErrorMessage(err, 'Erreur de chargement')
+    error.value = getApiErrorMessage(err, t('host.loadError'))
   } finally {
     loading.value = false
   }
@@ -226,17 +230,22 @@ function severityBadge(severity: string): string {
   return severity === 'crit' ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'
 }
 
+// Incident status ("active"/"resolved") is a lifecycle concept distinct from
+// the execution-state vocabulary getExecutionStateClass/Label cover (see
+// utils/statusClasses.ts's own audit-vs-execution split) — audit/command
+// events (pending/running/completed/failed/cancelled) delegate to it, the two
+// incident-only values stay local, reusing AlertIncidentList's own wording
+// (alerts.notificationStateActive/Resolved) rather than a third copy of it.
 function statusBadge(status: string): string {
-  const map: Record<string, string> = {
-    completed: 'bg-success-lt text-success',
-    failed: 'bg-danger-lt text-danger',
-    running: 'bg-primary-lt text-primary',
-    pending: 'bg-secondary-lt text-secondary',
-    cancelled: 'bg-secondary-lt text-secondary',
-    active: 'bg-danger-lt text-danger',
-    resolved: 'bg-success-lt text-success',
-  }
-  return map[status] || 'bg-secondary-lt text-secondary'
+  if (status === 'active') return 'bg-danger-lt text-danger'
+  if (status === 'resolved') return 'bg-success-lt text-success'
+  return getExecutionStateClass(status)
+}
+
+function statusLabel(status: string): string {
+  if (status === 'active') return t('alerts.notificationStateActive')
+  if (status === 'resolved') return t('alerts.notificationStateResolved')
+  return getExecutionStateLabel(status)
 }
 
 onMounted(() => {
@@ -245,8 +254,8 @@ onMounted(() => {
 })
 onUnmounted(stopRefreshTimer)
 
-// Lets a caller (the "Commandes récentes" KPI card, since this tab absorbed
-// the standalone Commandes tab) jump straight to the command-type filter.
+// Lets a caller (the recent-commands KPI card, since this tab absorbed
+// the standalone commands tab) jump straight to the command-type filter.
 function filterCommands(): void {
   typeFilter.value = 'command'
 }

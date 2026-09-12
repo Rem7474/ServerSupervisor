@@ -5,7 +5,7 @@
         <tr>
           <th>
             <SortableHeader
-              label="Périphérique"
+              :label="t('proxmox.deviceColumn')"
               :active="sortKey === 'dev_path'"
               :direction="sortDir"
               @toggle="toggleSort('dev_path')"
@@ -13,7 +13,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Modèle"
+              :label="t('proxmox.modelColumn')"
               :active="sortKey === 'model'"
               :direction="sortDir"
               @toggle="toggleSort('model')"
@@ -21,7 +21,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Type"
+              :label="t('proxmox.typeColumn')"
               :active="sortKey === 'disk_type'"
               :direction="sortDir"
               @toggle="toggleSort('disk_type')"
@@ -29,7 +29,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Taille"
+              :label="t('proxmox.sizeColumn')"
               :active="sortKey === 'size_bytes'"
               :direction="sortDir"
               @toggle="toggleSort('size_bytes')"
@@ -37,7 +37,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Santé SMART"
+              :label="t('proxmox.smartHealthColumn')"
               :active="sortKey === 'health'"
               :direction="sortDir"
               @toggle="toggleSort('health')"
@@ -45,7 +45,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Usure SSD"
+              :label="t('proxmox.ssdWearColumn')"
               :active="sortKey === 'wearout'"
               :direction="sortDir"
               @toggle="toggleSort('wearout')"
@@ -56,7 +56,7 @@
       <tbody>
         <tr v-if="!sortedDisks.length">
           <td colspan="6">
-            <EmptyState title="Aucun disque détecté sur ce nœud." />
+            <EmptyState :title="t('proxmox.noDisksTitle')" />
           </td>
         </tr>
         <tr
@@ -113,10 +113,13 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import type { ProxmoxDisk } from '../../types/proxmox'
 import { compareValues } from '../../utils/sort'
+
+const { t } = useI18n()
 
 const props = defineProps<{ disks: ProxmoxDisk[] }>()
 
@@ -144,14 +147,15 @@ const sortedDisks = computed(() => {
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
-  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
+  const unitKeys = ['', 'proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
   let i = 0
   let v = bytes
-  while (v >= 1024 && i < units.length - 1) {
+  while (v >= 1024 && i < unitKeys.length - 1) {
     v /= 1024
     i++
   }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+  const unit = i === 0 ? 'B' : t(unitKeys[i])
+  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
 }
 
 function wearoutColor(wearout: number): string {

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,66 @@ func parseVMID(s string) int {
 		return 0
 	}
 	return v
+}
+
+// taskFinished reports whether a PVE task has stopped.
+//
+// The task *list* endpoint does not report the lifecycle the way the per-task
+// status endpoint does: it puts the outcome straight into `status` ("OK",
+// "job errors", …) and leaves `exitstatus` empty, so testing `status ==
+// "stopped"` never matches a finished task and every backup result was
+// discarded. Treating anything that isn't "running" as finished works against
+// both shapes, and an empty status (no data at all) is deliberately not
+// finished — better to skip a task than to record a result PVE never gave.
+func taskFinished(t proxmoxclient.PVETask) bool {
+	if t.Status == "" && t.ExitStatus == "" {
+		return false
+	}
+	return t.Status != "running"
+}
+
+// taskOutcome returns a finished task's result, preferring the dedicated
+// exitstatus field when the endpoint provides one and falling back to the
+// status field that the list endpoint overloads with it.
+func taskOutcome(t proxmoxclient.PVETask) string {
+	if t.ExitStatus != "" {
+		return t.ExitStatus
+	}
+	if t.Status != "running" {
+		return t.Status
+	}
+	return ""
+}
+
+// Backup run statuses. proxmox_backup_runs.status is a small vocabulary the UI
+// can colour and translate; the raw PVE outcome is kept in exit_status.
+//
+// Storing the raw string in both meant a failure rendered as an untranslated,
+// unbounded badge ("could not activate storage 'pbs-immich': …") in neutral
+// grey, while the same task showed a red "failed" in the log panel.
+const (
+	BackupStatusOK       = "OK"
+	BackupStatusFailed   = "failed"
+	BackupStatusWarnings = "warnings"
+	BackupStatusRunning  = "running"
+)
+
+// normalizeBackupStatus maps a PVE task outcome onto that vocabulary.
+//
+// vzdump reports "OK", "WARNINGS: n" when guests were skipped but the job
+// completed, or an arbitrary error string. Only the last is a failure —
+// collapsing warnings into it would report a backup that ran as broken.
+func normalizeBackupStatus(outcome string) string {
+	switch trimmed := strings.TrimSpace(outcome); {
+	case trimmed == "":
+		return BackupStatusRunning
+	case strings.EqualFold(trimmed, "OK"):
+		return BackupStatusOK
+	case strings.HasPrefix(strings.ToUpper(trimmed), "WARNINGS"):
+		return BackupStatusWarnings
+	default:
+		return BackupStatusFailed
+	}
 }
 
 // mergeTasksByUPID appends extra tasks not already present in base (keyed by
@@ -98,6 +159,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 	}
 
 	cutoff := time.Now().Add(-3 * interval)
+	deg := &degraded{}
 
 	for _, n := range nodes {
 		pveVersion := n.PVEVersion
@@ -173,6 +235,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 		storages, err := client.GetNodeStorage(n.Node)
 		if err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get storage: %v", conn.Name, n.Node, err))
+			deg.note("storage", err)
 		} else {
 			for _, st := range storages {
 				if err := s.db.UpsertProxmoxStorage(ctx,
@@ -183,6 +246,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert storage %s: %v", conn.Name, n.Node, st.Storage, err))
 				}
 			}
+			s.pollBackupVolumes(ctx, client, conn, n.Node, storages, deg)
 		}
 
 		// The plain top-taskLimit window and the vzdump-filtered window are
@@ -207,7 +271,8 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 		wg.Wait()
 
 		if tasksErr != nil {
-			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get tasks: %v", conn.Name, n.Node, tasksErr))
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get tasks FAILED (needs Sys.Audit on /nodes/%s — without it PVE returns only the token's own tasks): %v", conn.Name, n.Node, n.Node, tasksErr))
+			deg.note("tasks", tasksErr)
 		} else {
 			// The plain top-taskLimit window above can silently push an
 			// older vzdump (backup) task out on a node busy with other
@@ -239,12 +304,15 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 				); err != nil {
 					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert task %s: %v", conn.Name, n.Node, t.UPID, err))
 				}
-				if t.Type == "vzdump" && t.Status == "stopped" && t.ID != "" {
+				if t.Type == "vzdump" && taskFinished(t) {
 					if vmid := parseVMID(t.ID); vmid > 0 {
-						_ = s.db.UpsertProxmoxBackupRun(ctx,
-							conn.ID, n.Node, vmid, t.UPID, t.ExitStatus,
-							startTime, endTime, t.ExitStatus,
-						)
+						outcome := taskOutcome(t)
+						if err := s.db.UpsertProxmoxBackupRun(ctx,
+							conn.ID, n.Node, vmid, t.UPID, normalizeBackupStatus(outcome),
+							startTime, endTime, outcome,
+						); err != nil {
+							slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert backup run vmid=%d: %v", conn.Name, n.Node, vmid, err))
+						}
 					}
 				}
 			}
@@ -253,6 +321,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 		disks, diskErr := client.GetNodeDisksList(n.Node)
 		if diskErr != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get disks FAILED (check Sys.Audit privilege on API token): %v", conn.Name, n.Node, diskErr))
+			deg.note("disks", diskErr)
 		} else {
 			slog.InfoContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: got %d disk(s)", conn.Name, n.Node, len(disks)))
 			for _, d := range disks {
@@ -276,6 +345,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 		pkgs, aptErr := client.GetNodeAptUpdate(n.Node)
 		if aptErr != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get apt/update FAILED (requires Sys.Modify — PVEAuditor is insufficient; create a custom role or add Sys.Modify to your token): %v", conn.Name, n.Node, aptErr))
+			deg.note("apt updates", aptErr)
 		} else {
 			slog.InfoContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: got %d pending apt package(s)", conn.Name, n.Node, len(pkgs)))
 		}
@@ -291,6 +361,7 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 	backupJobs, err := client.GetClusterBackup()
 	if err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s]: get backup jobs: %v", conn.Name, err))
+		deg.note("backup jobs", err)
 	} else {
 		for _, j := range backupJobs {
 			if err := s.db.UpsertProxmoxBackupJob(ctx,
@@ -308,6 +379,107 @@ func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFul
 	_ = s.db.DeleteStaleProxmoxTasks(ctx, conn.ID, cutoff)
 	_ = s.db.DeleteStaleProxmoxDisks(ctx, conn.ID, cutoff)
 
-	_ = s.db.UpdateProxmoxConnectionSuccess(ctx, conn.ID)
+	// A cycle that reached PVE but could not make every call is neither a
+	// success nor an outage: last_success_at stays at the last fully clean poll
+	// while last_error names what is missing.
+	if msg := deg.summary(); msg != "" {
+		_ = s.db.UpdateProxmoxConnectionError(ctx, conn.ID, msg)
+	} else {
+		_ = s.db.UpdateProxmoxConnectionSuccess(ctx, conn.ID)
+	}
 	slog.InfoContext(ctx, fmt.Sprintf("proxmox poller [%s]: poll complete (%d node(s))", conn.Name, len(nodes)))
+}
+
+// pollBackupVolumes derives a last-backup-per-guest result from the files on
+// each backup-capable storage.
+//
+// The task list alone cannot supply this: a vzdump *job* spanning several
+// guests runs as one PVE task with no vmid attached, so its per-guest results
+// exist only inside that task's log. The backup volumes, by contrast, are one
+// file per guest and carry a creation time. Whatever the task list did manage
+// to report stays authoritative — UpsertProxmoxBackupRunFromStorage refuses to
+// overwrite a newer row — so this only fills the gaps.
+func (s *Poller) pollBackupVolumes(
+	ctx context.Context,
+	client *proxmoxclient.Client,
+	conn database.ProxmoxConnectionFull,
+	node string,
+	storages []proxmoxclient.PVEStorage,
+	deg *degraded,
+) {
+	// Newest volume wins per guest; a storage holds every retained backup, not
+	// just the latest.
+	newest := map[int]int64{}
+	for _, st := range storages {
+		if st.Active == 0 || !st.SupportsBackup() {
+			continue
+		}
+		entries, err := client.GetStorageBackups(node, st.Storage)
+		if err != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: list backups on %s: %v", conn.Name, node, st.Storage, err))
+			deg.note("backup volumes", err)
+			continue
+		}
+		for _, e := range entries {
+			vmid := e.GuestID()
+			if vmid == 0 || e.CTime <= 0 {
+				continue
+			}
+			if e.CTime > newest[vmid] {
+				newest[vmid] = e.CTime
+			}
+		}
+	}
+
+	for vmid, ctime := range newest {
+		// A retained volume is proof the backup completed; a failed run leaves
+		// no file (or a .tmp PVE does not list as backup content).
+		if err := s.db.UpsertProxmoxBackupRunFromStorage(
+			ctx, conn.ID, node, vmid, BackupStatusOK, time.Unix(ctime, 0).UTC(),
+		); err != nil {
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert backup volume vmid=%d: %v", conn.Name, node, vmid, err))
+		}
+	}
+}
+
+// degraded collects the PVE endpoints that failed during one poll cycle.
+//
+// Until now only a total failure to list nodes reached last_error; every other
+// call — tasks, disks, apt, storage, backup volumes — was logged and nothing
+// more, so a token missing one privilege produced a silently empty tab with no
+// hint anywhere in the interface.
+//
+// It accumulates rather than writing on each failure because the cycle ends by
+// marking the connection successful, which would otherwise erase whatever the
+// same cycle had just recorded. Endpoints are deduplicated: the same call
+// failing on every node of a cluster is one problem, not N.
+type degraded struct {
+	seen  map[string]bool
+	order []string
+}
+
+func (d *degraded) note(what string, cause error) {
+	if d.seen == nil {
+		d.seen = map[string]bool{}
+	}
+	msg := fmt.Sprintf("%s: %v", what, cause)
+	if d.seen[what] {
+		return
+	}
+	d.seen[what] = true
+	d.order = append(d.order, msg)
+}
+
+// summary renders the accumulated failures, or "" when the cycle was clean.
+func (d *degraded) summary() string {
+	if len(d.order) == 0 {
+		return ""
+	}
+	out := strings.Join(d.order, " | ")
+	// last_error is displayed in a badge tooltip and a banner; an unbounded
+	// upstream message would make both unusable.
+	if len(out) > 500 {
+		out = out[:500] + "…"
+	}
+	return out
 }

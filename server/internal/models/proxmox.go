@@ -58,6 +58,11 @@ type ProxmoxNode struct {
 	// Computed counts
 	VMCount  int `json:"vm_count,omitempty"`
 	LXCCount int `json:"lxc_count,omitempty"`
+	// ConnectionError is the owning connection's last_error, surfaced on the
+	// node detail so a PVE call the poller could not make (a missing token
+	// privilege, typically) is visible where its data is missing instead of
+	// only in the connection list.
+	ConnectionError string `json:"connection_error,omitempty"`
 	// Detail view (populated on single-node fetch)
 	Guests   []ProxmoxGuest   `json:"guests,omitempty"`
 	Storages []ProxmoxStorage `json:"storages,omitempty"`
@@ -144,6 +149,32 @@ type ProxmoxBackupRun struct {
 	LastSeenAt   time.Time  `json:"last_seen_at"`
 	// Joined from proxmox_guests
 	GuestName string `json:"guest_name,omitempty"`
+}
+
+// ProxmoxTaskLogLine is one line of a PVE task log.
+type ProxmoxTaskLogLine struct {
+	N int    `json:"n"` // 1-based line number within the whole log
+	T string `json:"t"` // text
+}
+
+// ProxmoxTaskLog is the response of GET /proxmox/nodes/{id}/tasks/{upid}/log.
+//
+// It carries the task's lifecycle alongside the lines because the two cannot
+// be derived from each other: PVE paginates the log, so the closing
+// "TASK OK"/"TASK ERROR" marker is absent from any page but the last, and a
+// client that infers "still running" from its absence would never stop
+// polling a finished task.
+type ProxmoxTaskLog struct {
+	Lines []ProxmoxTaskLogLine `json:"lines"`
+	// Total is the number of lines the task produced; len(Lines) is capped at
+	// one page, taken from the end of the log.
+	Total     int  `json:"total"`
+	Truncated bool `json:"truncated"`
+	// Status is PVE's lifecycle value ("running" | "stopped"), ExitStatus its
+	// outcome once stopped ("OK" or an error string).
+	Status     string `json:"status"`
+	ExitStatus string `json:"exit_status"`
+	Finished   bool   `json:"finished"`
 }
 
 // ProxmoxDisk represents a physical disk in a Proxmox node (GET /nodes/{node}/disks/list).

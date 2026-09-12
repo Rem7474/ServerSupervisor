@@ -4,7 +4,7 @@
     <a
       href="#main-content"
       class="skip-link visually-hidden-focusable"
-    >Aller au contenu principal</a>
+    >{{ t('common.skipToContent') }}</a>
 
     <!-- Sidebar + Main -->
     <div v-if="auth.isAuthenticated">
@@ -14,7 +14,7 @@
           <button
             class="navbar-toggler"
             type="button"
-            aria-label="Ouvrir le menu de navigation"
+            :aria-label="t('common.openNavMenu')"
             aria-controls="navbar-menu"
             :aria-expanded="navbarOpen"
             @click="navbarOpen = !navbarOpen"
@@ -34,7 +34,7 @@
             class="badge bg-danger-lt text-danger ms-2 py-2 hosts-down-badge d-none d-md-inline-flex align-items-center"
           >
             <IconAlertTriangle class="icon icon-sm me-1" />
-            {{ hostsDownCount }} HORS LIGNE
+            {{ hostsDownCount }} {{ t('common.offlineBadge') }}
           </span>
 
           <div class="navbar-nav flex-row order-last">
@@ -42,20 +42,20 @@
               <button
                 type="button"
                 class="btn btn-outline-secondary d-none d-sm-flex align-items-center gap-2 command-palette-trigger"
-                title="Rechercher (Ctrl+K)"
+                :title="t('common.searchShortcut')"
                 @click="paletteToggle"
               >
                 <IconSearch
                   :size="16"
                   class="icon"
                 />
-                <span class="text-secondary small">Rechercher…</span>
+                <span class="text-secondary small">{{ t('common.search') }}</span>
                 <kbd class="ms-2">Ctrl K</kbd>
               </button>
               <button
                 type="button"
                 class="btn btn-icon d-sm-none"
-                aria-label="Rechercher"
+                :aria-label="t('common.searchAriaLabel')"
                 @click="paletteToggle"
               >
                 <IconSearch :size="18" />
@@ -85,24 +85,29 @@
                   class="dropdown-menu dropdown-menu-end show user-dropdown"
                 >
                   <div class="dropdown-header">
-                    Compte
+                    {{ t('common.account') }}
                   </div>
                   <div class="dropdown-item text-secondary small">
-                    Rôle: {{ auth.role || 'inconnu' }}
+                    {{ t('common.role', { role: auth.role || t('common.roleUnknown') }) }}
                   </div>
+                  <div class="dropdown-item d-flex align-items-center justify-content-between">
+                    <span class="text-secondary small">{{ t('common.language') }}</span>
+                    <LocaleSwitcher />
+                  </div>
+                  <div class="dropdown-divider" />
                   <router-link
                     to="/account"
                     class="dropdown-item"
                     @click="userMenuOpen = false"
                   >
-                    Mon compte
+                    {{ t('common.myAccount') }}
                   </router-link>
                   <div class="dropdown-divider" />
                   <button
                     class="dropdown-item text-danger"
                     @click="handleLogout"
                   >
-                    Déconnexion
+                    {{ t('common.logout') }}
                   </button>
                 </div>
               </div>
@@ -128,14 +133,14 @@
             :class="['collapse navbar-collapse', { show: navbarOpen }]"
           >
             <ul class="navbar-nav">
-              <!-- Badge hôtes hors ligne (mobile: row 1's copy is hidden below md) -->
+              <!-- Offline-hosts badge (mobile: row 1's copy is hidden below md) -->
               <li
                 v-if="hostsDownCount > 0"
                 class="nav-item d-flex d-md-none align-items-center"
               >
                 <span class="badge bg-danger-lt text-danger ms-2 py-2 hosts-down-badge">
                   <IconAlertTriangle class="icon icon-sm me-1" />
-                  {{ hostsDownCount }} HORS LIGNE
+                  {{ hostsDownCount }} {{ t('common.offlineBadge') }}
                 </span>
               </li>
 
@@ -183,7 +188,7 @@
                     <span
                       v-if="item.to === '/proxmox' && suggestedProxmoxLinksCount > 0"
                       class="badge bg-azure-lt text-azure ms-1"
-                      :title="`${suggestedProxmoxLinksCount} liaison(s) hôte ↔ VM/LXC suggérée(s), à confirmer`"
+                      :title="t('common.proxmoxSuggestedLinks', { count: suggestedProxmoxLinksCount })"
                     >{{ suggestedProxmoxLinksCount }}</span>
                   </router-link>
                 </div>
@@ -204,8 +209,8 @@
             :size="20"
             class="icon flex-shrink-0"
           />
-          <span v-if="!isOnline">Pas de connexion réseau — les données affichées peuvent être obsolètes.</span>
-          <span v-else>Serveur injoignable — reconnexion en cours, les données affichées peuvent être obsolètes.</span>
+          <span v-if="!isOnline">{{ t('common.offlineNetwork') }}</span>
+          <span v-else>{{ t('common.serverUnreachable') }}</span>
         </div>
       </div>
 
@@ -219,7 +224,7 @@
           <button
             type="button"
             class="btn-close"
-            aria-label="Fermer"
+            :aria-label="t('common.close')"
             @click="httpError = ''"
           />
         </div>
@@ -255,6 +260,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { useRouter, useRoute } from 'vue-router'
@@ -262,6 +268,7 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
+import LocaleSwitcher from './components/LocaleSwitcher.vue'
 import { IconAlertTriangle, IconServer, IconSearch, IconUser } from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
 import CommandPalette from './components/CommandPalette.vue'
@@ -271,10 +278,12 @@ import { useAttentionCenter } from './composables/useAttentionCenter'
 import apiClient from './api'
 import { visibleNavSections, type NavSection } from './config/navigation'
 
+const { t } = useI18n()
 const auth = useAuthStore()
 const hostsStore = useHostsStore()
 const router = useRouter()
 const route = useRoute()
+
 const { isOpen: paletteOpen, toggle: paletteToggle } = useCommandPalette()
 const navbarOpen = ref(false)
 const userMenuOpen = ref(false)
@@ -288,7 +297,7 @@ let unsubscribeHttpErrors: () => void = () => {}
 let unsubscribeNetworkOk: () => void = () => {}
 let resumeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
-// Computed property: compter les hôtes hors ligne
+// Count offline hosts
 const hostsDownCount = computed(() => {
   return hostsStore.hosts.filter(
     (h) => h.status === 'offline'
@@ -333,7 +342,7 @@ function handlePageShow(event: PageTransitionEvent): void {
   }
 }
 
-const visibleSections = computed(() => visibleNavSections(auth))
+const visibleSections = computed(() => visibleNavSections(auth, t))
 
 function isItemActive(to: string): boolean {
   return to === '/' ? route.path === '/' : route.path.startsWith(to)
@@ -416,6 +425,15 @@ onMounted(() => {
     navbarOpen.value = false
     openSectionKey.value = null
     userMenuOpen.value = false
+    // httpError is a one-shot "last actionable HTTP error" flag with no other
+    // path back to empty besides an explicit dismiss click or a later error
+    // overwriting it — without this it keeps showing a stale failure (e.g. a
+    // 502 from one page's API call) on every subsequent page the user visits,
+    // looking like it applies to whatever they're looking at now. Unlike
+    // serverUnreachable (a live connectivity flag, cleared by its own
+    // subscribeNetworkOk signal), a past request's error has nothing to do
+    // with the page navigated to next.
+    httpError.value = ''
   })
 })
 
@@ -525,14 +543,23 @@ onUnmounted(() => {
 }
 
 /* position: sticky; top: 0 now come from Tabler's own .sticky-top utility
-   (applied in the template) — only the stacking level (above .navbar/
-   .navbar-secondary, below .modal) needs overriding here. */
+   (applied in the template) — only the stacking level needs overriding here.
+   Must stay below .navbar-secondary's 1020 (not just below .navbar's 1030):
+   these alerts are siblings of the header, not descendants, so once
+   .navbar-secondary establishes its own stacking context (position + z-index,
+   see its own comment above), every one of its descendants — including its
+   "Réglages"/etc. dropdown menu at z-index 1050 — is composited as a single
+   unit capped at .navbar-secondary's own 1020 relative to these siblings.
+   These alerts used to sit at 1039/1040, i.e. *above* that whole capped unit,
+   so an open row-2 dropdown rendered underneath the alert banner instead of
+   over it. There is no equivalent conflict with .navbar (1030): these values
+   only need to clear .navbar-secondary, the lower of the two rows. */
 .app-network-alert {
-  z-index: 1040;
+  z-index: 1010;
 }
 
 .app-http-alert {
-  z-index: 1039;
+  z-index: 1009;
 }
 
 .user-menu {

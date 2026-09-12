@@ -230,15 +230,19 @@ func (c *gitHubClient) fetchGitHubTagHistory(owner, repo string, limit int) ([]R
 	return out, nil
 }
 
+// APIError is a typed GitHub API failure carrying just the HTTP status — no
+// English/French text. The caller (which knows how to render an HTTP
+// response, this package doesn't) maps Status to an apperr i18n key via
+// apperr.Error.I18n so the message renders in the requester's language
+// instead of a language baked in at the source.
+type APIError struct {
+	Status int
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("github api error (%d)", e.Status)
+}
+
 func githubAPIError(status int) error {
-	switch status {
-	case http.StatusUnauthorized:
-		return fmt.Errorf("token GitHub invalide ou expiré (401) — vérifiez GITHUB_TOKEN dans les paramètres")
-	case http.StatusForbidden:
-		return fmt.Errorf("limite de taux GitHub atteinte (403) — configurez un GITHUB_TOKEN pour augmenter la limite")
-	case http.StatusNotFound:
-		return fmt.Errorf("dépôt introuvable sur GitHub (404) — vérifiez owner/repo")
-	default:
-		return fmt.Errorf("erreur GitHub API (%d)", status)
-	}
+	return &APIError{Status: status}
 }

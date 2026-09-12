@@ -131,7 +131,7 @@
             v-else
             class="h-100 d-flex align-items-center justify-content-center text-secondary"
           >
-            Aucune donnée
+            {{ t('common.noData') }}
           </div>
         </div>
       </div>
@@ -140,7 +140,7 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">
-            Mémoire
+            {{ t('host.metricsMemoryTitle') }}
           </h3>
         </div>
         <div
@@ -159,7 +159,7 @@
             v-else
             class="h-100 d-flex align-items-center justify-content-center text-secondary"
           >
-            Aucune donnée
+            {{ t('common.noData') }}
           </div>
         </div>
       </div>
@@ -169,6 +169,7 @@
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, onMounted, watch, toRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import { fetchMetricsHistory, type MetricsHistoryPoint } from '../../composables/useHostMetricsHistory'
@@ -208,6 +209,7 @@ const props = withDefaults(defineProps<{
   refreshTick: 0,
 })
 
+const { t } = useI18n()
 const chartHours = ref(24)
 const historyLoading = ref(false)
 const metricsHistory = ref<HistoryPoint[]>([])
@@ -322,7 +324,7 @@ function formatUptime(seconds: number | undefined): string {
   if (!seconds) return 'N/A'
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
-  if (days > 0) return `${days}j ${hours}h`
+  if (days > 0) return t('host.metricsUptimeDaysHours', { days, hours })
   const mins = Math.floor((seconds % 3600) / 60)
   return `${hours}h ${mins}m`
 }
@@ -403,7 +405,7 @@ function buildCharts(): void {
     .filter((p): p is MemChartPoint => p != null)
 
   cpuSeries.value = [{ name: 'CPU', data: cpuPoints.value }]
-  memSeries.value = [{ name: 'Mémoire', data: memPoints.value }]
+  memSeries.value = [{ name: t('host.metricsMemoryTitle'), data: memPoints.value }]
 
   if (!cpuChartOptions.value) {
     cpuChartOptions.value = buildCpuChartOptions()

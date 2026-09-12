@@ -27,7 +27,7 @@ jobs:
         run: |
           # Format attendu : <type>(<scope>): <description>
           # Types valides (conventionalcommits.org)
-          PATTERN='^(feat|fix|docs|style|refactor|perf|test|chore|ci|revert|build)(\([a-z0-9\-\/]+\))?: .{3,}'
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|chore|ci|revert|build)(\([a-z0-9/-]+\))?: .{3,}'
           if ! echo "$PR_TITLE" | grep -qE "$PATTERN"; then
             echo "::error::Titre de PR invalide : '$PR_TITLE'"
             echo ""

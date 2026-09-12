@@ -7,14 +7,14 @@
           :class="filter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
           @click="filter = 'active'"
         >
-          Actifs
+          {{ t('proxmox.activeFilterLabel') }}
         </button>
         <button
           type="button"
           :class="filter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
           @click="filter = 'all'"
         >
-          Tous
+          {{ t('proxmox.allLabel') }}
         </button>
       </div>
       <button
@@ -32,7 +32,7 @@
           :size="16"
           class="icon icon-sm me-1"
         />
-        {{ loading ? 'Chargement...' : 'Actualiser' }}
+        {{ loading ? t('proxmox.loadingLabel') : t('proxmox.refreshButton') }}
       </button>
       <span
         v-if="actionMsg"
@@ -61,7 +61,7 @@
       class="card-body"
     >
       <div class="text-secondary small">
-        Cliquez sur "Actualiser" pour charger les services du nœud Proxmox.
+        {{ t('proxmox.clickRefreshHint') }}
       </div>
     </div>
     <div
@@ -71,12 +71,12 @@
       <table class="table table-vcenter card-table mb-0">
         <thead>
           <tr>
-            <th>Service</th>
-            <th>État</th>
-            <th>Sous-état</th>
-            <th>Démarrage</th>
-            <th>Description</th>
-            <th>Actions</th>
+            <th>{{ t('proxmox.serviceColumn') }}</th>
+            <th>{{ t('proxmox.stateColumn') }}</th>
+            <th>{{ t('proxmox.subStateColumn') }}</th>
+            <th>{{ t('proxmox.startupColumn') }}</th>
+            <th>{{ t('proxmox.descriptionColumn') }}</th>
+            <th>{{ t('proxmox.actionsColumn') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -107,8 +107,8 @@
                   type="button"
                   :disabled="!!actionLoading?.[svc.name]"
                   class="btn btn-icon btn-sm btn-ghost-success"
-                  title="Démarrer"
-                  aria-label="Démarrer le service"
+                  :title="t('proxmox.startTooltip')"
+                  :aria-label="t('proxmox.startAriaLabel')"
                   @click="emit('action', { name: svc.name, action: 'start' })"
                 >
                   <span
@@ -126,8 +126,8 @@
                   type="button"
                   :disabled="!!actionLoading?.[svc.name]"
                   class="btn btn-icon btn-sm btn-ghost-danger"
-                  title="Arrêter"
-                  aria-label="Arrêter le service"
+                  :title="t('proxmox.stopTooltip')"
+                  :aria-label="t('proxmox.stopAriaLabel')"
                   @click="emit('action', { name: svc.name, action: 'stop' })"
                 >
                   <span
@@ -144,8 +144,8 @@
                   type="button"
                   :disabled="!!actionLoading?.[svc.name]"
                   class="btn btn-icon btn-sm btn-ghost-warning"
-                  title="Redémarrer"
-                  aria-label="Redémarrer le service"
+                  :title="t('proxmox.restartTooltip')"
+                  :aria-label="t('proxmox.restartAriaLabel')"
                   @click="emit('action', { name: svc.name, action: 'restart' })"
                 >
                   <span
@@ -162,8 +162,8 @@
                   type="button"
                   :disabled="!!actionLoading?.[svc.name]"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Recharger"
-                  aria-label="Recharger le service"
+                  :title="t('proxmox.reloadTooltip')"
+                  :aria-label="t('proxmox.reloadAriaLabel')"
                   @click="emit('action', { name: svc.name, action: 'reload' })"
                 >
                   <span
@@ -186,15 +186,18 @@
       v-if="error"
       class="card-footer text-muted small"
     >
-      Lecture : Sys.Audit requis · Actions (start/stop/restart/reload) : Sys.Modify requis sur le token API.
+      {{ t('proxmox.servicesPermissionsHint') }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconReload } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+
+const { t } = useI18n()
 
 interface Service {
   name: string

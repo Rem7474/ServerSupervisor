@@ -7,7 +7,7 @@
  */
 export interface AlertRulePreset {
   key: string
-  label: string
+  labelKey: string
   icon: string
   metric: string
   operator: string
@@ -19,7 +19,7 @@ export interface AlertRulePreset {
 export const ALERT_RULE_PRESETS: AlertRulePreset[] = [
   {
     key: 'host-offline',
-    label: 'Hôte hors ligne',
+    labelKey: 'alerts.presetHostOfflineLabel',
     icon: '🔌',
     metric: 'status_offline',
     operator: '>',
@@ -29,7 +29,7 @@ export const ALERT_RULE_PRESETS: AlertRulePreset[] = [
   },
   {
     key: 'cpu-high',
-    label: 'CPU élevé',
+    labelKey: 'alerts.presetCpuHighLabel',
     icon: '⚡',
     metric: 'cpu',
     operator: '>',
@@ -39,7 +39,7 @@ export const ALERT_RULE_PRESETS: AlertRulePreset[] = [
   },
   {
     key: 'disk-almost-full',
-    label: 'Disque presque plein',
+    labelKey: 'alerts.presetDiskAlmostFullLabel',
     icon: '💾',
     metric: 'disk',
     operator: '>',
@@ -49,7 +49,7 @@ export const ALERT_RULE_PRESETS: AlertRulePreset[] = [
   },
   {
     key: 'ssl-expiring',
-    label: 'Certificat SSL bientôt expiré',
+    labelKey: 'alerts.presetSslExpiringLabel',
     icon: '🔐',
     metric: 'ssl_min_days_remaining',
     operator: '<',

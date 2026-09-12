@@ -2,9 +2,9 @@
   <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title mb-0">
-        Historique des versions
+        {{ t('webhooks.versionHistoryTitle') }}
       </h3>
-      <small class="text-muted">Publication / détection</small>
+      <small class="text-muted">{{ t('webhooks.publicationDetectionSubtitle') }}</small>
     </div>
     <div class="card-body p-0">
       <div
@@ -18,7 +18,7 @@
       </div>
       <EmptyState
         v-else-if="!history.length"
-        title="Aucune version disponible."
+        :title="t('webhooks.noVersionAvailableTitle')"
       />
       <div
         v-else
@@ -27,10 +27,10 @@
         <table class="table table-sm table-vcenter mb-0">
           <thead>
             <tr>
-              <th>Version</th>
-              <th>Détails</th>
+              <th>{{ t('webhooks.versionColumn') }}</th>
+              <th>{{ t('webhooks.detailsColumn') }}</th>
               <th class="text-end">
-                Date de publication
+                {{ t('webhooks.publicationDateColumn') }}
               </th>
             </tr>
           </thead>
@@ -70,8 +70,8 @@
           @click="showAll = !showAll"
         >
           {{ showAll
-            ? 'Afficher moins'
-            : `Afficher plus (${history.length - PREVIEW_LIMIT})` }}
+            ? t('webhooks.showLessButton')
+            : t('webhooks.showMoreButton', { n: history.length - PREVIEW_LIMIT }) }}
         </button>
       </div>
     </div>
@@ -80,10 +80,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { formatDateTime } from '../../utils/formatters'
 import type { ReleaseVersionHistoryItem } from '../../types/tracker'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   history: ReleaseVersionHistoryItem[]

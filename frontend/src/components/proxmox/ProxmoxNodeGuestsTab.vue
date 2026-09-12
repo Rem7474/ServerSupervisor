@@ -13,7 +13,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Nom"
+              :label="t('proxmox.nameColumn')"
               :active="sortKey === 'name'"
               :direction="sortDir"
               @toggle="toggleSort('name')"
@@ -21,7 +21,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Statut"
+              :label="t('proxmox.statusColumn')"
               :active="sortKey === 'status'"
               :direction="sortDir"
               @toggle="toggleSort('status')"
@@ -29,7 +29,7 @@
           </th>
           <th>
             <SortableHeader
-              label="IP"
+              :label="t('proxmox.ipColumn')"
               :active="sortKey === 'ip'"
               :direction="sortDir"
               @toggle="toggleSort('ip')"
@@ -37,7 +37,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Domaines"
+              :label="t('proxmox.domainsColumn')"
               :active="sortKey === 'domains'"
               :direction="sortDir"
               @toggle="toggleSort('domains')"
@@ -45,7 +45,7 @@
           </th>
           <th>
             <SortableHeader
-              label="CPU"
+              :label="t('proxmox.cpuColumn')"
               :active="sortKey === 'cpu_used'"
               :direction="sortDir"
               @toggle="toggleSort('cpu_used')"
@@ -53,7 +53,7 @@
           </th>
           <th>
             <SortableHeader
-              label="RAM"
+              :label="t('proxmox.ramColumn')"
               :active="sortKey === 'mem_used'"
               :direction="sortDir"
               @toggle="toggleSort('mem_used')"
@@ -61,7 +61,7 @@
           </th>
           <th>
             <SortableHeader
-              label="Disque"
+              :label="t('proxmox.diskColumn')"
               :active="sortKey === 'disk_used'"
               :direction="sortDir"
               @toggle="toggleSort('disk_used')"
@@ -162,7 +162,7 @@
                   v-if="g.status === 'stopped'"
                   type="button"
                   class="btn btn-sm btn-icon btn-ghost-success"
-                  title="Démarrer"
+                  :title="t('proxmox.startTooltip')"
                   :disabled="actionLoadingFor(g) !== null"
                   @click="emit('guest-action', g, 'start')"
                 >
@@ -179,7 +179,7 @@
                   <button
                     type="button"
                     class="btn btn-sm btn-icon btn-ghost-warning"
-                    title="Redémarrer"
+                    :title="t('proxmox.restartTooltip')"
                     :disabled="actionLoadingFor(g) !== null"
                     @click="emit('guest-action', g, 'reboot')"
                   >
@@ -195,7 +195,7 @@
                   <button
                     type="button"
                     class="btn btn-sm btn-icon btn-ghost-danger"
-                    title="Arrêter"
+                    :title="t('proxmox.stopTooltip')"
                     :disabled="actionLoadingFor(g) !== null"
                     @click="emit('guest-action', g, 'shutdown')"
                   >
@@ -214,10 +214,10 @@
                 v-if="showMigrate && peerNodes.length > 0"
                 type="button"
                 class="btn btn-sm btn-ghost-secondary"
-                title="Migrer vers un autre nœud"
+                :title="t('proxmox.migrateTooltip')"
                 @click="emit('migrate', g)"
               >
-                Migrer
+                {{ t('proxmox.migrateButton') }}
               </button>
             </div>
           </td>
@@ -229,6 +229,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
@@ -257,6 +258,8 @@ const emit = defineEmits<{
   (e: 'guest-action', guest: Guest, action: GuestPowerAction): void
 }>()
 
+const { t } = useI18n()
+
 const auth = useAuthStore()
 
 const showMigrate = computed(() => props.kind === 'vm')
@@ -266,7 +269,7 @@ const showMigrate = computed(() => props.kind === 'vm')
 // tab only gains the column for admins — it never had a migrate button.
 const showActionsCol = computed(() => showMigrate.value || auth.isAdmin)
 const idLabel = computed(() => (props.kind === 'vm' ? 'VMID' : 'CT ID'))
-const emptyText = computed(() => (props.kind === 'vm' ? 'Aucune VM sur ce nœud.' : 'Aucun conteneur LXC sur ce nœud.'))
+const emptyText = computed(() => (props.kind === 'vm' ? t('proxmox.noVmsText') : t('proxmox.noLxcText')))
 const colspan = computed(() => (showActionsCol.value ? 9 : 8))
 
 function actionLoadingFor(guest: Guest): GuestPowerAction | null {

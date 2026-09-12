@@ -79,7 +79,7 @@ func (s *Poller) checkOneGit(ctx context.Context, t models.ReleaseTracker) {
 	cooldown := time.Duration(t.CooldownHours) * time.Hour
 	if err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("Git tracker %s (%s/%s): fetch error: %v", t.Name, t.RepoOwner, t.RepoName, err))
-		_ = s.db.UpdateReleaseTrackerError(ctx, t.ID, err.Error())
+		_ = s.db.UpdateReleaseTrackerError(ctx, t.ID, gitProviderPollError(err))
 		return
 	}
 	if tag == "" {

@@ -274,7 +274,7 @@ func (s *Service) VersionHistory(ctx context.Context, id string, limit int) ([]m
 	} else {
 		releases, ferr := gitprovider.NewClient(t.Provider, s.cfg.GitHubToken).FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
 		if ferr != nil {
-			return nil, apperr.BadGateway(ferr.Error())
+			return nil, gitProviderHTTPError(ferr)
 		}
 		for _, r := range releases {
 			item := models.ReleaseVersionHistoryItem{Version: r.TagName, Name: r.Name, ReleaseURL: r.HTMLURL}

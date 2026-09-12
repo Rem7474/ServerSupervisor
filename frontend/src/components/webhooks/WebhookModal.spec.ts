@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { setLocale } from '../../i18n'
 
 // Mock the API barrel so the component never hits the network on mount/watchers
 // (useWebhookForm's immediate watcher loads custom tasks / registry credentials
@@ -28,6 +29,7 @@ function mountModal(props: Record<string, unknown> = {}) {
 describe('WebhookModal (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
   })
 
   it('webhook mode: renders the git-webhook fields, VM cible and the tasks.yaml field, each labelled', async () => {
@@ -78,12 +80,42 @@ describe('WebhookModal (characterization)', () => {
     ]) {
       expect(wrapper.find(`#${id}`).exists(), `#${id}`).toBe(true)
     }
-    expect(wrapper.text()).toContain('Mode de mise a jour')
+    expect(wrapper.text()).toContain('Mode de mise à jour')
   })
 
   it('emits "close" when the close button is clicked', async () => {
     const wrapper = mountModal()
     await wrapper.find('.btn-close').trigger('click')
     expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('renders the translated title, submit label and validation error for a new git webhook', async () => {
+    const wrapper = mountModal({ mode: 'webhook' })
+    await nextTick()
+    expect(wrapper.text()).toContain('Nouveau webhook Git')
+    expect(wrapper.text()).toContain('Créer')
+
+    await wrapper.find('#webhook-host-id').setValue('')
+    await wrapper.find('button.btn-primary').trigger('click')
+    expect(wrapper.text()).toContain('Nom, VM cible et ID de tâche sont obligatoires.')
+  })
+
+  it('renders the translated title and submit label for an edited tracker', async () => {
+    const wrapper = mountModal({
+      mode: 'tracker',
+      item: { name: 'Update Home Assistant', tracker_type: 'git', repo_owner: 'home-assistant', repo_name: 'core' },
+    })
+    await nextTick()
+    expect(wrapper.text()).toContain('Modifier le tracker')
+    expect(wrapper.text()).toContain('Mettre à jour')
+  })
+
+  it('translates to English when the locale is switched', async () => {
+    setLocale('en')
+    const wrapper = mountModal({ mode: 'tracker' })
+    await nextTick()
+    expect(wrapper.text()).toContain('New Git release tracker')
+    expect(wrapper.text()).toContain('Trigger a task on update')
+    expect(wrapper.text()).toContain('Notifications')
   })
 })

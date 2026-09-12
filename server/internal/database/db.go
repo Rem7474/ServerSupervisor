@@ -76,7 +76,7 @@ func Open(cfg *config.Config) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	conn.SetMaxOpenConns(25)
+	conn.SetMaxOpenConns(50) // Increased to support wider dashboards
 	conn.SetMaxIdleConns(5)
 	conn.SetConnMaxLifetime(5 * time.Minute)
 

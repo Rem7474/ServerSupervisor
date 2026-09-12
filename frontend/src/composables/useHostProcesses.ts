@@ -1,4 +1,5 @@
 import { ref, toValue, type MaybeRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api, { getApiErrorMessage } from '../api'
 import { useCommandStream } from './useCommandStream'
 
@@ -15,6 +16,7 @@ export interface HostProcess {
 const STREAM_TIMEOUT_MS = 60_000
 
 export function useHostProcesses(hostId: MaybeRef<string>) {
+  const { t } = useI18n()
   const processes = ref<HostProcess[]>([])
   const loading = ref(false)
   const error = ref('')
@@ -31,14 +33,14 @@ export function useHostProcesses(hostId: MaybeRef<string>) {
           try {
             processes.value = JSON.parse(output)
           } catch {
-            error.value = 'Impossible de parser la liste des processus'
+            error.value = t('host.parseProcessesError')
           }
         })
         .catch((e: unknown) => {
-          error.value = e instanceof Error ? e.message : 'Erreur lors du chargement des processus'
+          error.value = e instanceof Error ? e.message : t('host.loadProcessesError')
         })
     } catch (e) {
-      error.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")
+      error.value = getApiErrorMessage(e, t('host.sendCommandError'))
     } finally {
       loading.value = false
     }

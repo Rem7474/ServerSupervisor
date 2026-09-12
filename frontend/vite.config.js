@@ -13,6 +13,12 @@ export default defineConfig({
   plugins: [vue()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // vue-i18n build flags: drop the Options-API path (this app is
+    // `legacy: false`) and the devtools hooks from the production bundle.
+    // Worth ~2.5 KB gzipped on vendor-vue.
+    __VUE_I18N_FULL_INSTALL__: false,
+    __VUE_I18N_LEGACY_API__: false,
+    __INTLIFY_PROD_DEVTOOLS__: false,
   },
   server: {
     port: 3000,
@@ -27,23 +33,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined
-
-          if (id.includes('cytoscape') || id.includes('d3-force')) return 'vendor-graph'
-          if (id.includes('apexcharts')) return 'vendor-apexcharts'
-          if (id.includes('/d3-')) return 'vendor-d3'
-          if (id.includes('world-atlas') || id.includes('topojson-client')) return 'vendor-map'
-          if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vendor-vue'
-          if (id.includes('axios')) return 'vendor-http'
-          if (id.includes('dayjs')) return 'vendor-date'
-          if (id.includes('@tabler')) return 'vendor-tabler'
-
-          return 'vendor-misc'
-        },
-      },
-    },
+    // No manualChunks: Rollup's default splitting respects the dynamic
+    // import() boundaries that already exist in the codebase. The previous
+    // manualChunks function grouped node_modules by package name, which
+    // inadvertently pulled the Vue runtime into the 1.43 MB ApexCharts
+    // chunk (because `id.includes('vue')` matched vue-related code before
+    // the `vendor-vue` bucket was tested). That chunk was then
+    // modulepreload'd in the entry, defeating the defineAsyncComponent in
+    // apexChartTheme.ts and the IntersectionObserver in DashboardView.
+    // The same mechanism pulled xterm.js into the entry via vendor-misc.
+    // Measured impact: 3 126 KB → 1 420 KB brut, 779 KB → 316 KB gzip.
+    chunkSizeWarningLimit: 900,
   },
 })

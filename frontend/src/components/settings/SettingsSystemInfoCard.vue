@@ -2,21 +2,21 @@
   <div class="card">
     <div class="card-header">
       <h3 class="card-title">
-        Systeme
+        {{ t('settings.systemTitle') }}
       </h3>
     </div>
     <div class="card-body">
       <div class="mb-3 pb-3 border-bottom">
         <div class="text-secondary small">
-          URL de base
+          {{ t('settings.baseUrl') }}
         </div>
         <div class="font-monospace">
-          {{ settings.baseUrl || 'Non configure' }}
+          {{ settings.baseUrl || t('settings.notConfigured') }}
         </div>
       </div>
       <div class="mb-3 pb-3 border-bottom">
         <div class="text-secondary small">
-          Base de données
+          {{ t('settings.databaseTitle') }}
         </div>
         <div class="font-monospace">
           {{ settings.dbHost }}:{{ settings.dbPort }}
@@ -24,15 +24,15 @@
       </div>
       <div class="mb-3 pb-3 border-bottom">
         <div class="text-secondary small">
-          Mode HTTPS/TLS
+          {{ t('settings.httpsTlsMode') }}
         </div>
         <span :class="settings.tlsEnabled ? 'badge bg-success-lt text-success' : 'badge bg-warning-lt text-warning'">
-          {{ settings.tlsEnabled ? 'Active' : 'Desactive' }}
+          {{ settings.tlsEnabled ? t('settings.active') : t('settings.inactive') }}
         </span>
       </div>
       <div class="mb-3">
         <div class="text-secondary small">
-          Version agent recommandee
+          {{ t('settings.recommendedAgentVersion') }}
         </div>
         <div class="font-monospace">
           {{ settings.latestAgentVersion || '-' }}
@@ -43,6 +43,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 interface SystemSettings {
   baseUrl?: string
   dbHost?: string
@@ -55,4 +59,3 @@ defineProps<{
   settings: SystemSettings
 }>()
 </script>
-

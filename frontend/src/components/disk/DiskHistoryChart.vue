@@ -3,7 +3,7 @@
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
       <div class="d-flex align-items-center gap-3">
         <h3 class="card-title mb-0">
-          Historique disques
+          {{ t('monitoring.diskHistoryTitle') }}
         </h3>
         <select
           v-if="mounts.length > 1"
@@ -29,9 +29,9 @@
         <span
           v-if="fillPrediction"
           :class="['badge', fillPrediction.days <= 30 ? 'bg-danger text-white' : 'bg-warning text-white']"
-          :title="`Basé sur la tendance des ${chartHours}h`"
+          :title="t('monitoring.fillPredictionTooltip', { hours: chartHours })"
         >
-          Plein dans ~{{ fillPrediction.days }}j
+          {{ t('monitoring.fillPredictionBadge', { days: fillPrediction.days }) }}
         </span>
         <span
           v-if="rangeLoading"
@@ -70,7 +70,7 @@
         v-else
         class="h-100 d-flex align-items-center justify-content-center text-secondary"
       >
-        Aucune donnée
+        {{ t('monitoring.noHistoryData') }}
       </div>
     </div>
   </div>
@@ -78,6 +78,7 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, watch, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import { fetchDiskMetricsHistory } from '../../composables/useDiskMetricsHistory'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
@@ -102,6 +103,8 @@ const props = withDefaults(defineProps<{
   refreshTick: 0,
 })
 
+const { t } = useI18n()
+
 const chartHours = ref(24)
 const selectedMount = ref<string>(props.mounts[0] ?? '')
 const points = ref<ChartPoint[]>([])
@@ -117,15 +120,15 @@ const loading = ref(false)
 // pops in.
 const rangeLoading = ref(false)
 
-const timeRangeOptions = [
-  { hours: 1,    label: '1h' },
-  { hours: 6,    label: '6h' },
-  { hours: 24,   label: '24h' },
-  { hours: 168,  label: '7j' },
-  { hours: 720,  label: '30j' },
-  { hours: 2160, label: '90j' },
-  { hours: 8760, label: '1a' },
-]
+const timeRangeOptions = computed(() => [
+  { hours: 1,    label: t('monitoring.timeRange1h') },
+  { hours: 6,    label: t('monitoring.timeRange6h') },
+  { hours: 24,   label: t('monitoring.timeRange24h') },
+  { hours: 168,  label: t('monitoring.timeRange7d') },
+  { hours: 720,  label: t('monitoring.timeRange30d') },
+  { hours: 2160, label: t('monitoring.timeRange90d') },
+  { hours: 8760, label: t('monitoring.timeRange1y') },
+])
 
 // Linear regression on {x: timestamp ms, y: used_gb}
 const fillPrediction = computed(() => {
@@ -210,7 +213,7 @@ function buildChartOptions(): ApexOptions {
         formatter: (v: number, opts?: { dataPointIndex: number }) => {
           const p = opts ? points.value[opts.dataPointIndex] : undefined
           return p?.used_gb != null && p?.size_gb
-            ? `${v.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
+            ? `${v.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} ${t('monitoring.gbUnit')})`
             : `${v.toFixed(1)}%`
         },
       },
@@ -238,7 +241,7 @@ async function loadHistory(hours: number): Promise<void> {
 
     if (!points.value.length) { series.value = null; return }
 
-    series.value = [{ name: 'Utilisé', data: points.value }]
+    series.value = [{ name: t('monitoring.usedSeriesLabel'), data: points.value }]
     if (!chartOptions.value) {
       chartOptions.value = buildChartOptions()
     } else {

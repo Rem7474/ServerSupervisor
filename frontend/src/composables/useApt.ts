@@ -1,4 +1,5 @@
 import { ref, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from './useWebSocket'
@@ -67,6 +68,8 @@ interface LiveCommand {
 interface CommandPatch { status?: string; output?: string; action?: string }
 
 export function useApt() {
+  const { t } = useI18n()
+
   // ── État hôtes / APT ─────────────────────────────────────────────────────────
   const hosts = ref<Host[]>([])
   const selectedHosts = ref<string[]>([])
@@ -157,13 +160,13 @@ export function useApt() {
   const hostSortKey = ref<'name' | 'pending' | 'security' | 'cve'>('name')
   const hostSortDir = ref<'asc' | 'desc'>('asc')
 
-  const hostFilterOptions = [
-    { value: 'all', label: 'Tous' },
-    { value: 'critical', label: 'CVE critiques' },
-    { value: 'security', label: 'Sécu > 0' },
-    { value: 'reboot', label: 'Redémarrage requis' },
-    { value: 'outdated_agent', label: 'Agent obsolète' },
-  ]
+  const hostFilterOptions = computed(() => [
+    { value: 'all', label: t('apt.filterAll') },
+    { value: 'critical', label: t('apt.filterCriticalCve') },
+    { value: 'security', label: t('apt.filterSecurityAboveZero') },
+    { value: 'reboot', label: t('apt.filterRebootRequired') },
+    { value: 'outdated_agent', label: t('apt.filterOutdatedAgent') },
+  ])
 
   function isAgentOutdated(host: Host): boolean {
     return !!host.agent_version && !!latestAgentVersion.value && host.agent_version !== latestAgentVersion.value
@@ -336,13 +339,13 @@ export function useApt() {
         await pendingCommand.track(launched[0].command_id)
       } else if (failed.length > 0) {
         await dialog.confirm({
-          title: 'Erreur',
-          message: failed[0].error || 'Erreur lors de l\'envoi de la commande',
+          title: t('common.error'),
+          message: failed[0].error || t('apt.sendCommandError'),
           variant: 'danger',
         })
       }
     } catch (e) {
-      await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
+      await dialog.confirm({ title: t('common.error'), message: getApiErrorMessage(e), variant: 'danger' })
     } finally {
       const next = { ...hostCmdLoading.value }
       delete next[host.id]
@@ -357,7 +360,7 @@ export function useApt() {
       .map((h: Host) => h.name || h.hostname)
       .join(', ')
 
-    const confirmed = await confirmAptCommand(command, hostnames || 'les hôtes sélectionnés', selectedHosts.value.length)
+    const confirmed = await confirmAptCommand(command, hostnames || t('apt.selectedHostsFallback'), selectedHosts.value.length)
     if (!confirmed) return
 
     aptBulkLoading.value = command
@@ -393,10 +396,12 @@ export function useApt() {
       if (selectedHosts.value.length > 1 || failedCommands.length > 0) {
         const launched = launchedCommands.map((item: AptCommandResult) => hostNameById.get(item.host_id ?? "") || (item.host_id ?? ""))
         const failed = failedCommands.map((item: AptCommandResult) => hostNameById.get(item.host_id ?? "") || (item.host_id ?? ""))
-        const launchedLabel = launched.length === 1 ? `sur ${launched[0]}` : `sur ${launched.length} hôtes`
+        const launchedMsg = launched.length === 1
+          ? t('apt.commandLaunchedOnHost', { command, host: launched[0] })
+          : t('apt.commandLaunchedOnHosts', { command, count: launched.length })
         const msg = launched.length > 0
-          ? `apt ${command} lancée ${launchedLabel}${failed.length ? ` — échec sur : ${failed.join(', ')}` : ''}`
-          : `apt ${command} — aucune commande lancée`
+          ? `${launchedMsg}${failed.length ? t('apt.commandFailedOnList', { list: failed.join(', ') }) : ''}`
+          : t('apt.commandNoneLaunched', { command })
         addToast(msg, failed.length > 0 ? 'warning' : 'success', 7000)
       }
 
@@ -405,7 +410,7 @@ export function useApt() {
       await Promise.all(launchedCommands.map((item: AptCommandResult) => pendingCommand.track(item.command_id)))
     } catch (e) {
       await dialog.confirm({
-        title: 'Erreur',
+        title: t('common.error'),
         message: getApiErrorMessage(e),
         variant: 'danger'
       })
@@ -432,9 +437,9 @@ export function useApt() {
 
     const hostnames = targets.map((h: Host) => h.name || h.hostname).join(', ')
     const confirmed = await confirmBulkAction(
-      'Mettre à jour les agents',
+      t('apt.updateAgentsTitle'),
       targets.length,
-      `Déployer la version ${latestAgentVersion.value} sur : ${hostnames}. L'agent sera redémarré pendant l'opération sur chaque hôte.`
+      t('apt.updateAgentsConfirmMsg', { version: latestAgentVersion.value, hostnames })
     )
     if (!confirmed) return
 
@@ -444,10 +449,10 @@ export function useApt() {
       const succeeded = results.filter((r) => r.status === 'fulfilled').length
       const failed = results.length - succeeded
       if (failed === 0) {
-        addToast(`Mise à jour lancée sur ${succeeded} agent${succeeded > 1 ? 's' : ''}`, 'success', 7000)
+        addToast(t('apt.agentUpdateLaunchedOn', { count: succeeded }, succeeded), 'success', 7000)
       } else {
         addToast(
-          `${succeeded} agent(s) lancé(s), ${failed} échec(s)`,
+          t('apt.agentUpdateSummary', { succeeded, failed }),
           failed === results.length ? 'error' : 'warning',
           7000
         )

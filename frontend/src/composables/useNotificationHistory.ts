@@ -5,6 +5,7 @@ import { getApiErrorMessage } from '../api/client'
 import { resolvableIncidentId } from '../utils/incidentFormat'
 import type { NotificationItem } from '../types/generated'
 import type { WSNotificationMessage } from '../types/ws'
+import { i18n } from '../i18n'
 
 // Server caps `limit` at 200 (server/internal/handlers/notifications.go's
 // clampQueryInt) — this is the single unfiltered fetch every filter/search/
@@ -58,7 +59,7 @@ export function useNotificationHistory(): UseNotificationHistoryApi {
       incidents.value = response.data?.notifications || []
       loaded.value = true
     } catch {
-      error.value = "Impossible de charger l'historique des notifications"
+      error.value = i18n.global.t('alerts.notificationHistoryLoadError')
     } finally {
       loading.value = false
     }
@@ -68,9 +69,9 @@ export function useNotificationHistory(): UseNotificationHistoryApi {
     markingRead.value = true
     try {
       await apiClient.markNotificationsRead()
-      addToast('Toutes les notifications marquées comme lues', 'success')
+      addToast(i18n.global.t('alerts.markAllReadSuccess'), 'success')
     } catch {
-      addToast('Erreur lors du marquage', 'error')
+      addToast(i18n.global.t('alerts.markAllReadError'), 'error')
     } finally {
       markingRead.value = false
     }
@@ -85,9 +86,9 @@ export function useNotificationHistory(): UseNotificationHistoryApi {
       incidents.value = incidents.value.map((n) =>
         n.id === item.id ? { ...n, resolved_at: new Date().toISOString() } : n
       )
-      addToast('Incident résolu', 'success')
+      addToast(i18n.global.t('alerts.incidentResolvedToast'), 'success')
     } catch (err: unknown) {
-      addToast(getApiErrorMessage(err, 'Impossible de résoudre'), 'error')
+      addToast(getApiErrorMessage(err, i18n.global.t('alerts.incidentResolveError')), 'error')
     } finally {
       resolvingId.value = null
     }
@@ -102,9 +103,9 @@ export function useNotificationHistory(): UseNotificationHistoryApi {
       incidents.value = incidents.value.map((n) =>
         n.id === item.id ? { ...n, acknowledged_at: new Date().toISOString() } : n
       )
-      addToast('Incident pris en charge', 'success')
+      addToast(i18n.global.t('alerts.incidentAcknowledgedToast'), 'success')
     } catch (err: unknown) {
-      addToast(getApiErrorMessage(err, "Impossible d'accuser réception"), 'error')
+      addToast(getApiErrorMessage(err, i18n.global.t('alerts.incidentAcknowledgeError')), 'error')
     } finally {
       acknowledgingId.value = null
     }

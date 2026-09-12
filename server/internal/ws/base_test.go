@@ -1,6 +1,13 @@
 package ws
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/gorilla/websocket"
+)
 
 func TestIsAllowedOrigin(t *testing.T) {
 	const baseURL = "https://supervisor.example.com"
@@ -36,7 +43,7 @@ func TestIsAllowedOrigin(t *testing.T) {
 func TestSnapshotChanged(t *testing.T) {
 	var lastHash string
 
-	if !snapshotChanged(map[string]int{"a": 1}, &lastHash) {
+	if _, changed := snapshotChanged(map[string]int{"a": 1}, &lastHash); !changed {
 		t.Error("first call should always report a change")
 	}
 	firstHash := lastHash
@@ -44,17 +51,49 @@ func TestSnapshotChanged(t *testing.T) {
 		t.Error("expected lastHash to be set after the first call")
 	}
 
-	if snapshotChanged(map[string]int{"a": 1}, &lastHash) {
+	if _, changed := snapshotChanged(map[string]int{"a": 1}, &lastHash); changed {
 		t.Error("identical payload should not report a change")
 	}
 	if lastHash != firstHash {
 		t.Error("lastHash should not change when the payload is identical")
 	}
 
-	if !snapshotChanged(map[string]int{"a": 2}, &lastHash) {
+	if _, changed := snapshotChanged(map[string]int{"a": 2}, &lastHash); !changed {
 		t.Error("different payload should report a change")
 	}
 	if lastHash == firstHash {
 		t.Error("lastHash should update when the payload changes")
+	}
+}
+
+func TestSafeWriteRaw(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		defer releaseWriteGuard(conn)
+		_ = safeWriteRaw(conn, []byte(`{"test":1}`))
+	}))
+	defer s.Close()
+
+	u := "ws" + strings.TrimPrefix(s.URL, "http")
+	conn, resp, err := websocket.DefaultDialer.Dial(u, nil)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		t.Fatalf("dial error: %v", err)
+	}
+	defer conn.Close()
+
+	_, msg, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	if string(msg) != `{"test":1}` {
+		t.Errorf("got %s, want %s", string(msg), `{"test":1}`)
 	}
 }

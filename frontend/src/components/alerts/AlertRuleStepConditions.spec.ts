@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import AlertRuleStepConditions from './AlertRuleStepConditions.vue'
 import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 function formFor(metric: string, overrides: Partial<AlertRuleFormData> = {}): AlertRuleFormData {
   const base = useAlertRuleForm().defaultForm()
@@ -53,6 +58,40 @@ describe('AlertRuleStepConditions (characterization, per-metric branches)', () =
       expect(wrapper.find(`#${id}`).exists(), `#${id}`).toBe(true)
       expect(wrapper.find(`label[for="${id}"]`).exists(), `label for #${id}`).toBe(true)
     }
+  })
+
+  it('generic metric: pluralizes the incoherence hint and clear-threshold hint text', async () => {
+    const wrapper = mountStep(formFor('cpu', { operator: '>', threshold_warn: 80, threshold_clear_warn: 90 }))
+    expect(wrapper.text()).toContain('Incohérent : le seuil de résolution doit être')
+    expect(wrapper.text()).toContain('exacte')
+    expect(wrapper.text()).toContain("à laquelle l'alerte warn se résout")
+  })
+
+  it('docker_compose_degraded_services: pluralizes the warn/crit hint by threshold value', () => {
+    const singular = mountStep(formFor('docker_compose_degraded_services', { threshold_warn: 1, threshold_crit: 1 }))
+    expect(singular.text()).toContain('Alerte warn dès 1 service dégradé.')
+    expect(singular.text()).toContain('Alerte critique dès 1 service dégradé.')
+
+    const plural = mountStep(formFor('docker_compose_degraded_services', { threshold_warn: 3, threshold_crit: 5 }))
+    expect(plural.text()).toContain('Alerte warn dès 3 services dégradés.')
+    expect(plural.text()).toContain('Alerte critique dès 5 services dégradés.')
+  })
+
+  it('shows the translated test-results panel, including the pluralized compose degraded-services value', () => {
+    const wrapper = mountStep(formFor('docker_compose_degraded_services'))
+    wrapper.setProps({
+      testResults: {
+        any_fires: true,
+        evaluated_at: '2026-01-01T00:00:00Z',
+        results: [{ host_id: 'h1', host_name: 'proj', has_data: true, current_value: 2, would_fire: true }],
+      },
+    })
+    return wrapper.vm.$nextTick().then(() => {
+      expect(wrapper.text()).toContain('Résultat du test')
+      expect(wrapper.text()).toContain('Déclencherait une alerte')
+      expect(wrapper.text()).toContain('2 services dégradés')
+      expect(wrapper.text()).toContain('Alerte')
+    })
   })
 })
 

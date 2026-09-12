@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import AptPendingPackagesList from './AptPendingPackagesList.vue'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 describe('AptPendingPackagesList', () => {
   it('renders nothing when there are no pending packages', () => {

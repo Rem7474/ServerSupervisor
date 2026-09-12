@@ -3,56 +3,56 @@
     <!-- Legend -->
     <div class="graph-legend card">
       <div class="legend-title">
-        Légende
+        {{ t('network.graphLegendTitle') }}
       </div>
       <div class="legend-item">
         <span class="legend-box root-box" />
-        Reverse proxy
+        {{ t('network.nodeReverseProxyLabel') }}
       </div>
       <div class="legend-item">
         <span class="legend-box host-box" />
-        Hôte
+        {{ t('network.nodeTypeHost') }}
       </div>
       <div class="legend-item">
         <span class="legend-dot online-dot" />
-        En ligne
+        {{ t('network.graphLegendOnline') }}
       </div>
       <div class="legend-item">
         <span class="legend-dot offline-dot" />
-        Hors ligne
+        {{ t('network.graphLegendOffline') }}
       </div>
       <div class="legend-item">
         <span class="legend-dot service-node" />
-        Service proxy
+        {{ t('network.graphLegendServiceProxy') }}
       </div>
       <div class="legend-item">
         <span class="legend-dot port-tcp" />
-        Port TCP
+        {{ t('network.graphLegendPortTcp') }}
       </div>
       <div class="legend-item">
         <span class="legend-dot port-udp" />
-        Port UDP
+        {{ t('network.graphLegendPortUdp') }}
       </div>
       <div
         v-if="hasAutheliaTargets"
         class="legend-item"
       >
         <span class="legend-dash proxy-authelia-dash" />
-        Proxy → {{ autheliaLabel || 'Authelia' }}
+        {{ t('network.graphLegendProxyAuthelia', { authelia: autheliaLabel || 'Authelia' }) }}
       </div>
       <div
         v-if="hasAutheliaTargets"
         class="legend-item"
       >
         <span class="legend-dash authelia-dash" />
-        {{ autheliaLabel || 'Authelia' }} → service
+        {{ t('network.graphLegendAutheliaService', { authelia: autheliaLabel || 'Authelia' }) }}
       </div>
       <div
         v-if="hasInternetTargets"
         class="legend-item"
       >
         <span class="legend-dash internet-proxy-dash" />
-        Internet → Proxy
+        {{ t('network.graphLegendInternetProxy') }}
       </div>
     </div>
 
@@ -61,7 +61,7 @@
       <button
         type="button"
         class="btn btn-sm btn-ghost-secondary graph-btn"
-        title="Zoom +"
+        :title="t('network.graphZoomIn')"
         @click="zoomIn"
       >
         <svg
@@ -77,7 +77,7 @@
       <button
         type="button"
         class="btn btn-sm btn-ghost-secondary graph-btn"
-        title="Zoom −"
+        :title="t('network.graphZoomOut')"
         @click="zoomOut"
       >
         <svg
@@ -93,7 +93,7 @@
       <button
         type="button"
         class="btn btn-sm btn-ghost-secondary graph-btn"
-        title="Ajuster à l'écran"
+        :title="t('network.graphFitView')"
         @click="fitView"
       >
         <svg
@@ -110,7 +110,7 @@
       <button
         type="button"
         class="btn btn-sm btn-ghost-secondary graph-btn"
-        title="Réinitialiser la disposition"
+        :title="t('network.graphResetLayout')"
         @click="resetLayout"
       >
         <svg
@@ -132,10 +132,10 @@
       class="graph-empty"
     >
       <div class="empty-title">
-        Aucune topologie disponible
+        {{ t('network.graphEmptyTitle') }}
       </div>
       <div class="empty-subtitle">
-        Les hôtes actifs apparaîtront ici dès que les données remontent.
+        {{ t('network.graphEmptySubtitle') }}
       </div>
     </div>
 
@@ -152,6 +152,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import cytoscape from 'cytoscape'
 // @ts-expect-error cytoscape-fcose lacks types
 import fcose from 'cytoscape-fcose'
@@ -200,6 +201,7 @@ const emit = defineEmits<{
   (e: 'update:nodePositions', positions: Record<string, { x: number; y: number }>): void
 }>()
 
+const { t } = useI18n()
 const cyContainer = ref<HTMLElement | null>(null)
 const tooltipRef = ref<HTMLElement | null>(null)
 let cy: cytoscape.Core | null = null
@@ -341,25 +343,25 @@ function initCytoscape(): void {
     const lines: string[] = []
     if (d.type === 'host') {
       lines.push(d.label)
-      if (d.sublabel) lines.push(`IP : ${d.sublabel}`)
-      lines.push(`Statut : ${d.status || 'unknown'}`)
+      if (d.sublabel) lines.push(t('network.graphTooltipIpPrefix', { ip: d.sublabel }))
+      lines.push(t('network.graphTooltipStatusPrefix', { status: d.status || t('network.nodeUnknownStatus') }))
     } else if (d.type === 'proxmox_guest') {
       lines.push(d.label)
       if (d.sublabel) lines.push(d.sublabel)
-      lines.push(`Statut : ${d.status || 'unknown'}`)
-      lines.push('VM Proxmox sans agent')
+      lines.push(t('network.graphTooltipStatusPrefix', { status: d.status || t('network.nodeUnknownStatus') }))
+      lines.push(t('network.graphTooltipProxmoxNoAgent'))
     } else if (d.type === 'service') {
       lines.push(d.label)
       if (d.sublabel) lines.push(d.sublabel)
-      lines.push(`Port interne : ${d.internalPort || '-'}`)
-      if (d.externalPort) lines.push(`Port externe : ${d.externalPort}`)
-      if (d.tags) lines.push(`Tags : ${d.tags}`)
+      lines.push(t('network.graphTooltipInternalPortPrefix', { port: d.internalPort || '-' }))
+      if (d.externalPort) lines.push(t('network.graphTooltipExternalPortPrefix', { port: d.externalPort }))
+      if (d.tags) lines.push(t('network.graphTooltipTagsPrefix', { tags: d.tags }))
     } else if (d.type === 'port') {
       lines.push(d.label)
-      if (d.containers?.length) lines.push(`Conteneurs : ${d.containers.join(', ')}`)
+      if (d.containers?.length) lines.push(t('network.graphTooltipContainersPrefix', { containers: d.containers.join(', ') }))
     } else if (d.type === 'root') {
       lines.push(d.label)
-      if (d.sublabel) lines.push(`IP : ${d.sublabel}`)
+      if (d.sublabel) lines.push(t('network.graphTooltipIpPrefix', { ip: d.sublabel }))
     } else if (d.type === 'authelia' || d.type === 'internet') {
       lines.push(d.label)
       if (d.sublabel) lines.push(d.sublabel)
@@ -374,17 +376,17 @@ function initCytoscape(): void {
     const d = event.target.data()
     const lines: string[] = []
     if (d.edgeType === 'internet-proxy') {
-      lines.push('Trafic Internet → Proxy')
-      if (d.ports?.length) lines.push(`Ports exposés : ${d.ports.map((p: number) => `:${p}`).join(', ')}`)
+      lines.push(t('network.graphTooltipInternetToProxy'))
+      if (d.ports?.length) lines.push(t('network.graphTooltipExposedPortsPrefix', { ports: d.ports.map((p: number) => `:${p}`).join(', ') }))
     } else if (d.edgeType === 'proxy-authelia') {
-      lines.push('Proxy → Authelia')
-      lines.push('Vérification d\'authentification avant routage')
+      lines.push(t('network.graphTooltipProxyToAuthelia'))
+      lines.push(t('network.graphTooltipAuthCheck'))
     } else if (d.edgeType === 'internet' && d.externalPort) {
-      lines.push(`Exposé directement sur Internet : port ${d.externalPort}`)
+      lines.push(t('network.graphTooltipDirectInternet', { port: d.externalPort }))
     } else if (d.edgeType === 'proxy') {
-      lines.push('Proxy → Service (route directe)')
+      lines.push(t('network.graphTooltipProxyToService'))
     } else if (d.edgeType === 'authelia') {
-      lines.push('Authelia → Service (accès autorisé)')
+      lines.push(t('network.graphTooltipAutheliaToService'))
     }
     if (lines.length) showTooltip(event, lines)
   })

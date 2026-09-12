@@ -8,13 +8,13 @@
               to="/"
               class="text-decoration-none"
             >
-              Dashboard
+              {{ t('nav.sections.control.items.dashboard') }}
             </router-link>
             <span class="text-muted mx-1">/</span>
-            <span>{{ TAB_TITLES[alertsTab] || 'Alertes' }}</span>
+            <span>{{ TAB_TITLES[alertsTab] || t('alerts.rulesPageTitle') }}</span>
           </div>
           <h2 class="page-title">
-            {{ TAB_TITLES[alertsTab] || 'Alertes' }}
+            {{ TAB_TITLES[alertsTab] || t('alerts.rulesPageTitle') }}
           </h2>
         </div>
         <div class="col-auto ms-auto d-flex gap-2">
@@ -28,7 +28,7 @@
               :size="14"
               class="icon me-1"
             />
-            Nouvelle alerte
+            {{ t('alerts.newAlertButton') }}
           </button>
         </div>
       </div>
@@ -39,7 +39,7 @@
       class="alert alert-danger mb-3"
     >
       <IconAlertTriangle class="icon alert-icon me-2" />
-      Erreur de chargement des règles : {{ fetchError }}
+      {{ t('alerts.loadRulesErrorPrefix', { error: fetchError }) }}
     </div>
 
     <EntityTabShell
@@ -140,7 +140,7 @@
       @apply="onApplyTemplate"
     />
 
-    <ErrorBoundary title="Erreur lors du chargement du formulaire de règle d'alerte">
+    <ErrorBoundary :title="t('alerts.ruleFormLoadErrorTitle')">
       <AlertRuleModal
         :visible="showModal"
         :rule="(editingRule as any)"
@@ -159,6 +159,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
 import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
@@ -183,15 +184,16 @@ import type { AlertRule } from '../types/alert'
 import type { AlertRuleTemplate, AlertRuleTemplateRequest } from '../types/generated'
 
 const auth = useAuthStore()
+const { t } = useI18n()
 
-const TAB_TITLES: Record<string, string> = {
-  warroom: 'Vue active',
-  rules: 'Alertes',
-  releases: 'Suivi de versions',
-  incidents: 'Historique de notifications',
-  maintenance: 'Fenêtres de maintenance',
-  templates: 'Modèles de règles',
-}
+const TAB_TITLES = computed<Record<string, string>>(() => ({
+  warroom: t('alerts.warRoomPageTitle'),
+  rules: t('alerts.rulesPageTitle'),
+  releases: t('alerts.versionTrackingTitle'),
+  incidents: t('alerts.notificationHistoryPageTitle'),
+  maintenance: t('alerts.maintenanceTitle'),
+  templates: t('alerts.templatesTitle'),
+}))
 
 const route = useRoute()
 const router = useRouter()
@@ -311,7 +313,7 @@ async function onApplyTemplate(hostIds: string[], enabled: boolean): Promise<voi
   const ok = await applyTemplate(applyingTemplate.value.id, hostIds, enabled)
   // Applying stamps out new rules via a path this view's own `rules` list
   // (useAlertsPage's alertRulesStore) doesn't know about — force a refetch so
-  // the Règles tab isn't stuck showing stale data (or an empty state) until
+  // the Rules tab isn't stuck showing stale data (or an empty state) until
   // a full page reload.
   if (ok) await alertRulesStore.fetchRules(true)
 }
@@ -349,37 +351,37 @@ const hostFilterFromQuery = typeof route.query.host === 'string' ? route.query.h
 const alertsTabs = computed<EntityTab[]>(() => [
   {
     key: 'warroom',
-    label: 'Vue active',
+    label: t('alerts.warRoomPageTitle'),
     badges: activeIncidentCount.value > 0 ? [{ value: activeIncidentCount.value, badgeClass: 'badge bg-danger-lt text-danger ms-1' }] : [],
     lazy: true,
   },
   {
     key: 'rules',
-    label: 'Règles',
+    label: t('alerts.rulesTabLabel'),
     badges: [{ value: rules.value.length, badgeClass: 'badge bg-azure-lt text-azure ms-1' }],
     lazy: true,
   },
   {
     key: 'releases',
-    label: 'Suivi de versions',
+    label: t('alerts.versionTrackingTitle'),
     badges: trackers.value.length > 0 ? [{ value: trackers.value.length, badgeClass: 'badge bg-azure-lt text-azure ms-1' }] : [],
     lazy: true,
   },
   {
     key: 'incidents',
-    label: 'Historique notifications',
+    label: t('alerts.notificationHistoryTabLabel'),
     badges: activeIncidentCount.value > 0 ? [{ value: activeIncidentCount.value, badgeClass: 'badge bg-danger-lt text-danger ms-1' }] : [],
     lazy: true,
   },
   {
     key: 'maintenance',
-    label: 'Maintenance',
+    label: t('alerts.maintenanceTabLabel'),
     badges: [],
     lazy: true,
   },
   {
     key: 'templates',
-    label: 'Modèles',
+    label: t('alerts.templatesTabLabel'),
     badges: templates.value.length > 0 ? [{ value: templates.value.length, badgeClass: 'badge bg-azure-lt text-azure ms-1' }] : [],
     lazy: true,
   },

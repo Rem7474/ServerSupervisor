@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { setLocale } from './i18n'
 
 // Bootstrap module — importing it runs createApp(...).mount('#app') plus a
 // handful of window-level error/rejection listeners as a side effect. The
@@ -14,6 +15,9 @@ vi.mock('./App.vue', () => ({
 
 describe('main.ts — window error/rejection handling', () => {
   beforeAll(async () => {
+    // main.ts's fatal-fallback copy is translated — pin the locale so the
+    // assertions below don't depend on the test env's detected language.
+    setLocale('fr')
     document.body.innerHTML = '<div id="app"></div>'
     await import('./main')
   })

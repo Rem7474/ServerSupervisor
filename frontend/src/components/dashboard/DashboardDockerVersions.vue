@@ -11,11 +11,11 @@
       @keydown.space.prevent="toggle"
     >
       <h3 class="card-title d-flex align-items-center gap-2">
-        Versions &amp; Mises à jour Docker
+        {{ t('dashboard.dockerVersionsTitle') }}
         <span
           v-if="outdatedCount > 0"
           class="badge bg-warning-lt text-warning"
-        >{{ outdatedCount }} en retard</span>
+        >{{ t('dashboard.outdatedBadge', outdatedCount) }}</span>
         <IconChevronDown
           :size="16"
           class="ms-auto docker-chevron"
@@ -23,12 +23,12 @@
         />
       </h3>
       <div class="card-options text-secondary small gap-1">
-        <span>Suivi via</span>
+        <span>{{ t('dashboard.trackedVia') }}</span>
         <router-link
           to="/git-webhooks"
           @click.stop
         >
-          Git / Automatisation
+          {{ t('nav.sections.automation.items.gitAutomation') }}
         </router-link>
       </div>
     </div>
@@ -41,11 +41,11 @@
         <thead>
           <tr>
             <th>Image</th>
-            <th>Hôte</th>
-            <th>Conteneurs</th>
-            <th>En cours</th>
-            <th>Dernière version</th>
-            <th>Statut</th>
+            <th>{{ t('dashboard.hostColumn') }}</th>
+            <th>{{ t('dashboard.containersColumn') }}</th>
+            <th>{{ t('dashboard.runningColumn') }}</th>
+            <th>{{ t('dashboard.latestVersionColumn') }}</th>
+            <th>{{ t('common.status') }}</th>
             <th>Task</th>
             <th class="text-end">
               Actions
@@ -67,7 +67,7 @@
               <span
                 v-if="(v.container_count ?? 0) > 0"
                 class="badge bg-azure-lt text-azure"
-                :title="`${v.container_count} conteneur${(v.container_count ?? 0) > 1 ? 's' : ''} utilisent cette image`"
+                :title="t('dashboard.containersUsingImage', v.container_count ?? 0)"
               >{{ v.container_count }}</span>
               <span
                 v-else
@@ -78,7 +78,7 @@
               <code v-if="v.running_version">{{ v.running_version }}</code><span
                 v-else
                 class="text-secondary small"
-              >inconnue</span>
+              >{{ t('dashboard.unknownVersion') }}</span>
             </td>
             <td>
               <a
@@ -94,32 +94,32 @@
               <span
                 v-if="v.is_up_to_date"
                 class="badge bg-success-lt text-success"
-              >À jour</span>
+              >{{ t('dashboard.upToDate') }}</span>
               <span
                 v-else-if="v.running_version || v.update_confirmed"
                 class="badge bg-warning-lt text-warning"
-              >Mise à jour disponible</span>
+              >{{ t('dashboard.updateAvailable') }}</span>
               <span
                 v-else
                 class="badge bg-secondary-lt text-secondary"
-              >Version inconnue</span>
+              >{{ t('dashboard.versionUnknown') }}</span>
             </td>
             <td>
               <span
                 v-if="v.custom_task_id"
                 class="badge bg-success-lt text-success"
-                title="Task de déploiement configurée"
-              >✅ Déploiement</span>
+                :title="t('dashboard.deploymentConfiguredTooltip')"
+              >{{ t('dashboard.deploymentBadge') }}</span>
               <span
                 v-else-if="v.tracker_id"
                 class="badge bg-warning-lt text-warning"
-                title="Surveillance active mais aucune task configurée"
-              >⏸️ Surveillance</span>
+                :title="t('dashboard.monitoringConfiguredTooltip')"
+              >{{ t('dashboard.monitoringBadge') }}</span>
               <span
                 v-else
                 class="badge bg-secondary-lt text-secondary"
-                title="Aucun tracker configuré"
-              >❌ Non suivi</span>
+                :title="t('dashboard.noTrackerTooltip')"
+              >{{ t('dashboard.notTrackedBadge') }}</span>
             </td>
             <td class="text-end">
               <div class="btn-list justify-content-end">
@@ -127,9 +127,9 @@
                   v-if="v.tracker_id"
                   :to="`/release-trackers/${v.tracker_id}`"
                   class="btn btn-sm btn-outline-secondary"
-                  title="Ouvrir le suivi de version"
+                  :title="t('dashboard.viewTrackerTooltip')"
                 >
-                  Voir suivi
+                  {{ t('dashboard.viewTracker') }}
                 </router-link>
                 <button
                   v-if="v.tracker_id"
@@ -137,7 +137,7 @@
                   class="btn btn-icon btn-sm btn-ghost-success"
                   :disabled="isRunDisabled(v)"
                   :title="runTooltip(v)"
-                  aria-label="Déclencher le tracker"
+                  :aria-label="t('dashboard.triggerTrackerAriaLabel')"
                   @click="runTracker(v)"
                 >
                   <span
@@ -156,9 +156,9 @@
           <tr v-if="versions.length === 0">
             <td colspan="8">
               <EmptyState
-                title="Aucun suivi de version configuré."
-                subtitle="Ajoutez des release trackers pour surveiller vos images Docker."
-                cta-label="Git / Automatisation"
+                :title="t('dashboard.noTrackersConfigured')"
+                :subtitle="t('dashboard.noTrackersSubtitle')"
+                :cta-label="t('nav.sections.automation.items.gitAutomation')"
                 cta-to="/git-webhooks"
               />
             </td>
@@ -175,7 +175,7 @@
         <button
           type="button"
           class="btn-close"
-          aria-label="Fermer"
+          :aria-label="t('common.close')"
           @click="dismissFeedback"
         />
       </div>
@@ -185,6 +185,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconChevronDown, IconPlayerPlay } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import { useAuthStore } from '../../stores/auth'
@@ -210,6 +211,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   versions: () => [],
 })
+
+const { t } = useI18n()
 
 const auth = useAuthStore()
 const isOpen = ref(false)
@@ -264,9 +267,9 @@ function isRunDisabled(v: DockerVersion): boolean {
 }
 
 function runTooltip(v: DockerVersion): string {
-  if (!canRunTracker.value) return 'Action réservée admin/opérateur'
-  if (!hasManualData(v)) return 'Attendez la première vérification automatique'
-  return 'Déclencher la tâche du tracker maintenant'
+  if (!canRunTracker.value) return t('dashboard.adminOperatorOnly')
+  if (!hasManualData(v)) return t('dashboard.waitForFirstCheck')
+  return t('dashboard.triggerNow')
 }
 
 async function runTracker(v: DockerVersion): Promise<void> {
@@ -276,9 +279,9 @@ async function runTracker(v: DockerVersion): Promise<void> {
   dismissFeedback()
   try {
     await apiClient.runReleaseTracker(id)
-    showFeedback(`Déclenchement lancé pour ${v.docker_image}.`)
+    showFeedback(t('dashboard.triggerLaunched', { image: v.docker_image }))
   } catch (e: unknown) {
-    showFeedback(getApiErrorMessage(e, 'Échec du déclenchement manuel.'), true)
+    showFeedback(getApiErrorMessage(e, t('dashboard.triggerFailed')), true)
   } finally {
     const next = { ...runningIds.value }
     delete next[id]

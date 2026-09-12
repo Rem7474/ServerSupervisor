@@ -4,10 +4,10 @@
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
           <h2 class="page-title">
-            Git / Automatisation
+            {{ t('webhooks.pageTitle') }}
           </h2>
           <div class="text-muted">
-            Webhooks entrants et suivi de releases pour déclencher des scripts sur vos VMs.
+            {{ t('webhooks.pageSubtitle') }}
           </div>
         </div>
         <div class="btn-list">
@@ -21,7 +21,7 @@
               :size="14"
               class="icon me-1"
             />
-            Mise à jour auto
+            {{ t('webhooks.autoUpdateButton') }}
           </button>
           <button
             type="button"
@@ -32,7 +32,7 @@
               :size="14"
               class="icon me-1"
             />
-            {{ activeTab === 'webhooks' ? 'Nouveau webhook' : 'Nouveau tracker' }}
+            {{ activeTab === 'webhooks' ? t('webhooks.newWebhookButton') : t('webhooks.newTrackerButton') }}
           </button>
         </div>
       </div>
@@ -50,7 +50,7 @@
             :size="16"
             class="icon me-1"
           />
-          Webhooks entrants
+          {{ t('webhooks.incomingWebhooksTab') }}
           <span
             v-if="webhooks.length"
             class="badge bg-azure-lt text-azure ms-1"
@@ -68,7 +68,7 @@
             :size="16"
             class="icon me-1"
           />
-          Suivi de versions
+          {{ t('webhooks.versionTrackingTab') }}
           <span
             v-if="trackers.length"
             class="badge bg-azure-lt text-azure ms-1"
@@ -98,9 +98,9 @@
         <div class="card-body">
           <EmptyState
             :icon="IconGitBranch"
-            title="Aucun webhook configuré."
-            subtitle="Recevez des événements depuis GitHub, GitLab, Gitea ou Forgejo pour déclencher des scripts sur vos VMs."
-            cta-label="Créer le premier webhook"
+            :title="t('webhooks.noWebhookConfiguredTitle')"
+            :subtitle="t('webhooks.noWebhookConfiguredSubtitle')"
+            :cta-label="t('webhooks.createFirstWebhookButton')"
             @cta="openCreateWebhook"
           />
         </div>
@@ -129,7 +129,7 @@
                   <span
                     v-if="!webhook.enabled"
                     class="badge bg-secondary-lt text-secondary"
-                  >Désactivé</span>
+                  >{{ t('webhooks.disabledBadge') }}</span>
                 </div>
               </div>
               <div class="card-body">
@@ -138,21 +138,21 @@
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Repo</span>
-                    <span class="text-truncate">{{ webhook.repo_filter || '<tous>' }}</span>
+                    >{{ t('webhooks.cardRepoLabel') }}</span>
+                    <span class="text-truncate">{{ webhook.repo_filter || t('webhooks.allReposPlaceholder') }}</span>
                   </div>
                   <div class="d-flex gap-2 mb-1">
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Branche</span>
-                    <span>{{ webhook.branch_filter || '<toutes>' }}</span>
+                    >{{ t('webhooks.cardBranchLabel') }}</span>
+                    <span>{{ webhook.branch_filter || t('webhooks.allBranchesPlaceholder') }}</span>
                   </div>
                   <div class="d-flex gap-2 mb-1">
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >VM</span>
+                    >{{ t('webhooks.cardVmLabel') }}</span>
                     <router-link
                       v-if="webhook.host_id"
                       :to="`/hosts/${webhook.host_id}`"
@@ -169,7 +169,7 @@
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Tache</span>
+                    >{{ t('webhooks.cardTaskLabel') }}</span>
                     <code class="small text-truncate">{{ webhook.custom_task_id }}</code>
                   </div>
                 </div>
@@ -177,7 +177,7 @@
                   v-if="webhook.last_execution"
                   class="mt-2 pt-2 border-top small"
                 >
-                  <span class="text-muted">Dernière exécution :</span>
+                  <span class="text-muted">{{ t('webhooks.lastExecutionLabel') }}</span>
                   <span
                     class="ms-1 badge"
                     :class="execStatusBadge(webhook.last_execution.status || '')"
@@ -188,7 +188,7 @@
                   v-else
                   class="mt-2 pt-2 border-top small text-muted"
                 >
-                  Jamais déclenché
+                  {{ t('webhooks.neverTriggeredLabel') }}
                 </div>
               </div>
               <div class="card-footer d-flex gap-2">
@@ -196,14 +196,14 @@
                   :to="`/git-webhooks/${webhook.id}`"
                   class="btn btn-sm btn-outline-primary"
                 >
-                  Détails
+                  {{ t('webhooks.detailsButton') }}
                 </router-link>
                 <button
                   type="button"
                   class="btn btn-sm btn-outline-secondary"
                   @click="openEditWebhook(webhook)"
                 >
-                  Modifier
+                  {{ t('webhooks.editButton') }}
                 </button>
                 <button
                   type="button"
@@ -211,7 +211,7 @@
                   :class="webhook.enabled ? 'btn-outline-warning' : 'btn-outline-success'"
                   @click="toggleWebhook(webhook)"
                 >
-                  {{ webhook.enabled ? 'Désactiver' : 'Activer' }}
+                  {{ webhook.enabled ? t('webhooks.disableButton') : t('webhooks.enableButton') }}
                 </button>
                 <button
                   type="button"
@@ -229,8 +229,8 @@
           class="mt-4"
           :executions="recentWebhookExecutions"
           kind="webhook"
-          title="Dernières exécutions des webhooks"
-          empty-text="Aucune exécution connue."
+          :title="t('webhooks.recentWebhookExecutionsTitle')"
+          :empty-text="t('webhooks.noExecutionKnownTitle')"
         />
       </template>
     </div>
@@ -249,9 +249,9 @@
         <div class="card-body">
           <EmptyState
             :icon="IconActivity"
-            title="Aucun tracker configuré."
-            subtitle="Surveillez les releases Git ou les images Docker et déclenchez automatiquement un script sur une VM lors d'une mise à jour."
-            cta-label="Créer le premier tracker"
+            :title="t('webhooks.noTrackerConfiguredTitle')"
+            :subtitle="t('webhooks.noTrackerConfiguredSubtitle')"
+            :cta-label="t('webhooks.createFirstTrackerButton')"
             @cta="openCreateTracker"
           />
         </div>
@@ -286,7 +286,7 @@
                   <span
                     v-if="!tracker.enabled"
                     class="badge bg-secondary-lt text-secondary"
-                  >Désactivé</span>
+                  >{{ t('webhooks.disabledBadge') }}</span>
                 </div>
               </div>
               <div class="card-body">
@@ -297,7 +297,7 @@
                       <span
                         class="text-muted"
                         style="min-width:60px"
-                      >Image</span>
+                      >{{ t('webhooks.cardImageLabel') }}</span>
                       <code class="text-truncate">{{ tracker.docker_image }}:{{ tracker.docker_tag || 'latest' }}</code>
                     </div>
                     <div
@@ -307,7 +307,7 @@
                       <span
                         class="text-muted"
                         style="min-width:60px"
-                      >Repo</span>
+                      >{{ t('webhooks.cardRepoLabel') }}</span>
                       <a
                         :href="repoURL(tracker)"
                         target="_blank"
@@ -321,7 +321,7 @@
                       <span
                         class="text-muted"
                         style="min-width:60px"
-                      >Repo</span>
+                      >{{ t('webhooks.cardRepoLabel') }}</span>
                       <a
                         :href="repoURL(tracker)"
                         target="_blank"
@@ -334,7 +334,7 @@
                       <span
                         class="text-muted"
                         style="min-width:60px"
-                      >VM</span>
+                      >{{ t('webhooks.cardVmLabel') }}</span>
                       <router-link
                         :to="`/hosts/${tracker.host_id}`"
                         class="text-truncate text-decoration-none"
@@ -346,7 +346,7 @@
                       <span
                         class="text-muted"
                         style="min-width:60px"
-                      >Compose</span>
+                      >{{ t('webhooks.cardComposeLabel') }}</span>
                       <code class="small text-truncate">{{ tracker.compose_project }}{{ tracker.compose_service ? ' / ' + tracker.compose_service : '' }}</code>
                     </div>
                   </template>
@@ -355,7 +355,7 @@
                       <span
                         class="text-muted"
                         style="min-width:60px"
-                      >VM</span>
+                      >{{ t('webhooks.cardVmLabel') }}</span>
                       <router-link
                         :to="`/hosts/${tracker.host_id}`"
                         class="text-truncate text-decoration-none"
@@ -367,7 +367,7 @@
                       <span
                         class="text-muted"
                         style="min-width:60px"
-                      >Tache</span>
+                      >{{ t('webhooks.cardTaskLabel') }}</span>
                       <code class="small text-truncate">{{ tracker.custom_task_id }}</code>
                     </div>
                   </template>
@@ -376,8 +376,8 @@
                       <span
                         class="text-muted"
                         style="min-width:60px"
-                      >Mode</span>
-                      <span class="badge bg-blue-lt text-blue">Surveillance seule</span>
+                      >{{ t('webhooks.modeLabel') }}</span>
+                      <span class="badge bg-blue-lt text-blue">{{ t('webhooks.monitoringOnlyBadge') }}</span>
                     </div>
                   </template>
                   <div
@@ -387,14 +387,14 @@
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Dernière</span>
+                    >{{ t('webhooks.cardLastLabel') }}</span>
                     <span class="badge bg-success-lt text-success">{{ tracker.last_release_tag }}</span>
                   </div>
                   <div class="d-flex gap-2 mb-1">
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Vérifiée</span>
+                    >{{ t('webhooks.cardCheckedLabel') }}</span>
                     <span>{{ formatDateOnly(tracker.last_checked_at || tracker.last_triggered_at || tracker.last_execution?.triggered_at) }}</span>
                   </div>
                   <div
@@ -404,7 +404,7 @@
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Cooldown</span>
+                    >{{ t('webhooks.cooldownLabel') }}</span>
                     <span>{{ `${tracker.cooldown_hours}h` }}</span>
                   </div>
                 </div>
@@ -415,11 +415,11 @@
                   >
                     <span
                       class="badge bg-warning-lt text-warning"
-                      :title="`Déploiement prévu: ${cooldownEtaLabel(tracker)}`"
-                    >Cooldown actif · reste {{ cooldownRemainingLabel(tracker) }}</span>
+                      :title="t('webhooks.plannedDeploymentTooltip', { eta: cooldownEtaLabel(tracker) })"
+                    >{{ t('webhooks.cooldownActiveLabel', { remaining: cooldownRemainingLabel(tracker) }) }}</span>
                   </div>
                   <template v-if="tracker.last_execution">
-                    <span class="text-muted">Dernière exécution :</span>
+                    <span class="text-muted">{{ t('webhooks.lastExecutionLabel') }}</span>
                     <span
                       class="ms-1 badge"
                       :class="execStatusBadge(tracker.last_execution.status || '')"
@@ -427,19 +427,19 @@
                     <span class="ms-1 text-muted">{{ formatRelative(tracker.last_execution.triggered_at || '') }}</span>
                   </template>
                   <template v-else-if="tracker.last_checked_at">
-                    <span class="text-muted">Dernière vérif : {{ formatRelative(tracker.last_checked_at) }}</span>
+                    <span class="text-muted">{{ t('webhooks.lastCheckedRelativeLabel', { relative: formatRelative(tracker.last_checked_at) }) }}</span>
                     <span
                       v-if="tracker.last_error"
                       class="ms-1 badge bg-danger-lt text-danger"
                       :title="(tracker.last_error as string)"
-                    >erreur</span>
+                    >{{ t('webhooks.errorBadgeWord') }}</span>
                     <span
                       v-else-if="!tracker.last_release_tag && tracker.tracker_type !== 'docker'"
                       class="ms-1 badge bg-warning-lt text-warning"
-                    >aucune release trouvée</span>
+                    >{{ t('webhooks.noReleaseFoundBadge') }}</span>
                   </template>
                   <template v-else>
-                    <span class="text-muted">En attente du premier check...</span>
+                    <span class="text-muted">{{ t('webhooks.awaitingFirstCheckLabel') }}</span>
                   </template>
                 </div>
               </div>
@@ -448,19 +448,19 @@
                   :to="`/release-trackers/${tracker.id}`"
                   class="btn btn-sm btn-outline-primary"
                 >
-                  Détails
+                  {{ t('webhooks.detailsButton') }}
                 </router-link>
                 <button
                   type="button"
                   class="btn btn-sm btn-outline-secondary"
                   @click="openEditTracker(tracker)"
                 >
-                  Modifier
+                  {{ t('webhooks.editButton') }}
                 </button>
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Verifier maintenant"
+                  :title="t('webhooks.checkNowButton')"
                   @click="checkNow(tracker)"
                 >
                   <IconRefresh :size="14" />
@@ -471,7 +471,7 @@
                   :class="tracker.enabled ? 'btn-outline-warning' : 'btn-outline-success'"
                   @click="toggleTracker(tracker)"
                 >
-                  {{ tracker.enabled ? 'Désactiver' : 'Activer' }}
+                  {{ tracker.enabled ? t('webhooks.disableButton') : t('webhooks.enableButton') }}
                 </button>
                 <button
                   type="button"
@@ -489,8 +489,8 @@
           class="mt-4"
           :executions="recentTrackerExecutions"
           kind="tracker"
-          title="Dernières exécutions des trackers"
-          empty-text="Aucune exécution connue."
+          :title="t('webhooks.recentTrackerExecutionsTitle')"
+          :empty-text="t('webhooks.noExecutionKnownTitle')"
           logs-mode="inline"
           @open-logs="openTrackerLogs"
         />
@@ -499,8 +499,8 @@
           <CommandLogPanel
             :command="selectedTrackerCmd"
             :show="showTrackerConsole"
-            title="Console live"
-            empty-text="Sélectionnez 'Logs' dans les dernières exécutions"
+            :title="t('webhooks.consoleLiveTitle')"
+            :empty-text="t('webhooks.selectLogsInRecentExecutionsHint')"
             @close="closeTrackerLogs"
             @open="showTrackerConsole = true"
           />
@@ -548,12 +548,12 @@
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">
-                Webhook créé
+                {{ t('webhooks.webhookCreatedTitle') }}
               </h5>
             </div>
             <div class="modal-body">
               <div class="alert alert-warning">
-                Copiez ce secret maintenant, il ne sera plus affiché en clair.
+                {{ t('webhooks.copySecretNowWarning') }}
               </div>
               <WebhookUrlCard
                 :webhook-id="newWebhookId"
@@ -567,7 +567,7 @@
                 class="btn btn-primary"
                 @click="closeSecretModal"
               >
-                J'ai copié le secret
+                {{ t('webhooks.copiedSecretButton') }}
               </button>
             </div>
           </div>
@@ -579,6 +579,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { IconActivity, IconGitBranch, IconPlus, IconRefresh, IconSearch, IconTrash } from '@tabler/icons-vue'
@@ -591,6 +592,9 @@ import TrackableContainersModal from '../components/webhooks/TrackableContainers
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { ref } from 'vue'
 import { useModalChrome } from '../composables/useModalChrome'
+
+const { t } = useI18n()
+
 const {
   activeTab,
   hosts,
@@ -642,7 +646,7 @@ const {
 } = useGitWebhooksPage()
 
 // No dismiss affordance by design — the secret is shown once, and the
-// only way out is the "J'ai copié le secret" button, so ESC/backdrop
+// only way out is the "copied the secret" button, so ESC/backdrop
 // close must stay disabled (persistent: true).
 const secretModalRef = ref<HTMLElement | null>(null)
 useModalChrome(secretModalRef, () => !!newWebhookSecret.value, { persistent: true })

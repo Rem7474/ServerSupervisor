@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        État SMART des disques
+        {{ t('monitoring.diskSmartStatusTitle') }}
       </h3>
     </div>
     <div
@@ -20,8 +20,8 @@
     >
       <EmptyState
         :icon="IconClock"
-        title="Aucune donnée SMART disponible"
-        subtitle="Vérifie que l'agent collecte SMART et que smartmontools est installé."
+        :title="t('monitoring.noSmartData')"
+        :subtitle="t('monitoring.noSmartDataHint')"
       />
     </div>
     <div
@@ -31,13 +31,13 @@
       <table class="table table-vcenter card-table table-sm">
         <thead>
           <tr>
-            <th>Périphérique</th>
-            <th>Statut</th>
-            <th>Température</th>
-            <th>Heures d'utilisation</th>
-            <th>Secteurs (réal. / attente / incorr.)</th>
-            <th>Cycles d'alim.</th>
-            <th>Usure SSD/NVMe</th>
+            <th>{{ t('monitoring.device') }}</th>
+            <th>{{ t('common.status') }}</th>
+            <th>{{ t('monitoring.temperature') }}</th>
+            <th>{{ t('monitoring.powerOnHours') }}</th>
+            <th>{{ t('monitoring.sectorsHeader') }}</th>
+            <th>{{ t('monitoring.powerCycles') }}</th>
+            <th>{{ t('monitoring.ssdWear') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -119,12 +119,15 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconClock } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import BadgePill from '../common/BadgePill.vue'
 import { useDiskHealth, type DiskHealth } from '../../composables/useDiskHealth'
 import { smartStatusTone } from '../../utils/diskHealth'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   hostId: string

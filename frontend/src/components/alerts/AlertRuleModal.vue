@@ -12,7 +12,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              {{ rule ? 'Modifier l\'alerte' : 'Nouvelle alerte' }}
+              {{ rule ? t('alerts.editAlertModalTitle') : t('alerts.newAlertButton') }}
             </h5>
             <button
               type="button"
@@ -27,21 +27,21 @@
                 :class="{ active: step === 1, done: step > 1 }"
               >
                 <span class="step-chip-index">1</span>
-                <span>Quoi surveiller</span>
+                <span>{{ t('alerts.stepWhatLabel') }}</span>
               </div>
               <div
                 class="step-chip"
                 :class="{ active: step === 2, done: step > 2 }"
               >
                 <span class="step-chip-index">2</span>
-                <span>Conditions</span>
+                <span>{{ t('alerts.stepConditionsLabel') }}</span>
               </div>
               <div
                 class="step-chip"
                 :class="{ active: step === 3 }"
               >
                 <span class="step-chip-index">3</span>
-                <span>Notification</span>
+                <span>{{ t('alerts.notification') }}</span>
               </div>
             </div>
 
@@ -50,7 +50,7 @@
               class="alert-presets mb-3"
             >
               <div class="text-secondary small mb-2">
-                Démarrer avec un modèle (tout reste modifiable ensuite) :
+                {{ t('alerts.presetsIntroLabel') }}
               </div>
               <div class="d-flex flex-wrap gap-2">
                 <button
@@ -60,7 +60,7 @@
                   class="btn btn-outline-secondary btn-sm"
                   @click="applyPreset(preset)"
                 >
-                  {{ preset.icon }} {{ preset.label }}
+                  {{ preset.icon }} {{ t(preset.labelKey) }}
                 </button>
               </div>
             </div>
@@ -133,7 +133,7 @@
               class="btn btn-secondary"
               @click="close"
             >
-              Annuler
+              {{ t('alerts.cancelButton') }}
             </button>
             <button
               v-if="step > 1"
@@ -142,7 +142,7 @@
               :disabled="saving"
               @click="step -= 1"
             >
-              ← Précédent
+              {{ t('alerts.previousButton') }}
             </button>
             <button
               v-if="step < 3"
@@ -151,7 +151,7 @@
               :disabled="saving || !canProceedStep"
               @click="goNextStep"
             >
-              Suivant →
+              {{ t('alerts.nextButton') }}
             </button>
             <button
               v-if="step === 3"
@@ -168,7 +168,7 @@
                 :size="16"
                 class="icon me-1"
               />
-              {{ testing ? 'Test en cours...' : 'Tester' }}
+              {{ testing ? t('alerts.testingInProgressLabel') : t('alerts.testButton') }}
             </button>
             <button
               v-if="step === 3"
@@ -181,7 +181,7 @@
                 v-if="saving"
                 class="spinner-border spinner-border-sm me-2"
               />
-              {{ rule ? 'Mettre à jour' : 'Créer' }}
+              {{ rule ? t('alerts.updateButton') : t('alerts.createButton') }}
             </button>
           </div>
         </div>
@@ -196,6 +196,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconCircleCheck } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import AlertRuleStepSource from './AlertRuleStepSource.vue'
@@ -282,6 +283,8 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', payload: unknown): void
 }>()
+
+const { t } = useI18n()
 
 const modalRef = ref<HTMLElement | null>(null)
 useModalChrome(modalRef, () => props.visible, { onClose: close })
@@ -383,7 +386,7 @@ const canProceedStep = computed(() => {
   if (step.value === 1) {
     const hasBase = !!form.value.metric && !!form.value.name?.trim()
     if (!hasBase) return false
-    // "Tous les hôtes" is a valid selection for agent-based rules.
+    // "All hosts" is a valid selection for agent-based rules.
     if (form.value.source_type === 'agent') return true
     // Synthetic rules are global by construction — no scope to validate.
     if (form.value.source_type === 'synthetic') return true
@@ -454,7 +457,7 @@ watch(
   () => form.value.host_id,
   async (hostId) => {
     if (!hostId) {
-      // "Tous les hôtes" selected — clear host-specific metrics
+      // "All hosts" selected — clear host-specific metrics
       hostMetrics.value = null
       hostMetricsLoading.value = false
       hostMetricsError.value = ''
@@ -468,7 +471,7 @@ watch(
       const response = await apiClient.getHostCapabilities(hostId)
       hostMetrics.value = response.data
     } catch (_error) {
-      hostMetricsError.value = 'Échec du chargement des métriques pour cet hôte'
+      hostMetricsError.value = t('alerts.hostMetricsLoadError')
       hostMetrics.value = null
     } finally {
       hostMetricsLoading.value = false
@@ -574,7 +577,7 @@ async function testAlert(): Promise<void> {
     testResults.value = response.data
   } catch (err: unknown) {
     testResults.value = null
-    testError.value = getApiErrorMessage(err, 'Échec du test de la règle.')
+    testError.value = getApiErrorMessage(err, t('alerts.testRuleFailedError'))
   } finally {
     testing.value = false
   }
@@ -598,7 +601,7 @@ async function downloadTestLogs(): Promise<void> {
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   } catch (err: unknown) {
-    testError.value = getApiErrorMessage(err, 'Échec du téléchargement des logs.')
+    testError.value = getApiErrorMessage(err, t('alerts.downloadLogsFailedError'))
   } finally {
     downloadingLogs.value = false
   }
@@ -618,7 +621,7 @@ const alertRulePresets = ALERT_RULE_PRESETS
 function applyPreset(preset: AlertRulePreset): void {
   form.value.metric = preset.metric
   onMetricChange()
-  form.value.name = preset.label
+  form.value.name = t(preset.labelKey)
   form.value.operator = preset.operator
   form.value.threshold_warn = preset.thresholdWarn
   form.value.threshold_crit = preset.thresholdCrit

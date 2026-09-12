@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 
 // Real-browser test: ApexCharts (SVG-based) actually renders here (Chromium
 // provides real layout), unlike happy-dom. Only the API is mocked.
@@ -20,6 +21,10 @@ vi.mock('../../api', () => ({
 import DiskHistoryChart from './DiskHistoryChart.vue'
 
 describe('DiskHistoryChart (browser / real render)', () => {
+  beforeEach(() => {
+    setLocale('fr')
+  })
+
   it('renders a real ApexCharts SVG once data has loaded', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

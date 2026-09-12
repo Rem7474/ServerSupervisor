@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import ExposureDomainsPanel from './ExposureDomainsPanel.vue'
 import type { HostExposure } from '../../types/host'
 import type { UptimeProbe } from '../../types/uptime'
@@ -55,6 +56,10 @@ function mountPanel(exposure: HostExposure | null) {
 }
 
 describe('ExposureDomainsPanel — disponibilité column', () => {
+  beforeEach(() => {
+    setLocale('fr')
+  })
+
   it('shows a monitoring badge and detail link when the domain\'s NPM proxy host has a linked probe/cert', () => {
     probesRef.value = [{ id: 'p1', npm_proxy_host_id: 'proxy-1', last_status: 'up' } as UptimeProbe]
     certsRef.value = [{ id: 'c1', npm_proxy_host_id: 'proxy-1', days_remaining: 42 } as SSLCertificate]
@@ -81,5 +86,26 @@ describe('ExposureDomainsPanel — disponibilité column', () => {
     const rows = wrapper.findAll('tbody tr')
     expect(rows).toHaveLength(1)
     expect(rows[0].text()).toContain('—')
+  })
+
+  it('renders the translated KPI labels and table headers, and interpolates the subject in the empty state', () => {
+    const wrapper = mountPanel(makeExposure([]))
+
+    expect(wrapper.text()).toContain('Adresse IP')
+    expect(wrapper.text()).toContain('Requêtes (24h)')
+    expect(wrapper.text()).toContain('Suspectes')
+    expect(wrapper.text()).toContain('Bloquées')
+    expect(wrapper.text()).toContain('Aucun domaine NPM ne route vers cet hôte.')
+  })
+
+  it('shows the translated "Désactivé" badge for a domain whose NPM proxy host is disabled', () => {
+    const wrapper = mountPanel(makeExposure([
+      { proxy_host_id: 'proxy-3', connection_id: 'conn-1', connection_name: 'main', domain_name: 'off.example.com', forward_port: 80, ssl_enabled: false, npm_enabled: false, requests: 0, bytes: 0, errors_4xx: 0, errors_5xx: 0, suspicious_requests: 0, blocked_requests: 0 },
+    ]))
+
+    expect(wrapper.text()).toContain('Désactivé')
+    for (const header of ['Domaine', 'Connexion NPM', 'Cible', 'Disponibilité', 'Volume', 'Erreurs 4xx/5xx']) {
+      expect(wrapper.text()).toContain(header)
+    }
   })
 })

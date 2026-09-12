@@ -4,7 +4,7 @@
       <div class="card card-sm h-100">
         <div class="card-body text-center">
           <div class="text-secondary small mb-1">
-            Requêtes totales
+            {{ t('security.totalRequestsLabel') }}
           </div>
           <div class="h2 mb-0">
             {{ numberFormat(traffic.total_requests || 0) }}
@@ -22,7 +22,7 @@
       <div class="card card-sm h-100">
         <div class="card-body text-center">
           <div class="text-secondary small mb-1">
-            Bande passante
+            {{ t('security.bandwidthLabel') }}
           </div>
           <div class="h2 mb-0">
             {{ formatBytes(traffic.total_bytes || 0) }}
@@ -40,7 +40,7 @@
       <div class="card card-sm h-100">
         <div class="card-body text-center">
           <div class="text-secondary small mb-1">
-            Taux 5xx
+            {{ t('security.ratio5xxLabel') }}
           </div>
           <div class="h2 mb-0 text-danger">
             {{ percent(traffic.ratio_5xx) }}
@@ -58,7 +58,7 @@
       <div class="card card-sm h-100">
         <div class="card-body text-center">
           <div class="text-secondary small mb-1">
-            IPs suspectes
+            {{ t('security.suspiciousIpsLabel') }}
           </div>
           <div class="h2 mb-0">
             {{ numberFormat(threats.suspicious_ips || 0) }}
@@ -76,6 +76,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model); typed in the Phase 7 split
 type AnyRecord = Record<string, any>
 
@@ -85,8 +87,10 @@ const props = defineProps<{
   compare: AnyRecord
 }>()
 
+const { t, locale } = useI18n()
+
 function numberFormat(v: number): string {
-  return new Intl.NumberFormat('fr-FR').format(Number(v) || 0)
+  return new Intl.NumberFormat(locale.value).format(Number(v) || 0)
 }
 
 function formatBytes(bytes: number): string {
@@ -131,8 +135,8 @@ function deltaClass(metric: string): string {
 
 function deltaLabel(metric: string): string {
   const v = kpiDelta(metric)
-  if (v === null) return 'N/A vs période précédente'
+  if (v === null) return t('security.notAvailableVsPreviousPeriod')
   const sign = v > 0 ? '+' : ''
-  return `${sign}${v.toFixed(1)}% vs période précédente`
+  return `${sign}${v.toFixed(1)}% ${t('security.vsPreviousPeriodSuffix')}`
 }
 </script>

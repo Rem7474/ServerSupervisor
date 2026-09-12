@@ -2,7 +2,7 @@
   <div>
     <PageRefreshBar
       v-model="autoRefresh"
-      label="Exposition"
+      :label="t('host.exposureLabel')"
       :interval-sec="EXPOSURE_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />
@@ -31,13 +31,14 @@
       :error="error"
       :period="period"
       :period-label="periodLabel"
-      subject-label="cet hôte"
+      :subject-label="t('host.thisHostSubject')"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../../api'
 import ExposureDomainsPanel from '../security/ExposureDomainsPanel.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
@@ -48,11 +49,13 @@ const props = defineProps<{ hostId: string }>()
 
 const emit = defineEmits<{ (e: 'loaded', domainCount: number): void }>()
 
-const PERIODS = [
-  { value: '24h', label: '24h' },
-  { value: '168h', label: '7j' },
-  { value: '720h', label: '30j' },
-]
+const { t } = useI18n()
+
+const PERIODS = computed(() => [
+  { value: '24h', label: t('host.timeRange24h') },
+  { value: '168h', label: t('host.timeRange7d') },
+  { value: '720h', label: t('host.timeRange30d') },
+])
 
 const EXPOSURE_REFRESH_SEC = 60
 
@@ -64,7 +67,7 @@ const autoRefresh = ref(true)
 const lastUpdatedAt = ref<Date | null>(null)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 
-const periodLabel = computed(() => PERIODS.find((p) => p.value === period.value)?.label ?? period.value)
+const periodLabel = computed(() => PERIODS.value.find((p) => p.value === period.value)?.label ?? period.value)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -75,7 +78,7 @@ async function load(): Promise<void> {
     lastUpdatedAt.value = new Date()
     emit('loaded', exposure.value?.domains.length ?? 0)
   } catch (err: unknown) {
-    error.value = getApiErrorMessage(err, 'Erreur de chargement')
+    error.value = getApiErrorMessage(err, t('host.loadError'))
   } finally {
     loading.value = false
   }

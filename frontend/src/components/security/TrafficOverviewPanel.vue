@@ -75,7 +75,7 @@
     <div v-else>
       <PageRefreshBar
         v-model="autoRefresh"
-        label="Stats web"
+        :label="t('security.trafficPageTitle')"
         :interval-sec="REFRESH_INTERVAL_MS / 1000"
         :last-updated-at="lastUpdatedAt"
       >
@@ -114,9 +114,9 @@
           <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
               <h3 class="card-title mb-0">
-                Trafic - requêtes par tranche
+                {{ t('security.trafficRequestsPerBucketTitle') }}
               </h3>
-              <span class="small text-secondary">Humain vs Bot</span>
+              <span class="small text-secondary">{{ t('security.humanVsBotLabel') }}</span>
             </div>
             <div
               class="card-body chart-body"
@@ -135,7 +135,7 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Distribution HTTP
+                {{ t('security.httpDistributionTitle') }}
               </h3>
             </div>
             <div
@@ -157,17 +157,17 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Top endpoints
+                {{ t('security.topEndpointsTitle') }}
               </h3>
             </div>
             <div class="table-responsive">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>Méthode</th>
-                    <th>Chemin</th>
+                    <th>{{ t('security.methodColumn') }}</th>
+                    <th>{{ t('security.pathColumn') }}</th>
                     <th class="text-end">
-                      Req.
+                      {{ t('security.reqAbbrColumn') }}
                     </th>
                     <th class="text-end">
                       Status
@@ -177,7 +177,7 @@
                 <tbody>
                   <tr v-if="!topEndpoints.length">
                     <td colspan="4">
-                      <EmptyState title="Aucun endpoint sur la période." />
+                      <EmptyState :title="t('security.noEndpointDataTitle')" />
                     </td>
                   </tr>
                   <tr
@@ -212,13 +212,13 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Top IPs suspectes
+                {{ t('security.topSuspiciousIpsTitle') }}
               </h3>
             </div>
             <div class="card-body p-0">
               <EmptyState
                 v-if="!topThreatIPs.length"
-                title="Aucune IP suspecte."
+                :title="t('security.noSuspiciousIpShortTitle')"
               />
               <button
                 v-for="ip in topThreatIPs.slice(0, 10)"
@@ -233,7 +233,7 @@
                     {{ ip.ip }}
                   </div>
                   <div class="small text-secondary">
-                    {{ ip.level || 'LOW' }} · chemins {{ ip.unique_paths || 0 }}
+                    {{ ip.level || 'LOW' }} · {{ t('security.pathsCountInline', { n: ip.unique_paths || 0 }) }}
                   </div>
                 </div>
                 <span class="badge bg-danger-lt text-danger">{{ numberFormat(ip.hits || 0) }}</span>
@@ -248,7 +248,7 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
-                Carte mondiale des IP clientes
+                {{ t('security.worldMapClientIpsTitle') }}
               </h3>
             </div>
             <div class="card-body">
@@ -261,16 +261,16 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
-                Pays les plus actifs
+                {{ t('security.mostActiveCountriesTitle') }}
               </h3>
-              <span class="small text-secondary">{{ numberFormat(countryDistribution.length) }} pays</span>
+              <span class="small text-secondary">{{ t('security.countriesCountLabel', { n: numberFormat(countryDistribution.length) }) }}</span>
             </div>
             <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>Pays</th>
-                    <th>Code</th>
+                    <th>{{ t('security.countryColumn') }}</th>
+                    <th>{{ t('security.codeColumn') }}</th>
                     <th class="text-end">
                       Hits
                     </th>
@@ -279,7 +279,7 @@
                 <tbody>
                   <tr v-if="!countryDistribution.length">
                     <td colspan="3">
-                      <EmptyState title="Aucune donnée pays." />
+                      <EmptyState :title="t('security.noCountryDataTitle')" />
                     </td>
                   </tr>
                   <tr
@@ -287,7 +287,7 @@
                     :key="`country-${item.country}`"
                   >
                     <td>
-                      <span class="small">{{ item.country || 'Inconnu' }}</span>
+                      <span class="small">{{ item.country || t('security.unknownCountryLabel') }}</span>
                     </td>
                     <td>
                       <span class="badge bg-azure-lt text-azure">{{ item.country_code || '--' }}</span>
@@ -308,13 +308,13 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Répartition du trafic par domaine
+                {{ t('security.trafficByDomainTitle') }}
               </h3>
             </div>
             <div class="card-body">
               <EmptyState
                 v-if="!topProxyHosts.length"
-                title="Aucune donnée domaine."
+                :title="t('security.noDomainDataTitle')"
               />
               <div v-else>
                 <div
@@ -351,14 +351,14 @@
           <div class="card h-100">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
-                Top domaines cibles
+                {{ t('security.topTargetDomainsTitle') }}
               </h3>
             </div>
             <div class="table-responsive">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>Domaine</th>
+                    <th>{{ t('security.domainColumn') }}</th>
                     <th class="text-end">
                       Hits
                     </th>
@@ -373,7 +373,7 @@
                 <tbody>
                   <tr v-if="!topDomains.length">
                     <td colspan="4">
-                      <EmptyState title="Aucune donnée de trafic." />
+                      <EmptyState :title="t('security.noTrafficDataTitle')" />
                     </td>
                   </tr>
                   <tr
@@ -409,19 +409,19 @@
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h3 class="card-title mb-0">
-            Flux temps réel - dernières requêtes
+            {{ t('security.realtimeFeedTitle') }}
           </h3>
-          <span class="small text-secondary">auto-refresh {{ autoRefresh ? 'ON' : 'OFF' }}</span>
+          <span class="small text-secondary">{{ t('security.autoRefreshStatusLabel', { status: autoRefresh ? 'ON' : 'OFF' }) }}</span>
         </div>
         <div class="table-responsive">
           <table class="table table-sm table-vcenter card-table">
             <thead>
               <tr>
-                <th>Heure</th>
-                <th>IP</th>
-                <th>Domaine cible</th>
-                <th>Méthode</th>
-                <th>Chemin</th>
+                <th>{{ t('security.timeColumn') }}</th>
+                <th>{{ t('security.ipColumn') }}</th>
+                <th>{{ t('security.targetDomainColumn') }}</th>
+                <th>{{ t('security.methodColumn') }}</th>
+                <th>{{ t('security.pathColumn') }}</th>
                 <th>Status</th>
                 <th>Bytes</th>
               </tr>
@@ -429,7 +429,7 @@
             <tbody>
               <tr v-if="!liveRequests.length">
                 <td colspan="7">
-                  <EmptyState title="Aucune requête récente." />
+                  <EmptyState :title="t('security.noRecentRequestTitle')" />
                 </td>
               </tr>
               <tr
@@ -516,6 +516,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import EmptyState from '../EmptyState.vue'
@@ -528,6 +529,8 @@ import { useTraffic } from '../../composables/useTraffic'
 import DomainDetailsModal from './DomainDetailsModal.vue'
 import IPTimelineModal from './IPTimelineModal.vue'
 import TimeRangePicker from '../common/TimeRangePicker.vue'
+
+const { t } = useI18n()
 
 const {
   periodOptions,

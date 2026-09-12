@@ -4,13 +4,13 @@
       <label
         for="process-table-filter"
         class="visually-hidden"
-      >Filtrer processus</label>
+      >{{ t('host.filterProcessesLabel') }}</label>
       <input
         id="process-table-filter"
         v-model="filter"
         type="text"
         class="form-control form-control-sm"
-        placeholder="Filtrer…"
+        :placeholder="t('host.filterPlaceholder')"
         style="width: 160px;"
       >
     </div>
@@ -34,13 +34,13 @@
             </th>
             <th>
               <SortableHeader
-                label="Nom"
+                :label="t('host.nameColumn')"
                 :active="sortKey === 'name'"
                 :direction="sortDirLabel"
                 @toggle="sortBy('name')"
               />
             </th>
-            <th>Utilisateur</th>
+            <th>{{ t('host.userColumn') }}</th>
             <th>
               <SortableHeader
                 label="CPU%"
@@ -65,7 +65,7 @@
                 @toggle="sortBy('mem_rss_kb')"
               />
             </th>
-            <th>État</th>
+            <th>{{ t('host.stateColumn') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -111,23 +111,26 @@
       v-else
       class="text-secondary small"
     >
-      Aucun processus.
+      {{ t('host.noProcesses') }}
     </div>
     <div
       v-if="processes.length"
       class="text-secondary small mt-2"
     >
-      {{ filteredProcesses.length }} / {{ processes.length }} processus
+      {{ t('host.filteredOfTotalProcesses', { filtered: filteredProcesses.length, total: processes.length }) }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import SortableHeader from '../common/SortableHeader.vue'
 import type { HostProcess } from '../../composables/useHostProcesses'
 
 type SortKey = keyof HostProcess
+
+const { t } = useI18n()
 
 const props = defineProps<{
   processes: HostProcess[]

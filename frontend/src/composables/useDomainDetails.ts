@@ -4,6 +4,7 @@ import { getApiErrorMessage } from '../api/client'
 import { addToast } from './useGlobalToast'
 import { useConfirmDialog } from './useConfirmDialog'
 import type { DomainDetailsParams } from '../types/security'
+import { i18n } from '../i18n'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GetDomainDetails is an ad-hoc server-side aggregate (map[string]any), no Go model to type against — see types/security.ts
 type AnyRecord = Record<string, any>
@@ -79,7 +80,7 @@ export function useDomainDetails() {
       }, range)
       details.value = res.data?.details || {}
     } catch (e: unknown) {
-      error.value = getApiErrorMessage(e, 'Erreur de chargement')
+      error.value = getApiErrorMessage(e, i18n.global.t('common.loadError'))
       details.value = {}
     } finally {
       loading.value = false
@@ -158,13 +159,13 @@ export function useDomainDetails() {
 
   async function blockIP(ip: string, hostId: string, duration = '4h'): Promise<void> {
     if (!hostId) {
-      addToast(`Hôte introuvable pour bloquer ${ip}`, 'error')
+      addToast(i18n.global.t('security.blockHostNotFound', { ip }), 'error')
       return
     }
 
     const confirmed = await dialog.confirm({
-      title: `Bloquer l'IP ${ip}`,
-      message: `Bloquer ${ip} via CrowdSec pour ${duration} ?`,
+      title: i18n.global.t('security.blockIpConfirmTitle', { ip }),
+      message: i18n.global.t('security.blockIpConfirmMessage', { ip, duration }),
       variant: 'danger',
     })
     if (!confirmed) return
@@ -174,10 +175,10 @@ export function useDomainDetails() {
       await api.blockCrowdSecIP(ip, hostId, duration)
       delete blockState[ip]
       markBlockedLocally(ip)
-      addToast(`IP ${ip} bloquée par CrowdSec (${duration})`, 'success')
+      addToast(i18n.global.t('security.blockIpSuccess', { ip, duration }), 'success')
     } catch (e: unknown) {
       blockState[ip] = 'error'
-      addToast(`Impossible de bloquer ${ip} : ${getApiErrorMessage(e)}`, 'error')
+      addToast(i18n.global.t('security.blockIpError', { ip, message: getApiErrorMessage(e) }), 'error')
     }
   }
 

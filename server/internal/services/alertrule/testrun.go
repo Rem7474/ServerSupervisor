@@ -157,14 +157,14 @@ func (s *Service) TestRunLogs(ctx context.Context, in TestRunInput) ([]string, t
 		in.SourceType = models.InferAlertSourceType(in.Metric)
 	}
 	if in.Metric != "proxmox_auth_failures_recent" {
-		return nil, time.Time{}, apperr.Validation("Metrique non supportee pour les logs.")
+		return nil, time.Time{}, apperr.Validation("metric not supported for logs").I18n(apperr.CodeAlertMetricUnsupportedForLogs, nil)
 	}
 
 	rule := in.toRule()
 	rule.DockerScope = nil // logs preview is proxmox-only
 
 	if rule.SourceType != models.AlertSourceProxmox {
-		return nil, time.Time{}, apperr.Validation("La metrique requiert une source Proxmox.")
+		return nil, time.Time{}, apperr.Validation("this metric requires a Proxmox source").I18n(apperr.CodeAlertMetricRequiresProxmox, nil)
 	}
 	if err := s.ValidateProxmoxScope(ctx, rule.ProxmoxScope); err != nil {
 		return nil, time.Time{}, err

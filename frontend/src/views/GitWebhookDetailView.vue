@@ -7,7 +7,7 @@
             to="/git-webhooks"
             class="text-decoration-none"
           >
-            Git Webhooks
+            {{ t('webhooks.gitWebhooksBreadcrumb') }}
           </router-link>
           <span class="text-muted mx-1">/</span>
           <span>{{ webhook?.name || id }}</span>
@@ -22,7 +22,7 @@
           <span
             v-if="webhook && !webhook.enabled"
             class="badge bg-secondary-lt text-secondary"
-          >Désactivé</span>
+          >{{ t('webhooks.disabledBadge') }}</span>
         </h2>
       </div>
     </div>
@@ -58,44 +58,44 @@
         <div class="card mt-3">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title">
-              Configuration
+              {{ t('webhooks.configurationTitle') }}
             </h3>
             <router-link
               to="/git-webhooks"
               class="btn btn-sm btn-ghost-secondary"
               @click.prevent="openEdit"
             >
-              Modifier
+              {{ t('webhooks.editButton') }}
             </router-link>
           </div>
           <div class="card-body">
             <dl class="row mb-0 small">
               <dt class="col-5 text-muted">
-                Événement
+                {{ t('webhooks.eventLabel') }}
               </dt>
               <dd class="col-7">
                 {{ webhook.event_filter }}
               </dd>
               <dt class="col-5 text-muted">
-                Filtre repo
+                {{ t('webhooks.repoFilterLabel') }}
               </dt>
               <dd class="col-7">
-                {{ webhook.repo_filter || '<tous>' }}
+                {{ webhook.repo_filter || t('webhooks.allReposPlaceholder') }}
               </dd>
               <dt class="col-5 text-muted">
-                Filtre branche
+                {{ t('webhooks.branchFilterLabel') }}
               </dt>
               <dd class="col-7">
-                {{ webhook.branch_filter || '<toutes>' }}
+                {{ webhook.branch_filter || t('webhooks.allBranchesPlaceholder') }}
               </dd>
               <dt class="col-5 text-muted">
-                VM cible
+                {{ t('webhooks.targetVmLabel') }}
               </dt>
               <dd class="col-7">
                 {{ webhook.host_name || webhook.host_id }}
               </dd>
               <dt class="col-5 text-muted">
-                Tâche
+                {{ t('webhooks.taskLabel') }}
               </dt>
               <dd class="col-7">
                 <code>{{ webhook.custom_task_id }}</code>
@@ -104,7 +104,7 @@
                 v-if="webhook.notify_channels?.length"
                 class="col-5 text-muted"
               >
-                Notifications
+                {{ t('webhooks.notificationsLabel') }}
               </dt>
               <dd
                 v-if="webhook.notify_channels?.length"
@@ -116,10 +116,10 @@
                   class="badge me-1"
                   :class="channelBadge(ch)"
                 >{{ ch }}</span>
-                <span class="text-muted">({{ [webhook.notify_on_success && 'succès', webhook.notify_on_failure && 'échec'].filter(Boolean).join(', ') || 'aucune' }})</span>
+                <span class="text-muted">({{ [webhook.notify_on_success && t('webhooks.onSuccessWord'), webhook.notify_on_failure && t('webhooks.onFailureWord')].filter(Boolean).join(', ') || t('webhooks.noneWord') }})</span>
               </dd>
               <dt class="col-5 text-muted">
-                Créé le
+                {{ t('webhooks.createdOnLabel') }}
               </dt>
               <dd class="col-7">
                 {{ formatDateTime(webhook.created_at) }}
@@ -128,7 +128,7 @@
                 v-if="webhook.last_triggered_at"
                 class="col-5 text-muted"
               >
-                Dernier déclench.
+                {{ t('webhooks.lastTriggeredLabel') }}
               </dt>
               <dd
                 v-if="webhook.last_triggered_at"
@@ -144,7 +144,7 @@
         <div class="card mt-3">
           <div class="card-header">
             <h3 class="card-title">
-              Variables disponibles dans le script
+              {{ t('webhooks.availableVarsInScriptTitle') }}
             </h3>
           </div>
           <div class="card-body p-0">
@@ -171,8 +171,8 @@
         <WebhookExecutionList
           :executions="executions"
           kind="webhook"
-          title="Historique des exécutions"
-          empty-text="Aucune exécution enregistrée."
+          :title="t('webhooks.executionHistoryTitle')"
+          :empty-text="t('webhooks.noExecutionRecordedTitle')"
           :show-refresh="true"
           logs-mode="inline"
           @refresh="loadExecutions"
@@ -184,8 +184,8 @@
           <CommandLogPanel
             :command="selectedCmd"
             :show="showConsole"
-            title="Console live"
-            empty-text="Sélectionnez 'Logs' dans l'historique des exécutions"
+            :title="t('webhooks.consoleLiveTitle')"
+            :empty-text="t('webhooks.selectLogsHint')"
             @close="clearExecutionLogs"
             @open="showConsole = true"
           />
@@ -213,6 +213,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import RelativeTime from '../components/RelativeTime.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
@@ -221,6 +222,8 @@ import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import PayloadViewerModal from '../components/webhooks/PayloadViewerModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useGitWebhookDetail } from '../composables/useGitWebhookDetail'
+
+const { t } = useI18n()
 
 const selectedPayload = ref<string | null>(null)
 

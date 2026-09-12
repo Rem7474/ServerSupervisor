@@ -1,5 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
-import { reactive } from 'vue'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { reactive, defineComponent, h } from 'vue'
+import { mount } from '@vue/test-utils'
+import { setLocale } from '../i18n'
 
 // The composable loads custom tasks / registry credentials on open via the API
 // barrel; stub it so the immediate watcher never hits the network.
@@ -25,12 +27,24 @@ function makeProps(overrides: Partial<WebhookFormProps> = {}): WebhookFormProps 
   })
 }
 
-// setup builds a composable instance and captures the last submitted payload.
+// setup builds a composable instance (inside a mounted host component, since
+// useI18n() needs an active component instance) and captures the last
+// submitted payload.
 function setup(props: WebhookFormProps) {
   const submitted: { payload: WebhookFormData | null } = { payload: null }
-  const api = useWebhookForm(props, (p) => { submitted.payload = p })
-  return { ...api, submitted }
+  let api: ReturnType<typeof useWebhookForm> | undefined
+  mount(defineComponent({
+    setup() {
+      api = useWebhookForm(props, (p) => { submitted.payload = p })
+      return () => h('div')
+    },
+  }))
+  return { ...api!, submitted }
 }
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 describe('useWebhookForm — defaults', () => {
   it('defaults to a webhook form in webhook mode', () => {
@@ -91,8 +105,16 @@ describe('useWebhookForm — validation (submit guard)', () => {
     const { form, submit, validationError, submitted } = setup(makeProps({ mode: 'webhook' }))
     form.value.name = 'x'
     submit()
-    expect(validationError.value).not.toBe('')
+    expect(validationError.value).toBe('Nom, VM cible et ID de tâche sont obligatoires.')
     expect(submitted.payload).toBeNull()
+  })
+
+  it('translates the validation message to English when the locale is switched', () => {
+    setLocale('en')
+    const { form, submit, validationError } = setup(makeProps({ mode: 'webhook' }))
+    form.value.name = 'x'
+    submit()
+    expect(validationError.value).toBe('Name, target VM and task ID are required.')
   })
 
   it('accepts a complete webhook', () => {
@@ -201,8 +223,22 @@ describe('useWebhookForm — computeds', () => {
       item: { name: 'x', tracker_type: 'docker', docker_image: 'nginx' },
     }))
     expect(currentEnvVars.value.some(v => v.name === 'SS_IMAGE_NAME')).toBe(true)
+    const version = currentEnvVars.value.find(v => v.name === 'SS_IMAGE_VERSION')
+    expect(version?.desc).toContain('résolue')
     expect(title.value).toBe('Modifier le tracker')
-    expect(submitLabel.value).toBe('Mettre a jour')
+    expect(submitLabel.value).toBe('Mettre à jour')
+  })
+
+  it('translates the title, submit label and env var descriptions to English when the locale is switched', () => {
+    setLocale('en')
+    const { currentEnvVars, title, submitLabel } = setup(makeProps({
+      mode: 'tracker',
+      item: { name: 'x', tracker_type: 'git', repo_owner: 'a', repo_name: 'b' },
+    }))
+    expect(title.value).toBe('Edit tracker')
+    expect(submitLabel.value).toBe('Update')
+    const repoVar = currentEnvVars.value.find(v => v.name === 'SS_REPO_NAME')
+    expect(repoVar?.desc).toContain('owner/repo')
   })
 
   it('flags compose mode only when docker + dispatch + compose action align', () => {

@@ -19,8 +19,8 @@
       >
         <EmptyState
           :icon="IconTerminal2"
-          title="Aucune tâche personnalisée"
-          subtitle="Déclarez des tâches dans le tasks.yaml de l'agent pour les exécuter ici à la demande."
+          :title="t('host.noCustomTasksTitle')"
+          :subtitle="t('host.noCustomTasksSubtitle')"
         />
       </div>
       <div
@@ -30,7 +30,7 @@
         <table class="table table-vcenter card-table mb-0">
           <thead>
             <tr>
-              <th>Nom</th>
+              <th>{{ t('host.nameColumn') }}</th>
               <th>ID</th>
               <th class="text-end" />
             </tr>
@@ -50,8 +50,8 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-success"
                   :disabled="runningId === task.id"
-                  title="Exécuter"
-                  aria-label="Exécuter la tâche maintenant"
+                  :title="t('host.executeTooltip')"
+                  :aria-label="t('host.executeTaskAriaLabel')"
                   @click="runTaskNow(task)"
                 >
                   <span
@@ -81,7 +81,7 @@
       <div class="toast show align-items-center text-bg-success border-0">
         <div class="d-flex">
           <div class="toast-body">
-            <strong>{{ taskRunResult.name }}</strong> déclenchée — commande <code>{{ taskRunResult.id }}</code>
+            <strong>{{ taskRunResult.name }}</strong> {{ t('host.taskTriggeredPrefix') }} <code>{{ taskRunResult.id }}</code>
           </div>
           <button
             type="button"
@@ -96,6 +96,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPlayerPlay, IconTerminal2 } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
@@ -125,6 +126,7 @@ const props = withDefaults(defineProps<{
   active: false,
 })
 
+const { t } = useI18n()
 const pendingCommand = usePendingCommand()
 const tasks = ref<CustomTaskSummary[]>([])
 const tasksLoading = ref(false)
@@ -157,7 +159,7 @@ async function loadTasks(): Promise<void> {
     const { data } = await apiClient.getHostCustomTasks(String(props.hostId))
     tasks.value = data || []
   } catch (e: unknown) {
-    tasksError.value = getApiErrorMessage(e, 'Erreur de chargement')
+    tasksError.value = getApiErrorMessage(e, t('host.loadError'))
   } finally {
     tasksLoading.value = false
   }
@@ -179,7 +181,7 @@ async function runTaskNow(task: CustomTaskSummary): Promise<void> {
     emit('history-changed')
     await pendingCommand.track(data.command_id)
   } catch (e: unknown) {
-    tasksError.value = getApiErrorMessage(e, 'Erreur')
+    tasksError.value = getApiErrorMessage(e, t('common.error'))
   } finally {
     runningId.value = null
   }

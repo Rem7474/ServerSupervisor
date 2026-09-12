@@ -2,7 +2,7 @@
   <div>
     <PageRefreshBar
       v-model="autoRefresh"
-      label="Menaces web"
+      :label="t('security.threatsPageTitle')"
       :interval-sec="BOT_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     >
@@ -23,7 +23,7 @@
       @search="handleSearch"
     />
 
-    <!-- Squelette chargement -->
+    <!-- Loading skeleton -->
     <template v-if="loading">
       <LoadingSkeleton
         variant="kpi"
@@ -99,17 +99,17 @@
       </div>
     </template>
 
-    <!-- Contenu réel -->
+    <!-- Real content -->
     <template v-else>
       <div class="row row-cards mb-4">
         <div class="col-12 col-sm-3">
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">
-                Requêtes suspectes
+                {{ t('security.suspiciousRequestsLabel') }}
               </div>
               <div class="h2 mb-0 text-warning">
-                {{ (threats.suspicious_requests || 0).toLocaleString('fr-FR') }}
+                {{ (threats.suspicious_requests || 0).toLocaleString(locale) }}
               </div>
             </div>
           </div>
@@ -118,10 +118,10 @@
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">
-                IPs suspectes
+                {{ t('security.suspiciousIpsLabel') }}
               </div>
               <div class="h2 mb-0 text-warning">
-                {{ (threats.suspicious_ips || 0).toLocaleString('fr-FR') }}
+                {{ (threats.suspicious_ips || 0).toLocaleString(locale) }}
               </div>
             </div>
           </div>
@@ -130,10 +130,10 @@
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">
-                Domaines ciblés
+                {{ t('security.targetedDomainsLabel') }}
               </div>
               <div class="h2 mb-0 text-warning">
-                {{ (threats.targeted_hosts || 0).toLocaleString('fr-FR') }}
+                {{ (threats.targeted_hosts || 0).toLocaleString(locale) }}
               </div>
             </div>
           </div>
@@ -142,10 +142,10 @@
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">
-                IPs bloquées
+                {{ t('security.blockedIpsTitle') }}
               </div>
               <div class="h2 mb-0 text-success">
-                {{ (threats.blocked_ips || 0).toLocaleString('fr-FR') }}
+                {{ (threats.blocked_ips || 0).toLocaleString(locale) }}
               </div>
             </div>
           </div>
@@ -157,14 +157,14 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                IPs suspectes
+                {{ t('security.suspiciousIpsLabel') }}
               </h3>
             </div>
             <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>IP</th>
+                    <th>{{ t('security.ipColumn') }}</th>
                     <th class="text-end">
                       <SortableHeader
                         label="Hits"
@@ -175,7 +175,7 @@
                     </th>
                     <th class="text-end">
                       <SortableHeader
-                        label="Chemins"
+                        :label="t('security.pathsColumn')"
                         :active="ipSortKey === 'unique_paths'"
                         :direction="ipSortDir"
                         @toggle="toggleIPSort('unique_paths')"
@@ -183,21 +183,21 @@
                     </th>
                     <th class="text-end">
                       <SortableHeader
-                        label="Domaines"
+                        :label="t('security.domainsColumn')"
                         :active="ipSortKey === 'host_count'"
                         :direction="ipSortDir"
                         @toggle="toggleIPSort('host_count')"
                       />
                     </th>
-                    <th>Niveau</th>
-                    <th>Blocage</th>
+                    <th>{{ t('security.levelColumn') }}</th>
+                    <th>{{ t('security.blockingLabel') }}</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="!topIPs.length">
                     <td colspan="7">
-                      <EmptyState title="Aucune IP suspecte sur la période." />
+                      <EmptyState :title="t('security.noSuspiciousIpTitle')" />
                     </td>
                   </tr>
                   <tr
@@ -208,13 +208,13 @@
                       {{ ip.ip }}
                     </td>
                     <td class="text-end">
-                      {{ (ip.hits || 0).toLocaleString('fr-FR') }}
+                      {{ (ip.hits || 0).toLocaleString(locale) }}
                     </td>
                     <td class="text-end">
-                      {{ (ip.unique_paths || 0).toLocaleString('fr-FR') }}
+                      {{ (ip.unique_paths || 0).toLocaleString(locale) }}
                     </td>
                     <td class="text-end">
-                      {{ (ip.host_count || 0).toLocaleString('fr-FR') }}
+                      {{ (ip.host_count || 0).toLocaleString(locale) }}
                     </td>
                     <td>
                       <span
@@ -245,7 +245,7 @@
                         class="btn btn-sm btn-outline-primary"
                         @click="openTimeline(ip.ip)"
                       >
-                        Timeline
+                        {{ t('security.timelineButton') }}
                       </button>
                     </td>
                   </tr>
@@ -257,7 +257,7 @@
               class="card-footer d-flex align-items-center justify-content-between"
             >
               <div class="text-secondary small">
-                Page {{ ipPage }} sur {{ ipTotalPages }} — {{ topIPs.length }} IPs
+                {{ t('security.pageOfTotalIpsLabel', { page: ipPage, totalPages: ipTotalPages, total: topIPs.length }) }}
               </div>
               <PaginationNav
                 :current-page="ipPage"
@@ -272,13 +272,13 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Top chemins scannés
+                {{ t('security.topScannedPathsTitle') }}
               </h3>
             </div>
             <div class="card-body p-0">
               <EmptyState
                 v-if="!topPaths.length"
-                title="Aucun chemin suspect."
+                :title="t('security.noSuspiciousPathTitle')"
               />
               <div
                 v-for="p in pagedTopPaths"
@@ -294,7 +294,7 @@
                     {{ p.category || 'Unknown' }}
                   </div>
                 </div>
-                <span class="badge bg-warning-lt text-warning flex-shrink-0">{{ (p.hits || 0).toLocaleString('fr-FR') }}</span>
+                <span class="badge bg-warning-lt text-warning flex-shrink-0">{{ (p.hits || 0).toLocaleString(locale) }}</span>
               </div>
             </div>
             <div
@@ -302,7 +302,7 @@
               class="card-footer d-flex align-items-center justify-content-between"
             >
               <div class="text-secondary small">
-                Page {{ pathsPage }} sur {{ pathsTotalPages }} — {{ topPaths.length }} chemins
+                {{ t('security.pageOfTotalPathsLabel', { page: pathsPage, totalPages: pathsTotalPages, total: topPaths.length }) }}
               </div>
               <PaginationNav
                 :current-page="pathsPage"
@@ -319,7 +319,7 @@
           <div class="card">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Carte mondiale des menaces
+                {{ t('security.worldThreatMapTitle') }}
               </h3>
             </div>
             <div class="card-body">
@@ -331,16 +331,16 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
-                Pays des IPs suspectes
+                {{ t('security.suspiciousIpCountriesTitle') }}
               </h3>
-              <span class="small text-secondary">{{ countryDistribution.length }} pays</span>
+              <span class="small text-secondary">{{ t('security.countriesCountLabel', { n: countryDistribution.length }) }}</span>
             </div>
             <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>Pays</th>
-                    <th>Code</th>
+                    <th>{{ t('security.countryColumn') }}</th>
+                    <th>{{ t('security.codeColumn') }}</th>
                     <th class="text-end">
                       Hits
                     </th>
@@ -349,7 +349,7 @@
                 <tbody>
                   <tr v-if="!countryDistribution.length">
                     <td colspan="3">
-                      <EmptyState title="Aucune donnée pays." />
+                      <EmptyState :title="t('security.noCountryDataTitle')" />
                     </td>
                   </tr>
                   <tr
@@ -357,13 +357,13 @@
                     :key="`country-${item.country}`"
                   >
                     <td class="small">
-                      {{ item.country || 'Inconnu' }}
+                      {{ item.country || t('security.unknownCountryLabel') }}
                     </td>
                     <td>
                       <span class="badge bg-azure-lt text-azure">{{ item.country_code || '--' }}</span>
                     </td>
                     <td class="text-end">
-                      {{ (item.hits || 0).toLocaleString('fr-FR') }}
+                      {{ (item.hits || 0).toLocaleString(locale) }}
                     </td>
                   </tr>
                 </tbody>
@@ -378,14 +378,14 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Domaines les plus ciblés
+                {{ t('security.mostTargetedDomainsTitle') }}
               </h3>
             </div>
             <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>Domaine cible</th>
+                    <th>{{ t('security.targetDomainColumn') }}</th>
                     <th class="text-end">
                       <SortableHeader
                         label="Hits"
@@ -399,7 +399,7 @@
                 <tbody>
                   <tr v-if="!mostTargetedHosts.length">
                     <td colspan="2">
-                      <EmptyState title="Aucun domaine ciblé" />
+                      <EmptyState :title="t('security.noTargetedDomainTitle')" />
                     </td>
                   </tr>
                   <tr
@@ -416,7 +416,7 @@
                       {{ h.host_name || h.host_id || '—' }}
                     </td>
                     <td class="text-end">
-                      {{ (h.hits || 0).toLocaleString('fr-FR') }}
+                      {{ (h.hits || 0).toLocaleString(locale) }}
                     </td>
                   </tr>
                 </tbody>
@@ -428,17 +428,17 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                IP × Domaines (scan coordonné)
+                {{ t('security.ipDomainsCoordinatedScanTitle') }}
               </h3>
             </div>
             <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>IP</th>
+                    <th>{{ t('security.ipColumn') }}</th>
                     <th class="text-end">
                       <SortableHeader
-                        label="Domaines"
+                        :label="t('security.domainsColumn')"
                         :active="matrixSortKey === 'host_count'"
                         :direction="matrixSortDir"
                         @toggle="toggleMatrixSort('host_count')"
@@ -458,7 +458,7 @@
                 <tbody>
                   <tr v-if="!ipHostMatrix.length">
                     <td colspan="4">
-                      <EmptyState title="Pas de scan coordonné détecté" />
+                      <EmptyState :title="t('security.noCoordinatedScanTitle')" />
                     </td>
                   </tr>
                   <tr
@@ -469,10 +469,10 @@
                       {{ m.ip }}
                     </td>
                     <td class="text-end">
-                      {{ (m.host_count || 0).toLocaleString('fr-FR') }}
+                      {{ (m.host_count || 0).toLocaleString(locale) }}
                     </td>
                     <td class="text-end">
-                      {{ (m.hits || 0).toLocaleString('fr-FR') }}
+                      {{ (m.hits || 0).toLocaleString(locale) }}
                     </td>
                     <td class="text-end">
                       <button
@@ -480,7 +480,7 @@
                         class="btn btn-sm btn-outline-primary"
                         @click="openTimeline(m.ip)"
                       >
-                        Timeline
+                        {{ t('security.timelineButton') }}
                       </button>
                     </td>
                   </tr>
@@ -499,10 +499,10 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
               <h3 class="card-title mb-0">
-                IPs bloquées par CrowdSec
+                {{ t('security.crowdsecBlockedIpsTitle') }}
               </h3>
               <span class="badge bg-success-lt text-success fs-4">
-                {{ crowdSecTotal.toLocaleString() }} décisions actives
+                {{ t('security.activeDecisionsCountBadge', { n: crowdSecTotal.toLocaleString(locale) }) }}
               </span>
             </div>
             <div class="table-responsive scroll-table">
@@ -511,27 +511,27 @@
                   <tr>
                     <th>
                       <SortableHeader
-                        label="IP"
+                        :label="t('security.ipColumn')"
                         :active="crowdSecSortKey === 'ip'"
                         :direction="crowdSecSortDir"
                         @toggle="toggleCrowdSecSort('ip')"
                       />
                     </th>
-                    <th>Décision</th>
-                    <th>Scénario</th>
-                    <th>Origine</th>
+                    <th>{{ t('security.decisionColumn') }}</th>
+                    <th>{{ t('security.scenarioColumn') }}</th>
+                    <th>{{ t('security.originColumn') }}</th>
                     <th>
                       <SortableHeader
-                        label="Pays"
+                        :label="t('security.countryColumn')"
                         :active="crowdSecSortKey === 'country'"
                         :direction="crowdSecSortDir"
                         @toggle="toggleCrowdSecSort('country')"
                       />
                     </th>
-                    <th>AS / Opérateur</th>
+                    <th>{{ t('security.asOperatorColumn') }}</th>
                     <th>
                       <SortableHeader
-                        label="Expiration"
+                        :label="t('security.expirationColumn')"
                         :active="crowdSecSortKey === 'blocked_until'"
                         :direction="crowdSecSortDir"
                         @toggle="toggleCrowdSecSort('blocked_until')"
@@ -582,8 +582,8 @@
                           class="btn btn-icon btn-sm"
                           :class="rowState[entry.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-success'"
                           :disabled="rowState[entry.ip] === 'loading'"
-                          :title="rowState[entry.ip] === 'error' ? 'Erreur — Réessayer' : 'Débloquer'"
-                          aria-label="Débloquer cette IP"
+                          :title="rowState[entry.ip] === 'error' ? t('security.errorRetryTooltip') : t('security.unblockButton')"
+                          :aria-label="t('security.unblockThisIpAriaLabel')"
                           @click="unblockCrowdSecEntry(entry.ip)"
                         >
                           <span
@@ -601,7 +601,7 @@
                           class="btn btn-sm btn-outline-primary"
                           @click="openTimeline(entry.ip)"
                         >
-                          Timeline
+                          {{ t('security.timelineButton') }}
                         </button>
                       </div>
                     </td>
@@ -613,12 +613,12 @@
               v-if="crowdSecTotal > crowdSecIPs.length"
               class="card-footer text-secondary small"
             >
-              Affichage des {{ crowdSecIPs.length }} premières entrées sur {{ crowdSecTotal.toLocaleString() }} IPs bloquées
+              {{ t('security.firstEntriesDisplayedLabel', { shown: crowdSecIPs.length, total: crowdSecTotal.toLocaleString(locale) }) }}
             </div>
           </div>
         </div>
       </div>
-    </template><!-- fin v-else contenu réel -->
+    </template><!-- end v-else real content -->
 
     <IPTimelineModal
       :show="showTimeline"
@@ -659,6 +659,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconLockOpen } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
@@ -676,6 +677,8 @@ import { compareValues } from '../../utils/sort'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
+
+const { t, locale } = useI18n()
 
 const {
   periodOptions,
@@ -723,9 +726,9 @@ const {
 // list here (topIPs, mostTargetedHosts, ipHostMatrix, crowdSecIPs) is server-
 // capped (25/30/… rows) rather than genuinely paginated server-side, so this
 // only reorders/chunks what's already in memory. crowdSecIPs specifically
-// stays sort-only (no PaginationNav): its own "Affichage des N premières
-// entrées sur M" footnote already says the rest isn't loaded, and a pager
-// here would wrongly imply you could page through to it.
+// stays sort-only (no PaginationNav): its own "showing the first N out of M"
+// footnote already says the rest isn't loaded, and a pager here would
+// wrongly imply you could page through to it.
 const ipSortKey = ref<'hits' | 'unique_paths' | 'host_count'>('hits')
 const ipSortDir = ref<'asc' | 'desc'>('desc')
 function toggleIPSort(key: typeof ipSortKey.value): void {

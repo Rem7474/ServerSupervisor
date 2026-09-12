@@ -1,5 +1,8 @@
 import type { NotificationItem } from '../types/generated'
 import { isTrackerType, notificationAcknowledged, notificationResolved } from './incidentFormat'
+import { i18n } from '../i18n'
+
+const { t } = i18n.global
 
 type StateFields = Parameters<typeof notificationResolved>[0] & Parameters<typeof notificationAcknowledged>[0]
 type TypeFields = Pick<NotificationItem, 'type' | 'severity'>
@@ -21,9 +24,9 @@ export function notificationStateTone(item: StateFields): 'danger' | 'success' |
 }
 
 export function notificationStateLabel(item: StateFields): string {
-  if (notificationResolved(item)) return 'Terminé'
-  if (notificationAcknowledged(item)) return 'En cours'
-  return 'Actif'
+  if (notificationResolved(item)) return t('alerts.notificationStateResolved')
+  if (notificationAcknowledged(item)) return t('alerts.notificationStateAcknowledged')
+  return t('alerts.notificationStateActive')
 }
 
 export function notificationTypeTone(item: TypeFields): 'info' | 'secondary' | 'danger' | 'warning' {
@@ -35,10 +38,10 @@ export function notificationTypeTone(item: TypeFields): 'info' | 'secondary' | '
 }
 
 export function notificationTypeLabel(item: TypeFields): string {
-  if (item.type === 'release_tracker_detected') return 'Release tracker'
-  if (item.type === 'release_tracker_execution') return 'Exécution tracker'
-  if ((item.severity || '').toLowerCase() === 'crit') return 'Alerte critique'
-  if ((item.severity || '').toLowerCase() === 'warn') return 'Alerte avertissement'
+  if (item.type === 'release_tracker_detected') return t('alerts.notificationTypeTracker')
+  if (item.type === 'release_tracker_execution') return t('alerts.notificationTypeTrackerExecution')
+  if ((item.severity || '').toLowerCase() === 'crit') return t('alerts.notificationTypeCritical')
+  if ((item.severity || '').toLowerCase() === 'warn') return t('alerts.notificationTypeWarning')
   return '-'
 }
 

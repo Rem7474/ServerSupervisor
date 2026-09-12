@@ -2,7 +2,7 @@
   <div class="card mb-4">
     <div class="card-body d-flex flex-wrap gap-2 align-items-end traffic-filters">
       <div class="traffic-filter-field">
-        <label class="form-label mb-1">Source</label>
+        <label class="form-label mb-1">{{ t('security.sourceLabel') }}</label>
         <div class="input-group input-group-sm">
           <select
             v-model="source"
@@ -11,7 +11,7 @@
             style="min-width: 9rem;"
           >
             <option value="">
-              Toutes
+              {{ t('security.allSourcesOption') }}
             </option>
             <option value="npm">
               npm
@@ -38,7 +38,7 @@
           <span
             v-else-if="sourceHasNoData"
             class="input-group-text px-2 text-warning"
-            title="Aucune donnée pour cette source sur la période sélectionnée"
+            :title="t('security.noDataForSourceTooltip')"
           >
             <IconAlertTriangle :size="14" />
           </span>
@@ -46,7 +46,7 @@
       </div>
 
       <div class="traffic-filter-field">
-        <label class="form-label mb-1">Hôte</label>
+        <label class="form-label mb-1">{{ t('security.hostLabel') }}</label>
         <select
           v-model="hostId"
           class="form-select form-select-sm"
@@ -54,7 +54,7 @@
           style="min-width: 12rem;"
         >
           <option value="">
-            Tous les hôtes
+            {{ t('security.allHostsOption') }}
           </option>
           <option
             v-for="h in hostsStore.hosts"
@@ -76,17 +76,17 @@
           v-if="loading"
           class="spinner-border spinner-border-sm me-1"
         />
-        Rafraîchir
+        {{ t('security.refreshButton') }}
       </button>
 
       <div class="traffic-filter-field ms-auto">
-        <label class="form-label mb-1">Rechercher un domaine ou une IP</label>
+        <label class="form-label mb-1">{{ t('security.searchDomainOrIpLabel') }}</label>
         <div class="input-group input-group-sm">
           <input
             v-model="searchTerm"
             type="text"
             class="form-control form-control-sm"
-            placeholder="exemple.com ou 1.2.3.4"
+            :placeholder="t('security.searchPlaceholderExample')"
             style="min-width: 16rem;"
             @keyup.enter="$emit('search')"
           >
@@ -96,7 +96,7 @@
             :disabled="!searchTerm.trim()"
             @click="$emit('search')"
           >
-            Voir les requêtes
+            {{ t('security.viewRequestsButton') }}
           </button>
         </div>
       </div>
@@ -105,8 +105,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle } from '@tabler/icons-vue'
 import { useHostsStore } from '../../stores/hosts'
+
+const { t } = useI18n()
 
 withDefaults(defineProps<{
   loading?: boolean

@@ -2,20 +2,16 @@
   <div class="card h-100">
     <div class="card-header">
       <h3 class="card-title">
-        Score de menace (IPs suspectes)
+        {{ t('settings.threatScoreTitle') }}
       </h3>
     </div>
     <div class="card-body">
       <p class="text-secondary small">
-        Pondérations utilisées pour calculer le score et le niveau (LOW/MEDIUM/HIGH/CRITICAL)
-        des IP suspectes sur la page Menaces. Le score combine la catégorie de motif détecté,
-        le code de réponse HTTP et le nombre de chemins distincts ciblés — un volume élevé de
-        requêtes toutes en 2xx reste peu suspect, alors qu'un faible volume en 404/5xx ou
-        réparti sur de nombreux chemins fait grimper le score rapidement.
+        {{ t('settings.threatScoreDesc') }}
       </p>
 
       <h4 class="mb-2">
-        Poids par catégorie
+        {{ t('settings.weightsByCategory') }}
       </h4>
       <div class="row g-2 mb-3">
         <div class="col-6 col-md-4">
@@ -36,7 +32,7 @@
           <label
             for="threat-weight-adminpanel"
             class="form-label"
-          >Panneau admin</label>
+          >{{ t('settings.adminPanel') }}</label>
           <input
             id="threat-weight-adminpanel"
             v-model.number="weightAdminpanelModel"
@@ -50,7 +46,7 @@
           <label
             for="threat-weight-pathtraversal"
             class="form-label"
-          >Traversée de chemin</label>
+          >{{ t('settings.pathTraversal') }}</label>
           <input
             id="threat-weight-pathtraversal"
             v-model.number="weightPathtraversalModel"
@@ -64,7 +60,7 @@
           <label
             for="threat-weight-knownscanner"
             class="form-label"
-          >Scanner connu</label>
+          >{{ t('settings.knownScanner') }}</label>
           <input
             id="threat-weight-knownscanner"
             v-model.number="weightKnownscannerModel"
@@ -78,7 +74,7 @@
           <label
             for="threat-weight-suspiciousmethod"
             class="form-label"
-          >Méthode suspecte</label>
+          >{{ t('settings.suspiciousMethod') }}</label>
           <input
             id="threat-weight-suspiciousmethod"
             v-model.number="weightSuspiciousmethodModel"
@@ -91,14 +87,14 @@
       </div>
 
       <h4 class="mb-2">
-        Multiplicateurs par code de réponse
+        {{ t('settings.multipliersByStatus') }}
       </h4>
       <div class="row g-2 mb-3">
         <div class="col-6 col-md-4">
           <label
             for="threat-weight-status-2xx"
             class="form-label"
-          >2xx (succès)</label>
+          >{{ t('settings.status2xx') }}</label>
           <input
             id="threat-weight-status-2xx"
             v-model.number="weightStatus2xxModel"
@@ -112,7 +108,7 @@
           <label
             for="threat-weight-status-3xx"
             class="form-label"
-          >3xx (redirection)</label>
+          >{{ t('settings.status3xx') }}</label>
           <input
             id="threat-weight-status-3xx"
             v-model.number="weightStatus3xxModel"
@@ -140,7 +136,7 @@
           <label
             for="threat-weight-status-4xx"
             class="form-label"
-          >4xx (autre)</label>
+          >{{ t('settings.status4xxOther') }}</label>
           <input
             id="threat-weight-status-4xx"
             v-model.number="weightStatus4xxModel"
@@ -167,14 +163,14 @@
       </div>
 
       <h4 class="mb-2">
-        Pondération structurelle
+        {{ t('settings.structuralWeighting') }}
       </h4>
       <div class="row g-2 mb-3">
         <div class="col-6 col-md-4">
           <label
             for="threat-weight-breadth"
             class="form-label"
-          >Largeur (chemins distincts)</label>
+          >{{ t('settings.breadthLabel') }}</label>
           <input
             id="threat-weight-breadth"
             v-model.number="weightBreadthModel"
@@ -188,14 +184,14 @@
             id="threat-breadth-hint"
             class="form-hint"
           >
-            Poids par chemin distinct scanné par l'IP
+            {{ t('settings.breadthHint') }}
           </div>
         </div>
         <div class="col-6 col-md-4">
           <label
             for="threat-weight-hits"
             class="form-label"
-          >Volume de requêtes</label>
+          >{{ t('settings.requestVolumeLabel') }}</label>
           <input
             id="threat-weight-hits"
             v-model.number="weightHitsModel"
@@ -209,20 +205,20 @@
             id="threat-hits-hint"
             class="form-hint"
           >
-            Poids du volume (atténué en ln(hits+1), pas linéaire)
+            {{ t('settings.requestVolumeHint') }}
           </div>
         </div>
       </div>
 
       <h4 class="mb-2">
-        Seuils de niveau
+        {{ t('settings.levelThresholds') }}
       </h4>
       <div class="row g-2">
         <div class="col-6 col-md-4">
           <label
             for="threat-threshold-medium"
             class="form-label"
-          >MEDIUM à partir de</label>
+          >{{ t('settings.mediumFrom') }}</label>
           <input
             id="threat-threshold-medium"
             v-model.number="thresholdMediumModel"
@@ -236,7 +232,7 @@
           <label
             for="threat-threshold-high"
             class="form-label"
-          >HIGH à partir de</label>
+          >{{ t('settings.highFrom') }}</label>
           <input
             id="threat-threshold-high"
             v-model.number="thresholdHighModel"
@@ -250,7 +246,7 @@
           <label
             for="threat-threshold-critical"
             class="form-label"
-          >CRITICAL à partir de</label>
+          >{{ t('settings.criticalFrom') }}</label>
           <input
             id="threat-threshold-critical"
             v-model.number="thresholdCriticalModel"
@@ -276,7 +272,7 @@
         :disabled="savingThreatDetection"
         @click="$emit('save')"
       >
-        {{ savingThreatDetection ? 'Enregistrement...' : 'Enregistrer' }}
+        {{ savingThreatDetection ? t('common.saving') : t('common.save') }}
       </button>
       <span
         v-if="threatDetectionSaveMsg"
@@ -290,6 +286,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface ThreatDetectionForm {
   threatWeightWordpress: number
@@ -361,6 +360,6 @@ const thresholdCriticalModel = fieldModel('threatThresholdCritical')
 const thresholdOrderWarning = computed(() => {
   const { threatThresholdMedium: m, threatThresholdHigh: h, threatThresholdCritical: c } = props.form
   if (m < h && h < c) return ''
-  return 'Les seuils devraient être croissants (MEDIUM < HIGH < CRITICAL), sinon le niveau affiché peut être incohérent.'
+  return t('settings.thresholdOrderWarning')
 })
 </script>

@@ -102,7 +102,7 @@ func (h *RunbooksHandler) GetRunbookExecution(c *gin.Context) {
 		return
 	}
 	if exec.RunbookID != c.Param("id") {
-		respondError(c, apperr.NotFound("Exécution introuvable."))
+		respondError(c, apperr.NotFound("execution not found").I18n(apperr.CodeRunbookExecutionNotFound, nil))
 		return
 	}
 	c.JSON(http.StatusOK, exec)

@@ -3,14 +3,14 @@
     <table class="table table-vcenter card-table">
       <thead>
         <tr>
-          <th>Date / Heure</th>
+          <th>{{ t('common.dateTime') }}</th>
           <th v-if="showUsername">
-            Utilisateur
+            {{ t('common.user') }}
           </th>
           <th>IP</th>
-          <th>Navigateur</th>
+          <th>{{ t('common.browser') }}</th>
           <th>OS</th>
-          <th>Statut</th>
+          <th>{{ t('common.status') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -27,7 +27,7 @@
         </tr>
         <tr v-else-if="!events.length">
           <td :colspan="columnCount">
-            <EmptyState title="Aucune connexion enregistrée" />
+            <EmptyState :title="t('common.noConnectionsRecorded')" />
           </td>
         </tr>
         <tr
@@ -57,7 +57,7 @@
               class="badge"
               :class="ev.success ? 'bg-success-lt text-success' : 'bg-danger-lt text-danger'"
             >
-              {{ ev.success ? 'Succès' : 'Échec' }}
+              {{ ev.success ? t('common.success') : t('common.failure') }}
             </span>
           </td>
         </tr>
@@ -68,17 +68,20 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { LoginEvent } from '../../types/generated'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { parseUserAgent } from '../../utils/parseUserAgent'
 import { formatDateTime } from '../../utils/formatters'
 
+const { t } = useI18n()
+
 const props = withDefaults(defineProps<{
   events?: LoginEvent[]
   loading?: boolean
   // Audit's admin-wide view lists events across every user and needs the
-  // extra column; the account-scoped views (Mon compte, Sécurité du compte)
+  // extra column; the account-scoped views (AccountView, AccountSecurityView)
   // only ever show the current user's own events.
   showUsername?: boolean
 }>(), {

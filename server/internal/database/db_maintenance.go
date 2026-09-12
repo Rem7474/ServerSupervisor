@@ -88,6 +88,27 @@ func (db *DB) IsHostInMaintenance(ctx context.Context, hostID string) (bool, err
 	return active, err
 }
 
+func (db *DB) GetHostsInMaintenance(ctx context.Context) (map[string]bool, error) {
+	rows, err := db.conn.QueryContext(ctx, `SELECT DISTINCT host_id FROM maintenance_windows WHERE starts_at <= NOW() AND ends_at >= NOW() AND host_id IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	res := make(map[string]bool)
+	for rows.Next() {
+		var h string
+		if err := rows.Scan(&h); err == nil {
+			res[h] = true
+		}
+	}
+	var globalExists bool
+	_ = db.conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM maintenance_windows WHERE host_id IS NULL AND starts_at <= NOW() AND ends_at >= NOW())`).Scan(&globalExists)
+	if globalExists {
+		res["*"] = true
+	}
+	return res, nil
+}
+
 func scanMaintenanceWindows(rows *sql.Rows) ([]models.MaintenanceWindow, error) {
 	var windows []models.MaintenanceWindow
 	for rows.Next() {

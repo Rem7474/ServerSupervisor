@@ -26,6 +26,7 @@ et la référence API, voir le
 | [Two-Factor-Authentication](Two-Factor-Authentication.md) | TOTP et clés de sécurité/passkeys (WebAuthn) |
 | [Host-Discovery](Host-Discovery.md) | Scan de sous-réseau et ajout en masse |
 | [Custom-Tasks-Examples](Custom-Tasks-Examples.md) | Exemples de `tasks.yaml` prêts à copier |
+| [Internationalization](Internationalization.md) | Langues de l'interface, choix de la langue, ajout d'une traduction |
 
 ## Autres ressources
 

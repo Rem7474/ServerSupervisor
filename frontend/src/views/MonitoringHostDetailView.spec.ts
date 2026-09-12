@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../i18n'
 import type { NPMProxyHostEnriched } from '../types/npm'
 
 const { getUptimeProbe, getUptimeHistory, getUptimeStats, getUptimeHistoryBuckets, getSSLCertificate, getSSLCertificateHistory } = vi.hoisted(() => ({
@@ -50,6 +51,10 @@ function makeHost(overrides: Partial<NPMProxyHostEnriched> = {}): NPMProxyHostEn
   } as NPMProxyHostEnriched
 }
 
+beforeEach(() => {
+  setLocale('fr')
+})
+
 describe('MonitoringHostDetailView — auto-refresh when only uptime is configured', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -77,10 +82,6 @@ describe('MonitoringHostDetailView — auto-refresh when only uptime is configur
     await flushPromises() // UptimeDetailSection's onMounted fetchAll()
 
     expect(getUptimeProbe).toHaveBeenCalledTimes(1)
-    console.log('--- DOM after initial load ---')
-    console.log(wrapper.html())
-    console.log('--- console.error calls ---', errorSpy.mock.calls)
-    console.log('--- console.warn calls ---', warnSpy.mock.calls)
 
     await vi.advanceTimersByTimeAsync(30_000) // PROBE_REFRESH_SEC
     await flushPromises()
@@ -89,5 +90,74 @@ describe('MonitoringHostDetailView — auto-refresh when only uptime is configur
     wrapper.unmount()
     errorSpy.mockRestore()
     warnSpy.mockRestore()
+  })
+})
+
+describe('MonitoringHostDetailView — combined uptime + SSL summary', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shows the merged summary row with probe status and cert days remaining', async () => {
+    listAllProxyHosts.mockResolvedValue({
+      data: { proxy_hosts: [makeHost({ uptime_probe_id: 'probe-1', ssl_certificate_id: 'cert-1', ssl_enabled: true, ssl_monitoring_enabled: true })] },
+    })
+    getUptimeProbe.mockResolvedValue({ data: { id: 'probe-1', last_status: 'up', consecutive_failures: 0 } })
+    getUptimeHistory.mockResolvedValue({ data: { results: [] } })
+    getUptimeStats.mockResolvedValue({ data: { uptime_percent: 100, successful_checks: 1, total_checks: 1, avg_latency_ms: 10, p95_latency_ms: 10 } })
+    getUptimeHistoryBuckets.mockResolvedValue({ data: { buckets: [] } })
+    getSSLCertificate.mockResolvedValue({ data: { id: 'cert-1', days_remaining: 20, valid_to: '2026-09-20T00:00:00Z' } })
+    getSSLCertificateHistory.mockResolvedValue({ data: { results: [] } })
+
+    const wrapper = mount(MonitoringHostDetailView, { global: { stubs: { 'router-link': true } } })
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('UP')
+    expect(wrapper.text()).toContain('Sonde uptime')
+    expect(wrapper.text()).toContain('20 jours')
+  })
+
+  it('shows the singular day phrasing and the expired phrasing for the cert countdown', async () => {
+    listAllProxyHosts.mockResolvedValue({
+      data: { proxy_hosts: [makeHost({ uptime_probe_id: 'probe-1', ssl_certificate_id: 'cert-1', ssl_enabled: true, ssl_monitoring_enabled: true })] },
+    })
+    getUptimeProbe.mockResolvedValue({ data: { id: 'probe-1', last_status: 'down', consecutive_failures: 3 } })
+    getUptimeHistory.mockResolvedValue({ data: { results: [] } })
+    getUptimeStats.mockResolvedValue({ data: { uptime_percent: 0, successful_checks: 0, total_checks: 1, avg_latency_ms: 0, p95_latency_ms: 0 } })
+    getUptimeHistoryBuckets.mockResolvedValue({ data: { buckets: [] } })
+    getSSLCertificate.mockResolvedValue({ data: { id: 'cert-1', days_remaining: -2, valid_to: '2026-08-20T00:00:00Z' } })
+    getSSLCertificateHistory.mockResolvedValue({ data: { results: [] } })
+
+    const wrapper = mount(MonitoringHostDetailView, { global: { stubs: { 'router-link': true } } })
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('DOWN')
+    expect(wrapper.text()).toContain('Expiré (2j)')
+  })
+})
+
+describe('MonitoringHostDetailView — no active tracking', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('shows the no-tracking banner when neither uptime nor SSL is configured', async () => {
+    listAllProxyHosts.mockResolvedValue({ data: { proxy_hosts: [makeHost()] } })
+
+    const wrapper = mount(MonitoringHostDetailView, { global: { stubs: { 'router-link': true } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Aucun suivi actif pour ce proxy host')
+  })
+
+  it('shows a translated error when the host is not found', async () => {
+    listAllProxyHosts.mockResolvedValue({ data: { proxy_hosts: [] } })
+
+    const wrapper = mount(MonitoringHostDetailView, { global: { stubs: { 'router-link': true } } })
+    await flushPromises()
+
+    expect(wrapper.find('.alert-danger').exists()).toBe(true)
   })
 })

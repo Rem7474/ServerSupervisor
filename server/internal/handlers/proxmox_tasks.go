@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/errors"
+	"github.com/serversupervisor/server/internal/apperr"
 )
 
 // ListTasks returns recent tasks, optionally filtered by ?connection_id and ?limit.
@@ -54,17 +54,17 @@ func (h *ProxmoxHandler) ListBackupRuns(c *gin.Context) {
 // GetTaskLog proxies GET /nodes/{node}/tasks/{upid}/log from PVE.
 func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 	upid := c.Param("upid")
-	if upid == "" {
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusBadRequest, errors.NewErrorResponse(errors.CodeMissingParameter, lang))
+	if upid == "" || strings.ContainsAny(upid, "/\\?# \r\n\t") {
+		lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusBadRequest, apperr.NewErrorResponse(apperr.CodeMissingParameter, lang, nil))
 		return
 	}
-	lines, err := h.svc.TaskLog(c.Request.Context(), c.Param("id"), upid)
+	log, err := h.svc.TaskLog(c.Request.Context(), c.Param("id"), upid)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, lines)
+	c.JSON(http.StatusOK, log)
 }
 
 // GetNodeSyslog proxies GET /nodes/{node}/syslog from PVE.

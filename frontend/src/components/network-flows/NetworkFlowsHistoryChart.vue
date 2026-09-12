@@ -2,7 +2,7 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
       <h3 class="card-title mb-0">
-        {{ mode === 'summary' ? 'Bande passante trackée' : 'Historique du talker' }}
+        {{ mode === 'summary' ? t('network.flowsSummaryTitle') : t('network.flowsTalkerTitle') }}
       </h3>
       <TimeRangePicker
         v-model="timeRange"
@@ -31,14 +31,15 @@
         v-else
         class="h-100 d-flex align-items-center justify-content-center text-secondary"
       >
-        Aucune donnée
+        {{ t('common.noData') }}
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, watch, onMounted } from 'vue'
+import { ref, shallowRef, watch, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import { fetchNetworkFlowsSummary, fetchNetworkFlowsHistory } from '../../composables/useNetworkFlowsHistory'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
@@ -69,17 +70,18 @@ const props = withDefaults(defineProps<{
   refreshTick: 0,
 })
 
+const { t } = useI18n()
 const rxPoints = ref<ChartPoint[]>([])
 const txPoints = ref<ChartPoint[]>([])
 const series = shallowRef<{ name: string; data: ChartPoint[]; color: string }[] | null>(null)
 const loading = ref(false)
 
-const timeRangeOptions: TimeRangePreset[] = [
+const timeRangeOptions = computed<TimeRangePreset[]>(() => [
   { value: '1h', label: '1h' },
   { value: '6h', label: '6h' },
   { value: '24h', label: '24h' },
-  { value: '168h', label: '7j' },
-]
+  { value: '168h', label: t('network.flowsRangeSevenDays') },
+])
 
 const timeRange = ref<TimeRangeModel>({ mode: 'preset', period: '24h', from: null, to: null })
 
@@ -169,8 +171,8 @@ async function loadHistory(): Promise<void> {
 
     const palette = getApexChartPalette()
     series.value = [
-      { name: 'Entrant (Rx)', data: rxPoints.value, color: palette.networkRx },
-      { name: 'Sortant (Tx)', data: txPoints.value, color: palette.networkTx },
+      { name: t('network.flowsRxSeries'), data: rxPoints.value, color: palette.networkRx },
+      { name: t('network.flowsTxSeries'), data: txPoints.value, color: palette.networkTx },
     ]
     if (!chartOptions.value) {
       chartOptions.value = buildChartOptions()

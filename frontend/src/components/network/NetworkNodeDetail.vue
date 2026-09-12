@@ -13,55 +13,55 @@
       <button
         type="button"
         class="btn-close"
-        aria-label="Fermer"
+        :aria-label="t('common.close')"
         @click="$emit('close')"
       />
     </div>
 
     <!-- Grid of sections -->
     <div class="detail-grid">
-      <!-- Rôle réseau (host) -->
+      <!-- Network role (host) -->
       <div
         v-if="selectedNode?.type === 'host'"
         class="detail-section"
       >
         <div class="detail-section-title">
-          Rôle réseau
+          {{ t('network.nodeNetworkRole') }}
         </div>
         <div class="detail-kv">
-          <span class="detail-key">Statut</span>
+          <span class="detail-key">{{ t('common.status') }}</span>
           <span :class="statusBadgeClass">
             <span class="status-dot status-dot-animated" />
-            {{ hostData?.status || 'unknown' }}
+            {{ hostData?.status || t('network.nodeUnknownStatus') }}
           </span>
         </div>
         <div class="detail-kv">
-          <span class="detail-key">Trafic</span>
+          <span class="detail-key">{{ t('network.nodeTrafficLabel') }}</span>
           <span class="detail-val small">↓ {{ formatBytes(hostData?.network_rx_bytes || 0) }} / ↑ {{ formatBytes(hostData?.network_tx_bytes || 0) }}</span>
         </div>
         <div class="detail-kv">
-          <span class="detail-key">Conteneurs</span>
-          <span class="detail-val">{{ hostContainers.length }} <span class="text-secondary">({{ hostContainers.filter(c => c.state === 'running').length }} actifs)</span></span>
+          <span class="detail-key">{{ t('network.nodeContainersLabel') }}</span>
+          <span class="detail-val">{{ hostContainers.length }} <span class="text-secondary">({{ hostContainers.filter(c => c.state === 'running').length }} {{ t('network.nodeActiveSuffix') }})</span></span>
         </div>
       </div>
 
-      <!-- Rôle réseau (Proxmox guest, no agent) -->
+      <!-- Network role (Proxmox guest, no agent) -->
       <div
         v-if="selectedNode?.type === 'proxmox_guest'"
         class="detail-section"
       >
         <div class="detail-section-title">
-          VM Proxmox
+          {{ t('network.nodeProxmoxGuestTitle') }}
         </div>
         <div class="detail-kv">
-          <span class="detail-key">Statut</span>
+          <span class="detail-key">{{ t('common.status') }}</span>
           <span :class="statusBadgeClass">
             <span class="status-dot status-dot-animated" />
-            {{ selectedNode.status || 'unknown' }}
+            {{ selectedNode.status || t('network.nodeUnknownStatus') }}
           </span>
         </div>
         <div class="detail-kv text-secondary small">
-          Sans agent ServerSupervisor — détectée via la corrélation IP des domaines NPM.
+          {{ t('network.nodeNoAgentHint') }}
         </div>
       </div>
 
@@ -71,17 +71,17 @@
         class="detail-section"
       >
         <div class="detail-section-title">
-          Port
+          {{ t('network.nodePortTitle') }}
         </div>
         <div class="detail-kv">
-          <span class="detail-key">Numéro</span>
+          <span class="detail-key">{{ t('network.nodeNumberLabel') }}</span>
           <span class="detail-val fw-semibold">{{ selectedNode.portNumber }}/{{ (selectedNode.protocol || '').toUpperCase() }}</span>
         </div>
         <div
           v-if="selectedNode.containers?.length"
           class="detail-kv"
         >
-          <span class="detail-key">Conteneurs</span>
+          <span class="detail-key">{{ t('network.nodeContainersLabel') }}</span>
           <span class="detail-val small">{{ selectedNode.containers.join(', ') }}</span>
         </div>
       </div>
@@ -92,24 +92,24 @@
         class="detail-section"
       >
         <div class="detail-section-title">
-          Service
+          {{ t('network.nodeServiceTitle') }}
         </div>
         <div class="detail-kv">
-          <span class="detail-key">Port interne</span>
+          <span class="detail-key">{{ t('network.nodeInternalPortLabel') }}</span>
           <span class="detail-val fw-semibold">{{ selectedNode.internalPort || '-' }}</span>
         </div>
         <div
           v-if="selectedNode.externalPort"
           class="detail-kv"
         >
-          <span class="detail-key">Port externe</span>
+          <span class="detail-key">{{ t('network.nodeExternalPortLabel') }}</span>
           <span class="detail-val">{{ selectedNode.externalPort }}</span>
         </div>
         <div
           v-if="serviceUrl"
           class="detail-kv"
         >
-          <span class="detail-key">URL</span>
+          <span class="detail-key">{{ t('network.nodeUrlLabel') }}</span>
           <a
             :href="serviceUrl"
             target="_blank"
@@ -120,35 +120,35 @@
         </div>
       </div>
 
-      <!-- Intégration (service / port) -->
+      <!-- Integration (service / port) -->
       <div
         v-if="['service', 'port'].includes(selectedNode?.type || '')"
         class="detail-section"
       >
         <div class="detail-section-title">
-          Intégration
+          {{ t('network.nodeIntegrationTitle') }}
         </div>
         <div class="detail-kv">
-          <span class="detail-key">Reverse proxy</span>
+          <span class="detail-key">{{ t('network.nodeReverseProxyLabel') }}</span>
           <span
             v-if="selectedNode?.isProxyLinked"
             class="badge bg-blue-lt text-blue"
-          >Oui</span>
+          >{{ t('network.nodeYes') }}</span>
           <span
             v-else
             class="text-secondary small"
-          >Non</span>
+          >{{ t('network.nodeNo') }}</span>
         </div>
         <div class="detail-kv">
           <span class="detail-key">Authelia</span>
           <span
             v-if="selectedNode?.isAutheliaLinked"
             class="badge bg-purple-lt text-purple"
-          >Oui</span>
+          >{{ t('network.nodeYes') }}</span>
           <span
             v-else
             class="text-secondary small"
-          >Non</span>
+          >{{ t('network.nodeNo') }}</span>
         </div>
         <div class="detail-kv">
           <span class="detail-key">Internet</span>
@@ -156,12 +156,12 @@
             v-if="selectedNode?.isInternetExposed"
             class="badge bg-orange-lt text-orange"
           >
-            Exposé{{ selectedNode?.externalPort ? ' (port ' + selectedNode.externalPort + ')' : '' }}
+            {{ selectedNode?.externalPort ? t('network.nodeExposedWithPort', { port: selectedNode.externalPort }) : t('network.nodeExposedLabel') }}
           </span>
           <span
             v-else
             class="text-secondary small"
-          >Non exposé</span>
+          >{{ t('network.nodeNotExposedLabel') }}</span>
         </div>
       </div>
 
@@ -171,14 +171,14 @@
         class="detail-section detail-section-wide"
       >
         <div class="detail-section-title">
-          Ports &amp; services exposés
+          {{ t('network.nodePortsServicesTitle') }}
         </div>
         <div class="port-chips">
           <span
             v-for="svc in hostServices"
             :key="svc.id"
             class="port-chip port-chip-service"
-            :title="svc.domain ? `https://${svc.domain}${svc.path || '/'}` : `Port ${svc.internalPort}`"
+            :title="svc.domain ? `https://${svc.domain}${svc.path || '/'}` : t('network.nodePortTitleAttr', { port: svc.internalPort })"
           >
             <span class="fw-semibold">{{ svc.name }}</span>
             <span class="text-secondary ms-1">:{{ svc.internalPort }}</span>
@@ -209,7 +209,7 @@
             <span
               v-if="!p.enabled"
               class="badge bg-secondary-lt text-secondary ms-1"
-            >off</span>
+            >{{ t('network.nodeOffBadge') }}</span>
             <template v-else>
               <span
                 v-if="p.isProxyLinked"
@@ -231,7 +231,7 @@
       <!-- Actions -->
       <div class="detail-section detail-actions">
         <div class="detail-section-title">
-          Actions
+          {{ t('network.nodeActionsTitle') }}
         </div>
         <router-link
           v-if="selectedNode?.type === 'host' && selectedNode.hostId"
@@ -242,14 +242,14 @@
             :size="14"
             class="me-1"
           />
-          Ouvrir l'hôte
+          {{ t('network.nodeOpenHost') }}
         </router-link>
         <router-link
           v-if="selectedNode?.type !== 'host' && selectedNode?.hostId"
           :to="`/hosts/${selectedNode.hostId}?tab=exposition`"
           class="btn btn-sm btn-outline-secondary"
         >
-          Voir l'hôte associé
+          {{ t('network.nodeViewAssociatedHost') }}
         </router-link>
         <router-link
           v-if="selectedNode?.type === 'proxmox_guest' && selectedNode.guestId"
@@ -260,14 +260,14 @@
             :size="14"
             class="me-1"
           />
-          Ouvrir la VM
+          {{ t('network.nodeOpenVM') }}
         </router-link>
         <router-link
           v-if="selectedNode?.type === 'service' && selectedNode.guestId"
           :to="`/proxmox/guests/${selectedNode.guestId}`"
           class="btn btn-sm btn-outline-secondary"
         >
-          Voir la VM associée
+          {{ t('network.nodeViewAssociatedVM') }}
         </router-link>
         <template v-if="selectedNode?.type === 'service' && serviceUrl">
           <a
@@ -275,13 +275,13 @@
             target="_blank"
             rel="noopener"
             class="btn btn-sm btn-outline-primary"
-          >Ouvrir dans le navigateur</a>
+          >{{ t('network.nodeOpenInBrowser') }}</a>
           <button
             type="button"
             class="btn btn-sm btn-outline-secondary"
             @click="copyUrl(serviceUrl)"
           >
-            Copier l'URL
+            {{ t('network.nodeCopyUrl') }}
           </button>
         </template>
       </div>
@@ -291,6 +291,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconHome } from '@tabler/icons-vue'
 
 interface SelectedNode {
@@ -372,6 +373,7 @@ defineEmits<{
   (e: 'close'): void
 }>()
 
+const { t } = useI18n()
 const hostData = computed(() => props.hosts.find(h => h.id === props.selectedNode?.hostId) || null)
 const hostContainers = computed(() => props.containers.filter(c => c.host_id === props.selectedNode?.hostId))
 
@@ -428,15 +430,15 @@ const serviceUrl = computed(() => {
 
 const nodeTypeLabel = computed(() => {
   const map: Record<string, string> = {
-    root: 'Reverse proxy',
-    host: 'Hôte',
-    proxmox_guest: 'VM Proxmox',
-    service: 'Service',
-    port: 'Port',
+    root: t('network.nodeReverseProxyLabel'),
+    host: t('network.nodeTypeHost'),
+    proxmox_guest: t('network.nodeProxmoxGuestTitle'),
+    service: t('network.nodeServiceTitle'),
+    port: t('network.nodePortTitle'),
     authelia: 'Authelia',
     internet: 'Internet',
   }
-  return map[props.selectedNode?.type || ''] || 'Nœud'
+  return map[props.selectedNode?.type || ''] || t('network.nodeTypeDefault')
 })
 
 const typeTagClass = computed(() => {

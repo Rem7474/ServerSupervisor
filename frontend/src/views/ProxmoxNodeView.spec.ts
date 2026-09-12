@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { setLocale } from '../i18n'
 
 // Auto-unmount after each test so the view's onUnmounted clears its polling
 // timers and no late-resolving async touches a torn-down component.
@@ -75,6 +76,7 @@ const mountOpts = {
 describe('ProxmoxNodeView (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
     routeQuery.current = {}
     // ProxmoxNodeGuestsTab (mounted for the vms/lxc tabs) calls useAuthStore()
     // for its admin-only guest power-action buttons.
@@ -155,5 +157,55 @@ describe('ProxmoxNodeView (characterization)', () => {
 
     expect(apiClient.getProxmoxBackupJobs).toHaveBeenCalled()
     expect(apiClient.getProxmoxBackupRuns).toHaveBeenCalled()
+  })
+
+  it('shows the configured sensor source name instead of the "not configured" hint once one is set', async () => {
+    vi.mocked(apiClient.getProxmoxNode).mockResolvedValue({
+      data: {
+        node_name: 'pve1', status: 'online', pending_updates: 0, storages: [], disks: [], tasks: [], guests: [],
+        cpu_temp_source_host_id: 'host-1', cpu_temp_source_host_name: 'sensor-host',
+      },
+    } as never)
+
+    const wrapper = mount(ProxmoxNodeView, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Actuel : sensor-host')
+    expect(wrapper.text()).not.toContain('Source non configurée')
+  })
+
+  it('formats a byte KPI (RAM) with a unit above bytes and an uptime above a day with the day suffix', async () => {
+    vi.mocked(apiClient.getProxmoxNode).mockResolvedValue({
+      data: {
+        node_name: 'pve1', status: 'online', pending_updates: 0, storages: [], disks: [], tasks: [], guests: [],
+        mem_used: 2 * 1024 * 1024, mem_total: 4 * 1024 * 1024, uptime: 90000, cpu_usage: 0.1, cpu_count: 4,
+      },
+    } as never)
+
+    const wrapper = mount(ProxmoxNodeView, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Mo')
+    expect(wrapper.text()).toContain('1j')
+  })
+
+  it('shows non-zero storage/disk tab badges when the node reports storages and disks', async () => {
+    vi.mocked(apiClient.getProxmoxNode).mockResolvedValue({
+      data: {
+        node_name: 'pve1', status: 'online', pending_updates: 0,
+        storages: [{ storage: 'local' }], disks: [{ device: 'sda' }], tasks: [], guests: [],
+      },
+    } as never)
+
+    const wrapper = mount(ProxmoxNodeView, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    const storageTab = wrapper.findAll('.proxmox-node-tabs .nav-link').find((b) => b.text().includes('Stockage'))
+    const disksTab = wrapper.findAll('.proxmox-node-tabs .nav-link').find((b) => b.text().includes('Disques'))
+    expect(storageTab!.text()).toContain('1')
+    expect(disksTab!.text()).toContain('1')
   })
 })

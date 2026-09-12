@@ -1,6 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import NetworkTopologyConfig from './NetworkTopologyConfig.vue'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 function mountConfig() {
   return mount(NetworkTopologyConfig, {
@@ -56,4 +62,54 @@ describe('NetworkTopologyConfig (characterization)', () => {
       expect(wrapper.find(`[aria-label="${label}"]`).exists(), `aria-label="${label}"`).toBe(true)
     }
   })
+
+  it('adds and removes a manual service row, confirming deletion first', async () => {
+    const wrapper = mountConfig()
+    const initialRows = wrapper.findAll('tbody tr').length
+
+    await wrapper.find('button.btn-outline-secondary').trigger('click')
+    expect(wrapper.findAll('tbody tr').length).toBeGreaterThan(initialRows)
+
+    const dialog = useConfirmDialog()
+    const deleteButtons = wrapper.findAll('button.btn-outline-danger')
+    const clickPromise = deleteButtons[0].trigger('click')
+    await vi.waitFor(() => expect(dialog.isOpen.value).toBe(true))
+    expect(dialog.title.value).toBe('Supprimer le service')
+
+    dialog.onConfirm()
+    await clickPromise
+    await wrapper.vm.$nextTick()
+  })
+
+  it('shows the empty state when there are no manual services', () => {
+    const wrapper = mount(NetworkTopologyConfig, {
+      props: {
+        hosts: [{ id: 'host-1', name: 'srv-web' }],
+        containers: [],
+        networkServices: [],
+      },
+    })
+    expect(wrapper.text()).toContain('Aucun service configuré')
+  })
+
+  it('shows the no-ports-detected empty state for a host with no discovered ports', () => {
+    const wrapper = mount(NetworkTopologyConfig, {
+      props: {
+        hosts: [{ id: 'host-1', name: 'srv-web' }],
+        containers: [],
+      },
+    })
+    expect(wrapper.text()).toContain('Aucun port détecté')
+  })
+
+  it('marks an internal-only Docker port with the "interne" badge and a disabled-by-default proxy switch tooltip', () => {
+    const wrapper = mount(NetworkTopologyConfig, {
+      props: {
+        hosts: [{ id: 'host-1', name: 'srv-web' }],
+        containers: [{ host_id: 'host-1', name: 'internal-app', port_mappings: [{ host_port: 0, container_port: 9000, protocol: 'tcp' }] }],
+      },
+    })
+    expect(wrapper.text()).toContain('interne')
+  })
+
 })

@@ -5,26 +5,26 @@
         <label
           for="network-config-root-node-name"
           class="form-label"
-        >Reverse proxy</label>
+        >{{ t('network.nodeReverseProxyLabel') }}</label>
         <input
           id="network-config-root-node-name"
           v-model="rootNodeName"
           type="text"
           class="form-control form-control-sm"
-          placeholder="Ex: Nginx Proxy Manager"
+          :placeholder="t('network.configRootNamePlaceholder')"
         >
       </div>
       <div class="network-config-item">
         <label
           for="network-config-root-node-ip"
           class="form-label"
-        >IP du proxy</label>
+        >{{ t('network.configProxyIpLabel') }}</label>
         <input
           id="network-config-root-node-ip"
           v-model="rootNodeIp"
           type="text"
           class="form-control form-control-sm"
-          placeholder="Ex: 192.168.1.10"
+          :placeholder="t('network.configProxyIpPlaceholder')"
         >
       </div>
     </div>
@@ -33,8 +33,8 @@
         for="network-config-root-host-id"
         class="form-label"
       >
-        Hôte correspondant
-        <span class="text-secondary fw-normal">(optionnel — supprime le nœud fantôme)</span>
+        {{ t('network.configMatchingHostLabel') }}
+        <span class="text-secondary fw-normal">{{ t('network.configOptionalRemovesGhost') }}</span>
       </label>
       <select
         id="network-config-root-host-id"
@@ -42,7 +42,7 @@
         class="form-select form-select-sm"
       >
         <option value="">
-          — Nœud abstrait (non lié à un hôte) —
+          {{ t('network.configAbstractNodeOption') }}
         </option>
         <option
           v-for="h in hosts"
@@ -53,7 +53,7 @@
         </option>
       </select>
       <div class="text-secondary small mt-1">
-        Quand lié, le nœud proxy dans le graphe devient cet hôte — les deux ne sont plus affichés séparément.
+        {{ t('network.configLinkedHostHint') }}
       </div>
       <div
         v-if="rootHostId && proxyHostPorts.length > 0"
@@ -63,8 +63,8 @@
           for="network-config-root-port-id"
           class="form-label"
         >
-          Port spécifique
-          <span class="text-secondary fw-normal">(optionnel)</span>
+          {{ t('network.configSpecificPortLabel') }}
+          <span class="text-secondary fw-normal">{{ t('network.configOptionalSuffix') }}</span>
         </label>
         <select
           id="network-config-root-port-id"
@@ -72,7 +72,7 @@
           class="form-select form-select-sm"
         >
           <option value="">
-            — Nœud hôte (pas de port précis) —
+            {{ t('network.configHostNodeOption') }}
           </option>
           <option
             v-for="p in proxyHostPorts"
@@ -86,7 +86,7 @@
           </option>
         </select>
         <div class="text-secondary small mt-1">
-          Le nœud proxy sera ce port précis dans le graphe.
+          {{ t('network.configProxyPortHint') }}
         </div>
       </div>
     </div>
@@ -95,12 +95,10 @@
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div>
           <div class="form-label mb-0">
-            Services manuels via proxy
+            {{ t('network.configManualServicesTitle') }}
           </div>
           <div class="text-secondary small mt-1">
-            Services définis manuellement, non détectés automatiquement.
-            Pour les ports découverts, utilisez la section "Ports découverts" ci-dessous
-            et cochez "Proxy".
+            {{ t('network.configManualServicesHint') }}
           </div>
         </div>
         <button
@@ -112,22 +110,22 @@
             :size="16"
             class="icon me-1"
           />
-          Ajouter
+          {{ t('network.configAddButton') }}
         </button>
       </div>
       <div class="table-responsive network-config-table">
         <table class="table table-sm table-vcenter">
           <thead>
             <tr>
-              <th>Nom</th>
-              <th>Domaine</th>
-              <th>Chemin</th>
-              <th>Port interne</th>
-              <th>Host</th>
-              <th>Proxy</th>
-              <th>Authelia</th>
-              <th>Internet</th>
-              <th>Port ext.</th>
+              <th>{{ t('network.configNameColumn') }}</th>
+              <th>{{ t('network.configDomainColumn') }}</th>
+              <th>{{ t('network.configPathColumn') }}</th>
+              <th>{{ t('network.configInternalPortColumn') }}</th>
+              <th>{{ t('network.configHostColumn') }}</th>
+              <th>{{ t('network.configProxyColumn') }}</th>
+              <th>{{ t('network.configAutheliaColumn') }}</th>
+              <th>{{ t('network.configInternetColumn') }}</th>
+              <th>{{ t('network.configExtPortColumn') }}</th>
               <th />
             </tr>
           </thead>
@@ -139,23 +137,23 @@
               <td>
                 <input
                   v-model="service.name"
-                  aria-label="Nom du service"
+                  :aria-label="t('network.configServiceNameAria')"
                   class="form-control form-control-sm"
-                  placeholder="Ex: Vaultwarden"
+                  :placeholder="t('network.configServiceNamePlaceholder')"
                 >
               </td>
               <td>
                 <input
                   v-model="service.domain"
-                  aria-label="Domaine"
+                  :aria-label="t('network.configDomainAria')"
                   class="form-control form-control-sm"
-                  placeholder="vault.example.com"
+                  :placeholder="t('network.configDomainPlaceholder')"
                 >
               </td>
               <td>
                 <input
                   v-model="service.path"
-                  aria-label="Chemin"
+                  :aria-label="t('network.configPathAria')"
                   class="form-control form-control-sm"
                   placeholder="/"
                 >
@@ -164,7 +162,7 @@
                 <input
                   v-model.number="service.internalPort"
                   type="number"
-                  aria-label="Port interne"
+                  :aria-label="t('network.configInternalPortAria')"
                   class="form-control form-control-sm"
                   placeholder="3000"
                 >
@@ -172,11 +170,11 @@
               <td>
                 <select
                   v-model="service.hostId"
-                  aria-label="Host"
+                  :aria-label="t('network.configHostAria')"
                   class="form-select form-select-sm"
                 >
                   <option value="">
-                    Choisir...
+                    {{ t('network.configChooseOption') }}
                   </option>
                   <option
                     v-for="h in hosts"
@@ -190,7 +188,7 @@
               <td>
                 <label class="form-check form-switch"><input
                   v-model="service.linkToProxy"
-                  aria-label="Lier au proxy"
+                  :aria-label="t('network.configLinkToProxyAria')"
                   class="form-check-input"
                   type="checkbox"
                 ></label>
@@ -198,7 +196,7 @@
               <td>
                 <label class="form-check form-switch"><input
                   v-model="service.linkToAuthelia"
-                  aria-label="Lier à Authelia"
+                  :aria-label="t('network.configLinkToAutheliaAria')"
                   class="form-check-input"
                   type="checkbox"
                 ></label>
@@ -206,7 +204,7 @@
               <td>
                 <label class="form-check form-switch"><input
                   v-model="service.exposedToInternet"
-                  aria-label="Exposer sur Internet"
+                  :aria-label="t('network.configExposeInternetAria')"
                   class="form-check-input"
                   type="checkbox"
                 ></label>
@@ -215,7 +213,7 @@
                 <input
                   v-model.number="service.externalPort"
                   type="number"
-                  aria-label="Port externe"
+                  :aria-label="t('network.configExternalPortAria')"
                   class="form-control form-control-sm"
                   placeholder="443"
                   :disabled="!service.exposedToInternet"
@@ -228,15 +226,15 @@
                   class="btn btn-sm btn-outline-danger"
                   @click="removeServiceRow(service.id)"
                 >
-                  Supprimer
+                  {{ t('network.configDeleteButton') }}
                 </button>
               </td>
             </tr>
             <tr v-if="networkServices.length === 0">
               <td colspan="10">
                 <EmptyState
-                  title="Aucun service configuré"
-                  subtitle="Ajoutez un service pour le faire apparaître dans la topologie réseau"
+                  :title="t('network.configNoServicesTitle')"
+                  :subtitle="t('network.configNoServicesSubtitle')"
                 />
               </td>
             </tr>
@@ -247,31 +245,31 @@
 
     <div class="network-config-item mt-3">
       <div class="form-label">
-        Nœud Authelia (optionnel)
+        {{ t('network.configAutheliaNodeTitle') }}
       </div>
       <div class="network-config-row">
         <div>
           <input
             v-model="autheliaLabel"
             type="text"
-            aria-label="Label affiché dans le graphe"
+            :aria-label="t('network.configGraphLabelAria')"
             class="form-control form-control-sm"
-            placeholder="Ex: Authelia"
+            :placeholder="t('network.configAutheliaLabelPlaceholder')"
           >
           <div class="text-secondary small mt-1">
-            Label affiché dans le graphe
+            {{ t('network.configGraphLabelHint') }}
           </div>
         </div>
         <div>
           <input
             v-model="autheliaIp"
             type="text"
-            aria-label="IP ou domaine Authelia"
+            :aria-label="t('network.configAutheliaIpAria')"
             class="form-control form-control-sm"
-            placeholder="Ex: 192.168.1.11"
+            :placeholder="t('network.configAutheliaIpPlaceholder')"
           >
           <div class="text-secondary small mt-1">
-            IP / domaine Authelia
+            {{ t('network.configAutheliaIpHint') }}
           </div>
         </div>
       </div>
@@ -280,8 +278,8 @@
           for="network-config-authelia-host-id"
           class="form-label"
         >
-          Hôte correspondant
-          <span class="text-secondary fw-normal">(optionnel)</span>
+          {{ t('network.configMatchingHostLabel') }}
+          <span class="text-secondary fw-normal">{{ t('network.configOptionalSuffix') }}</span>
         </label>
         <select
           id="network-config-authelia-host-id"
@@ -289,7 +287,7 @@
           class="form-select form-select-sm"
         >
           <option value="">
-            — Nœud abstrait (non lié à un hôte) —
+            {{ t('network.configAbstractNodeOption') }}
           </option>
           <option
             v-for="h in hosts"
@@ -307,8 +305,8 @@
             for="network-config-authelia-port-id"
             class="form-label"
           >
-            Port spécifique
-            <span class="text-secondary fw-normal">(optionnel)</span>
+            {{ t('network.configSpecificPortLabel') }}
+            <span class="text-secondary fw-normal">{{ t('network.configOptionalSuffix') }}</span>
           </label>
           <select
             id="network-config-authelia-port-id"
@@ -316,7 +314,7 @@
             class="form-select form-select-sm"
           >
             <option value="">
-              — Nœud hôte (pas de port précis) —
+              {{ t('network.configHostNodeOption') }}
             </option>
             <option
               v-for="p in autheliaHostPorts"
@@ -330,7 +328,7 @@
             </option>
           </select>
           <div class="text-secondary small mt-1">
-            Le nœud Authelia sera ce port précis dans le graphe.
+            {{ t('network.configAutheliaPortHint') }}
           </div>
         </div>
       </div>
@@ -338,31 +336,31 @@
 
     <div class="network-config-item mt-3">
       <div class="form-label">
-        Nœud Internet / Routeur (optionnel)
+        {{ t('network.configInternetNodeTitle') }}
       </div>
       <div class="network-config-row">
         <div>
           <input
             v-model="internetLabel"
             type="text"
-            aria-label="Label affiché dans le graphe"
+            :aria-label="t('network.configGraphLabelAria')"
             class="form-control form-control-sm"
-            placeholder="Ex: Internet"
+            :placeholder="t('network.configInternetLabelPlaceholder')"
           >
           <div class="text-secondary small mt-1">
-            Label affiché dans le graphe
+            {{ t('network.configGraphLabelHint') }}
           </div>
         </div>
         <div>
           <input
             v-model="internetIp"
             type="text"
-            aria-label="IP publique ou domaine"
+            :aria-label="t('network.configInternetIpAria')"
             class="form-control form-control-sm"
-            placeholder="Ex: 1.2.3.4"
+            :placeholder="t('network.configInternetIpPlaceholder')"
           >
           <div class="text-secondary small mt-1">
-            IP publique / domaine
+            {{ t('network.configInternetIpHint') }}
           </div>
         </div>
       </div>
@@ -371,10 +369,10 @@
     <div class="network-config-item mt-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div class="form-label mb-0">
-          Ports decouverts par host
+          {{ t('network.configDiscoveredPortsTitle') }}
         </div>
         <div class="text-secondary small">
-          Nommer, masquer, lier au proxy
+          {{ t('network.configDiscoveredPortsHint') }}
         </div>
       </div>
       <div class="network-discovered">
@@ -388,38 +386,38 @@
               {{ host.name || host.hostname || host.ip_address || host.id }}
             </div>
             <div class="text-secondary small">
-              {{ host.ip_address || 'IP inconnue' }}
+              {{ host.ip_address || t('network.configUnknownIp') }}
             </div>
             <div class="d-flex gap-2 mt-1">
-              <span class="badge bg-blue-lt text-blue text-xs">{{ countEnabled(host.id) }} / {{ (discoveredPortsByHost[host.id] || []).length }} ports affiches</span>
+              <span class="badge bg-blue-lt text-blue text-xs">{{ t('network.configPortsShownBadge', { enabled: countEnabled(host.id), total: (discoveredPortsByHost[host.id] || []).length }) }}</span>
               <span
                 v-if="countProxyLinked(host.id) > 0"
                 class="badge bg-cyan-lt text-cyan text-xs"
-              >{{ countProxyLinked(host.id) }} proxy</span>
+              >{{ t('network.configProxyCountBadge', { count: countProxyLinked(host.id) }) }}</span>
               <span
                 v-if="countAutheliaLinked(host.id) > 0"
                 class="badge bg-purple-lt text-purple text-xs"
-              >{{ countAutheliaLinked(host.id) }} Authelia</span>
+              >{{ t('network.configAutheliaCountBadge', { count: countAutheliaLinked(host.id) }) }}</span>
               <span
                 v-if="countInternetExposed(host.id) > 0"
                 class="badge bg-orange-lt text-orange text-xs"
-              >{{ countInternetExposed(host.id) }} Internet</span>
+              >{{ t('network.configInternetCountBadge', { count: countInternetExposed(host.id) }) }}</span>
             </div>
           </div>
           <div class="table-responsive network-config-table">
             <table class="table table-sm table-vcenter">
               <thead>
                 <tr>
-                  <th>Port</th>
-                  <th>Proto</th>
-                  <th>Nom</th>
-                  <th>Domaine</th>
-                  <th>Chemin</th>
-                  <th>Afficher</th>
-                  <th>Proxy</th>
-                  <th>Authelia</th>
-                  <th>Internet</th>
-                  <th>Port ext.</th>
+                  <th>{{ t('network.configPortColumn') }}</th>
+                  <th>{{ t('network.configProtoColumn') }}</th>
+                  <th>{{ t('network.configNameColumn') }}</th>
+                  <th>{{ t('network.configDomainColumn') }}</th>
+                  <th>{{ t('network.configPathColumn') }}</th>
+                  <th>{{ t('network.configShowColumn') }}</th>
+                  <th>{{ t('network.configProxyColumn') }}</th>
+                  <th>{{ t('network.configAutheliaColumn') }}</th>
+                  <th>{{ t('network.configInternetColumn') }}</th>
+                  <th>{{ t('network.configExtPortColumn') }}</th>
                   <th />
                 </tr>
               </thead>
@@ -434,8 +432,8 @@
                     <span
                       v-if="port.internal"
                       class="badge bg-secondary-lt text-secondary ms-1"
-                      title="Port interne Docker uniquement, non exposé sur l'hôte"
-                    >interne</span>
+                      :title="t('network.configInternalPortTitle')"
+                    >{{ t('network.configInternalBadge') }}</span>
                     <div
                       v-if="port.containers?.length"
                       class="text-secondary fw-normal"
@@ -450,23 +448,23 @@
                   <td>
                     <input
                       v-model="getPortSetting(host.id, port.port).name"
-                      aria-label="Nom du service"
+                      :aria-label="t('network.configServiceNameAria')"
                       class="form-control form-control-sm"
-                      placeholder="Ex: Vaultwarden"
+                      :placeholder="t('network.configServiceNamePlaceholder')"
                     >
                   </td>
                   <td>
                     <input
                       v-model="getPortSetting(host.id, port.port).domain"
-                      aria-label="Domaine"
+                      :aria-label="t('network.configDomainAria')"
                       class="form-control form-control-sm"
-                      placeholder="vault.example.com"
+                      :placeholder="t('network.configDomainPlaceholder')"
                     >
                   </td>
                   <td>
                     <input
                       v-model="getPortSetting(host.id, port.port).path"
-                      aria-label="Chemin"
+                      :aria-label="t('network.configPathAria')"
                       class="form-control form-control-sm"
                       placeholder="/"
                     >
@@ -476,7 +474,7 @@
                       <input
                         :id="`port-enabled-${host.id}-${port.port}`"
                         v-model="getPortSetting(host.id, port.port).enabled"
-                        aria-label="Afficher ce port"
+                        :aria-label="t('network.configShowPortAria')"
                         class="form-check-input"
                         type="checkbox"
                         @change="onEnabledChange(host.id, port.port, $event)"
@@ -490,7 +488,7 @@
                     >
                       <input
                         v-model="getPortSetting(host.id, port.port).linkToProxy"
-                        aria-label="Lier au proxy"
+                        :aria-label="t('network.configLinkToProxyAria')"
                         class="form-check-input"
                         type="checkbox"
                         :disabled="!getPortSetting(host.id, port.port).enabled"
@@ -501,7 +499,7 @@
                     <label class="form-check form-switch">
                       <input
                         v-model="getPortSetting(host.id, port.port).linkToAuthelia"
-                        aria-label="Lier à Authelia"
+                        :aria-label="t('network.configLinkToAutheliaAria')"
                         class="form-check-input"
                         type="checkbox"
                         :disabled="!getPortSetting(host.id, port.port).enabled"
@@ -512,7 +510,7 @@
                     <label class="form-check form-switch">
                       <input
                         v-model="getPortSetting(host.id, port.port).exposedToInternet"
-                        aria-label="Exposer sur Internet"
+                        :aria-label="t('network.configExposeInternetAria')"
                         class="form-check-input"
                         type="checkbox"
                         :disabled="!getPortSetting(host.id, port.port).enabled"
@@ -523,7 +521,7 @@
                     <input
                       v-model.number="getPortSetting(host.id, port.port).externalPort"
                       type="number"
-                      aria-label="Port externe"
+                      :aria-label="t('network.configExternalPortAria')"
                       class="form-control form-control-sm"
                       placeholder="443"
                       :disabled="!getPortSetting(host.id, port.port).exposedToInternet"
@@ -535,8 +533,8 @@
                       v-if="isPortModified(host.id, port.port)"
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-secondary"
-                      title="Reinitialiser ce port"
-                      aria-label="Reinitialiser ce port"
+                      :title="t('network.configResetPortTooltip')"
+                      :aria-label="t('network.configResetPortTooltip')"
                       @click="resetPortSetting(host.id, port.port)"
                     >
                       <IconRefresh
@@ -549,8 +547,8 @@
                 <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
                   <td colspan="7">
                     <EmptyState
-                      title="Aucun port détecté"
-                      subtitle="L'agent doit être actif et avoir collecté les données réseau"
+                      :title="t('network.configNoPortsTitle')"
+                      :subtitle="t('network.configNoPortsSubtitle')"
                     />
                   </td>
                 </tr>
@@ -565,6 +563,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPlus, IconRefresh } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
@@ -647,6 +646,7 @@ const props = withDefaults(defineProps<{
   containers: () => [],
 })
 
+const { t } = useI18n()
 const dialog = useConfirmDialog()
 
 const discoveredPortsByHost = computed<Record<string, DiscoveredPort[]>>(() => {
@@ -716,7 +716,7 @@ function onEnabledChange(hostId: string, portNumber: number, event: Event): void
 
 function getPortProxyTooltip(hostId: string, portNumber: number): string {
   const setting = getPortSetting(hostId, portNumber)
-  return !setting.enabled ? "Activez d'abord l'affichage du port" : ''
+  return !setting.enabled ? t('network.configEnableFirstHint') : ''
 }
 
 function portRowClass(hostId: string, portNumber: number): Record<string, boolean> {
@@ -825,8 +825,8 @@ function addServiceRow(): void {
 async function removeServiceRow(serviceId: string): Promise<void> {
   const service = networkServices.value.find((s) => s.id === serviceId)
   const confirmed = await dialog.confirm({
-    title: 'Supprimer le service',
-    message: `Le service "${service?.name || 'sans nom'}" sera retiré de la configuration réseau.`,
+    title: t('network.configDeleteServiceTitle'),
+    message: t('network.configDeleteServiceMessage', { name: service?.name || t('network.configUnnamedService') }),
     variant: 'danger',
   })
   if (!confirmed) return

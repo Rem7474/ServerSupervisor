@@ -53,7 +53,7 @@ func humanizeValidationError(err error) string {
 func parseAlertRuleID(c *gin.Context) (int64, bool) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		respondError(c, apperr.Validation("Identifiant de règle invalide."))
+		respondError(c, apperr.Validation("invalid alert rule id").I18n(apperr.CodeAlertRuleIDInvalid, nil))
 		return 0, false
 	}
 	return id, true

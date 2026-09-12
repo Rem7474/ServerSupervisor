@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -162,5 +163,121 @@ func TestLoad_RateLimitRPSFromEnv(t *testing.T) {
 	c := Load()
 	if c.RateLimitRPS != 150 {
 		t.Fatalf("expected RateLimitRPS=150, got %d", c.RateLimitRPS)
+	}
+}
+
+func TestOIDCConfig_LoadAndValidate(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("OIDC_ENABLED", "true")
+	t.Setenv("OIDC_DISPLAY_NAME", "Authentik SSO")
+	t.Setenv("OIDC_ISSUER_URL", "https://auth.example.com/application/o/ss/")
+	t.Setenv("OIDC_CLIENT_ID", "ss-client-id")
+	t.Setenv("OIDC_CLIENT_SECRET", "ss-secret")
+	t.Setenv("OIDC_REDIRECT_URL", "https://ss.example.com/api/auth/oidc/callback")
+	t.Setenv("OIDC_SCOPES", "openid,profile,email,groups")
+	t.Setenv("OIDC_ADMIN_GROUP", "admins")
+	t.Setenv("OIDC_OPERATOR_GROUP", "operators")
+	t.Setenv("OIDC_VIEWER_GROUP", "viewers")
+	t.Setenv("OIDC_DEFAULT_ROLE", "viewer")
+	t.Setenv("OIDC_AUTO_CREATE_USER", "true")
+	t.Setenv("OIDC_ALLOW_LOCAL_LOGIN", "false")
+	t.Setenv("OIDC_INSECURE_SKIP_VERIFY", "false")
+
+	c := Load()
+	if !c.OIDCEnabled || c.OIDCDisplayName != "Authentik SSO" || c.OIDCIssuerURL != "https://auth.example.com/application/o/ss/" {
+		t.Fatalf("unexpected OIDC config loaded: %+v", c)
+	}
+	if len(c.OIDCScopes) != 4 || c.OIDCScopes[3] != "groups" {
+		t.Fatalf("unexpected OIDC scopes: %v", c.OIDCScopes)
+	}
+	if c.OIDCAllowLocalLogin != false || c.OIDCAutoCreateUser != true {
+		t.Fatalf("unexpected flags: allow_local=%v auto_create=%v", c.OIDCAllowLocalLogin, c.OIDCAutoCreateUser)
+	}
+
+	c.JWTSecret = strings.Repeat("x", 64)
+	c.AdminPassword = "strong-admin-pass"
+	c.DBPassword = "strong-db-pass"
+	if err := c.ValidateStrict(); err != nil {
+		t.Fatalf("valid OIDC config should pass ValidateStrict, got %v", err)
+	}
+
+	// Test missing OIDC_ISSUER_URL
+	cMissingIssuer := *c
+	cMissingIssuer.OIDCIssuerURL = ""
+	if err := cMissingIssuer.ValidateStrict(); err == nil {
+		t.Fatal("expected error on missing OIDC_ISSUER_URL")
+	}
+
+	// Test missing OIDC_CLIENT_ID
+	cMissingClient := *c
+	cMissingClient.OIDCClientID = ""
+	if err := cMissingClient.ValidateStrict(); err == nil {
+		t.Fatal("expected error on missing OIDC_CLIENT_ID")
+	}
+
+	// Test missing OIDC_REDIRECT_URL
+	cMissingRedir := *c
+	cMissingRedir.OIDCRedirectURL = ""
+	if err := cMissingRedir.ValidateStrict(); err == nil {
+		t.Fatal("expected error on missing OIDC_REDIRECT_URL")
+	}
+}
+
+type mockSettingsLoader map[string]string
+
+func (m mockSettingsLoader) GetAllSettings(ctx context.Context) (map[string]string, error) {
+	return m, nil
+}
+
+func TestOIDCConfig_OverrideFromDB(t *testing.T) {
+	c := &Config{
+		OIDCEnabled:     false,
+		OIDCDisplayName: "Default",
+	}
+
+	dbSettings := mockSettingsLoader{
+		"oidc_enabled":              "true",
+		"oidc_display_name":         "Custom DB SSO",
+		"oidc_issuer_url":           "https://custom-auth.example.com",
+		"oidc_client_id":            "custom-client",
+		"oidc_client_secret":        "custom-secret",
+		"oidc_redirect_url":         "https://custom.example.com/callback",
+		"oidc_scopes":               "openid,email",
+		"oidc_username_claim":       "preferred_username",
+		"oidc_email_claim":          "email",
+		"oidc_groups_claim":         "groups",
+		"oidc_admin_group":          "db-admins",
+		"oidc_operator_group":       "db-ops",
+		"oidc_viewer_group":         "db-viewers",
+		"oidc_default_role":         "operator",
+		"oidc_auto_create_user":     "false",
+		"oidc_allow_local_login":    "true",
+		"oidc_insecure_skip_verify": "true",
+	}
+
+	c.OverrideFromDB(dbSettings)
+
+	if !c.OIDCEnabled || c.OIDCDisplayName != "Custom DB SSO" || c.OIDCIssuerURL != "https://custom-auth.example.com" {
+		t.Fatalf("unexpected overrides: %+v", c)
+	}
+	if len(c.OIDCScopes) != 2 || c.OIDCAdminGroup != "db-admins" || c.OIDCDefaultRole != "operator" {
+		t.Fatalf("unexpected OIDC claims/groups: %+v", c)
+	}
+	if c.OIDCAutoCreateUser != false || c.OIDCInsecureSkipVerify != true {
+		t.Fatalf("unexpected flags after override: %+v", c)
+	}
+}
+
+func TestGetCSVEnvOrDefault(t *testing.T) {
+	t.Setenv("TEST_CSV_KEY", "apple, banana , cherry")
+	res := getCSVEnvOrDefault("TEST_CSV_KEY", []string{"default"})
+	if len(res) != 3 || res[0] != "apple" || res[1] != "banana" || res[2] != "cherry" {
+		t.Fatalf("unexpected csv parsed: %v", res)
+	}
+
+	t.Setenv("TEST_EMPTY_CSV", "")
+	resDef := getCSVEnvOrDefault("TEST_EMPTY_CSV", []string{"foo", "bar"})
+	if len(resDef) != 2 || resDef[0] != "foo" {
+		t.Fatalf("unexpected default csv: %v", resDef)
 	}
 }

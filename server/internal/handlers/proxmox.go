@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
-	"github.com/serversupervisor/server/internal/errors"
 	"github.com/serversupervisor/server/internal/models"
 	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
 )
@@ -44,8 +43,8 @@ func (h *ProxmoxHandler) PollOnce(ctx context.Context) {
 // original behavior of a few node endpoints); otherwise respondError is used.
 func renderProxmoxErr(c *gin.Context, err error, i18nNodeNotFound bool) {
 	if i18nNodeNotFound && apperr.From(err).HTTPStatus == http.StatusNotFound {
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
+		lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusNotFound, apperr.NewErrorResponse(apperr.CodeNodeNotFound, lang, nil))
 		return
 	}
 	respondError(c, err)

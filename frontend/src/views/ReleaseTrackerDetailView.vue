@@ -7,7 +7,7 @@
             to="/git-webhooks?tab=trackers"
             class="text-decoration-none"
           >
-            Suivi de versions
+            {{ t('webhooks.versionTrackingTab') }}
           </router-link>
           <span class="text-muted mx-1">/</span>
           <span>{{ tracker?.name || id }}</span>
@@ -28,12 +28,12 @@
           <span
             v-if="tracker && !tracker.enabled"
             class="badge bg-secondary-lt text-secondary"
-          >Désactivé</span>
+          >{{ t('webhooks.disabledBadge') }}</span>
           <span
             v-if="tracker && cooldownActive"
             class="badge bg-warning-lt text-warning"
-            :title="`Déploiement prévu: ${cooldownEtaText}`"
-          >Cooldown actif · reste {{ cooldownRemainingText }}</span>
+            :title="t('webhooks.plannedDeploymentTooltip', { eta: cooldownEtaText })"
+          >{{ t('webhooks.cooldownActiveLabel', { remaining: cooldownRemainingText }) }}</span>
         </h2>
       </div>
     </div>
@@ -63,18 +63,18 @@
         <div class="card bg-primary-lt border-primary">
           <div class="card-body">
             <h4 class="card-title">
-              Dernière version détectée
+              {{ t('webhooks.latestVersionDetectedTitle') }}
             </h4>
             <dl class="row mb-0 small">
               <dt class="col-sm-3 text-muted">
-                Version
+                {{ t('webhooks.versionColumn') }}
               </dt>
               <dd class="col-sm-9">
                 <code class="fs-6">{{ tracker.last_release_tag }}</code>
               </dd>
               <template v-if="tracker.docker_image">
                 <dt class="col-sm-3 text-muted">
-                  Image &amp; tag
+                  {{ t('webhooks.imageAndTagLabel') }}
                 </dt>
                 <dd class="col-sm-9">
                   <code>{{ tracker.docker_image }}:{{ tracker.last_release_tag }}</code>
@@ -82,7 +82,7 @@
               </template>
               <template v-if="tracker.release_url">
                 <dt class="col-sm-3 text-muted">
-                  Release
+                  {{ t('webhooks.releaseColumn') }}
                 </dt>
                 <dd class="col-sm-9">
                   <a
@@ -91,7 +91,7 @@
                     rel="noopener noreferrer"
                     class="link-primary"
                   >
-                    → Voir sur GitHub
+                    {{ t('webhooks.viewOnGithubLink') }}
                   </a>
                 </dd>
               </template>
@@ -121,19 +121,19 @@
           class="alert alert-warning mt-3 mb-3"
         >
           <h4 class="alert-title">
-            Aucune tâche configurée
+            {{ t('webhooks.noTaskConfiguredTitle') }}
           </h4>
           <p class="mb-2">
-            Cette image Docker est surveillée, mais aucune tâche de déploiement n'a été configurée.
+            {{ t('webhooks.noTaskConfiguredMessage') }}
           </p>
           <p class="mb-2 small text-muted">
-            Créer une tâche pour automatiser les mises à jour lorsqu'une nouvelle version est détectée.
+            {{ t('webhooks.createTaskHint') }}
           </p>
           <router-link
             :to="`/hosts/${tracker.host_id}`"
             class="btn btn-sm btn-warning"
           >
-            Créer une tâche
+            {{ t('webhooks.createTaskButton') }}
           </router-link>
         </div>
 
@@ -154,8 +154,8 @@
         <WebhookExecutionList
           :executions="executions"
           kind="tracker"
-          title="Historique des exécutions"
-          empty-text="Aucune exécution enregistrée."
+          :title="t('webhooks.executionHistoryTitle')"
+          :empty-text="t('webhooks.noExecutionRecordedTitle')"
           :show-refresh="true"
           logs-mode="inline"
           @refresh="loadExecutions"
@@ -166,8 +166,8 @@
           <CommandLogPanel
             :command="selectedCmd"
             :show="showConsole"
-            title="Console live"
-            empty-text="Sélectionnez 'Logs' dans l'historique des exécutions"
+            :title="t('webhooks.consoleLiveTitle')"
+            :empty-text="t('webhooks.selectLogsHint')"
             @close="clearExecutionLogs"
             @open="showConsole = true"
           />
@@ -189,6 +189,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
@@ -197,6 +198,8 @@ import TrackerConfigCard from '../components/webhooks/TrackerConfigCard.vue'
 import TrackerScriptHelpCard from '../components/webhooks/TrackerScriptHelpCard.vue'
 import TrackerVersionHistoryCard from '../components/webhooks/TrackerVersionHistoryCard.vue'
 import { useReleaseTrackerDetail } from '../composables/useReleaseTrackerDetail'
+
+const { t } = useI18n()
 
 const {
   id,

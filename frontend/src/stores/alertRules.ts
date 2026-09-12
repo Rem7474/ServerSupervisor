@@ -2,6 +2,7 @@ import { ref, Ref } from 'vue'
 import { defineStore } from 'pinia'
 import apiClient from '../api'
 import type { AlertRule } from '../types/alert'
+import { i18n } from '../i18n'
 
 const TTL_MS = 30_000 // 30 seconds
 
@@ -13,7 +14,7 @@ function getErrorMessage(error: unknown): string {
     const message = 'message' in error ? (error as { message?: unknown }).message : undefined
     if (typeof message === 'string') return message
   }
-  return 'Erreur de chargement'
+  return i18n.global.t('common.loadError')
 }
 
 export const useAlertRulesStore = defineStore('alertRules', () => {

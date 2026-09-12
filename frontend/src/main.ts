@@ -2,7 +2,9 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
+import { currentLocale, ensureLocaleMessages, i18n } from './i18n'
 import '@tabler/core/dist/css/tabler.min.css'
+import '@tabler/core/dist/css/tabler-flags.min.css'
 import './style.css'
 
 type FatalDetail = {
@@ -32,8 +34,8 @@ function renderBootPlaceholder(): void {
               <div class="card-body py-5 d-flex align-items-center gap-3">
                 <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
                 <div>
-                  <div class="fw-semibold">Initialisation de l'application</div>
-                  <div class="text-secondary small">Chargement en cours...</div>
+                  <div class="fw-semibold">${escapeHtml(i18n.global.t('common.bootTitle'))}</div>
+                  <div class="text-secondary small">${escapeHtml(i18n.global.t('common.bootSubtitle'))}</div>
                 </div>
               </div>
             </div>
@@ -46,8 +48,8 @@ function renderBootPlaceholder(): void {
 
 function renderFatalFallback(detail: FatalDetail): void {
   if (!appRoot) return
-  const title = escapeHtml(detail.title || 'Erreur critique de l interface')
-  const message = escapeHtml(detail.message || 'Une erreur inattendue a interrompu le rendu de l application.')
+  const title = escapeHtml(detail.title || i18n.global.t('common.fatalTitle'))
+  const message = escapeHtml(detail.message || i18n.global.t('common.fatalMessage'))
   appRoot.innerHTML = `
     <div class="page">
       <div class="page-wrapper">
@@ -61,7 +63,7 @@ function renderFatalFallback(detail: FatalDetail): void {
                 <div class="flex-fill">
                   <h3 class="alert-title mb-1">${title}</h3>
                   <div class="text-secondary mb-3">${message}</div>
-                  <button type="button" class="btn btn-danger" id="fatal-reload-btn">Recharger l'application</button>
+                  <button type="button" class="btn btn-danger" id="fatal-reload-btn">${escapeHtml(i18n.global.t('common.fatalReload'))}</button>
                 </div>
               </div>
             </div>
@@ -82,7 +84,7 @@ function toErrorMessage(reason: unknown): string {
   if (typeof reason === 'string') {
     return reason
   }
-  return 'Erreur inconnue'
+  return i18n.global.t('common.unknownError')
 }
 
 renderBootPlaceholder()
@@ -108,7 +110,7 @@ window.addEventListener('error', (event: ErrorEvent) => {
     return
   }
   renderFatalFallback({
-    title: 'Erreur JavaScript non gérée',
+    title: i18n.global.t('common.fatalUnhandledError'),
     message: toErrorMessage(event.error ?? event.message),
   })
 })
@@ -168,7 +170,7 @@ window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => 
     return
   }
   renderFatalFallback({
-    title: 'Erreur asynchrone non gérée',
+    title: i18n.global.t('common.fatalUnhandledRejection'),
     message: toErrorMessage(event.reason),
   })
 })
@@ -180,8 +182,17 @@ window.addEventListener('ss:fatal-error', (event: Event) => {
 
 const app = createApp(App)
 app.use(createPinia())
+app.use(i18n)
 app.use(router)
-app.mount('#app')
+
+// The active locale's chunk must be registered before the first render, or the
+// UI paints in the fallback language and then swaps. French is the fallback and
+// ships in the entry chunk, so this only awaits anything for other locales; a
+// failed fetch still mounts (every key falls back to French) rather than
+// leaving the boot placeholder up forever.
+ensureLocaleMessages(currentLocale())
+  .catch((e) => console.warn('[i18n] could not load the active locale, falling back', e))
+  .finally(() => app.mount('#app'))
 
 // Register service worker for PWA support
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

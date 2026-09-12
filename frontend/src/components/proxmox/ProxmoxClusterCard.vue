@@ -8,7 +8,7 @@
           class="text-orange"
         />
         <h3 class="card-title mb-0">
-          Cluster Proxmox
+          {{ t('proxmox.clusterTitle') }}
         </h3>
         <span
           v-if="clusterName"
@@ -19,7 +19,7 @@
         to="/proxmox"
         class="btn btn-sm btn-outline-secondary"
       >
-        Détails
+        {{ t('proxmox.detailsButton') }}
       </router-link>
     </div>
 
@@ -29,7 +29,7 @@
         <div class="col-6 col-md-3">
           <div class="d-flex flex-column">
             <div class="subheader">
-              Nœuds
+              {{ t('proxmox.nodesLabel') }}
             </div>
             <div class="d-flex align-items-baseline gap-1">
               <span
@@ -42,14 +42,14 @@
               v-if="nodesDown > 0"
               class="text-danger small"
             >
-              {{ nodesDown }} hors ligne
+              {{ t('proxmox.nodesDownText', { n: nodesDown }) }}
             </div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="d-flex flex-column">
             <div class="subheader">
-              VMs / LXC
+              {{ t('proxmox.vmsLxcLabel') }}
             </div>
             <div class="h2 mb-0">
               {{ totalVMs + totalLXC }}
@@ -62,7 +62,7 @@
         <div class="col-6 col-md-3">
           <div class="d-flex flex-column">
             <div class="subheader">
-              CPU cluster
+              {{ t('proxmox.cpuClusterLabel') }}
             </div>
             <div
               class="h2 mb-0"
@@ -71,14 +71,14 @@
               {{ clusterCpuPct.toFixed(1) }}%
             </div>
             <div class="text-secondary small">
-              {{ totalCpus }} cœurs
+              {{ t('proxmox.coresLabel', { n: totalCpus }) }}
             </div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="d-flex flex-column">
             <div class="subheader">
-              RAM cluster
+              {{ t('proxmox.ramClusterLabel') }}
             </div>
             <div
               class="h2 mb-0"
@@ -142,8 +142,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconDeviceDesktop } from '@tabler/icons-vue'
 import { getMetricColorClass } from '../../utils/metricColor'
+
+const { t } = useI18n()
 
 interface ClusterNode {
   id: string | number
@@ -209,11 +212,12 @@ function ramBarColor(pct: number): string {
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
-  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
+  const unitKeys = ['', 'proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
   let i = 0
   let v = bytes
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
-  return v.toFixed(i === 0 ? 0 : 1) + ' ' + units[i]
+  while (v >= 1024 && i < unitKeys.length - 1) { v /= 1024; i++ }
+  const unit = i === 0 ? 'B' : t(unitKeys[i])
+  return v.toFixed(i === 0 ? 0 : 1) + ' ' + unit
 }
 </script>
 

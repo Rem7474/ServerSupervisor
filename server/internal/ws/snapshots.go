@@ -16,10 +16,11 @@ func (h *WSHandler) sendDashboardSnapshot(ctx context.Context, conn *websocket.C
 	if err != nil {
 		return err
 	}
-	if !snapshotChanged(payload, lastHash) {
+	raw, changed := snapshotChanged(payload, lastHash)
+	if !changed {
 		return nil
 	}
-	return safeWriteJSON(conn, payload)
+	return safeWriteRaw(conn, raw)
 }
 
 // dashboardPayload returns the shared dashboard snapshot, rebuilding it only when
@@ -185,13 +186,7 @@ func (h *WSHandler) sendHostSnapshot(ctx context.Context, conn *websocket.Conn, 
 	uuStatus, _ := h.db.GetUUStatus(ctx, hostID)
 	uuRuns, _ := h.db.GetUURuns(ctx, hostID, 20)
 
-	allComparisons, _ := h.buildVersionComparisons(ctx)
-	comparisons := make([]models.VersionComparison, 0)
-	for _, vc := range allComparisons {
-		if vc.HostID == hostID {
-			comparisons = append(comparisons, vc)
-		}
-	}
+	comparisons, _ := h.buildVersionComparisonsForHost(ctx, hostID)
 
 	proxmoxLink, _ := h.db.GetProxmoxGuestLinkByHost(ctx, hostID)
 
@@ -206,10 +201,11 @@ func (h *WSHandler) sendHostSnapshot(ctx context.Context, conn *websocket.Conn, 
 		VersionComparisons: comparisons,
 		ProxmoxLink:        proxmoxLink,
 	}
-	if !snapshotChanged(payload, lastHash) {
+	raw, changed := snapshotChanged(payload, lastHash)
+	if !changed {
 		return nil
 	}
-	return safeWriteJSON(conn, payload)
+	return safeWriteRaw(conn, raw)
 }
 
 func (h *WSHandler) sendDockerSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
@@ -237,10 +233,11 @@ func (h *WSHandler) sendDockerSnapshot(ctx context.Context, conn *websocket.Conn
 		ComposeProjects:    composeProjects,
 		VersionComparisons: comparisons,
 	}
-	if !snapshotChanged(payload, lastHash) {
+	raw, changed := snapshotChanged(payload, lastHash)
+	if !changed {
 		return nil
 	}
-	return safeWriteJSON(conn, payload)
+	return safeWriteRaw(conn, raw)
 }
 
 func (h *WSHandler) sendNetworkSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
@@ -258,10 +255,11 @@ func (h *WSHandler) sendNetworkSnapshot(ctx context.Context, conn *websocket.Con
 		Config:     config,
 		UpdatedAt:  snapshot.UpdatedAt,
 	}
-	if !snapshotChanged(payload, lastHash) {
+	raw, changed := snapshotChanged(payload, lastHash)
+	if !changed {
 		return nil
 	}
-	return safeWriteJSON(conn, payload)
+	return safeWriteRaw(conn, raw)
 }
 
 func (h *WSHandler) sendAptSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
@@ -270,24 +268,9 @@ func (h *WSHandler) sendAptSnapshot(ctx context.Context, conn *websocket.Conn, l
 		return err
 	}
 
-	aptStatuses := map[string]*models.AptStatus{}
-	aptHistories := map[string][]models.RemoteCommand{}
-	uuStatuses := map[string]*models.UnattendedUpgradesDB{}
-
-	for _, host := range hosts {
-		status, err := h.db.GetAptStatus(ctx, host.ID)
-		if err == nil {
-			aptStatuses[host.ID] = status
-		}
-		hist, err := h.db.GetAptHistoryWithAgentUpdates(ctx, host.ID, 20)
-		if err == nil {
-			aptHistories[host.ID] = hist
-		}
-		uu, err := h.db.GetUUStatus(ctx, host.ID)
-		if err == nil {
-			uuStatuses[host.ID] = uu
-		}
-	}
+	aptStatuses, _ := h.db.GetAptStatusAll(ctx)
+	aptHistories, _ := h.db.GetAptHistoryAll(ctx, 20)
+	uuStatuses, _ := h.db.GetUUStatusAll(ctx)
 
 	payload := &models.WSAptSnapshot{
 		Type:               "apt",
@@ -297,8 +280,9 @@ func (h *WSHandler) sendAptSnapshot(ctx context.Context, conn *websocket.Conn, l
 		UUStatuses:         uuStatuses,
 		LatestAgentVersion: h.latestAgentVersion(),
 	}
-	if !snapshotChanged(payload, lastHash) {
+	raw, changed := snapshotChanged(payload, lastHash)
+	if !changed {
 		return nil
 	}
-	return safeWriteJSON(conn, payload)
+	return safeWriteRaw(conn, raw)
 }

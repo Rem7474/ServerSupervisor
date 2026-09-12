@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import ProxmoxNodeBackupsTab from './ProxmoxNodeBackupsTab.vue'
 import type { ProxmoxBackupJob, ProxmoxBackupRun } from '../../types/proxmox'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 const JOB: ProxmoxBackupJob = {
   id: 'j1', connection_id: 'c1', job_id: 'backup-nightly', enabled: true,
@@ -17,7 +22,8 @@ const RUN_OK: ProxmoxBackupRun = {
 
 const RUN_ERROR: ProxmoxBackupRun = {
   id: 'r2', connection_id: 'c1', node_name: 'pve1', vmid: 101, task_upid: 'UPID:pve1:...',
-  status: 'error', end_time: new Date().toISOString(), exit_status: 'error opening file',
+  status: 'failed', end_time: new Date().toISOString(),
+  exit_status: "could not activate storage 'pbs-immich': error fetching datastores - 500",
   last_seen_at: new Date().toISOString(), guest_name: 'db-01',
 }
 
@@ -52,7 +58,7 @@ describe('ProxmoxNodeBackupsTab', () => {
     expect(wrapper.text()).toContain('web-01')
     expect(wrapper.text()).toContain('db-01')
     expect(wrapper.text()).toContain('OK')
-    expect(wrapper.text()).toContain('Erreur')
+    expect(wrapper.text()).toContain('Échoué')
     const badges = wrapper.findAll('.badge')
     expect(badges.some((b) => b.classes().includes('bg-success-lt'))).toBe(true)
     expect(badges.some((b) => b.classes().includes('bg-danger-lt'))).toBe(true)
@@ -72,5 +78,47 @@ describe('ProxmoxNodeBackupsTab', () => {
   it('shows the error alert when loading failed', () => {
     const wrapper = mountTab({ error: 'Erreur lors du chargement des sauvegardes.' })
     expect(wrapper.text()).toContain('Erreur lors du chargement des sauvegardes.')
+  })
+})
+
+describe('ProxmoxNodeBackupsTab — status presentation', () => {
+  // The badge used to be the raw PVE outcome, so a storage failure rendered as
+  // an untranslated, unbounded grey badge while the live task panel showed a
+  // red "failed" for the very same run.
+  it('badges a failure with the shared state vocabulary and keeps PVE wording alongside', () => {
+    const wrapper = mountTab({ runs: [RUN_ERROR] })
+
+    const badge = wrapper.find('tbody .badge')
+    expect(badge.text()).toBe('Échoué')
+    expect(badge.classes()).toContain('bg-danger-lt')
+    expect(wrapper.find('.run-detail').text()).toContain("could not activate storage 'pbs-immich'")
+  })
+
+  it('exposes the full PVE outcome as a tooltip, since the line is clipped', () => {
+    const wrapper = mountTab({ runs: [RUN_ERROR] })
+    expect(wrapper.find('.run-detail').attributes('title')).toBe(RUN_ERROR.exit_status)
+  })
+
+  it('shows no detail line for a successful run', () => {
+    const wrapper = mountTab({ runs: [{ ...RUN_OK, status: 'OK', exit_status: 'OK' }] })
+
+    expect(wrapper.find('tbody .badge').text()).toBe('OK')
+    expect(wrapper.find('.run-detail').exists()).toBe(false)
+  })
+
+  it('shows no detail line for a storage-derived run, which has no PVE outcome', () => {
+    // Those rows come from a retained backup file, not a task.
+    const wrapper = mountTab({ runs: [{ ...RUN_OK, status: 'OK', exit_status: '', task_upid: '' }] })
+
+    expect(wrapper.find('tbody .badge').text()).toBe('OK')
+    expect(wrapper.find('.run-detail').exists()).toBe(false)
+  })
+
+  it('badges a run that ended with warnings as a warning', () => {
+    const wrapper = mountTab({ runs: [{ ...RUN_OK, status: 'warnings', exit_status: 'WARNINGS: 1' }] })
+
+    const badge = wrapper.find('tbody .badge')
+    expect(badge.text()).toBe('Avertissements')
+    expect(badge.classes()).toContain('bg-warning-lt')
   })
 })

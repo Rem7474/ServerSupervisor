@@ -3,16 +3,16 @@
     <div class="card-header d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
       <div>
         <h3 class="card-title mb-1">
-          Historique de notifications
+          {{ t('alerts.notificationHistoryPageTitle') }}
         </h3>
         <div class="text-muted small">
-          Recherche, filtre par type ou par état, puis ouvre le détail en un clic.
+          {{ t('alerts.incidentListSubtitle') }}
         </div>
       </div>
       <div class="d-flex flex-wrap align-items-center gap-2">
         <BadgePill
           v-if="activeIncidentCount > 0"
-          :text="`${activeIncidentCount} actif${activeIncidentCount > 1 ? 's' : ''}`"
+          :text="t('alerts.activeIncidentsBadge', { count: activeIncidentCount }, activeIncidentCount)"
           tone="danger"
           compact
         />
@@ -28,7 +28,7 @@
       <div class="row g-3 align-items-end">
         <div class="col-12 col-xl-4">
           <label class="form-label text-muted small mb-2">
-            Recherche
+            {{ t('alerts.searchLabel') }}
           </label>
           <div class="input-icon">
             <span class="input-icon-addon">
@@ -41,13 +41,13 @@
               v-model="searchQuery"
               type="text"
               class="form-control"
-              placeholder="Rechercher une règle, un hôte, une source…"
+              :placeholder="t('alerts.incidentSearchPlaceholder')"
             >
             <button
               v-if="searchQuery"
               class="btn btn-icon btn-outline-secondary"
               type="button"
-              aria-label="Effacer la recherche"
+              :aria-label="t('alerts.clearSearchAriaLabel')"
               @click="clearSearch"
             >
               <IconX
@@ -60,7 +60,7 @@
         <div class="col-12 col-xl-8">
           <div class="d-flex flex-wrap align-items-center justify-content-xl-end gap-3">
             <div class="d-flex flex-wrap align-items-center gap-2">
-              <span class="text-muted small me-1 fw-semibold">Type :</span>
+              <span class="text-muted small me-1 fw-semibold">{{ t('alerts.typeFilterLabel') }}</span>
               <button
                 v-for="opt in TYPE_FILTERS"
                 :key="opt.value"
@@ -69,7 +69,7 @@
                 :class="filterType === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
                 @click="setTypeFilter(opt.value)"
               >
-                {{ opt.label }}
+                {{ t(opt.labelKey) }}
               </button>
             </div>
             <div
@@ -77,7 +77,7 @@
               style="height: 24px;"
             />
             <div class="d-flex flex-wrap align-items-center gap-2">
-              <span class="text-muted small me-1 fw-semibold">État :</span>
+              <span class="text-muted small me-1 fw-semibold">{{ t('alerts.statusFilterLabel') }}</span>
               <button
                 v-for="opt in STATUS_FILTERS"
                 :key="opt.value"
@@ -86,14 +86,14 @@
                 :class="filterStatus === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
                 @click="setStatusFilter(opt.value)"
               >
-                {{ opt.label }}
+                {{ t(opt.labelKey) }}
               </button>
             </div>
           </div>
         </div>
         <div class="col-12 d-flex flex-wrap align-items-center gap-2">
           <span class="text-muted small me-1">
-            Actions rapides
+            {{ t('alerts.quickActionsLabel') }}
           </span>
           <button
             type="button"
@@ -105,12 +105,12 @@
               :size="16"
               class="icon me-1"
             />
-            Tout marquer lu
+            {{ t('alerts.markAllReadButton') }}
           </button>
           <button
             type="button"
             class="btn btn-sm btn-ghost-secondary"
-            :title="groupByHost ? 'Afficher en liste chronologique' : 'Regrouper par hôte'"
+            :title="groupByHost ? t('alerts.showChronologicalTitle') : t('alerts.groupByHostLabel')"
             @click="groupByHost = !groupByHost"
           >
             <IconStack2
@@ -123,7 +123,7 @@
               :size="14"
               class="icon me-1"
             />
-            {{ groupByHost ? 'Vue chronologique' : 'Regrouper par hôte' }}
+            {{ groupByHost ? t('alerts.chronologicalViewLabel') : t('alerts.groupByHostLabel') }}
           </button>
           <button
             v-if="hasActiveFilters"
@@ -131,7 +131,7 @@
             type="button"
             @click="resetFilters"
           >
-            Réinitialiser
+            {{ t('alerts.resetButton') }}
           </button>
           <span class="ms-auto text-secondary small text-nowrap">
             {{ incidentCountLabel }}
@@ -158,8 +158,8 @@
     >
       <EmptyState
         :icon="IconBell"
-        title="Aucune notification enregistrée"
-        subtitle="Les alertes et les notifications du release tracker apparaîtront ici"
+        :title="t('alerts.noNotificationsTitle')"
+        :subtitle="t('alerts.noNotificationsSubtitle')"
       />
     </div>
     <div
@@ -168,9 +168,9 @@
     >
       <EmptyState
         :icon="IconBell"
-        title="Aucune notification ne correspond à cette recherche."
-        subtitle="Essayez un autre mot-clé ou réinitialisez les filtres."
-        :cta-label="hasActiveFilters ? 'Réinitialiser' : ''"
+        :title="t('alerts.noMatchTitle')"
+        :subtitle="t('alerts.noMatchSubtitle')"
+        :cta-label="hasActiveFilters ? t('alerts.resetButton') : ''"
         @cta="resetFilters"
       />
     </div>
@@ -182,15 +182,15 @@
         <thead>
           <tr>
             <th style="width: 90px;">
-              État
+              {{ t('alerts.stateColumn') }}
             </th>
-            <th>Type</th>
-            <th>Élément</th>
-            <th>Source</th>
-            <th>Détails</th>
+            <th>{{ t('alerts.typeColumn') }}</th>
+            <th>{{ t('alerts.elementColumn') }}</th>
+            <th>{{ t('alerts.sourceColumn') }}</th>
+            <th>{{ t('alerts.detailsColumn') }}</th>
             <th>
               <SortableHeader
-                label="Déclenché"
+                :label="t('alerts.triggeredColumn')"
                 :active="sortKey === 'triggered_at'"
                 :direction="sortDir"
                 @toggle="toggleSort('triggered_at')"
@@ -198,7 +198,7 @@
             </th>
             <th>
               <SortableHeader
-                label="Terminé"
+                :label="t('alerts.completedColumn')"
                 :active="sortKey === 'resolved_at'"
                 :direction="sortDir"
                 @toggle="toggleSort('resolved_at')"
@@ -235,7 +235,7 @@
                   />
                   <BadgePill
                     v-if="row.activeCount > 0"
-                    :text="`${row.activeCount} actif${row.activeCount > 1 ? 's' : ''}`"
+                    :text="t('alerts.activeIncidentsBadge', { count: row.activeCount }, row.activeCount)"
                     tone="danger"
                     compact
                   />
@@ -248,7 +248,7 @@
                   colspan="8"
                   class="text-center text-muted small py-1 border-top"
                 >
-                  — Plus de 7 jours —
+                  {{ t('alerts.olderThan7DaysSeparator') }}
                 </td>
               </tr>
               <tr :class="{ 'text-muted': row.item._isOld }">
@@ -269,7 +269,7 @@
                     v-if="row.item.correlated_with"
                     :size="14"
                     class="icon text-muted ms-1"
-                    title="Corrélé avec l'incident « hôte hors ligne » — pas de notification séparée"
+                    :title="t('alerts.correlatedIncidentTitle')"
                   />
                 </td>
                 <td>
@@ -293,9 +293,9 @@
                     :to="notificationRoute(row.item)"
                     class="text-decoration-none"
                   >
-                    {{ row.item.host_name || 'Source inconnue' }}
+                    {{ row.item.host_name || t('alerts.warRoomUnknownSource') }}
                   </router-link>
-                  <span v-else>{{ row.item.host_name || 'Source inconnue' }}</span>
+                  <span v-else>{{ row.item.host_name || t('alerts.warRoomUnknownSource') }}</span>
                   <div
                     v-if="row.item.source_label && row.item.source_label !== row.item.host_name"
                     class="text-muted small text-truncate"
@@ -308,7 +308,7 @@
                 <td>
                   <template v-if="isTrackerType(row.item)">
                     <div>
-                      Version : <code>{{ row.item.version || '-' }}</code>
+                      {{ t('alerts.versionPrefixLabel') }} <code>{{ row.item.version || '-' }}</code>
                     </div>
                     <div class="text-muted small">
                       {{ trackerStatusLabel(row.item.status) }}
@@ -320,7 +320,7 @@
                       v-if="!isCompleted(row.item) && row.item.current_value != null"
                       class="text-muted small mt-1"
                     >
-                      Actuel :
+                      {{ t('alerts.currentValuePrefixLabel') }}
                       <span class="fw-medium">{{ formatIncidentValue({ value: row.item.current_value, metric: row.item.metric, value_label: row.item.value_label }) }}</span>
                       <span
                         v-if="resolveHint(row.item)"
@@ -331,7 +331,7 @@
                       v-if="row.item.command_status"
                       class="text-muted small mt-1"
                     >
-                      Remédiation :
+                      {{ t('alerts.remediationPrefixLabel') }}
                       <span :class="getExecutionStateClass(row.item.command_status)">{{ commandStatusLabel(row.item.command_status) }}</span>
                     </div>
                   </template>
@@ -355,8 +355,8 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-warning"
                     :disabled="acknowledgingId === row.item.id"
-                    title="Accuser réception — je m'en occupe"
-                    aria-label="Accuser réception de l'incident"
+                    :title="t('alerts.warRoomAckTooltip')"
+                    :aria-label="t('alerts.warRoomAckAriaLabel')"
                     @click="$emit('acknowledge', row.item)"
                   >
                     <span
@@ -374,7 +374,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="resolvingId === row.item.id"
-                    title="Clôturer manuellement"
+                    :title="t('alerts.warRoomCloseTooltip')"
                     @click="$emit('resolve', row.item)"
                   >
                     <span
@@ -400,7 +400,7 @@
       class="card-footer d-flex align-items-center justify-content-between"
     >
       <p class="m-0 text-muted">
-        Page {{ currentPage }} / {{ totalPages }}
+        {{ t('alerts.pageOfLabel', { current: currentPage, total: totalPages }) }}
       </p>
       <PaginationNav
         :current-page="currentPage"
@@ -413,6 +413,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconBell, IconCheck, IconChevronRight, IconEye, IconLink, IconList, IconSearch, IconStack2, IconX } from '@tabler/icons-vue'
 import BadgePill from '../common/BadgePill.vue'
 import SortableHeader from '../common/SortableHeader.vue'
@@ -464,17 +465,17 @@ const PAGE_SIZE = 50
 const AGE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 
 const TYPE_FILTERS = [
-  { value: 'all', label: 'Tous', activeClass: 'btn-primary shadow-sm' },
-  { value: 'crit', label: 'Critique', activeClass: 'btn-danger shadow-sm' },
-  { value: 'warn', label: 'Avertissement', activeClass: 'btn-warning shadow-sm' },
-  { value: 'tracker', label: 'Tracker', activeClass: 'btn-secondary shadow-sm' },
+  { value: 'all', labelKey: 'alerts.typeFilterAll', activeClass: 'btn-primary shadow-sm' },
+  { value: 'crit', labelKey: 'alerts.typeFilterCrit', activeClass: 'btn-danger shadow-sm' },
+  { value: 'warn', labelKey: 'alerts.typeFilterWarn', activeClass: 'btn-warning shadow-sm' },
+  { value: 'tracker', labelKey: 'alerts.typeFilterTracker', activeClass: 'btn-secondary shadow-sm' },
 ] as const
 
 const STATUS_FILTERS = [
-  { value: 'all', label: 'Tous états', activeClass: 'btn-primary shadow-sm' },
-  { value: 'active', label: 'Actifs', activeClass: 'btn-danger shadow-sm' },
-  { value: 'acknowledged', label: 'En cours', activeClass: 'btn-warning shadow-sm' },
-  { value: 'resolved', label: 'Terminés', activeClass: 'btn-success shadow-sm' },
+  { value: 'all', labelKey: 'alerts.statusFilterAll', activeClass: 'btn-primary shadow-sm' },
+  { value: 'active', labelKey: 'alerts.statusFilterActive', activeClass: 'btn-danger shadow-sm' },
+  { value: 'acknowledged', labelKey: 'alerts.statusFilterAcknowledged', activeClass: 'btn-warning shadow-sm' },
+  { value: 'resolved', labelKey: 'alerts.statusFilterResolved', activeClass: 'btn-success shadow-sm' },
 ] as const
 
 const props = withDefaults(defineProps<{
@@ -504,6 +505,8 @@ defineEmits<{
   (e: 'resolve', item: Incident): void
   (e: 'acknowledge', item: Incident): void
 }>()
+
+const { t, locale } = useI18n()
 
 const filterType = ref('all')
 const filterStatus = ref('all')
@@ -560,7 +563,8 @@ const hasActiveFilters = computed(() => filterType.value !== 'all' || filterStat
 const incidentCountLabel = computed(() => {
   const visible = filteredIncidents.value.length
   const total = props.incidents.length
-  return `${visible}${visible !== total ? `/${total}` : ''} notification${visible !== 1 ? 's' : ''}`
+  const count = `${visible}${visible !== total ? `/${total}` : ''}`
+  return `${count} ${t('alerts.notificationWord', {}, visible)}`
 })
 
 watch([filterType, filterStatus, searchQuery], () => {
@@ -639,7 +643,7 @@ const displayRows = computed<DisplayRow[]>(() => {
     rows.push({
       kind: 'group-header',
       hostKey: key,
-      hostName: key === '__sans_hote__' ? 'Sans hôte' : key,
+      hostName: key === '__sans_hote__' ? t('alerts.noHostGroupLabel') : key,
       count: list.length,
       activeCount: list.filter((item) => !isCompleted(item)).length,
     })
@@ -673,20 +677,20 @@ function resetFilters() {
 
 // Describes the remote_commands row a rule's command_trigger dispatched when
 // this incident fired (item.command_status, joined server-side from
-// remote_commands.status) — adjectival wording ("réussie"/"échouée") to
-// agree with "Remédiation :" above it, not the standalone noun forms
+// remote_commands.status) — adjectival wording (agrees grammatically with
+// the "Remediation:" prefix above it), not the standalone noun forms
 // commandStatusLabel in utils/commandStatus.ts uses elsewhere.
 function commandStatusLabel(status: string | undefined): string {
-  if (status === 'pending') return 'en attente'
-  if (status === 'running') return 'en cours'
-  if (status === 'completed') return 'réussie'
-  if (status === 'failed') return 'échouée'
-  return status || 'inconnue'
+  if (status === 'pending') return t('alerts.commandStatusPending')
+  if (status === 'running') return t('alerts.commandStatusRunning')
+  if (status === 'completed') return t('alerts.commandStatusCompleted')
+  if (status === 'failed') return t('alerts.commandStatusFailed')
+  return status || t('alerts.commandStatusUnknown')
 }
 
 function formatDate(dateStr: string | undefined | null): string {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('fr-FR')
+  return new Date(dateStr).toLocaleString(locale.value)
 }
 </script>
 

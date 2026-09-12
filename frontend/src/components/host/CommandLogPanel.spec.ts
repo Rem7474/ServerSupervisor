@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import CommandLogPanel from './CommandLogPanel.vue'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 const baseCommand = {
   host_name: 'web-01',
@@ -62,7 +67,7 @@ describe('CommandLogPanel', () => {
     })
     expect(wrapper.text()).toContain('abc123')
     const badges = wrapper.findAll('.badge')
-    expect(badges[badges.length - 1].text()).toBe('ok')
+    expect(badges[badges.length - 1].text()).toBe('OK')
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.find('pre.console-output').exists()).toBe(false)
   })

@@ -26,87 +26,115 @@ export interface NavSection {
   items: NavItem[]
 }
 
+interface NavItemDef {
+  key: string
+  to: string
+  icon: Component
+  adminOnly?: boolean
+  requiresPermission?: string
+}
+
+interface NavSectionDef {
+  key: string
+  icon: Component
+  items: NavItemDef[]
+}
+
 // Grouped by intent (what the user is trying to do) rather than by role or
 // alphabetically — replaces the previous flat navbar + "Plus"/"Admin"
 // dropdown split. Every route below already existed; this only changes how
 // they're grouped for navigation. adminOnly mirrors each item's exact
 // pre-existing visibility (either the route's own requiresAdmin, or the
 // v-if the old navbar had on it) — not a new permission decision.
-export const navigationSections: NavSection[] = [
+//
+// Labels are i18n keys resolved by visibleNavSections (locales/{fr,en}/nav.json,
+// under `sections.<section.key>.label` / `.items.<item.key>`), not literal text —
+// this list is otherwise the same shape it was before i18n.
+const navigationSections: NavSectionDef[] = [
   {
     key: 'control',
-    label: 'Centre de contrôle',
     icon: IconApps,
     items: [
-      { label: 'Dashboard', to: '/', icon: IconLayoutDashboard },
-      { label: 'Alertes', to: '/alerts', icon: IconBell },
-      { label: 'Commandes', to: '/audit', icon: IconTerminal2, requiresPermission: 'view:audit:commands' },
+      { key: 'dashboard', to: '/', icon: IconLayoutDashboard },
+      { key: 'alerts', to: '/alerts', icon: IconBell },
+      { key: 'commands', to: '/audit', icon: IconTerminal2, requiresPermission: 'view:audit:commands' },
     ],
   },
   {
     key: 'hosts',
-    label: 'Hôtes',
     icon: IconServer,
     items: [
-      { label: 'Docker', to: '/docker', icon: IconBrandDocker },
-      { label: 'Mises à jour', to: '/apt', icon: IconRefresh },
-      { label: 'Monitoring', to: '/monitoring', icon: IconActivity },
+      { key: 'docker', to: '/docker', icon: IconBrandDocker },
+      { key: 'updates', to: '/apt', icon: IconRefresh },
+      { key: 'monitoring', to: '/monitoring', icon: IconActivity },
     ],
   },
   {
     key: 'automation',
-    label: 'Automatisation',
     icon: IconRobot,
     items: [
-      { label: 'Tâches planifiées', to: '/scheduled-tasks', icon: IconClock },
-      { label: 'Runbooks', to: '/runbooks', icon: IconPlayerPlay, adminOnly: true },
-      { label: 'Git / Automatisation', to: '/git-webhooks', icon: IconGitBranch, adminOnly: true },
+      { key: 'scheduledTasks', to: '/scheduled-tasks', icon: IconClock },
+      { key: 'runbooks', to: '/runbooks', icon: IconPlayerPlay, adminOnly: true },
+      { key: 'gitAutomation', to: '/git-webhooks', icon: IconGitBranch, adminOnly: true },
     ],
   },
   {
     key: 'security',
-    label: 'Sécurité',
     icon: IconShieldLock,
     items: [
-      { label: 'Menaces web', to: '/threats', icon: IconShieldCheck, adminOnly: true },
-      { label: 'Stats web', to: '/traffic', icon: IconChartLine, adminOnly: true },
+      { key: 'webThreats', to: '/threats', icon: IconShieldCheck, adminOnly: true },
+      { key: 'webStats', to: '/traffic', icon: IconChartLine, adminOnly: true },
     ],
   },
   {
     key: 'infrastructure',
-    label: 'Infrastructure',
     icon: IconStack2,
     items: [
-      { label: 'Proxmox', to: '/proxmox', icon: IconServer2 },
-      { label: 'Réseau', to: '/network', icon: IconTopologyStar3 },
-      { label: 'NPM', to: '/npm', icon: IconBox },
+      { key: 'proxmox', to: '/proxmox', icon: IconServer2 },
+      { key: 'network', to: '/network', icon: IconTopologyStar3 },
+      { key: 'npm', to: '/npm', icon: IconBox },
     ],
   },
   {
     key: 'settings',
-    label: 'Réglages',
     icon: IconAdjustments,
     items: [
-      { label: 'Paramètres', to: '/settings', icon: IconSettings, adminOnly: true },
-      { label: 'Utilisateurs', to: '/users', icon: IconUsers, adminOnly: true },
-      { label: 'Audit', to: '/audit', icon: IconClipboardList, adminOnly: true },
+      { key: 'settings', to: '/settings', icon: IconSettings, adminOnly: true },
+      { key: 'users', to: '/users', icon: IconUsers, adminOnly: true },
+      { key: 'audit', to: '/audit', icon: IconClipboardList, adminOnly: true },
     ],
   },
 ]
 
 // Shared by the navbar and the command palette so the two never disagree
 // about which destinations a given role can see. Returns only sections that
-// still have at least one visible item (Sécurité/Réglages are 100%
+// still have at least one visible item (Security/Settings are 100%
 // adminOnly today, so a viewer/operator gets 4 sections, not 6 with two
-// dead-ends).
-export function visibleNavSections(auth: { isAdmin: boolean; hasPermission: (permission: string) => boolean }): NavSection[] {
+// dead-ends). `t` is vue-i18n's translate function — passed in rather than
+// imported so this stays a plain function callers can use inside their own
+// reactive computed (its locale-reactivity comes from that computed reading
+// t(), not from anything here).
+export function visibleNavSections(
+  auth: { isAdmin: boolean; hasPermission: (permission: string) => boolean },
+  t: (key: string) => string
+): NavSection[] {
   return navigationSections
     .map((section) => ({
-      ...section,
-      items: section.items.filter((item) =>
-        (!item.adminOnly || auth.isAdmin) &&
-        (!item.requiresPermission || auth.hasPermission(item.requiresPermission))
-      ),
+      key: section.key,
+      label: t(`nav.sections.${section.key}.label`),
+      icon: section.icon,
+      items: section.items
+        .filter((item) =>
+          (!item.adminOnly || auth.isAdmin) &&
+          (!item.requiresPermission || auth.hasPermission(item.requiresPermission))
+        )
+        .map((item) => ({
+          label: t(`nav.sections.${section.key}.items.${item.key}`),
+          to: item.to,
+          icon: item.icon,
+          adminOnly: item.adminOnly,
+          requiresPermission: item.requiresPermission,
+        })),
     }))
     .filter((section) => section.items.length > 0)
 }

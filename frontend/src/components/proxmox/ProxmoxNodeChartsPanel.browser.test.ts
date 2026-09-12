@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import ProxmoxNodeChartsPanel from './ProxmoxNodeChartsPanel.vue'
 import type { RRDChartSeries } from './RRDChartCard.vue'
 
@@ -11,6 +12,10 @@ const series = (name: string): RRDChartSeries => [
 ]
 
 describe('ProxmoxNodeChartsPanel (browser / real render)', () => {
+  beforeEach(() => {
+    setLocale('fr')
+  })
+
   it('renders one real ApexCharts SVG per non-empty RRD series (CPU/RAM/network)', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

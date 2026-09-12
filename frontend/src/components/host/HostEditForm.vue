@@ -2,7 +2,7 @@
   <div class="card mb-4">
     <div class="card-header">
       <h3 class="card-title">
-        Modifier l'hote
+        {{ t('host.editHostTitle') }}
       </h3>
     </div>
     <div class="card-body">
@@ -11,7 +11,7 @@
         @submit.prevent="saveEdit"
       >
         <div class="col-md-6">
-          <label class="form-label">Nom</label>
+          <label class="form-label">{{ t('host.nameLabel') }}</label>
           <input
             v-model="editForm.name"
             type="text"
@@ -29,7 +29,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Adresse IP</label>
+          <label class="form-label">{{ t('host.ipAddressLabel') }}</label>
           <input
             v-model="editForm.ip_address"
             type="text"
@@ -55,7 +55,7 @@
             placeholder="prod, site-lyon"
           >
           <div class="form-hint">
-            Séparés par des virgules.
+            {{ t('host.tagsHint') }}
           </div>
         </div>
         <div
@@ -73,14 +73,14 @@
             :disabled="saving"
             @click="$emit('close')"
           >
-            Annuler
+            {{ t('host.cancel') }}
           </button>
           <button
             type="submit"
             class="btn btn-primary"
             :disabled="saving"
           >
-            {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
+            {{ saving ? t('host.savingLabel') : t('host.saveLabel') }}
           </button>
         </div>
         <div class="col-12">
@@ -88,10 +88,10 @@
             <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
               <div>
                 <div class="fw-semibold">
-                  API Key agent
+                  {{ t('host.agentApiKeyTitle') }}
                 </div>
                 <div class="text-secondary small">
-                  Régénérer la clé pour un hôte existant.
+                  {{ t('host.regenerateKeyHint') }}
                 </div>
               </div>
               <button
@@ -100,7 +100,7 @@
                 :disabled="rotateKeyLoading"
                 @click="rotateHostKey"
               >
-                {{ rotateKeyLoading ? 'Rotation...' : 'Regenerer la cle' }}
+                {{ rotateKeyLoading ? t('host.regeneratingLabel') : t('host.regenerateKeyButton') }}
               </button>
             </div>
             <div
@@ -109,10 +109,10 @@
               role="alert"
             >
               <div class="fw-semibold mb-2">
-                Nouvelle cle generee
+                {{ t('host.newKeyGeneratedTitle') }}
               </div>
               <div class="text-secondary small mb-2">
-                Copiez-la maintenant, elle ne sera plus affichee.
+                {{ t('host.copyNowWarning') }}
               </div>
               <div class="d-flex align-items-center gap-2 mb-3">
                 <div class="bg-dark rounded p-2 flex-fill">
@@ -123,32 +123,32 @@
                   class="btn btn-outline-secondary"
                   @click="copyRotatedKey"
                 >
-                  {{ rotateCopiedKey ? 'Copie' : 'Copier' }}
+                  {{ rotateCopiedKey ? t('host.copiedLabel') : t('host.copyLabel') }}
                 </button>
               </div>
               <div class="d-flex align-items-center justify-content-between mb-1">
                 <div class="text-secondary small">
-                  Commande d'installation (a executer sur l'hote cible) :
+                  {{ t('host.installCommandLabel') }}
                 </div>
                 <button
                   type="button"
                   class="btn btn-outline-secondary btn-sm"
                   @click="copyRotatedInstallCmd"
                 >
-                  {{ rotateCopiedInstallCmd ? 'Copie' : 'Copier' }}
+                  {{ rotateCopiedInstallCmd ? t('host.copiedLabel') : t('host.copyLabel') }}
                 </button>
               </div>
               <pre class="bg-dark text-light p-2 rounded small mb-3 text-wrap">{{ rotatedInstallCmd }}</pre>
               <div class="d-flex align-items-center justify-content-between mb-1">
                 <div class="text-secondary small">
-                  Configuration agent :
+                  {{ t('host.agentConfigLabel') }}
                 </div>
                 <button
                   type="button"
                   class="btn btn-outline-secondary btn-sm"
                   @click="copyRotatedConfig"
                 >
-                  {{ rotateCopiedConfig ? 'Copie' : 'Copier la config' }}
+                  {{ rotateCopiedConfig ? t('host.copiedLabel') : t('host.copyConfigLabel') }}
                 </button>
               </div>
               <pre class="bg-dark text-light p-2 rounded small mb-0">{{ rotatedAgentConfig }}</pre>
@@ -162,6 +162,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import apiClient from '../../api'
 import { getApiErrorMessage } from '../../api/client'
 import { parseTagsInput, formatTagsInput } from '../../utils/tags'
@@ -201,6 +202,7 @@ const props = withDefaults(defineProps<{
   host: null,
 })
 
+const { t } = useI18n()
 const dialog = useConfirmDialog()
 const saving = ref(false)
 const editError = ref('')
@@ -257,8 +259,8 @@ async function saveEdit(): Promise<void> {
 
 async function rotateHostKey(): Promise<void> {
   const confirmed = await dialog.confirm({
-    title: 'Régénérer la clé API',
-    message: "L'ancienne clé sera immédiatement invalidée : l'agent actuellement déployé sur cet hôte perdra l'accès tant qu'il n'aura pas été reconfiguré avec la nouvelle clé.",
+    title: t('host.regenerateKeyDialogTitle'),
+    message: t('host.regenerateKeyDialogMsg'),
     variant: 'warning',
   })
   if (!confirmed) return

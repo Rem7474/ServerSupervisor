@@ -3,7 +3,7 @@
     <div
       class="toast-container position-fixed bottom-0 end-0 p-3"
       aria-live="polite"
-      aria-label="Notifications"
+      :aria-label="t('common.notificationsRegionLabel')"
     >
       <TransitionGroup name="ss-toast">
         <div
@@ -39,7 +39,7 @@
             <button
               type="button"
               class="ss-toast-close flex-shrink-0"
-              aria-label="Fermer"
+              :aria-label="t('common.close')"
               @click="removeToast(toast.id)"
             >
               <IconX
@@ -55,9 +55,11 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useGlobalToast } from '../composables/useGlobalToast'
 import { IconCircleCheck, IconCircleX, IconAlertTriangle, IconInfoCircle, IconX } from '@tabler/icons-vue'
 
+const { t } = useI18n()
 const { toasts, removeToast } = useGlobalToast()
 </script>
 

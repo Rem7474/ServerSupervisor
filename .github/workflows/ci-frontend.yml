@@ -53,6 +53,9 @@ jobs:
       - name: Unit & component tests
         run: npm run test
 
+      - name: Check for un-migrated hardcoded French strings
+        run: npm run lint:i18n
+
       - name: Build
         run: npm run build
         env:

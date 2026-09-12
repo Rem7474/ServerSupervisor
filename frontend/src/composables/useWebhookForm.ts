@@ -1,4 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import type { CustomTaskSummary } from '../types/task'
 
@@ -96,21 +97,21 @@ export interface WebhookFormData {
   reconcile_drift?: boolean
 }
 
-const gitEnvVars = [
-  { name: 'SS_REPO_NAME', desc: 'owner/repo (ex: home-assistant/core)' },
-  { name: 'SS_TAG_NAME', desc: 'Tag de la nouvelle release (ex: v1.2.3)' },
-  { name: 'SS_RELEASE_URL', desc: 'URL de la release sur le provider' },
-  { name: 'SS_RELEASE_NAME', desc: 'Titre de la release' },
-  { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
+const gitEnvVarKeys = [
+  { name: 'SS_REPO_NAME', descKey: 'webhooks.repoOwnerDesc' },
+  { name: 'SS_TAG_NAME', descKey: 'webhooks.newReleaseTagDesc' },
+  { name: 'SS_RELEASE_URL', descKey: 'webhooks.releaseProviderUrlDesc' },
+  { name: 'SS_RELEASE_NAME', descKey: 'webhooks.releaseTitleDesc' },
+  { name: 'SS_TRACKER_NAME', descKey: 'webhooks.trackerNameDesc' },
 ]
 
-const dockerEnvVars = [
-  { name: 'SS_IMAGE_NAME', desc: 'image:tag surveille (ex: nginx:latest)' },
-  { name: 'SS_IMAGE_TAG', desc: 'Tag surveille (ex: latest)' },
-  { name: 'SS_IMAGE_VERSION', desc: 'Version exacte resolue a partir du digest (ex: 4.4.1), ou identique a SS_IMAGE_TAG si non resolue' },
-  { name: 'SS_OLD_DIGEST', desc: 'Digest manifest SHA256 precedent' },
-  { name: 'SS_NEW_DIGEST', desc: 'Nouveau digest manifest SHA256' },
-  { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
+const dockerEnvVarKeys = [
+  { name: 'SS_IMAGE_NAME', descKey: 'webhooks.watchedImageTagDesc' },
+  { name: 'SS_IMAGE_TAG', descKey: 'webhooks.watchedTagDesc' },
+  { name: 'SS_IMAGE_VERSION', descKey: 'webhooks.imageVersionResolvedDesc' },
+  { name: 'SS_OLD_DIGEST', descKey: 'webhooks.oldDigestDesc' },
+  { name: 'SS_NEW_DIGEST', descKey: 'webhooks.newDigestDesc' },
+  { name: 'SS_TRACKER_NAME', descKey: 'webhooks.trackerNameDesc' },
 ]
 
 // WebhookFormProps mirrors the subset of WebhookModal props the form logic reads.
@@ -131,6 +132,7 @@ export interface WebhookFormProps {
  * only DOM concerns (focus trap, escape handling) and the markup.
  */
 export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: WebhookFormData) => void) {
+  const { t } = useI18n()
   const customTasks = ref<CustomTask[]>([])
   const registryCredentials = ref<RegistryCredential[]>([])
   const pickableContainers = ref<PickableContainer[]>([])
@@ -180,7 +182,7 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
   const form: Ref<WebhookFormData> = ref(defaultWebhookForm())
 
   const currentEnvVars = computed(() =>
-    form.value.tracker_type === 'docker' ? dockerEnvVars : gitEnvVars,
+    (form.value.tracker_type === 'docker' ? dockerEnvVarKeys : gitEnvVarKeys).map((v) => ({ name: v.name, desc: t(v.descKey) })),
   )
 
   const isComposeMode = computed(() =>
@@ -192,13 +194,13 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
 
   const title = computed(() => {
     if (props.mode === 'tracker') {
-      if (props.item) return 'Modifier le tracker'
-      return form.value.tracker_type === 'docker' ? 'Nouveau tracker Docker' : 'Nouveau tracker de release Git'
+      if (props.item) return t('webhooks.editTrackerTitle')
+      return form.value.tracker_type === 'docker' ? t('webhooks.newDockerTrackerTitle') : t('webhooks.newGitTrackerTitle')
     }
-    return props.item ? 'Modifier le webhook' : 'Nouveau webhook Git'
+    return props.item ? t('webhooks.editWebhookTitle') : t('webhooks.newGitWebhookTitle')
   })
 
-  const submitLabel = computed(() => (props.item ? 'Mettre a jour' : 'Creer'))
+  const submitLabel = computed(() => (props.item ? t('webhooks.updateButton') : t('webhooks.createButton')))
   const errorMessage = computed(() => validationError.value || props.error)
 
   function hydrateForm(): void {
@@ -344,31 +346,31 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
 
   function validate(): string {
     if (props.mode === 'tracker') {
-      if (!form.value.name) return 'Le nom est obligatoire.'
+      if (!form.value.name) return t('webhooks.nameRequiredError')
       if ((form.value.cooldown_hours ?? 0) < 0 || (form.value.cooldown_hours ?? 0) > 168) {
-        return 'Le cooldown doit etre compris entre 0 et 168 heures.'
+        return t('webhooks.cooldownRangeError')
       }
       if (form.value.tracker_type === 'git') {
         if (!form.value.repo_owner || !form.value.repo_name) {
-          return 'Owner et depot sont obligatoires pour un tracker Git.'
+          return t('webhooks.gitOwnerRepoRequiredError')
         }
         if (form.value.dispatch_task && (!form.value.host_id || !form.value.custom_task_id)) {
-          return 'VM cible et ID de tâche sont obligatoires si le déclenchement de tâche est activé.'
+          return t('webhooks.dispatchTaskRequiredError')
         }
       } else {
         if (!form.value.docker_image) {
-          return 'Sélectionnez le conteneur à suivre.'
+          return t('webhooks.selectContainerToTrackError')
         }
         if ((form.value.repo_owner && !form.value.repo_name) || (!form.value.repo_owner && form.value.repo_name)) {
-          return 'Pour le repo Git lie, renseignez owner et depot ensemble (ou laissez les deux vides).'
+          return t('webhooks.linkedRepoBothFieldsError')
         }
         if (form.value.dispatch_task) {
           if (form.value.update_action === 'compose') {
             if (!form.value.host_id || !form.value.compose_project) {
-              return 'VM cible et projet compose sont obligatoires en mode Compose.'
+              return t('webhooks.composeModeRequiredError')
             }
           } else if (!form.value.host_id || !form.value.custom_task_id) {
-            return 'VM cible et ID de tâche sont obligatoires si le déclenchement de tâche est activé.'
+            return t('webhooks.dispatchTaskRequiredError')
           }
         }
       }
@@ -376,7 +378,7 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
     }
 
     if (!form.value.name || !form.value.host_id || !form.value.custom_task_id) {
-      return 'Nom, VM cible et ID de tache sont obligatoires.'
+      return t('webhooks.webhookRequiredFieldsError')
     }
     return ''
   }

@@ -1,4 +1,5 @@
 import { ref, Ref } from 'vue'
+import { i18n } from '../i18n'
 
 type ConfirmVariant = 'warning' | 'danger'
 
@@ -32,19 +33,19 @@ const title: Ref<string> = ref('')
 const variant: Ref<ConfirmVariant> = ref('warning')
 const requiredText: Ref<string> = ref('')
 const destructive: Ref<boolean> = ref(false)
-const okLabel: Ref<string> = ref('Confirmer')
-const cancelLabel: Ref<string> = ref('Annuler')
+const okLabel: Ref<string> = ref('')
+const cancelLabel: Ref<string> = ref('')
 let resolvePromise: ((value: boolean) => void) | null = null
 
 export function useConfirmDialog(): ConfirmDialogApi {
   function confirm(options: ConfirmOptions): Promise<boolean> {
-    title.value = options.title || 'Confirmation'
+    title.value = options.title || i18n.global.t('common.confirmationTitle')
     message.value = options.message || ''
     variant.value = options.variant || 'warning'
     requiredText.value = options.requiredText || ''
     destructive.value = options.destructive || false
-    okLabel.value = options.okLabel || 'Confirmer'
-    cancelLabel.value = options.cancelLabel || 'Annuler'
+    okLabel.value = options.okLabel || i18n.global.t('common.confirm')
+    cancelLabel.value = options.cancelLabel || i18n.global.t('common.cancel')
     isOpen.value = true
     return new Promise((resolve) => {
       resolvePromise = resolve
@@ -55,8 +56,8 @@ export function useConfirmDialog(): ConfirmDialogApi {
     isOpen.value = false
     requiredText.value = ''
     destructive.value = false
-    okLabel.value = 'Confirmer'
-    cancelLabel.value = 'Annuler'
+    okLabel.value = ''
+    cancelLabel.value = ''
     resolvePromise?.(true)
     resolvePromise = null
   }
@@ -65,8 +66,8 @@ export function useConfirmDialog(): ConfirmDialogApi {
     isOpen.value = false
     requiredText.value = ''
     destructive.value = false
-    okLabel.value = 'Confirmer'
-    cancelLabel.value = 'Annuler'
+    okLabel.value = ''
+    cancelLabel.value = ''
     resolvePromise?.(false)
     resolvePromise = null
   }

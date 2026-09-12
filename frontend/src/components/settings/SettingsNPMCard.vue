@@ -14,7 +14,7 @@
           :size="16"
           class="icon me-1"
         />
-        Ajouter une connexion
+        {{ t('settings.addConnection') }}
       </button>
     </div>
 
@@ -25,7 +25,7 @@
     >
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">Nom *</label>
+          <label class="form-label">{{ t('settings.name') }} *</label>
           <input
             v-model="form.name"
             type="text"
@@ -34,7 +34,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">URL API *</label>
+          <label class="form-label">{{ t('settings.apiUrl') }} *</label>
           <input
             v-model="form.api_url"
             type="text"
@@ -43,7 +43,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Identifiant (email) *</label>
+          <label class="form-label">{{ t('settings.identityEmail') }} *</label>
           <input
             v-model="form.identity"
             type="text"
@@ -53,7 +53,7 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Mot de passe {{ editingId ? '(vide = inchangé)' : '*' }}</label>
+          <label class="form-label">{{ t('settings.password') }} {{ editingId ? t('settings.unchangedIfEmpty') : '*' }}</label>
           <input
             v-model="form.secret"
             type="password"
@@ -62,7 +62,7 @@
           >
         </div>
         <div class="col-md-4">
-          <label class="form-label">Intervalle de rafraîchissement (s)</label>
+          <label class="form-label">{{ t('settings.pollInterval') }}</label>
           <input
             v-model.number="form.poll_interval_sec"
             type="number"
@@ -77,7 +77,7 @@
               class="form-check-input"
               type="checkbox"
             >
-            <span class="form-check-label">Activé</span>
+            <span class="form-check-label">{{ t('settings.enabled') }}</span>
           </label>
         </div>
       </div>
@@ -88,14 +88,14 @@
           :disabled="saving"
           @click="save"
         >
-          {{ saving ? 'Enregistrement…' : (editingId ? 'Mettre à jour' : 'Créer') }}
+          {{ saving ? t('common.saving') : (editingId ? t('settings.update') : t('settings.create')) }}
         </button>
         <button
           type="button"
           class="btn btn-outline-secondary"
           @click="cancelForm"
         >
-          Annuler
+          {{ t('settings.cancel') }}
         </button>
         <button
           type="button"
@@ -103,7 +103,7 @@
           :disabled="testing"
           @click="testForm"
         >
-          {{ testing ? 'Test…' : 'Tester la connexion' }}
+          {{ testing ? t('settings.testingShort') : t('settings.testConnection') }}
         </button>
         <span
           v-if="formMsg"
@@ -117,12 +117,12 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Nom</th>
-            <th>URL API</th>
-            <th>Identifiant</th>
-            <th>Proxy hosts</th>
-            <th>Statut</th>
-            <th>Dernier contact</th>
+            <th>{{ t('settings.name') }}</th>
+            <th>{{ t('settings.apiUrl') }}</th>
+            <th>{{ t('settings.identity') }}</th>
+            <th>{{ t('settings.proxyHosts') }}</th>
+            <th>{{ t('common.status') }}</th>
+            <th>{{ t('settings.lastContact') }}</th>
             <th v-if="authIsAdmin" />
           </tr>
         </thead>
@@ -134,7 +134,7 @@
           </tr>
           <tr v-else-if="connections.length === 0">
             <td colspan="7">
-              <EmptyState title="Aucune connexion NPM configurée." />
+              <EmptyState :title="t('settings.noNpmConnections')" />
             </td>
           </tr>
           <tr
@@ -155,12 +155,12 @@
               <span
                 v-if="!conn.enabled"
                 class="badge bg-secondary-lt text-secondary"
-              >Désactivé</span>
+              >{{ t('settings.disabled') }}</span>
               <span
                 v-else-if="conn.last_error"
                 class="badge bg-danger-lt text-danger"
                 :title="conn.last_error"
-              >Erreur</span>
+              >{{ t('settings.errorBadge') }}</span>
               <span
                 v-else-if="conn.last_success_at"
                 class="badge bg-success-lt text-success"
@@ -168,7 +168,7 @@
               <span
                 v-else
                 class="badge bg-warning-lt text-warning"
-              >En attente</span>
+              >{{ t('settings.pendingBadge') }}</span>
             </td>
             <td class="text-muted small">
               <span v-if="conn.last_success_at">{{ formatDate(conn.last_success_at) }}</span>
@@ -183,7 +183,7 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Modifier"
+                  :title="t('settings.edit')"
                   @click="openEditForm(conn)"
                 >
                   <IconPencil
@@ -195,7 +195,7 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
-                  title="Rafraîchir maintenant"
+                  :title="t('settings.refreshNowTooltip')"
                   @click="refreshNow(conn)"
                 >
                   <IconRefresh
@@ -207,7 +207,7 @@
                 <button
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-danger"
-                  title="Supprimer"
+                  :title="t('settings.delete')"
                   @click="remove(conn)"
                 >
                   <IconTrash
@@ -233,6 +233,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import { npmApi } from '../../api/npm'
 import type { NPMConnection } from '../../types/npm'
@@ -241,6 +242,7 @@ import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 
+const { t, locale } = useI18n()
 const { confirm } = useConfirmDialog()
 
 withDefaults(defineProps<{
@@ -321,7 +323,7 @@ function cancelForm(): void {
 
 async function save(): Promise<void> {
   if (!form.value.name || !form.value.api_url || !form.value.identity) {
-    formMsg.value = 'Nom, URL API et identifiant sont obligatoires.'
+    formMsg.value = t('settings.nameUrlIdentityRequired')
     formOk.value = false
     return
   }
@@ -332,20 +334,20 @@ async function save(): Promise<void> {
       await npmApi.updateConnection(editingId.value, form.value)
     } else {
       if (!form.value.secret) {
-        formMsg.value = 'Le mot de passe est obligatoire à la création.'
+        formMsg.value = t('settings.passwordRequiredOnCreate')
         formOk.value = false
         saving.value = false
         return
       }
       await npmApi.createConnection(form.value)
     }
-    formMsg.value = editingId.value ? 'Connexion mise à jour.' : 'Connexion créée.'
+    formMsg.value = editingId.value ? t('settings.connectionUpdated') : t('settings.connectionCreated')
     formOk.value = true
     await load()
     showForm.value = false
     editingId.value = null
   } catch (e: unknown) {
-    formMsg.value = getApiErrorMessage(e, 'Erreur lors de l\'enregistrement.')
+    formMsg.value = getApiErrorMessage(e, t('settings.saveError'))
     formOk.value = false
   } finally {
     saving.value = false
@@ -354,7 +356,7 @@ async function save(): Promise<void> {
 
 async function testForm(): Promise<void> {
   if (!form.value.api_url || !form.value.identity || !form.value.secret) {
-    formMsg.value = 'Renseignez l\'URL, l\'identifiant et le mot de passe pour tester.'
+    formMsg.value = t('settings.fillUrlIdentityPasswordToTest')
     formOk.value = false
     return
   }
@@ -367,14 +369,14 @@ async function testForm(): Promise<void> {
       secret: form.value.secret,
     })
     if (res.data.success) {
-      formMsg.value = 'Connexion réussie !'
+      formMsg.value = t('settings.connectionSuccessful')
       formOk.value = true
     } else {
-      formMsg.value = res.data.error || 'Échec de connexion.'
+      formMsg.value = res.data.error || t('settings.connectionFailed')
       formOk.value = false
     }
   } catch (e: unknown) {
-    formMsg.value = getApiErrorMessage(e, 'Erreur réseau.')
+    formMsg.value = getApiErrorMessage(e, t('settings.networkError'))
     formOk.value = false
   } finally {
     testing.value = false
@@ -384,36 +386,36 @@ async function testForm(): Promise<void> {
 async function refreshNow(conn: NPMConnection): Promise<void> {
   try {
     await npmApi.refreshNow(conn.id)
-    listMsg.value = `[${conn.name}] Rafraîchissement déclenché.`
+    listMsg.value = t('settings.refreshTriggeredFor', { name: conn.name })
     listOk.value = true
     setTimeout(load, 3000)
   } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, 'Erreur.')
+    listMsg.value = getApiErrorMessage(e, t('settings.genericErrorPeriod'))
     listOk.value = false
   }
 }
 
 async function remove(conn: NPMConnection): Promise<void> {
   const confirmed = await confirm({
-    title: 'Supprimer la connexion NPM ?',
-    message: `Supprimer la connexion NPM « ${conn.name} » ? Les proxy hosts et leurs sondes uptime/SSL associées ne seront PAS supprimés.`,
+    title: t('settings.deleteNpmConnectionTitle'),
+    message: t('settings.deleteNpmConnectionMsg', { name: conn.name }),
     variant: 'danger',
   })
   if (!confirmed) return
   try {
     await npmApi.deleteConnection(conn.id)
     await load()
-    listMsg.value = 'Connexion supprimée.'
+    listMsg.value = t('settings.connectionDeleted')
     listOk.value = true
   } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, 'Erreur lors de la suppression.')
+    listMsg.value = getApiErrorMessage(e, t('settings.deleteError'))
     listOk.value = false
   }
 }
 
 function formatDate(iso: string | undefined): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 }
 
 onMounted(load)

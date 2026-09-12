@@ -22,7 +22,7 @@
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">
-              Connexions ({{ periodLabel }})
+              {{ t('security.connectionsPeriodLabel', { period: periodLabel }) }}
             </div>
             <div class="h2 mb-0">
               {{ security.stats?.total ?? '—' }}
@@ -34,7 +34,7 @@
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">
-              Échecs ({{ periodLabel }})
+              {{ t('security.failuresPeriodLabel', { period: periodLabel }) }}
             </div>
             <div class="h2 mb-0 text-danger">
               {{ security.stats?.failures ?? '—' }}
@@ -46,7 +46,7 @@
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">
-              IPs uniques ({{ periodLabel }})
+              {{ t('security.uniqueIpsPeriodLabel', { period: periodLabel }) }}
             </div>
             <div class="h2 mb-0 text-azure">
               {{ security.stats?.unique_ips ?? '—' }}
@@ -56,19 +56,19 @@
       </div>
     </div>
 
-    <!-- IPs bloquées + Top failed IPs -->
+    <!-- Blocked IPs + Top failed IPs -->
     <div class="row row-cards mb-4">
       <div class="col-lg-5">
         <div class="card h-100">
           <div class="card-header">
             <h3 class="card-title">
-              IPs bloquées
+              {{ t('security.blockedIpsTitle') }}
             </h3>
           </div>
           <div class="card-body p-0">
             <EmptyState
               v-if="!security.blocked_ips?.length"
-              title="Aucune IP bloquée"
+              :title="t('security.noBlockedIpTitle')"
             />
             <div v-else>
               <div
@@ -77,7 +77,7 @@
                 class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
               >
                 <div class="d-flex align-items-center gap-2">
-                  <span class="badge bg-danger-lt text-danger">Bloquée</span>
+                  <span class="badge bg-danger-lt text-danger">{{ t('security.blockedBadge') }}</span>
                   <span class="font-monospace small">{{ ip }}</span>
                 </div>
                 <button
@@ -86,7 +86,7 @@
                   :disabled="unblockingIp === ip"
                   @click="emit('unblock', ip)"
                 >
-                  {{ unblockingIp === ip ? '…' : 'Débloquer' }}
+                  {{ unblockingIp === ip ? '…' : t('security.unblockButton') }}
                 </button>
               </div>
             </div>
@@ -97,13 +97,13 @@
         <div class="card h-100">
           <div class="card-header">
             <h3 class="card-title">
-              Top IPs — échecs de connexion ({{ periodLabel }})
+              {{ t('security.topFailedIpsTitle', { period: periodLabel }) }}
             </h3>
           </div>
           <div class="card-body p-0">
             <EmptyState
               v-if="!security.top_failed_ips?.length"
-              title="Aucun échec enregistré sur cette période"
+              :title="t('security.noFailuresRecordedTitle')"
             />
             <div v-else>
               <div
@@ -113,7 +113,7 @@
               >
                 <div class="d-flex align-items-center justify-content-between mb-1">
                   <span class="font-monospace small">{{ item.ip_address }}</span>
-                  <span class="badge bg-danger-lt text-danger">{{ item.fail_count }} échecs</span>
+                  <span class="badge bg-danger-lt text-danger">{{ t('security.failuresCountBadge', { count: item.fail_count }, item.fail_count) }}</span>
                 </div>
                 <div
                   class="progress"
@@ -134,7 +134,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import EmptyState from '../EmptyState.vue'
+
+const { t } = useI18n()
 
 export interface SecurityFailedIp { ip_address: string; fail_count: number }
 export interface SecurityStats { total?: number; failures?: number; unique_ips?: number }

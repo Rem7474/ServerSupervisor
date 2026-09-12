@@ -1,4 +1,5 @@
 import { getCurrentInstance, onUnmounted } from 'vue'
+import { i18n } from '../i18n'
 import type {
   CommandStreamMessage,
   CommandStreamInitMsg,
@@ -228,7 +229,7 @@ export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCo
         },
         onClose: () => {
           if (!settled)
-            finishReject(new Error('Connexion WebSocket fermée avant la fin de la commande'))
+            finishReject(new Error(i18n.global.t('common.commandStreamClosed')))
         },
         onError: (error: Error) => {
           finishReject(error)
@@ -236,7 +237,7 @@ export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCo
       })
 
       timeoutId = window.setTimeout(() => {
-        finishReject(new Error("Timeout : l'agent n'a pas répondu dans le délai imparti (hôte hors-ligne ou surchargé ?)"))
+        finishReject(new Error(i18n.global.t('common.commandStreamTimeout')))
       }, timeoutMs)
     })
   }

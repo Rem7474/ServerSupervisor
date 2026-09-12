@@ -6,14 +6,14 @@
           to="/"
           class="text-decoration-none"
         >
-          Dashboard
+          {{ t('nav.sections.control.items.dashboard') }}
         </router-link>
         <span class="text-muted mx-1">/</span>
         <span>APT</span>
       </div>
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
         <h2 class="page-title">
-          APT — Mises à jour système
+          {{ t('apt.pageTitle') }}
         </h2>
         <router-link
           to="/audit?module=apt"
@@ -23,11 +23,11 @@
             :size="16"
             class="icon icon-sm me-1"
           />
-          Historique des commandes
+          {{ t('apt.commandHistory') }}
         </router-link>
       </div>
       <div class="text-secondary">
-        Gérer les mises à jour APT sur tous les hôtes
+        {{ t('apt.pageDescription') }}
       </div>
     </div>
 
@@ -78,7 +78,7 @@
           >
             <div class="card">
               <div class="card-body">
-                <EmptyState title="Aucun hôte ne correspond aux filtres." />
+                <EmptyState :title="t('apt.noHostsMatchFilters')" />
               </div>
             </div>
           </div>
@@ -113,8 +113,8 @@
       <CommandLogPanel
         :command="liveCommand"
         :show="showConsole"
-        title="Console Live"
-        empty-text="Aucune console active"
+        :title="t('apt.consoleLive')"
+        :empty-text="t('apt.noActiveConsole')"
         wrapper-class="side-panel"
         @open="showConsole = true"
         @close="closeLiveConsole"
@@ -130,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { IconList } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
@@ -140,6 +141,8 @@ import AptHostCard from '../components/apt/AptHostCard.vue'
 import AptScheduleModal from '../components/apt/AptScheduleModal.vue'
 import { useApt } from '../composables/useApt'
 import { addToast } from '../composables/useGlobalToast'
+
+const { t } = useI18n()
 
 const {
   hosts,
@@ -181,7 +184,7 @@ const {
 } = useApt()
 
 function onScheduleCreated(): void {
-  addToast('Tâche planifiée créée', 'success')
+  addToast(t('apt.scheduledTaskCreated'), 'success')
 }
 </script>
 

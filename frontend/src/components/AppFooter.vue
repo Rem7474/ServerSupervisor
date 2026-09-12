@@ -50,7 +50,7 @@
                 rel="noopener noreferrer"
                 class="link-secondary"
               >ServerSupervisor</a>.
-              Tous droits réservés.
+              {{ t('common.footerAllRightsReserved') }}
             </span>
           </p>
         </div>
@@ -61,7 +61,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconBrandGithub } from '@tabler/icons-vue'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   wsStatus?: string | null
@@ -86,11 +89,11 @@ const wsDotClass = computed(() => {
 
 const wsStatusLabel = computed(() => {
   switch (props.wsStatus) {
-    case 'connected':    return 'Connecté'
-    case 'connecting':   return 'Connexion…'
-    case 'reconnecting': return 'Reconnexion…'
-    case 'error':        return 'Erreur WS'
-    case 'disconnected': return 'Déconnecté'
+    case 'connected':    return t('common.footerWsConnectedLabel')
+    case 'connecting':   return t('common.footerWsConnectingLabel')
+    case 'reconnecting': return t('common.footerWsReconnectingLabel')
+    case 'error':        return t('common.footerWsErrorLabel')
+    case 'disconnected': return t('common.footerWsDisconnectedLabel')
     default:             return ''
   }
 })

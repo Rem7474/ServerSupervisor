@@ -3,20 +3,20 @@
     <table class="table table-vcenter card-table">
       <thead>
         <tr>
-          <th>Stockage</th>
-          <th>Type</th>
-          <th>Total</th>
-          <th>Utilisé</th>
-          <th>Disponible</th>
-          <th>Utilisation</th>
-          <th>Partagé</th>
-          <th>Statut</th>
+          <th>{{ t('proxmox.storageColumn') }}</th>
+          <th>{{ t('proxmox.typeColumn') }}</th>
+          <th>{{ t('proxmox.totalColumn') }}</th>
+          <th>{{ t('proxmox.usedColumn') }}</th>
+          <th>{{ t('proxmox.availableColumn') }}</th>
+          <th>{{ t('proxmox.usageColumn') }}</th>
+          <th>{{ t('proxmox.sharedColumn') }}</th>
+          <th>{{ t('proxmox.statusColumn') }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="!storages.length">
           <td colspan="8">
-            <EmptyState title="Aucun stockage sur ce nœud." />
+            <EmptyState :title="t('proxmox.noStorageTitle')" />
           </td>
         </tr>
         <tr
@@ -46,7 +46,7 @@
             <span
               v-if="s.shared"
               class="badge bg-azure-lt text-azure"
-            >Oui</span>
+            >{{ t('proxmox.yesLabel') }}</span>
             <span
               v-else
               class="text-muted"
@@ -56,11 +56,11 @@
             <span
               v-if="s.active && s.enabled"
               class="badge bg-success-lt text-success"
-            >Actif</span>
+            >{{ t('proxmox.activeBadge') }}</span>
             <span
               v-else
               class="badge bg-danger-lt text-danger"
-            >Inactif</span>
+            >{{ t('proxmox.inactiveBadge') }}</span>
           </td>
         </tr>
       </tbody>
@@ -69,21 +69,25 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { ProxmoxStorage } from '../../types/proxmox'
 import EmptyState from '../EmptyState.vue'
+
+const { t } = useI18n()
 
 defineProps<{ storages: ProxmoxStorage[] }>()
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
-  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
+  const unitKeys = ['', 'proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
   let i = 0
   let v = bytes
-  while (v >= 1024 && i < units.length - 1) {
+  while (v >= 1024 && i < unitKeys.length - 1) {
     v /= 1024
     i++
   }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+  const unit = i === 0 ? 'B' : t(unitKeys[i])
+  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
 }
 
 function storagePct(s: ProxmoxStorage): string {

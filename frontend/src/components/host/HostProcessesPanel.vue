@@ -5,7 +5,7 @@
   >
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        Processus
+        {{ t('host.processesTitle') }}
       </h3>
       <div class="d-flex align-items-center gap-2">
         <button
@@ -18,7 +18,7 @@
             v-if="loading"
             class="spinner-border spinner-border-sm me-1"
           />
-          {{ loading ? 'Chargement...' : (processes.length ? 'Actualiser les processus' : 'Charger les processus') }}
+          {{ loading ? t('host.loadingLabel') : (processes.length ? t('host.refreshProcessesLabel') : t('host.loadProcessesLabel')) }}
         </button>
       </div>
     </div>
@@ -44,7 +44,7 @@
       class="card-body"
     >
       <div class="text-secondary small">
-        Cliquez sur "Charger les processus" pour afficher les processus actifs de cet hôte.
+        {{ t('host.clickToLoadProcesses') }}
       </div>
     </div>
     <div
@@ -57,9 +57,12 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import ProcessesTable from './ProcessesTable.vue'
 import { useHostProcesses } from '../../composables/useHostProcesses'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   hostId: string

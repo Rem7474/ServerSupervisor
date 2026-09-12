@@ -1,4 +1,5 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { npmApi } from '../api/npm'
 import type { UptimeProbe } from '../types/uptime'
@@ -35,7 +36,20 @@ interface ProbeForm {
 const REFRESH_SEC = 30
 const PAGE_SIZE = 25
 
-export function useUptimeProbes() {
+export interface UseUptimeProbesOptions {
+  /**
+   * Fetch each probe's 24h uptime percentage (`probeStats`). Costs one request
+   * per probe on top of the list, so consumers that never read `probeStats`
+   * must opt out: `ExposureDomainsPanel` renders a status badge and a
+   * heartbeat bar only, and on a fleet with ~50 probes the stats fan-out it
+   * used to trigger was 50 requests whose results were discarded.
+   */
+  withStats?: boolean
+}
+
+export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
+  const { withStats = true } = options
+  const { t } = useI18n()
   const dialog = useConfirmDialog()
 
   const autoRefresh = ref(true)
@@ -113,7 +127,7 @@ export function useUptimeProbes() {
   function probeStatusLabel(p: Probe): string {
     if (p.last_status === 'up') return 'UP'
     if (p.last_status === 'down') return 'DOWN'
-    return 'Inconnue'
+    return t('monitoring.probeStatusUnknown')
   }
 
   function uptimeBadgeClass(pct: number): string {
@@ -129,11 +143,11 @@ export function useUptimeProbes() {
       probes.value = data?.probes || []
       lastUpdatedAt.value = new Date()
       error.value = ''
-      fetchAllProbeStats()
+      if (withStats) fetchAllProbeStats()
       fetchAllProbeHistory()
     } catch (e: unknown) {
       error.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
-        || (e as { message?: string })?.message || 'Impossible de charger les sondes'
+        || (e as { message?: string })?.message || t('monitoring.probeLoadError')
     } finally {
       loadingProbes.value = false
     }
@@ -175,7 +189,7 @@ export function useUptimeProbes() {
       await api.checkUptimeProbeNow(p.id)
       await fetchProbes()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
+      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.checkFailedError')
     } finally {
       checkingProbeId.value = ''
     }
@@ -227,7 +241,7 @@ export function useUptimeProbes() {
       closeProbeModal()
       await fetchProbes()
     } catch (e: unknown) {
-      probeFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Erreur lors de l\'enregistrement'
+      probeFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.saveErrorGeneric')
     } finally {
       savingProbe.value = false
     }
@@ -241,11 +255,11 @@ export function useUptimeProbes() {
     // off first — one action does both instead of leaving a second manual
     // step in NPM.
     const ok = await dialog.confirm({
-      title: 'Supprimer la sonde ?',
+      title: t('monitoring.deleteProbeConfirmTitle'),
       message: p.npm_proxy_host_id
-        ? `"${p.name}" est gérée par le proxy host NPM "${p.npm_proxy_host_domain}". La supprimer désactivera aussi le suivi uptime de ce proxy host dans NPM.`
-        : `Cette action supprimera "${p.name}" et tout son historique.`,
-      okLabel: 'Supprimer',
+        ? t('monitoring.deleteProbeConfirmMessageNpm', { name: p.name, domain: p.npm_proxy_host_domain })
+        : t('monitoring.deleteProbeConfirmMessagePlain', { name: p.name }),
+      okLabel: t('monitoring.deleteButton'),
       destructive: true,
     })
     if (!ok) return
@@ -256,7 +270,7 @@ export function useUptimeProbes() {
       await api.deleteUptimeProbe(p.id)
       await fetchProbes()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
+      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.deleteFailedError')
     }
   }
 

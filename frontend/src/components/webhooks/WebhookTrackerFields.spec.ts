@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import WebhookTrackerFields from './WebhookTrackerFields.vue'
 import type { WebhookFormData, PickableContainer } from '../../composables/useWebhookForm'
 
@@ -30,6 +31,34 @@ function mountFields(form: WebhookFormData) {
 }
 
 describe('WebhookTrackerFields (characterization)', () => {
+  beforeEach(() => {
+    setLocale('fr')
+  })
+
+  it('renders the translated tracking-type cards', () => {
+    const wrapper = mountFields(baseForm({ tracker_type: 'git' }))
+    expect(wrapper.text()).toContain('Type de suivi')
+    expect(wrapper.text()).toContain('Release Git')
+    expect(wrapper.text()).toContain('Surveille les nouvelles releases/tags sur GitHub, GitLab ou Gitea')
+    expect(wrapper.text()).toContain('Image Docker')
+    expect(wrapper.text()).toContain('Détecte quand une nouvelle image est poussée sur le registre')
+  })
+
+  it('renders the translated docker-mode hints and placeholders', () => {
+    const wrapper = mountFields(baseForm({ tracker_type: 'docker' }))
+    expect(wrapper.text()).toContain('Hôte sur lequel tourne le conteneur à suivre.')
+    expect(wrapper.text()).toContain("L'image et le tag surveillés sont déduits du conteneur choisi.")
+    expect(wrapper.text()).toContain('Public (aucune authentification)')
+    expect(wrapper.text()).toContain('Dépôt Git lié')
+  })
+
+  it('translates to English when the locale is switched', () => {
+    setLocale('en')
+    const wrapper = mountFields(baseForm({ tracker_type: 'docker' }))
+    expect(wrapper.text()).toContain('Tracking type')
+    expect(wrapper.text()).toContain('Linked Git repo')
+  })
+
   it('git mode: renders provider/owner/repo fields with associated labels', () => {
     const wrapper = mountFields(baseForm({ tracker_type: 'git' }))
 

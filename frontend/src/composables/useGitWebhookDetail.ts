@@ -1,5 +1,6 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
 import { useCommandStream } from './useCommandStream'
@@ -12,6 +13,7 @@ import type { WebhookFormData } from './useWebhookForm'
 interface CmdRow { id: string; status?: string; output?: string; [key: string]: unknown }
 
 export function useGitWebhookDetail() {
+  const { t } = useI18n()
   const route = useRoute()
   const id = route.params.id as string
   const signal = useAbortSignal()
@@ -30,15 +32,16 @@ export function useGitWebhookDetail() {
   const modalError = ref('')
   const { openCommandStream, closeStream } = useCommandStream()
 
-  const envVars = [
-    { name: 'SS_REPO_NAME', desc: 'Nom complet du dépôt (ex: monorg/mon-app)' },
-    { name: 'SS_BRANCH', desc: 'Branche ou tag déclencheur' },
-    { name: 'SS_COMMIT_SHA', desc: 'SHA du commit (40 chars)' },
-    { name: 'SS_COMMIT_MESSAGE', desc: 'Première ligne du message de commit' },
-    { name: 'SS_PUSHER', desc: 'Nom d\'utilisateur du pousseur' },
-    { name: 'SS_WEBHOOK_NAME', desc: 'Nom du webhook dans ServerSupervisor' },
-    { name: 'SS_EVENT_TYPE', desc: 'Type d\'événement (push, tag, release)' },
+  const envVarKeys = [
+    { name: 'SS_REPO_NAME', descKey: 'webhooks.repoNameFullDesc' },
+    { name: 'SS_BRANCH', descKey: 'webhooks.branchTriggerDesc' },
+    { name: 'SS_COMMIT_SHA', descKey: 'webhooks.commitShaDesc' },
+    { name: 'SS_COMMIT_MESSAGE', descKey: 'webhooks.commitMessageFirstLineDesc' },
+    { name: 'SS_PUSHER', descKey: 'webhooks.pusherUsernameDesc' },
+    { name: 'SS_WEBHOOK_NAME', descKey: 'webhooks.webhookNameDesc' },
+    { name: 'SS_EVENT_TYPE', descKey: 'webhooks.eventTypeDesc' },
   ]
+  const envVars = computed(() => envVarKeys.map((v) => ({ name: v.name, desc: t(v.descKey) })))
 
   async function load(): Promise<void> {
     loading.value = true
@@ -50,7 +53,7 @@ export function useGitWebhookDetail() {
       hosts.value = hostsRes.data || []
     } catch (e: unknown) {
       if (isApiAbort(e)) return
-      error.value = getApiErrorMessage(e, 'Erreur lors du chargement')
+      error.value = getApiErrorMessage(e, t('webhooks.loadErrorGeneric'))
     } finally {
       loading.value = false
     }
@@ -115,7 +118,7 @@ export function useGitWebhookDetail() {
         connectExecutionStream(commandId)
       }
     } catch {
-      error.value = 'Impossible de charger les logs de la commande.'
+      error.value = t('webhooks.couldNotLoadCommandLogsError')
     }
   }
 
@@ -132,7 +135,7 @@ export function useGitWebhookDetail() {
       closeEdit()
       await load()
     } catch (e: unknown) {
-      modalError.value = getApiErrorMessage(e, 'Erreur')
+      modalError.value = getApiErrorMessage(e, t('common.error'))
     } finally {
       saving.value = false
     }

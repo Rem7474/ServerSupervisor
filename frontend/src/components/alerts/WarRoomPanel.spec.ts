@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { setLocale } from '../../i18n'
 import WarRoomPanel from './WarRoomPanel.vue'
 import type { NotificationItem } from '../../types/generated'
+
+beforeEach(() => {
+  setLocale('fr')
+})
 
 function incident(overrides: Partial<NotificationItem>): NotificationItem {
   return {

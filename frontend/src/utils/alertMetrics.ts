@@ -1,3 +1,5 @@
+import { i18n } from '../i18n'
+
 export interface AlertMetricMeta {
   label: string
   unit: string
@@ -6,186 +8,162 @@ export interface AlertMetricMeta {
   category: 'host' | 'proxmox' | 'synthetic' | 'docker'
 }
 
-export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
+type AlertMetricStaticMeta = Omit<AlertMetricMeta, 'label'>
+
+export const ALERT_METRICS: Record<string, AlertMetricStaticMeta> = {
   cpu: {
-    label: 'CPU',
     unit: '%',
-    icon: '\u26a1',
+    icon: '⚡',
     badgeClass: 'bg-red-lt text-red',
     category: 'host',
   },
   cpu_temperature: {
-    label: 'Temp. CPU',
-    unit: '\u00b0C',
-    icon: '\ud83c\udf21',
+    unit: '°C',
+    icon: '🌡',
     badgeClass: 'bg-orange-lt text-orange',
     category: 'host',
   },
   memory: {
-    label: 'RAM',
     unit: '%',
-    icon: '\ud83e\udde0',
+    icon: '🧠',
     badgeClass: 'bg-blue-lt text-blue',
     category: 'host',
   },
   disk: {
-    label: 'Disque',
     unit: '%',
-    icon: '\ud83d\udcbe',
+    icon: '💾',
     badgeClass: 'bg-yellow-lt text-yellow',
     category: 'host',
   },
   load: {
-    label: 'Load avg',
     unit: '',
-    icon: '\ud83d\udcc8',
+    icon: '📈',
     badgeClass: 'bg-purple-lt text-purple',
     category: 'host',
   },
   bandwidth_vs_rolling_avg: {
-    label: 'Bande passante vs moyenne glissante',
     unit: '%',
-    icon: '\ud83d\udce1',
+    icon: '📡',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'host',
   },
   heartbeat_timeout: {
-    label: 'Heartbeat',
     unit: 's',
-    icon: '\ud83e\udec0',
+    icon: '🫀',
     badgeClass: 'bg-orange-lt text-orange',
     category: 'host',
   },
   status_offline: {
-    label: 'Hote hors ligne',
     unit: '',
-    icon: '\ud83d\udd0c',
+    icon: '🔌',
     badgeClass: 'bg-red-lt text-red',
     category: 'host',
   },
   disk_smart_status: {
-    label: 'SMART disque',
     unit: '',
-    icon: '\ud83d\udee1',
+    icon: '🛡',
     badgeClass: 'bg-yellow-lt text-yellow',
     category: 'host',
   },
   disk_temperature: {
-    label: 'Temp. disque',
-    unit: '\u00b0C',
-    icon: '\ud83c\udf21',
+    unit: '°C',
+    icon: '🌡',
     badgeClass: 'bg-orange-lt text-orange',
     category: 'host',
   },
   proxmox_storage_percent: {
-    label: 'Proxmox stockage',
     unit: '%',
-    icon: '\ud83d\udda5',
+    icon: '🖥',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_node_cpu_percent: {
-    label: 'Proxmox CPU noeud',
     unit: '%',
-    icon: '\ud83e\udde0',
+    icon: '🧠',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_node_memory_percent: {
-    label: 'Proxmox RAM noeud',
     unit: '%',
-    icon: '\ud83d\udcca',
+    icon: '📊',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_node_cpu_temperature: {
-    label: 'Proxmox temp. CPU noeud',
-    unit: '\u00b0C',
-    icon: '\ud83c\udf21',
+    unit: '°C',
+    icon: '🌡',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_node_fan_rpm: {
-    label: 'Proxmox RPM ventilateurs noeud',
     unit: ' RPM',
-    icon: '\ud83c\udf00',
+    icon: '🌀',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_guest_cpu_percent: {
-    label: 'CPU VM/LXC Proxmox',
     unit: '%',
-    icon: '\ud83e\udde0',
+    icon: '🧠',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_guest_memory_percent: {
-    label: 'RAM VM/LXC Proxmox',
     unit: '%',
-    icon: '\ud83d\udcca',
+    icon: '📊',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_node_pending_updates: {
-    label: 'Paquets APT en attente',
     unit: '',
-    icon: '\ud83d\udd04',
+    icon: '🔄',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_recent_failed_tasks_24h: {
-    label: 'Tâches Proxmox échouées (24h)',
     unit: '',
-    icon: '\ud83d\udd52',
+    icon: '🕒',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_auth_failures_recent: {
-    label: 'Echecs auth Proxmox (logs)',
     unit: '',
-    icon: '\ud83d\udd12',
+    icon: '🔒',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_disk_failed_count: {
-    label: 'Disques physiques en échec',
     unit: '',
-    icon: '\ud83d\udca5',
+    icon: '💥',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   proxmox_disk_min_wearout_percent: {
-    label: 'Usure disque min',
     unit: '%',
-    icon: '\ud83d\udee0',
+    icon: '🛠',
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
   docker_container_state: {
-    label: 'État d\'un container',
     unit: '',
     icon: '🐳',
     badgeClass: 'bg-blue-lt text-blue',
     category: 'docker',
   },
   docker_compose_degraded_services: {
-    label: 'Services Compose dégradés',
     unit: '',
     icon: '🐳',
     badgeClass: 'bg-blue-lt text-blue',
     category: 'docker',
   },
   uptime_down_count: {
-    label: 'Sondes uptime down',
     unit: '',
-    icon: '\ud83d\udea8',
+    icon: '🚨',
     badgeClass: 'bg-red-lt text-red',
     category: 'synthetic',
   },
   ssl_min_days_remaining: {
-    label: 'Cert SSL \u2014 jours restants',
     unit: 'j',
-    icon: '\ud83d\udd10',
+    icon: '🔐',
     badgeClass: 'bg-yellow-lt text-yellow',
     category: 'synthetic',
   },
@@ -220,12 +198,22 @@ export const ALERT_METRIC_ORDER = [
   'ssl_min_days_remaining',
 ]
 
+function metricLabelFor(metric: string): string {
+  const key = `alerts.metricLabels.${metric}`
+  return i18n.global.te(key) ? i18n.global.t(key) : metric
+}
+
 export function getAlertMetricMeta(metric: string): AlertMetricMeta {
-  return ALERT_METRICS[metric] || {
-    label: metric,
-    unit: '',
-    icon: '\ud83d\udcca',
-    badgeClass: 'bg-secondary-lt text-secondary',
-    category: 'host',
+  const meta = ALERT_METRICS[metric]
+  const label = metricLabelFor(metric)
+  if (!meta) {
+    return {
+      label,
+      unit: '',
+      icon: '📊',
+      badgeClass: 'bg-secondary-lt text-secondary',
+      category: 'host',
+    }
   }
+  return { ...meta, label }
 }

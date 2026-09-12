@@ -8,7 +8,7 @@
               v-model="search"
               type="text"
               class="form-control"
-              placeholder="Rechercher un port, conteneur, image…"
+              :placeholder="t('network.portListSearchPlaceholder')"
             >
           </div>
           <div class="col-md-6 col-lg-3">
@@ -17,7 +17,7 @@
               class="form-select"
             >
               <option value="">
-                Tous les protocoles
+                {{ t('network.portListAllProtocols') }}
               </option>
               <option value="tcp">
                 TCP
@@ -33,7 +33,7 @@
               class="form-select"
             >
               <option value="">
-                Tous les hôtes
+                {{ t('network.portListAllHosts') }}
               </option>
               <option
                 v-for="h in hosts"
@@ -51,7 +51,7 @@
                 class="form-check-input"
                 type="checkbox"
               >
-              <span class="form-check-label">Ports publies seulement</span>
+              <span class="form-check-label">{{ t('network.portListPublishedOnly') }}</span>
             </label>
           </div>
         </div>
@@ -63,15 +63,15 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Hôte</th>
-              <th>Conteneur</th>
-              <th>Image</th>
-              <th>Port hôte</th>
-              <th>Port conteneur</th>
-              <th>Proto</th>
+              <th>{{ t('network.portListHostColumn') }}</th>
+              <th>{{ t('network.portListContainerColumn') }}</th>
+              <th>{{ t('network.portListImageColumn') }}</th>
+              <th>{{ t('network.portListHostPortColumn') }}</th>
+              <th>{{ t('network.portListContainerPortColumn') }}</th>
+              <th>{{ t('network.portListProtoColumn') }}</th>
               <th>IPv4</th>
               <th>IPv6</th>
-              <th>État</th>
+              <th>{{ t('network.portListStateColumn') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -127,7 +127,7 @@
               </td>
               <td>
                 <span :class="row.state === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
-                  {{ ({ running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' } as Record<string, string>)[row.state || ''] || row.state || 'inconnu' }}
+                  {{ containerStateLabels[row.state || ''] || row.state || t('network.nodeUnknownStatus') }}
                 </span>
               </td>
             </tr>
@@ -136,18 +136,18 @@
       </div>
       <EmptyState
         v-if="portRows.length === 0"
-        title="Aucun port visible"
+        :title="t('network.portListNoPortsTitle')"
       />
     </div>
 
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">
-          Trafic par hôte
+          {{ t('network.portListTrafficByHostTitle') }}
         </h3>
         <div class="card-options">
           <span class="badge bg-azure-lt text-azure ms-1">
-            {{ hosts.length }} hôte{{ hosts.length > 1 ? 's' : '' }}
+            {{ t('network.portListHostCountBadge', { count: hosts.length }, hosts.length) }}
           </span>
         </div>
       </div>
@@ -155,15 +155,15 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Hote</th>
-              <th>IP</th>
+              <th>{{ t('network.portListHostColumn') }}</th>
+              <th>{{ t('network.portListIpColumn') }}</th>
               <th class="text-end">
-                ↓ Rx
+                ↓ {{ t('network.portListRxColumn') }}
               </th>
               <th class="text-end">
-                ↑ Tx
+                ↑ {{ t('network.portListTxColumn') }}
               </th>
-              <th>Statut</th>
+              <th>{{ t('common.status') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -191,7 +191,7 @@
               <td>
                 <span :class="h.status === 'online' ? 'status status-success' : h.status === 'warning' ? 'status status-warning' : 'status status-danger'">
                   <span class="status-dot status-dot-animated" />
-                  <span :data-translation-id="h.status === 'online' ? 'online' : h.status === 'offline' ? 'offline' : 'unknown'">{{ h.status || 'unknown' }}</span>
+                  <span :data-translation-id="h.status === 'online' ? 'online' : h.status === 'offline' ? 'offline' : 'unknown'">{{ h.status || t('network.nodeUnknownStatus') }}</span>
                 </span>
               </td>
             </tr>
@@ -200,7 +200,7 @@
       </div>
       <EmptyState
         v-if="hosts.length === 0"
-        title="Aucun hôte trouvé"
+        :title="t('network.portListNoHostsTitle')"
       />
     </div>
 
@@ -210,11 +210,11 @@
     >
       <div class="card-header">
         <h3 class="card-title">
-          Trafic reseau par conteneur
+          {{ t('network.portListTrafficByContainerTitle') }}
         </h3>
         <div class="card-options">
           <span class="badge bg-azure-lt text-azure ms-1">
-            {{ containersWithNetStats.length }} conteneur{{ containersWithNetStats.length > 1 ? 's' : '' }}
+            {{ t('network.portListContainerCountBadge', { count: containersWithNetStats.length }, containersWithNetStats.length) }}
           </span>
         </div>
       </div>
@@ -222,16 +222,16 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Conteneur</th>
-              <th>Hote</th>
+              <th>{{ t('network.portListContainerColumn') }}</th>
+              <th>{{ t('network.portListHostColumn') }}</th>
               <th class="text-end">
-                ↓ Rx
+                ↓ {{ t('network.portListRxColumn') }}
               </th>
               <th class="text-end">
-                ↑ Tx
+                ↑ {{ t('network.portListTxColumn') }}
               </th>
               <th class="text-end">
-                Total
+                {{ t('network.portListTotalColumn') }}
               </th>
             </tr>
           </thead>
@@ -267,7 +267,7 @@
     >
       <div class="card-header">
         <h3 class="card-title">
-          Adresses IP Proxmox
+          {{ t('network.portListProxmoxIpTitle') }}
         </h3>
         <div class="card-options">
           <span
@@ -278,7 +278,7 @@
             v-else
             class="badge bg-azure-lt text-azure ms-1"
           >
-            {{ proxmoxGuests.length }} ressource{{ proxmoxGuests.length > 1 ? 's' : '' }}
+            {{ t('network.portListResourceCountBadge', { count: proxmoxGuests.length }, proxmoxGuests.length) }}
           </span>
         </div>
       </div>
@@ -286,18 +286,18 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Ressource</th>
-              <th>Nœud</th>
+              <th>{{ t('network.portListResourceColumn') }}</th>
+              <th>{{ t('network.portListNodeColumn') }}</th>
               <th>
                 <SortableHeader
-                  label="IP(s)"
+                  :label="t('network.portListIpAddressesColumn')"
                   :active="true"
                   :direction="proxmoxIpSortDir"
                   @toggle="toggleProxmoxIpSort"
                 />
               </th>
-              <th>Hôte corrélé</th>
-              <th>État</th>
+              <th>{{ t('network.portListCorrelatedHostColumn') }}</th>
+              <th>{{ t('network.portListStateColumn') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -337,11 +337,11 @@
                 <span
                   v-else
                   class="text-muted"
-                >Non lié</span>
+                >{{ t('network.portListNotLinked') }}</span>
               </td>
               <td>
                 <span :class="g.status === 'running' ? 'badge bg-success-lt text-success' : 'badge bg-secondary-lt text-secondary'">
-                  {{ g.status === 'running' ? 'En cours' : g.status || 'inconnu' }}
+                  {{ g.status === 'running' ? t('network.portListStateRunning') : g.status || t('network.nodeUnknownStatus') }}
                 </span>
               </td>
             </tr>
@@ -350,7 +350,7 @@
       </div>
       <EmptyState
         v-if="!ipInventoryLoading && proxmoxGuests.length === 0"
-        title="Aucune IP Proxmox détectée"
+        :title="t('network.portListNoProxmoxIpTitle')"
       />
     </div>
 
@@ -360,7 +360,7 @@
     >
       <div class="card-header">
         <h3 class="card-title">
-          Domaines NPM
+          {{ t('network.portListNpmDomainsTitle') }}
         </h3>
         <div class="card-options">
           <span
@@ -371,7 +371,7 @@
             v-else
             class="badge bg-azure-lt text-azure ms-1"
           >
-            {{ npmEntries.length }} domaine{{ npmEntries.length > 1 ? 's' : '' }}
+            {{ t('network.portListDomainCountBadge', { count: npmEntries.length }, npmEntries.length) }}
           </span>
         </div>
       </div>
@@ -379,17 +379,17 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Domaine(s)</th>
+              <th>{{ t('network.portListDomainsColumn') }}</th>
               <th>
                 <SortableHeader
-                  label="IP / hôte cible"
+                  :label="t('network.portListIpTargetHostColumn')"
                   :active="true"
                   :direction="npmIpSortDir"
                   @toggle="toggleNpmIpSort"
                 />
               </th>
-              <th>Port</th>
-              <th>Ressource corrélée</th>
+              <th>{{ t('network.flowsPortColumn') }}</th>
+              <th>{{ t('network.portListCorrelatedResourceColumn') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -424,7 +424,7 @@
                 <span
                   v-else
                   class="badge bg-secondary-lt text-secondary"
-                >Non résolu</span>
+                >{{ t('network.portListNotResolved') }}</span>
               </td>
             </tr>
           </tbody>
@@ -432,7 +432,7 @@
       </div>
       <EmptyState
         v-if="!ipInventoryLoading && npmEntries.length === 0"
-        title="Aucun domaine NPM détecté"
+        :title="t('network.portListNoNpmTitle')"
       />
     </div>
   </div>
@@ -440,6 +440,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../../types/network'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
@@ -503,10 +504,21 @@ const props = withDefaults(defineProps<{
   ipInventoryLoading: false,
 })
 
+const i18n = useI18n()
+const { t } = i18n
 const search = ref('')
 const protocolFilter = ref('')
 const hostFilter = ref('')
 const onlyPublished = ref(true)
+
+const containerStateLabels = computed<Record<string, string>>(() => ({
+  running: t('network.portListStateRunning'),
+  exited: t('network.portListStateExited'),
+  paused: t('network.portListStatePaused'),
+  created: t('network.portListStateCreated'),
+  restarting: t('network.portListStateRestarting'),
+  dead: t('network.portListStateDead'),
+}))
 
 const portRows = computed<PortRow[]>(() => {
   const grouped = new Map<string, PortRow>()
@@ -597,7 +609,7 @@ function compareIPs(a: string, b: string, direction: 'asc' | 'desc'): number {
   const dir = direction === 'asc' ? 1 : -1
   const av = ipToComparable(a)
   const bv = ipToComparable(b)
-  if (av === null && bv === null) return a.localeCompare(b, 'fr', { sensitivity: 'base' }) * dir
+  if (av === null && bv === null) return a.localeCompare(b, i18n.locale.value, { sensitivity: 'base' }) * dir
   if (av === null) return 1 * dir
   if (bv === null) return -1 * dir
   if (av < bv) return -1 * dir

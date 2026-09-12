@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { setLocale } from '../../i18n'
 import type { UptimeProbe, SSLCertificate } from '../../types/generated'
 import { useAuthStore } from '../../stores/auth'
 
@@ -45,6 +46,7 @@ async function mountPanel() {
 describe('MonitoringOverviewPanel (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setLocale('fr')
   })
 
   it('merges the probe and cert sharing an npm_proxy_host_id into one row', async () => {

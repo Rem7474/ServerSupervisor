@@ -2,9 +2,11 @@ package proxmox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -17,6 +19,8 @@ import (
 // vzdump merge added alongside backup-run visibility (see poller.go's
 // mergeTasksByUPID doc comment) can be exercised end-to-end against a real
 // Postgres database.
+var errFake = errors.New("boom")
+
 func fakePVEPollServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
@@ -107,5 +111,241 @@ func TestPollOne_MergesVzdumpTasksAndRecordsBackupRun(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected a backup run for the vzdump task, got %+v", runs)
+	}
+}
+
+// fakePVEListShapeServer reproduces what a real PVE returned in the field: the
+// task *list* puts the outcome straight into `status` ("OK", "job errors") and
+// sends no `exitstatus`, and a multi-guest backup job runs as a single task
+// carrying no vmid at all. Backups therefore come from two places — the tasks
+// that do name a guest, and the volumes on the backup storage for the ones
+// swallowed by the job-level task.
+func fakePVEListShapeServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/cluster/status", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	mux.HandleFunc("/nodes", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"node":"pve1","status":"online","cpu":0.1,"maxcpu":4,"mem":1000,"maxmem":2000,"uptime":100}]}`))
+	})
+	mux.HandleFunc("/nodes/pve1/qemu", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	mux.HandleFunc("/nodes/pve1/lxc", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	mux.HandleFunc("/nodes/pve1/storage", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"storage":"backups","type":"dir","active":1,"enabled":1,"content":"backup,iso"}]}`))
+	})
+	mux.HandleFunc("/nodes/pve1/storage/backups/content", func(w http.ResponseWriter, r *http.Request) {
+		// vmid 300 is only ever covered by the job-level task, so the volume is
+		// the sole evidence it was backed up. 200 also has a volume, older than
+		// its own task result.
+		_, _ = w.Write([]byte(`{"data":[
+			{"volid":"backups:backup/vzdump-qemu-300-2026_09_07.vma.zst","vmid":300,"ctime":1757203200,"format":"vma.zst"},
+			{"volid":"backups:backup/vzdump-qemu-200-2026_09_01.vma.zst","vmid":200,"ctime":1000,"format":"vma.zst"}
+		]}`))
+	})
+	mux.HandleFunc("/nodes/pve1/tasks", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[
+			{"upid":"UPID:pve1:VM200","type":"vzdump","status":"job errors","user":"root@pam","starttime":1757200000,"endtime":1757205000,"id":"200"},
+			{"upid":"UPID:pve1:JOB","type":"vzdump","status":"job errors","user":"root@pam","starttime":1757200000,"endtime":1757201800,"id":""}
+		]}`))
+	})
+	mux.HandleFunc("/nodes/pve1/disks/list", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	mux.HandleFunc("/nodes/pve1/apt/update", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	mux.HandleFunc("/cluster/backup", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	return httptest.NewServer(mux)
+}
+
+func TestPollOne_RecordsBackupRunsFromListShapeAndStorage(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+	pve := fakePVEListShapeServer(t)
+	t.Cleanup(pve.Close)
+
+	connID, err := db.CreateProxmoxConnection(ctx, models.ProxmoxConnectionRequest{
+		Name: "list-shape", APIURL: pve.URL, TokenID: "user@pve!token", TokenSecret: "secret",
+		Enabled: true, PollIntervalSec: 60,
+	})
+	if err != nil {
+		t.Fatalf("create connection: %v", err)
+	}
+	conns, err := db.GetEnabledProxmoxConnections(ctx)
+	if err != nil || len(conns) != 1 {
+		t.Fatalf("get enabled connections: %v %+v", err, conns)
+	}
+
+	NewPoller(db, nil).PollOne(ctx, conns[0])
+
+	runs, err := db.ListProxmoxBackupRuns(ctx, connID)
+	if err != nil {
+		t.Fatalf("list backup runs: %v", err)
+	}
+	byVMID := make(map[int]models.ProxmoxBackupRun, len(runs))
+	for _, r := range runs {
+		byVMID[r.VMID] = r
+	}
+
+	// The task names vmid 200 and reports a failure in `status`. Testing
+	// status == "stopped" dropped it, leaving the tab permanently empty.
+	run200, ok := byVMID[200]
+	if !ok {
+		t.Fatalf("no run recorded for vmid 200, got %+v", runs)
+	}
+	// status is the normalized vocabulary the UI colours; the raw PVE string
+	// is kept alongside it.
+	if run200.Status != BackupStatusFailed {
+		t.Errorf("vmid 200 status = %q, want %q", run200.Status, BackupStatusFailed)
+	}
+	if run200.ExitStatus != "job errors" {
+		t.Errorf("vmid 200 exit_status = %q, want the raw PVE outcome", run200.ExitStatus)
+	}
+	if run200.TaskUPID != "UPID:pve1:VM200" {
+		t.Errorf("vmid 200 lost its task link: %q", run200.TaskUPID)
+	}
+
+	// vmid 300 appears in no task — only the job-level one, which carries no
+	// vmid — so its volume on the backup storage is the only evidence.
+	run300, ok := byVMID[300]
+	if !ok {
+		t.Fatalf("no run recorded for vmid 300 from storage, got %+v", runs)
+	}
+	if run300.TaskUPID != "" {
+		t.Errorf("vmid 300 should have no task link, got %q", run300.TaskUPID)
+	}
+	if run300.EndTime == nil || run300.EndTime.Unix() != 1757203200 {
+		t.Errorf("vmid 300 end_time = %v, want the volume ctime", run300.EndTime)
+	}
+
+	// The job-level task must not invent a run of its own.
+	if _, ok := byVMID[0]; ok {
+		t.Error("the vmid-less job task should not produce a run")
+	}
+}
+
+// TestPollOne_RecordsAFailedEndpointOnTheConnection covers the reason this
+// class of bug was hard to find at all: a PVE call the token is not allowed to
+// make used to be logged and nothing more, leaving an empty tab with no
+// explanation anywhere in the UI.
+func TestPollOne_RecordsAFailedEndpointOnTheConnection(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/cluster/status", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	mux.HandleFunc("/nodes", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"node":"pve1","status":"online"}]}`))
+	})
+	// The one endpoint a missing Sys.Audit actually breaks outright.
+	mux.HandleFunc("/nodes/pve1/disks/list", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"data":null,"errors":{"privs":"Sys.Audit"}}`))
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	})
+	pve := httptest.NewServer(mux)
+	t.Cleanup(pve.Close)
+
+	connID, err := db.CreateProxmoxConnection(ctx, models.ProxmoxConnectionRequest{
+		Name: "degraded", APIURL: pve.URL, TokenID: "user@pve!token", TokenSecret: "secret",
+		Enabled: true, PollIntervalSec: 60,
+	})
+	if err != nil {
+		t.Fatalf("create connection: %v", err)
+	}
+	conns, err := db.GetEnabledProxmoxConnections(ctx)
+	if err != nil || len(conns) != 1 {
+		t.Fatalf("get enabled connections: %v %+v", err, conns)
+	}
+
+	NewPoller(db, nil).PollOne(ctx, conns[0])
+
+	conn, err := db.GetProxmoxConnectionByID(ctx, connID)
+	if err != nil || conn == nil {
+		t.Fatalf("get connection: %v", err)
+	}
+	if conn.LastError == "" {
+		t.Fatal("a failed PVE call left no trace on the connection")
+	}
+	if !strings.Contains(conn.LastError, "disks") {
+		t.Errorf("last_error = %q, want it to name the endpoint that failed", conn.LastError)
+	}
+
+	// The node detail carries it so the banner can render where data is missing.
+	nodes, err := db.ListProxmoxNodesByConnection(ctx, connID)
+	if err != nil || len(nodes) != 1 {
+		t.Fatalf("list nodes: %v %+v", err, nodes)
+	}
+	node, err := db.GetProxmoxNode(ctx, nodes[0].ID)
+	if err != nil || node == nil {
+		t.Fatalf("get node: %v", err)
+	}
+	if !strings.Contains(node.ConnectionError, "disks") {
+		t.Errorf("node.connection_error = %q, want the connection's failure", node.ConnectionError)
+	}
+}
+
+func TestPollOne_CleanCycleClearsAPreviousFailure(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+	pve := fakePVEPollServer(t)
+	t.Cleanup(pve.Close)
+
+	connID, err := db.CreateProxmoxConnection(ctx, models.ProxmoxConnectionRequest{
+		Name: "recovers", APIURL: pve.URL, TokenID: "user@pve!token", TokenSecret: "secret",
+		Enabled: true, PollIntervalSec: 60,
+	})
+	if err != nil {
+		t.Fatalf("create connection: %v", err)
+	}
+	if err := db.UpdateProxmoxConnectionError(ctx, connID, "disks: boom"); err != nil {
+		t.Fatalf("seed error: %v", err)
+	}
+	conns, err := db.GetEnabledProxmoxConnections(ctx)
+	if err != nil || len(conns) != 1 {
+		t.Fatalf("get enabled connections: %v %+v", err, conns)
+	}
+
+	NewPoller(db, nil).PollOne(ctx, conns[0])
+
+	conn, err := db.GetProxmoxConnectionByID(ctx, connID)
+	if err != nil || conn == nil {
+		t.Fatalf("get connection: %v", err)
+	}
+	if conn.LastError != "" {
+		t.Errorf("last_error = %q, want it cleared by a clean cycle", conn.LastError)
+	}
+	if conn.LastSuccessAt == nil {
+		t.Error("a clean cycle should record last_success_at")
+	}
+}
+
+func TestDegradedSummary(t *testing.T) {
+	var d degraded
+	if got := d.summary(); got != "" {
+		t.Errorf("empty summary = %q, want %q", got, "")
+	}
+
+	d.note("disks", errFake)
+	d.note("disks", errFake) // same endpoint on another node — one problem
+	d.note("tasks", errFake)
+
+	got := d.summary()
+	if !strings.Contains(got, "disks") || !strings.Contains(got, "tasks") {
+		t.Errorf("summary = %q, want both endpoints named", got)
+	}
+	if strings.Count(got, "disks") != 1 {
+		t.Errorf("summary = %q, want disks deduplicated", got)
 	}
 }

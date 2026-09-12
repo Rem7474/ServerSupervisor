@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 import apiClient, { getApiErrorMessage } from '../api'
 import { isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
+import { i18n } from '../i18n'
 
 export function useSettings() {
   const route = useRoute()
@@ -157,7 +158,7 @@ export function useSettings() {
       }
     } catch (e) {
       if (isApiAbort(e)) return
-      console.error('Erreur chargement paramètres:', getApiErrorMessage(e))
+      console.error(i18n.global.t('settings.settingsLoadErrorLog'), getApiErrorMessage(e))
     }
   }
 
@@ -175,12 +176,12 @@ export function useSettings() {
         smtp_tls: form.value.smtpTls,
       })
       smtpSaveOk.value = true
-      smtpSaveMsg.value = 'Configuration SMTP enregistrée'
+      smtpSaveMsg.value = i18n.global.t('settings.smtpSavedMsg')
       await fetchSettings()
       setTimeout(() => { smtpSaveMsg.value = '' }, 4000)
     } catch (e) {
       smtpSaveOk.value = false
-      smtpSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
+      smtpSaveMsg.value = i18n.global.t('settings.saveErrorPrefix', { message: getApiErrorMessage(e) })
       setTimeout(() => { smtpSaveMsg.value = '' }, 5000)
     } finally {
       savingSmtp.value = false
@@ -196,12 +197,12 @@ export function useSettings() {
         github_token: form.value.githubToken,
       })
       notifSaveOk.value = true
-      notifSaveMsg.value = 'Notifications enregistrées'
+      notifSaveMsg.value = i18n.global.t('settings.notificationsSavedMsg')
       await fetchSettings()
       setTimeout(() => { notifSaveMsg.value = '' }, 4000)
     } catch (e) {
       notifSaveOk.value = false
-      notifSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
+      notifSaveMsg.value = i18n.global.t('settings.saveErrorPrefix', { message: getApiErrorMessage(e) })
       setTimeout(() => { notifSaveMsg.value = '' }, 5000)
     } finally {
       savingNotif.value = false
@@ -218,12 +219,12 @@ export function useSettings() {
         audit_retention_days_by_category: form.value.auditRetentionDaysByCategory,
       })
       retentionSaveOk.value = true
-      retentionSaveMsg.value = 'Rétention enregistrée'
+      retentionSaveMsg.value = i18n.global.t('settings.retentionSavedMsg')
       await fetchSettings()
       setTimeout(() => { retentionSaveMsg.value = '' }, 4000)
     } catch (e) {
       retentionSaveOk.value = false
-      retentionSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
+      retentionSaveMsg.value = i18n.global.t('settings.saveErrorPrefix', { message: getApiErrorMessage(e) })
       setTimeout(() => { retentionSaveMsg.value = '' }, 5000)
     } finally {
       savingRetention.value = false
@@ -252,12 +253,12 @@ export function useSettings() {
         threat_threshold_critical: form.value.threatThresholdCritical,
       })
       threatDetectionSaveOk.value = true
-      threatDetectionSaveMsg.value = 'Score de menace enregistré'
+      threatDetectionSaveMsg.value = i18n.global.t('settings.threatScoreSavedMsg')
       await fetchSettings()
       setTimeout(() => { threatDetectionSaveMsg.value = '' }, 4000)
     } catch (e) {
       threatDetectionSaveOk.value = false
-      threatDetectionSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
+      threatDetectionSaveMsg.value = i18n.global.t('settings.saveErrorPrefix', { message: getApiErrorMessage(e) })
       setTimeout(() => { threatDetectionSaveMsg.value = '' }, 5000)
     } finally {
       savingThreatDetection.value = false
@@ -270,11 +271,11 @@ export function useSettings() {
     try {
       await apiClient.testSmtp()
       smtpTestSuccess.value = true
-      smtpTestMessage.value = 'Connexion SMTP réussie'
+      smtpTestMessage.value = i18n.global.t('settings.smtpTestSuccessMsg')
       setTimeout(() => { smtpTestMessage.value = '' }, 5000)
     } catch (e) {
       smtpTestSuccess.value = false
-      smtpTestMessage.value = `Erreur : ${getApiErrorMessage(e)}`
+      smtpTestMessage.value = i18n.global.t('settings.saveErrorPrefix', { message: getApiErrorMessage(e) })
       setTimeout(() => { smtpTestMessage.value = '' }, 5000)
     } finally {
       testingSmtp.value = false
@@ -287,11 +288,11 @@ export function useSettings() {
     try {
       await apiClient.testNtfy()
       ntfyTestSuccess.value = true
-      ntfyTestMessage.value = 'Message test envoyé'
+      ntfyTestMessage.value = i18n.global.t('settings.ntfyTestSentMsg')
       setTimeout(() => { ntfyTestMessage.value = '' }, 5000)
     } catch (e) {
       ntfyTestSuccess.value = false
-      ntfyTestMessage.value = `Erreur : ${getApiErrorMessage(e)}`
+      ntfyTestMessage.value = i18n.global.t('settings.saveErrorPrefix', { message: getApiErrorMessage(e) })
       setTimeout(() => { ntfyTestMessage.value = '' }, 5000)
     } finally {
       testingNtfy.value = false
@@ -304,12 +305,12 @@ export function useSettings() {
     try {
       const res = await apiClient.cleanupMetrics()
       cleanSuccess.value = true
-      cleanMessage.value = res.data?.message || 'Nettoyage des métriques terminé'
+      cleanMessage.value = res.data?.message || i18n.global.t('settings.metricsCleanupDoneMsg')
       await fetchSettings()
       setTimeout(() => { cleanMessage.value = '' }, 5000)
     } catch (e) {
       cleanSuccess.value = false
-      cleanMessage.value = `Erreur : ${getApiErrorMessage(e)}`
+      cleanMessage.value = i18n.global.t('settings.saveErrorPrefix', { message: getApiErrorMessage(e) })
       setTimeout(() => { cleanMessage.value = '' }, 5000)
     } finally {
       cleaningMetrics.value = false
@@ -322,12 +323,12 @@ export function useSettings() {
     try {
       const res = await apiClient.cleanupAudit()
       auditCleanSuccess.value = true
-      auditCleanMessage.value = res.data?.message || 'Nettoyage des logs audit terminé'
+      auditCleanMessage.value = res.data?.message || i18n.global.t('settings.auditCleanupDoneMsg')
       await fetchSettings()
       setTimeout(() => { auditCleanMessage.value = '' }, 5000)
     } catch (e) {
       auditCleanSuccess.value = false
-      auditCleanMessage.value = `Erreur : ${getApiErrorMessage(e)}`
+      auditCleanMessage.value = i18n.global.t('settings.saveErrorPrefix', { message: getApiErrorMessage(e) })
       setTimeout(() => { auditCleanMessage.value = '' }, 5000)
     } finally {
       cleaningAuditLogs.value = false

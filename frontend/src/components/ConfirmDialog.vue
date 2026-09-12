@@ -37,7 +37,7 @@
             class="mt-3 text-start"
           >
             <div class="text-secondary small mb-1 modal-confirm-text">
-              Tapez <strong class="text-body">{{ dialog.requiredText.value }}</strong> pour confirmer :
+              {{ t('common.confirmTypePrefix') }} <strong class="text-body">{{ dialog.requiredText.value }}</strong> {{ t('common.confirmTypeSuffix') }}
             </div>
             <input
               ref="inputRef"
@@ -80,10 +80,12 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle } from '@tabler/icons-vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useModalChrome } from '../composables/useModalChrome'
 
+const { t } = useI18n()
 const dialog = useConfirmDialog()
 const typedText = ref('')
 const inputRef = ref<HTMLInputElement | null>(null)

@@ -60,6 +60,25 @@ type Config struct {
 	AdminUser              string
 	AdminPassword          string
 
+	// OIDC / SSO
+	OIDCEnabled            bool
+	OIDCDisplayName        string
+	OIDCIssuerURL          string
+	OIDCClientID           string
+	OIDCClientSecret       string
+	OIDCRedirectURL        string
+	OIDCScopes             []string
+	OIDCUsernameClaim      string
+	OIDCEmailClaim         string
+	OIDCGroupsClaim        string
+	OIDCAdminGroup         string
+	OIDCOperatorGroup      string
+	OIDCViewerGroup        string
+	OIDCDefaultRole        string
+	OIDCAutoCreateUser     bool
+	OIDCAllowLocalLogin    bool
+	OIDCInsecureSkipVerify bool
+
 	// Rate limiting
 	RateLimitRPS        int
 	RateLimitBurst      int
@@ -213,6 +232,25 @@ func Load() *Config {
 		AdminUser:              getEnv("ADMIN_USER", "admin"),
 		AdminPassword:          getEnv("ADMIN_PASSWORD", ""),
 
+		// OIDC / SSO
+		OIDCEnabled:            getBoolEnv("OIDC_ENABLED", false),
+		OIDCDisplayName:        getEnv("OIDC_DISPLAY_NAME", "SSO / OpenID Connect"),
+		OIDCIssuerURL:          getEnv("OIDC_ISSUER_URL", ""),
+		OIDCClientID:           getEnv("OIDC_CLIENT_ID", ""),
+		OIDCClientSecret:       getEnv("OIDC_CLIENT_SECRET", ""),
+		OIDCRedirectURL:        getEnv("OIDC_REDIRECT_URL", ""),
+		OIDCScopes:             getCSVEnvOrDefault("OIDC_SCOPES", []string{"openid", "profile", "email", "groups"}),
+		OIDCUsernameClaim:      getEnv("OIDC_USERNAME_CLAIM", "preferred_username"),
+		OIDCEmailClaim:         getEnv("OIDC_EMAIL_CLAIM", "email"),
+		OIDCGroupsClaim:        getEnv("OIDC_GROUPS_CLAIM", "groups"),
+		OIDCAdminGroup:         getEnv("OIDC_ADMIN_GROUP", "serversupervisor-admins"),
+		OIDCOperatorGroup:      getEnv("OIDC_OPERATOR_GROUP", "serversupervisor-operators"),
+		OIDCViewerGroup:        getEnv("OIDC_VIEWER_GROUP", "serversupervisor-viewers"),
+		OIDCDefaultRole:        getEnv("OIDC_DEFAULT_ROLE", "viewer"),
+		OIDCAutoCreateUser:     getBoolEnv("OIDC_AUTO_CREATE_USER", true),
+		OIDCAllowLocalLogin:    getBoolEnv("OIDC_ALLOW_LOCAL_LOGIN", true),
+		OIDCInsecureSkipVerify: getBoolEnv("OIDC_INSECURE_SKIP_VERIFY", false),
+
 		RateLimitRPS:        getIntEnv("RATE_LIMIT_RPS", 100),
 		RateLimitBurst:      getIntEnv("RATE_LIMIT_BURST", 200),
 		AgentRateLimitRPS:   getIntEnv("AGENT_RATE_LIMIT_RPS", 20),
@@ -264,89 +302,202 @@ type DBSettingsLoader interface {
 	GetAllSettings(ctx context.Context) (map[string]string, error)
 }
 
-// OverrideFromDB applies DB-persisted settings on top of env vars.
-// Call this after the database is connected.
-func (c *Config) OverrideFromDB(db DBSettingsLoader) {
+// OverrideFromDB applies DB-persisted settings on top of env vars, and
+// reports which setting keys it actually applied (i.e. which keys a
+// DB-stored value takes precedence over its env var for). Call this after
+// the database is connected.
+//
+// The returned map is the single source of truth for "does the UI/DB value
+// actually win over ENV for this key" — internal/services/config (the admin
+// configuration UI) uses it to report the real effective source instead of
+// assuming ENV always wins, which used to contradict what this function
+// does two lines above it (see that package's doc comments for the bug this
+// fixed). Deriving it from the same execution that applies the values,
+// rather than a second hand-maintained list of keys, means the two can't
+// drift apart the way a duplicate list would.
+func (c *Config) OverrideFromDB(db DBSettingsLoader) map[string]bool {
+	applied := make(map[string]bool)
 	settings, err := db.GetAllSettings(context.Background())
 	if err != nil {
-		return
+		return applied
 	}
 	if v, ok := settings["smtp_host"]; ok && v != "" {
 		c.SMTPHost = v
+		applied["smtp_host"] = true
 	}
 	if v, ok := settings["smtp_port"]; ok && v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			c.SMTPPort = i
+			applied["smtp_port"] = true
 		}
 	}
 	if v, ok := settings["smtp_user"]; ok && v != "" {
 		c.SMTPUser = v
+		applied["smtp_user"] = true
 	}
 	if v, ok := settings["smtp_pass"]; ok && v != "" {
 		c.SMTPPass = v
+		applied["smtp_pass"] = true
 	}
 	if v, ok := settings["smtp_from"]; ok && v != "" {
 		c.SMTPFrom = v
+		applied["smtp_from"] = true
 	}
 	if v, ok := settings["smtp_to"]; ok && v != "" {
 		c.SMTPTo = v
+		applied["smtp_to"] = true
 	}
 	if v, ok := settings["smtp_tls"]; ok {
 		c.SMTPTLS = v == "true" || v == "1"
+		applied["smtp_tls"] = true
 	}
 	if v, ok := settings["ntfy_url"]; ok && v != "" {
 		c.NotifyURL = v
+		applied["ntfy_url"] = true
+	}
+	if v, ok := settings["ntfy_auth_token"]; ok && v != "" {
+		c.NtfyAuthToken = v
+		applied["ntfy_auth_token"] = true
 	}
 	if v, ok := settings["github_token"]; ok && v != "" {
 		c.GitHubToken = v
+		applied["github_token"] = true
 	}
 	if v, ok := settings["metrics_retention_days"]; ok && v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			c.MetricsRetentionDays = i
+			applied["metrics_retention_days"] = true
 		}
 	}
 	if v, ok := settings["audit_retention_days"]; ok && v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			c.AuditRetentionDays = i
+			applied["audit_retention_days"] = true
 		}
 	}
 	if v, ok := settings["audit_retention_days_by_category"]; ok && v != "" {
 		var byCategory map[string]int
 		if err := json.Unmarshal([]byte(v), &byCategory); err == nil {
 			c.AuditRetentionDaysByCategory = byCategory
+			applied["audit_retention_days_by_category"] = true
 		}
 	}
 	if v, ok := settings["web_logs_retention_days"]; ok && v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			c.WebLogsRetentionDays = i
+			applied["web_logs_retention_days"] = true
 		}
 	}
 	if v, ok := settings["network_flows_retention_days"]; ok && v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			c.NetworkFlowsRetentionDays = i
+			applied["network_flows_retention_days"] = true
 		}
 	}
 	if c.JWTSecret == "" {
 		if v, ok := settings["jwt_secret"]; ok && v != "" {
 			c.JWTSecret = v
+			applied["jwt_secret"] = true
 		}
 	}
+	if v, ok := settings["jwt_expiration"]; ok && v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			c.JWTExpiration = d
+			applied["jwt_expiration"] = true
+		}
+	}
+	if v, ok := settings["refresh_token_expiration"]; ok && v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			c.RefreshTokenExpiration = d
+			applied["refresh_token_expiration"] = true
+		}
+	}
+	if v, ok := settings["oidc_enabled"]; ok {
+		c.OIDCEnabled = v == "true" || v == "1"
+		applied["oidc_enabled"] = true
+	}
+	if v, ok := settings["oidc_display_name"]; ok && v != "" {
+		c.OIDCDisplayName = v
+		applied["oidc_display_name"] = true
+	}
+	if v, ok := settings["oidc_issuer_url"]; ok && v != "" {
+		c.OIDCIssuerURL = v
+		applied["oidc_issuer_url"] = true
+	}
+	if v, ok := settings["oidc_client_id"]; ok && v != "" {
+		c.OIDCClientID = v
+		applied["oidc_client_id"] = true
+	}
+	if v, ok := settings["oidc_client_secret"]; ok && v != "" {
+		c.OIDCClientSecret = v
+		applied["oidc_client_secret"] = true
+	}
+	if v, ok := settings["oidc_redirect_url"]; ok && v != "" {
+		c.OIDCRedirectURL = v
+		applied["oidc_redirect_url"] = true
+	}
+	if v, ok := settings["oidc_scopes"]; ok && v != "" {
+		c.OIDCScopes = parseCSV(v)
+		applied["oidc_scopes"] = true
+	}
+	if v, ok := settings["oidc_username_claim"]; ok && v != "" {
+		c.OIDCUsernameClaim = v
+		applied["oidc_username_claim"] = true
+	}
+	if v, ok := settings["oidc_email_claim"]; ok && v != "" {
+		c.OIDCEmailClaim = v
+		applied["oidc_email_claim"] = true
+	}
+	if v, ok := settings["oidc_groups_claim"]; ok && v != "" {
+		c.OIDCGroupsClaim = v
+		applied["oidc_groups_claim"] = true
+	}
+	if v, ok := settings["oidc_admin_group"]; ok && v != "" {
+		c.OIDCAdminGroup = v
+		applied["oidc_admin_group"] = true
+	}
+	if v, ok := settings["oidc_operator_group"]; ok && v != "" {
+		c.OIDCOperatorGroup = v
+		applied["oidc_operator_group"] = true
+	}
+	if v, ok := settings["oidc_viewer_group"]; ok && v != "" {
+		c.OIDCViewerGroup = v
+		applied["oidc_viewer_group"] = true
+	}
+	if v, ok := settings["oidc_default_role"]; ok && v != "" {
+		c.OIDCDefaultRole = v
+		applied["oidc_default_role"] = true
+	}
+	if v, ok := settings["oidc_auto_create_user"]; ok {
+		c.OIDCAutoCreateUser = v == "true" || v == "1"
+		applied["oidc_auto_create_user"] = true
+	}
+	if v, ok := settings["oidc_allow_local_login"]; ok {
+		c.OIDCAllowLocalLogin = v == "true" || v == "1"
+		applied["oidc_allow_local_login"] = true
+	}
+	if v, ok := settings["oidc_insecure_skip_verify"]; ok {
+		c.OIDCInsecureSkipVerify = v == "true" || v == "1"
+		applied["oidc_insecure_skip_verify"] = true
+	}
 
-	overrideFloat(settings, "threat_weight_wordpress", &c.ThreatWeightWordPress)
-	overrideFloat(settings, "threat_weight_adminpanel", &c.ThreatWeightAdminPanel)
-	overrideFloat(settings, "threat_weight_pathtraversal", &c.ThreatWeightPathTraversal)
-	overrideFloat(settings, "threat_weight_knownscanner", &c.ThreatWeightKnownScanner)
-	overrideFloat(settings, "threat_weight_suspiciousmethod", &c.ThreatWeightSuspiciousMethod)
-	overrideFloat(settings, "threat_weight_status_2xx", &c.ThreatWeightStatus2xx)
-	overrideFloat(settings, "threat_weight_status_3xx", &c.ThreatWeightStatus3xx)
-	overrideFloat(settings, "threat_weight_status_404", &c.ThreatWeightStatus404)
-	overrideFloat(settings, "threat_weight_status_4xx", &c.ThreatWeightStatus4xxOther)
-	overrideFloat(settings, "threat_weight_status_5xx", &c.ThreatWeightStatus5xx)
-	overrideFloat(settings, "threat_weight_breadth", &c.ThreatWeightBreadth)
-	overrideFloat(settings, "threat_weight_hits", &c.ThreatWeightHits)
-	overrideFloat(settings, "threat_threshold_medium", &c.ThreatThresholdMedium)
-	overrideFloat(settings, "threat_threshold_high", &c.ThreatThresholdHigh)
-	overrideFloat(settings, "threat_threshold_critical", &c.ThreatThresholdCritical)
+	overrideFloat(settings, "threat_weight_wordpress", &c.ThreatWeightWordPress, applied)
+	overrideFloat(settings, "threat_weight_adminpanel", &c.ThreatWeightAdminPanel, applied)
+	overrideFloat(settings, "threat_weight_pathtraversal", &c.ThreatWeightPathTraversal, applied)
+	overrideFloat(settings, "threat_weight_knownscanner", &c.ThreatWeightKnownScanner, applied)
+	overrideFloat(settings, "threat_weight_suspiciousmethod", &c.ThreatWeightSuspiciousMethod, applied)
+	overrideFloat(settings, "threat_weight_status_2xx", &c.ThreatWeightStatus2xx, applied)
+	overrideFloat(settings, "threat_weight_status_3xx", &c.ThreatWeightStatus3xx, applied)
+	overrideFloat(settings, "threat_weight_status_404", &c.ThreatWeightStatus404, applied)
+	overrideFloat(settings, "threat_weight_status_4xx", &c.ThreatWeightStatus4xxOther, applied)
+	overrideFloat(settings, "threat_weight_status_5xx", &c.ThreatWeightStatus5xx, applied)
+	overrideFloat(settings, "threat_weight_breadth", &c.ThreatWeightBreadth, applied)
+	overrideFloat(settings, "threat_weight_hits", &c.ThreatWeightHits, applied)
+	overrideFloat(settings, "threat_threshold_medium", &c.ThreatThresholdMedium, applied)
+	overrideFloat(settings, "threat_threshold_high", &c.ThreatThresholdHigh, applied)
+	overrideFloat(settings, "threat_threshold_critical", &c.ThreatThresholdCritical, applied)
+
+	return applied
 }
 
 // overrideFloat applies settings[key] to *dst when present and parseable,
@@ -354,10 +505,11 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 // otherwise. Used for the threat-detection weights, where the zero value
 // (0) is a legitimate admin choice — unlike the int fields above, it can't
 // double as a "not set" sentinel.
-func overrideFloat(settings map[string]string, key string, dst *float64) {
+func overrideFloat(settings map[string]string, key string, dst *float64, applied map[string]bool) {
 	if v, ok := settings[key]; ok && v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			*dst = f
+			applied[key] = true
 		}
 	}
 }
@@ -421,6 +573,17 @@ func (c *Config) ValidateStrict() error {
 	if c.DBPassword == "supervisor" {
 		problems = append(problems, "DB_PASSWORD must not be the default 'supervisor' in production")
 	}
+	if c.OIDCEnabled {
+		if c.OIDCIssuerURL == "" {
+			problems = append(problems, "OIDC_ISSUER_URL is required when OIDC_ENABLED is true")
+		}
+		if c.OIDCClientID == "" {
+			problems = append(problems, "OIDC_CLIENT_ID is required when OIDC_ENABLED is true")
+		}
+		if c.OIDCRedirectURL == "" {
+			problems = append(problems, "OIDC_REDIRECT_URL is required when OIDC_ENABLED is true")
+		}
+	}
 	if len(problems) == 0 {
 		return nil
 	}
@@ -477,17 +640,30 @@ func getBoolEnv(key string, fallback bool) bool {
 	return fallback
 }
 
+func parseCSV(v string) []string {
+	parts := strings.Split(v, ",")
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func getCSVEnv(key string) []string {
 	if v := os.Getenv(key); v != "" {
-		parts := strings.Split(v, ",")
-		var out []string
-		for _, p := range parts {
-			p = strings.TrimSpace(p)
-			if p != "" {
-				out = append(out, p)
-			}
-		}
-		return out
+		return parseCSV(v)
 	}
 	return nil
+}
+
+func getCSVEnvOrDefault(key string, fallback []string) []string {
+	if v := os.Getenv(key); v != "" {
+		if out := parseCSV(v); len(out) > 0 {
+			return out
+		}
+	}
+	return fallback
 }

@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { setLocale } from '../i18n'
 
 const {
   getProxmoxGuests, getProxmoxGuestLink, getProxmoxGuestMetrics,
   getProxmoxNodes, getProxmoxNodeGuestNetworks, getProxmoxInstance,
+  updateProxmoxLink, deleteProxmoxLink,
 } = vi.hoisted(() => ({
   getProxmoxGuests: vi.fn(),
   getProxmoxGuestLink: vi.fn(),
@@ -11,6 +13,8 @@ const {
   getProxmoxNodes: vi.fn(),
   getProxmoxNodeGuestNetworks: vi.fn(),
   getProxmoxInstance: vi.fn(),
+  updateProxmoxLink: vi.fn(),
+  deleteProxmoxLink: vi.fn(),
 }))
 
 let routeQuery: Record<string, string> = {}
@@ -23,6 +27,7 @@ vi.mock('../api', () => ({
   default: {
     getProxmoxGuests, getProxmoxGuestLink, getProxmoxGuestMetrics,
     getProxmoxNodes, getProxmoxNodeGuestNetworks, getProxmoxInstance,
+    updateProxmoxLink, deleteProxmoxLink,
   },
   getApiErrorMessage: (e: unknown) => String(e),
   isApiAbort: () => false,
@@ -60,6 +65,7 @@ function mountUseProxmoxGuest() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setLocale('fr')
   routeQuery = {}
   getProxmoxGuests.mockResolvedValue({ data: [guest] })
   getProxmoxGuestLink.mockResolvedValue({ data: null })
@@ -294,5 +300,86 @@ describe('useProxmoxGuest — console configuration check', () => {
 
     expect(getProxmoxInstance).not.toHaveBeenCalled()
     expect(api.consoleButtonTitle.value).toBe('VM QEMU : bientôt disponible')
+  })
+})
+
+describe('useProxmoxGuest — guest lookup and link actions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setLocale('fr')
+    routeQuery = {}
+    getProxmoxGuestMetrics.mockResolvedValue({ data: [] })
+    getProxmoxNodeGuestNetworks.mockResolvedValue({ data: {} })
+    getProxmoxInstance.mockResolvedValue({ data: { console_configured: true } })
+  })
+
+  it('shows the translated "not found" error when the requested guest id is absent from the list', async () => {
+    getProxmoxGuests.mockResolvedValue({ data: [{ ...guest, id: 'other-guest' }] })
+    getProxmoxGuestLink.mockResolvedValue({ data: null })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(api.error.value).toBe('Guest introuvable')
+  })
+
+  it('surfaces the translated fallback error when the guest list itself fails to load', async () => {
+    getProxmoxGuests.mockRejectedValue(new Error('network down'))
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(api.error.value).toContain('network down')
+  })
+
+  it('shows the translated "confirmed" message on a successful link confirmation', async () => {
+    getProxmoxGuests.mockResolvedValue({ data: [guest] })
+    getProxmoxGuestLink.mockResolvedValue({ data: { id: 'link-1', status: 'suggested', host_id: 'host-1' } })
+    updateProxmoxLink.mockResolvedValue({ data: { id: 'link-1', status: 'confirmed', host_id: 'host-1' } })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+    await api.confirmLink()
+
+    expect(api.linkMsg.value).toBe('Lien confirmé.')
+    expect(api.linkMsgOk.value).toBe(true)
+  })
+
+  it('surfaces the translated fallback error when confirming a link fails', async () => {
+    getProxmoxGuests.mockResolvedValue({ data: [guest] })
+    getProxmoxGuestLink.mockResolvedValue({ data: { id: 'link-1', status: 'suggested', host_id: 'host-1' } })
+    updateProxmoxLink.mockRejectedValue(new Error('boom'))
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+    await api.confirmLink()
+
+    expect(api.linkMsgOk.value).toBe(false)
+  })
+
+  it('shows the translated "ignored" message on a successful link ignore', async () => {
+    getProxmoxGuests.mockResolvedValue({ data: [guest] })
+    getProxmoxGuestLink.mockResolvedValue({ data: { id: 'link-1', status: 'suggested', host_id: 'host-1' } })
+    deleteProxmoxLink.mockResolvedValue({ data: {} })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+    await api.ignoreLink()
+
+    expect(api.linkMsg.value).toBe('Suggestion ignorée.')
+    expect(api.linkMsgOk.value).toBe(true)
+    expect(api.guestLink.value).toBeNull()
+  })
+
+  it('surfaces the translated fallback error when ignoring a link fails', async () => {
+    getProxmoxGuests.mockResolvedValue({ data: [guest] })
+    getProxmoxGuestLink.mockResolvedValue({ data: { id: 'link-1', status: 'suggested', host_id: 'host-1' } })
+    deleteProxmoxLink.mockRejectedValue(new Error('boom'))
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+    await api.ignoreLink()
+
+    expect(api.linkMsgOk.value).toBe(false)
   })
 })

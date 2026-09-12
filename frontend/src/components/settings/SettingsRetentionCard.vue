@@ -2,12 +2,12 @@
   <div class="card h-100">
     <div class="card-header">
       <h3 class="card-title">
-        Rétention des données
+        {{ t('settings.retentionTitle') }}
       </h3>
     </div>
     <div class="card-body">
       <div class="mb-3">
-        <label class="form-label">Métriques (jours)</label>
+        <label class="form-label">{{ t('settings.metricsLabel') }}</label>
         <input
           v-model.number="form.metricsRetentionDays"
           type="number"
@@ -20,11 +20,11 @@
           id="metrics-retention-hint"
           class="form-hint"
         >
-          Politique de rétention TimescaleDB pour system_metrics et disk_metrics
+          {{ t('settings.metricsRetentionHint') }}
         </div>
       </div>
       <div class="mb-3">
-        <label class="form-label">Logs audit — par défaut (jours)</label>
+        <label class="form-label">{{ t('settings.auditDefaultLabel') }}</label>
         <input
           v-model.number="form.auditRetentionDays"
           type="number"
@@ -37,15 +37,14 @@
           id="audit-retention-hint"
           class="form-hint"
         >
-          Entrées d'audit plus anciennes que ce seuil sont supprimées — s'applique à toute
-          catégorie sans valeur spécifique ci-dessous
+          {{ t('settings.auditRetentionHint') }}
         </div>
       </div>
       <div
         v-if="auditCategories.length > 0"
         class="mb-0"
       >
-        <label class="form-label">Logs audit — par catégorie (jours, optionnel)</label>
+        <label class="form-label">{{ t('settings.auditByCategoryLabel') }}</label>
         <div class="row g-2">
           <div
             v-for="cat in auditCategories"
@@ -67,7 +66,7 @@
           </div>
         </div>
         <div class="form-hint">
-          Laisser vide pour utiliser la valeur par défaut ci-dessus
+          {{ t('settings.categoryDaysHint') }}
         </div>
       </div>
     </div>
@@ -79,7 +78,7 @@
         :disabled="savingRetention"
         @click="$emit('save')"
       >
-        {{ savingRetention ? 'Enregistrement...' : 'Enregistrer' }}
+        {{ savingRetention ? t('common.saving') : t('common.save') }}
       </button>
       <span
         v-if="retentionSaveMsg"
@@ -92,6 +91,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 interface RetentionForm {
   metricsRetentionDays: number
   auditRetentionDays: number

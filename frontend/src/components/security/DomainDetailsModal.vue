@@ -9,10 +9,10 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <div>
           <h3 class="card-title mb-0">
-            Détails domaine: <span class="font-monospace">{{ domain }}</span>
+            {{ t('security.domainDetailsTitlePrefix') }} <span class="font-monospace">{{ domain }}</span>
           </h3>
           <div class="text-secondary small">
-            Fenêtre de logs détaillée sur {{ period }}
+            {{ t('security.detailedLogsWindowLabel', { period }) }}
           </div>
         </div>
         <button
@@ -20,7 +20,7 @@
           class="btn btn-sm btn-outline-secondary"
           @click="$emit('close')"
         >
-          Fermer
+          {{ t('common.close') }}
         </button>
       </div>
 
@@ -69,7 +69,7 @@
                 type="button"
                 class="kpi-btn clickable-row border rounded p-2 text-center w-100"
                 :class="{ active: filters.status === '4xx' }"
-                title="Filtrer sur les statuts 4xx"
+                :title="t('security.filter4xxTooltip')"
                 @click="$emit('update-filter', { key: 'status', value: filters.status === '4xx' ? '' : '4xx' })"
               >
                 <div class="text-secondary small">
@@ -85,7 +85,7 @@
                 type="button"
                 class="kpi-btn clickable-row border rounded p-2 text-center w-100"
                 :class="{ active: filters.status === '5xx' }"
-                title="Filtrer sur les statuts 5xx"
+                :title="t('security.filter5xxTooltip')"
                 @click="$emit('update-filter', { key: 'status', value: filters.status === '5xx' ? '' : '5xx' })"
               >
                 <div class="text-secondary small">
@@ -103,13 +103,13 @@
               <div class="card h-100">
                 <div class="card-header">
                   <h4 class="card-title mb-0">
-                    Top chemins
+                    {{ t('security.topPathsTitle') }}
                   </h4>
                 </div>
                 <div class="card-body p-0">
                   <EmptyState
                     v-if="!(details.top_paths || []).length"
-                    title="Aucun chemin"
+                    :title="t('security.noPathTitle')"
                   />
                   <div
                     v-for="p in details.top_paths"
@@ -119,7 +119,7 @@
                     tabindex="0"
                     class="row-btn clickable-row d-flex justify-content-between align-items-center border-bottom px-3 py-2"
                     :class="{ active: filters.path === p.path }"
-                    :title="`Filtrer sur ${p.path}`"
+                    :title="t('security.filterOnValueTooltip', { value: p.path })"
                     @click="$emit('update-filter', { key: 'path', value: filters.path === p.path ? '' : p.path })"
                     @keydown.enter="$emit('update-filter', { key: 'path', value: filters.path === p.path ? '' : p.path })"
                     @keydown.space.prevent="$emit('update-filter', { key: 'path', value: filters.path === p.path ? '' : p.path })"
@@ -137,13 +137,13 @@
               <div class="card h-100">
                 <div class="card-header">
                   <h4 class="card-title mb-0">
-                    Top IPs clientes
+                    {{ t('security.topClientIpsTitle') }}
                   </h4>
                 </div>
                 <div class="card-body p-0">
                   <EmptyState
                     v-if="!(details.top_clients || []).length"
-                    title="Aucune IP"
+                    :title="t('security.noIpTitle')"
                   />
                   <div
                     v-for="c in details.top_clients"
@@ -153,7 +153,7 @@
                     tabindex="0"
                     class="row-btn clickable-row d-flex justify-content-between align-items-center gap-2 border-bottom px-3 py-2"
                     :class="{ active: filters.ip === c.ip }"
-                    :title="`Filtrer sur ${c.ip}`"
+                    :title="t('security.filterOnValueTooltip', { value: c.ip })"
                     @click="$emit('update-filter', { key: 'ip', value: filters.ip === c.ip ? '' : c.ip })"
                     @keydown.enter="$emit('update-filter', { key: 'ip', value: filters.ip === c.ip ? '' : c.ip })"
                     @keydown.space.prevent="$emit('update-filter', { key: 'ip', value: filters.ip === c.ip ? '' : c.ip })"
@@ -163,14 +163,14 @@
                       <span
                         v-if="c.blocked"
                         class="badge bg-danger-lt text-danger ms-1"
-                      >Bloquée</span>
+                      >{{ t('security.blockedBadge') }}</span>
                     </span>
                     <span class="d-flex align-items-center gap-1 flex-shrink-0">
                       <span class="badge bg-purple-lt text-purple">{{ c.hits }}</span>
                       <button
                         type="button"
                         class="btn btn-icon btn-sm btn-ghost-secondary"
-                        title="Copier l'IP"
+                        :title="t('security.copyIpTooltip')"
                         @click.stop="copyIP(c.ip)"
                       >
                         <IconCheck
@@ -190,7 +190,7 @@
                         class="btn btn-icon btn-sm"
                         :class="blockState?.[c.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-secondary'"
                         :disabled="blockState?.[c.ip] === 'loading' || !c.host_id"
-                        :title="!c.host_id ? 'Hôte introuvable' : blockState?.[c.ip] === 'error' ? 'Erreur — Réessayer' : `Bloquer ${c.ip} (CrowdSec, 4h)`"
+                        :title="!c.host_id ? t('security.hostNotFoundTooltip') : blockState?.[c.ip] === 'error' ? t('security.errorRetryTooltip') : t('security.blockIpTooltip', { ip: c.ip })"
                         @click.stop="$emit('block-ip', { ip: c.ip, hostId: c.host_id })"
                       >
                         <span
@@ -213,7 +213,7 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
               <h4 class="card-title mb-0">
-                Logs récents
+                {{ t('security.recentLogsTitle') }}
               </h4>
               <div class="d-flex align-items-center gap-2 flex-wrap">
                 <select
@@ -222,7 +222,7 @@
                   @change="$emit('update-filter', { key: 'status', value: ($event.target as HTMLSelectElement).value })"
                 >
                   <option value="">
-                    Tous statuts
+                    {{ t('security.allStatusesOption') }}
                   </option>
                   <option value="2xx">
                     2xx
@@ -237,10 +237,10 @@
                     5xx
                   </option>
                   <option value="blocked">
-                    Bloquées
+                    {{ t('security.blockedShortLabel') }}
                   </option>
                   <option value="suspicious">
-                    Suspectes
+                    {{ t('security.suspiciousShortLabel') }}
                   </option>
                 </select>
                 <select
@@ -249,7 +249,7 @@
                   @change="$emit('update-filter', { key: 'method', value: ($event.target as HTMLSelectElement).value })"
                 >
                   <option value="">
-                    Toutes méthodes
+                    {{ t('security.allMethodsOption') }}
                   </option>
                   <option
                     v-for="m in METHODS"
@@ -265,7 +265,7 @@
                   class="btn btn-sm btn-outline-secondary"
                   @click="$emit('clear-filters')"
                 >
-                  Réinitialiser
+                  {{ t('security.resetButton') }}
                 </button>
               </div>
             </div>
@@ -274,7 +274,7 @@
               v-if="hasActiveFilters"
               class="px-3 pt-2 d-flex align-items-center gap-2 flex-wrap"
             >
-              <span class="text-secondary small">Filtres actifs :</span>
+              <span class="text-secondary small">{{ t('security.activeFiltersLabel') }}</span>
               <span
                 v-if="filters.path"
                 class="badge bg-azure-lt text-azure d-inline-flex align-items-center gap-1"
@@ -284,7 +284,7 @@
                   type="button"
                   class="btn-close ms-1"
                   style="font-size: 0.55rem;"
-                  aria-label="Retirer le filtre chemin"
+                  :aria-label="t('security.removePathFilterAriaLabel')"
                   @click="$emit('update-filter', { key: 'path', value: '' })"
                 />
               </span>
@@ -297,7 +297,7 @@
                   type="button"
                   class="btn-close ms-1"
                   style="font-size: 0.55rem;"
-                  aria-label="Retirer le filtre IP"
+                  :aria-label="t('security.removeIpFilterAriaLabel')"
                   @click="$emit('update-filter', { key: 'ip', value: '' })"
                 />
               </span>
@@ -312,15 +312,15 @@
                   <tr>
                     <th>
                       <SortableHeader
-                        label="Heure"
+                        :label="t('security.timeColumn')"
                         :active="sortKey === 'time'"
                         :direction="sortDir"
                         @toggle="$emit('toggle-sort', 'time')"
                       />
                     </th>
-                    <th>IP</th>
-                    <th>Méthode</th>
-                    <th>Chemin</th>
+                    <th>{{ t('security.ipColumn') }}</th>
+                    <th>{{ t('security.methodColumn') }}</th>
+                    <th>{{ t('security.pathColumn') }}</th>
                     <th>
                       <SortableHeader
                         label="Status"
@@ -343,7 +343,7 @@
                 <tbody>
                   <tr v-if="!(details.requests || []).length">
                     <td colspan="7">
-                      <EmptyState title="Aucune requête disponible" />
+                      <EmptyState :title="t('security.noRequestsAvailableTitle')" />
                     </td>
                   </tr>
                   <tr
@@ -359,7 +359,7 @@
                         <button
                           type="button"
                           class="btn btn-icon btn-sm btn-ghost-secondary"
-                          title="Copier l'IP"
+                          :title="t('security.copyIpTooltip')"
                           @click="copyIP(r.ip)"
                         >
                           <IconCheck
@@ -379,7 +379,7 @@
                           class="btn btn-icon btn-sm"
                           :class="blockState?.[r.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-secondary'"
                           :disabled="blockState?.[r.ip] === 'loading' || !r.host_id"
-                          :title="!r.host_id ? 'Hôte introuvable' : blockState?.[r.ip] === 'error' ? 'Erreur — Réessayer' : `Bloquer ${r.ip} (CrowdSec, 4h)`"
+                          :title="!r.host_id ? t('security.hostNotFoundTooltip') : blockState?.[r.ip] === 'error' ? t('security.errorRetryTooltip') : t('security.blockIpTooltip', { ip: r.ip })"
                           @click="$emit('block-ip', { ip: r.ip, hostId: r.host_id })"
                         >
                           <span
@@ -410,12 +410,12 @@
                       <span
                         v-if="r.blocked"
                         class="badge bg-danger-lt text-danger ms-1"
-                        title="Bloquée"
+                        :title="t('security.blockedBadge')"
                       >B</span>
                       <span
                         v-if="r.suspicious"
                         class="badge bg-warning-lt text-warning ms-1"
-                        title="Suspecte"
+                        :title="t('security.suspiciousBadgeTooltip')"
                       >S</span>
                     </td>
                     <td class="small">
@@ -437,7 +437,7 @@
               class="card-footer d-flex align-items-center justify-content-between"
             >
               <div class="text-secondary small">
-                Page {{ page }} sur {{ totalPages }} — {{ details.total || 0 }} résultats
+                {{ t('security.pageOfTotalResultsLabel', { page, totalPages, total: details.total || 0 }) }}
               </div>
               <PaginationNav
                 :current-page="page"
@@ -454,6 +454,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconBan, IconCheck, IconCopy } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import PaginationNav from '../PaginationNav.vue'
@@ -493,6 +494,8 @@ const emit = defineEmits<{
   (e: 'update:page', page: number): void
   (e: 'block-ip', payload: { ip: string; hostId: string }): void
 }>()
+
+const { t } = useI18n()
 
 const modalRef = ref<HTMLElement | null>(null)
 useModalChrome(modalRef, () => props.show, { onClose: () => emit('close') })

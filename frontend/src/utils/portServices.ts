@@ -1,3 +1,4 @@
+import { i18n } from '../i18n'
 /**
  * Well-known-port → service-name heuristic for the host "Trafic réseau" tab.
  *
@@ -114,7 +115,8 @@ const UDP_ONLY_PORTS: Record<number, string> = {
 }
 
 /** Shown wherever a guessed label appears, so the uncertainty is never implicit. */
-export const PORT_GUESS_HINT = 'Détection par port, non garantie — le port ne prouve pas le protocole applicatif'
+/** Resolved lazily: the active locale isn't known at module-evaluation time. */
+export const portGuessHint = (): string => i18n.global.t('common.portGuessHint')
 
 /**
  * Best-effort application-protocol name for a remote port, or `''` when the

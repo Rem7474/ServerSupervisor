@@ -14,6 +14,10 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['src/**/*.browser.test.ts'],
+    // Same setup as vitest.config.ts (happy-dom) — installs the i18n plugin
+    // globally on every @vue/test-utils mount(), needed by any component
+    // under test that calls useI18n().
+    setupFiles: ['src/test/setup.ts'],
     browser: {
       enabled: true,
       provider: playwright(),

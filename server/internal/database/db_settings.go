@@ -35,3 +35,8 @@ func (db *DB) GetSetting(ctx context.Context, key string) (string, error) {
 	err := db.conn.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = $1`, key).Scan(&value)
 	return value, err
 }
+
+func (db *DB) DeleteSetting(ctx context.Context, key string) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM settings WHERE key = $1`, key)
+	return err
+}

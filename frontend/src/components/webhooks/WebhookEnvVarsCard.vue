@@ -1,7 +1,7 @@
 <template>
   <div class="mt-3 pt-3 border-top">
     <div class="text-muted small mb-2">
-      Variables injectees dans votre script :
+      {{ t('webhooks.injectedVarsInScriptLabel') }}
     </div>
     <div class="table-responsive">
       <table class="table table-sm mb-0">
@@ -24,6 +24,10 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 defineProps<{
   envVars: { name: string, desc: string }[]
 }>()

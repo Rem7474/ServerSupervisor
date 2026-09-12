@@ -10,12 +10,12 @@
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">
-            Payload reçu
+            {{ t('webhooks.payloadReceivedTitle') }}
           </h5>
           <button
             type="button"
             class="btn btn-sm btn-ghost-secondary me-1"
-            :title="copied ? 'Copié !' : 'Copier'"
+            :title="copied ? t('webhooks.copiedTooltip') : t('webhooks.copyTooltip')"
             @click="copy"
           >
             <IconCheck
@@ -40,7 +40,7 @@
             v-if="!isValidJson"
             class="alert alert-warning small mb-2"
           >
-            Payload tronqué ou non-JSON — affichage brut.
+            {{ t('webhooks.payloadTruncatedWarning') }}
           </div>
           <pre
             class="bg-dark text-light rounded p-3 small mb-0"
@@ -53,7 +53,7 @@
             class="btn btn-outline-secondary"
             @click="$emit('close')"
           >
-            Fermer
+            {{ t('common.close') }}
           </button>
         </div>
       </div>
@@ -67,8 +67,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { IconCheck, IconCopy } from '@tabler/icons-vue'
 import { useModalChrome } from '../../composables/useModalChrome'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   payload: string | null

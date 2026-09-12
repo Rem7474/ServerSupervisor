@@ -2,7 +2,7 @@
   <div>
     <PageRefreshBar
       v-model="autoRefresh"
-      label="Guest Proxmox"
+      :label="t('proxmox.guestRefreshLabel')"
       :interval-sec="GUEST_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />
@@ -31,14 +31,14 @@
               to="/"
               class="text-decoration-none"
             >
-              Dashboard
+              {{ t('nav.sections.control.items.dashboard') }}
             </router-link>
             <span class="text-muted mx-1">/</span>
             <router-link
               to="/proxmox"
               class="text-decoration-none"
             >
-              Proxmox VE
+              {{ t('proxmox.breadcrumbTitle') }}
             </router-link>
             <span class="text-muted mx-1">/</span>
             <router-link
@@ -69,7 +69,7 @@
             >{{ linkMsg }}</span>
           </div>
           <div class="text-secondary">
-            Nœud {{ guest.node_name }} · VMID {{ guest.vmid }} · Uptime {{ formatUptime(guest.uptime) }}
+            {{ t('proxmox.nodeUptimeSummary', { node: guest.node_name, vmid: guest.vmid, uptime: formatUptime(guest.uptime) }) }}
           </div>
         </div>
         <div
@@ -79,7 +79,7 @@
           <span
             v-if="guest.guest_type === 'lxc' && consoleConfigured === false"
             class="d-inline-flex align-items-center"
-            title="Identifiants console PVE non configurés pour cette connexion — Paramètres → Proxmox VE"
+            :title="t('proxmox.consoleUnconfiguredAlertTitle')"
           >
             <IconAlertTriangle
               :size="16"
@@ -97,7 +97,7 @@
               :size="16"
               class="icon me-1"
             />
-            Console
+            {{ t('proxmox.consoleButton') }}
           </button>
           <button
             v-if="guest.status === 'stopped'"
@@ -115,7 +115,7 @@
               :size="16"
               class="icon me-1"
             />
-            Démarrer
+            {{ t('proxmox.startButton') }}
           </button>
           <template v-else>
             <button
@@ -133,7 +133,7 @@
                 :size="16"
                 class="icon me-1"
               />
-              Redémarrer
+              {{ t('proxmox.restartButton') }}
             </button>
             <button
               type="button"
@@ -150,7 +150,7 @@
                 :size="16"
                 class="icon me-1"
               />
-              Arrêter
+              {{ t('proxmox.stopButton') }}
             </button>
           </template>
         </div>
@@ -163,7 +163,7 @@
               <div class="card card-sm h-100">
                 <div class="card-body">
                   <div class="subheader">
-                    CPU
+                    {{ t('proxmox.cpuColumn') }}
                   </div>
                   <div
                     class="h2 mt-2 mb-0"
@@ -172,7 +172,7 @@
                     {{ (guest.cpu_usage * 100).toFixed(1) }}%
                   </div>
                   <div class="text-secondary small">
-                    {{ guest.cpu_alloc }} vCPU alloués
+                    {{ t('proxmox.cpuAllocLabel', { n: guest.cpu_alloc }) }}
                   </div>
                 </div>
               </div>
@@ -181,7 +181,7 @@
               <div class="card card-sm h-100">
                 <div class="card-body">
                   <div class="subheader">
-                    RAM
+                    {{ t('proxmox.ramColumn') }}
                   </div>
                   <div
                     class="h2 mt-2 mb-0"
@@ -199,7 +199,7 @@
               <div class="card card-sm h-100">
                 <div class="card-body">
                   <div class="subheader">
-                    Disque
+                    {{ t('proxmox.diskColumn') }}
                   </div>
                   <div
                     class="h2 mt-2 mb-0"
@@ -217,7 +217,7 @@
               <div class="card card-sm h-100">
                 <div class="card-body">
                   <div class="subheader">
-                    IP
+                    {{ t('proxmox.ipColumn') }}
                   </div>
                   <div class="h2 mt-2 mb-0">
                     {{ guestPrimaryIp || '—' }}
@@ -226,7 +226,7 @@
                     href="#"
                     class="text-decoration-none small"
                     @click.prevent="showNetworkDetail = !showNetworkDetail"
-                  >{{ showNetworkDetail ? 'Masquer le détail réseau' : 'Voir le détail réseau' }}</a>
+                  >{{ showNetworkDetail ? t('proxmox.hideNetworkDetailLink') : t('proxmox.showNetworkDetailLink') }}</a>
                 </div>
               </div>
             </div>
@@ -238,17 +238,17 @@
           >
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Interfaces réseau
+                {{ t('proxmox.networkInterfacesTitle') }}
               </h3>
             </div>
             <div class="card-body">
               <span
                 v-if="guestNetworksLoading"
                 class="text-muted small"
-              >Chargement…</span>
+              >{{ t('proxmox.loadingLabel') }}</span>
               <EmptyState
                 v-else-if="guestNetworks.length === 0"
-                title="Aucune interface réseau détectée pour ce guest."
+                :title="t('proxmox.noNetworkInterfacesTitle')"
               />
               <div
                 v-else
@@ -277,17 +277,17 @@
             <div class="card-body d-flex align-items-center justify-content-between gap-2 flex-wrap">
               <div>
                 <div class="fw-medium">
-                  Domaines &amp; exposition
+                  {{ t('proxmox.domainsExposureTitle') }}
                 </div>
                 <div class="text-secondary small">
-                  Ce guest est lié à l'hôte {{ guestLink.host_hostname || guestLink.host_name }} — la corrélation domaine/IP se lit sur son onglet Exposition.
+                  {{ t('proxmox.guestExposureLinkedHint', { host: guestLink.host_hostname || guestLink.host_name }) }}
                 </div>
               </div>
               <router-link
                 :to="`/hosts/${guestLink.host_id}?tab=exposition`"
                 class="btn btn-sm btn-outline-primary"
               >
-                Voir la corrélation domaine/IP
+                {{ t('proxmox.viewDomainIpCorrelationButton') }}
               </router-link>
             </div>
           </div>
@@ -300,12 +300,12 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
               <h3 class="card-title mb-0">
-                Historique CPU / RAM
+                {{ t('proxmox.cpuRamHistoryTitle') }}
               </h3>
               <div
                 class="btn-group btn-group-sm guest-range-group"
                 role="group"
-                aria-label="Plage temporelle"
+                :aria-label="t('proxmox.timeRangeAriaLabel')"
               >
                 <button
                   v-for="h in [1, 6, 24, 168, 720]"
@@ -314,7 +314,7 @@
                   :class="hours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
                   @click="changeRange(h)"
                 >
-                  {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
+                  {{ h >= 24 ? (h / 24) + t('proxmox.daySuffix') : h + 'h' }}
                 </button>
               </div>
             </div>
@@ -337,7 +337,7 @@
                 v-else
                 class="h-100 d-flex align-items-center justify-content-center text-secondary"
               >
-                Aucune donnée
+                {{ t('proxmox.noChartDataText') }}
               </div>
             </div>
           </div>
@@ -358,6 +358,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle, IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
@@ -372,6 +373,7 @@ import { AsyncApexChart as ApexChart } from '../utils/apexChartTheme'
 
 const router = useRouter()
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const {
   guest,
@@ -449,14 +451,15 @@ const guestPrimaryIp = computed(() => {
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
-  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
+  const unitKeys = ['proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
   let i = 0
   let v = bytes
-  while (v >= 1024 && i < units.length - 1) {
+  while (v >= 1024 && i < unitKeys.length) {
     v /= 1024
     i++
   }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+  const unit = i === 0 ? 'B' : t(unitKeys[i - 1])
+  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
 }
 
 function formatUptime(seconds: number): string {
@@ -464,7 +467,7 @@ function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400)
   const h = Math.floor((seconds % 86400) / 3600)
   const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}j ${h}h`
+  if (d > 0) return `${d}${t('proxmox.daySuffix')} ${h}h`
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
 }
