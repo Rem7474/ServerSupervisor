@@ -425,6 +425,15 @@ onMounted(() => {
     navbarOpen.value = false
     openSectionKey.value = null
     userMenuOpen.value = false
+    // httpError is a one-shot "last actionable HTTP error" flag with no other
+    // path back to empty besides an explicit dismiss click or a later error
+    // overwriting it — without this it keeps showing a stale failure (e.g. a
+    // 502 from one page's API call) on every subsequent page the user visits,
+    // looking like it applies to whatever they're looking at now. Unlike
+    // serverUnreachable (a live connectivity flag, cleared by its own
+    // subscribeNetworkOk signal), a past request's error has nothing to do
+    // with the page navigated to next.
+    httpError.value = ''
   })
 })
 
@@ -534,14 +543,23 @@ onUnmounted(() => {
 }
 
 /* position: sticky; top: 0 now come from Tabler's own .sticky-top utility
-   (applied in the template) — only the stacking level (above .navbar/
-   .navbar-secondary, below .modal) needs overriding here. */
+   (applied in the template) — only the stacking level needs overriding here.
+   Must stay below .navbar-secondary's 1020 (not just below .navbar's 1030):
+   these alerts are siblings of the header, not descendants, so once
+   .navbar-secondary establishes its own stacking context (position + z-index,
+   see its own comment above), every one of its descendants — including its
+   "Réglages"/etc. dropdown menu at z-index 1050 — is composited as a single
+   unit capped at .navbar-secondary's own 1020 relative to these siblings.
+   These alerts used to sit at 1039/1040, i.e. *above* that whole capped unit,
+   so an open row-2 dropdown rendered underneath the alert banner instead of
+   over it. There is no equivalent conflict with .navbar (1030): these values
+   only need to clear .navbar-secondary, the lower of the two rows. */
 .app-network-alert {
-  z-index: 1040;
+  z-index: 1010;
 }
 
 .app-http-alert {
-  z-index: 1039;
+  z-index: 1009;
 }
 
 .user-menu {

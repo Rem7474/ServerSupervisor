@@ -121,6 +121,19 @@ describe('App.vue — connectivity/HTTP error banners', () => {
     expect(wrapper.find('.app-http-alert').exists()).toBe(false)
     wrapper.unmount()
   })
+
+  it('clears the HTTP error banner on navigation instead of leaving it shown on an unrelated page', async () => {
+    const { wrapper, router } = mountApp()
+
+    emitHttpError(502, 'Un service externe est injoignable')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.app-http-alert').exists()).toBe(true)
+
+    await router.push('/alerts')
+    await flushPromises()
+    expect(wrapper.find('.app-http-alert').exists()).toBe(false)
+    wrapper.unmount()
+  })
 })
 
 describe('App.vue — nav section active state', () => {
