@@ -112,29 +112,22 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 	// though the first command had already finished. ctx (execute()'s bounded
 	// per-command context) is cancelled the instant handleApt returns, so this
 	// goroutine gets its own independent, bounded context instead.
-	go refreshAptStatusDetached(s, cmd.Action)
-}
-
-// refreshAptStatusDetached resnapshots the full, CVE-enriched apt status
-// (security_updates/cve_list, not just the pending count) and pushes it
-// out-of-band via SendAptStatus — shared by the default apt branch above and
-// reportRunUUTerminal below, both of which already bundle a faster,
-// CVE-free count synchronously into their own CommandResult.AptStatus.
-func refreshAptStatusDetached(s *sender.Sender, action string) {
-	slog.Debug("collecting apt status with CVE extraction", "action", action)
-	collectCtx, cancel := context.WithTimeout(context.Background(), aptStatusRefreshTimeout)
-	apt, aptErr := collector.CollectAPT(collectCtx, true)
-	cancel()
-	if aptErr != nil {
-		slog.Warn("failed to collect apt status", "action", action, "err", aptErr)
-		return
-	}
-	slog.Debug("apt status collected", "packages", apt.PendingPackages, "security", apt.SecurityUpdates)
-	sendCtx, sendCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer sendCancel()
-	if err := s.SendAptStatus(sendCtx, apt); err != nil {
-		slog.Warn("failed to push apt status", "action", action, "err", err)
-	}
+	go func() {
+		slog.Debug("collecting apt status with CVE extraction", "action", cmd.Action)
+		collectCtx, cancel := context.WithTimeout(context.Background(), aptStatusRefreshTimeout)
+		apt, aptErr := collector.CollectAPT(collectCtx, true)
+		cancel()
+		if aptErr != nil {
+			slog.Warn("failed to collect apt status", "action", cmd.Action, "err", aptErr)
+			return
+		}
+		slog.Debug("apt status collected", "packages", apt.PendingPackages, "security", apt.SecurityUpdates)
+		sendCtx, sendCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer sendCancel()
+		if err := s.SendAptStatus(sendCtx, apt); err != nil {
+			slog.Warn("failed to push apt status", "action", cmd.Action, "err", err)
+		}
+	}()
 }
 
 func finaliseUUResult(err error, output string) (string, string) {
@@ -167,13 +160,17 @@ func reportUUTerminal(ctx context.Context, s *sender.Sender, cmd sender.PendingC
 // install/toggle/configure, a manual "Lancer maintenant" can itself install
 // pending upgrades, so it also bundles a fast, CVE-free CollectAPTFast()
 // package count — same synchronous treatment the default apt branch already
-// gives update/upgrade/full-upgrade/autoremove — and kicks off the same
-// detached CVE-enriched resnapshot. Without this, the pending-package KPI
-// depended entirely on the agent's next periodic report to catch up; worse,
-// that fallback never actually fired either, because CollectUnattendedUpgrades
-// above reads from the same run-log cursor (readNewUURuns) the periodic
-// report checks before deciding to refresh apt status — this command's own
-// call already consumes the "new run" the periodic report was waiting to see.
+// gives update/upgrade/full-upgrade/autoremove. Without this, the
+// pending-package KPI depended entirely on the agent's next periodic report
+// to catch up; worse, that fallback never actually fired either, because
+// CollectUnattendedUpgrades above reads from the same run-log cursor
+// (readNewUURuns) the periodic report checks before deciding to refresh apt
+// status — this command's own call already consumes the "new run" the
+// periodic report was waiting to see. Deliberately doesn't also kick off a
+// CVE-enriched detached resnapshot the way the default branch does: that
+// refresh is a slower, best-effort improvement to the security_updates/
+// cve_list detail already covered by the agent's regular periodic report,
+// not something this specific staleness bug needed.
 func reportRunUUTerminal(ctx context.Context, s *sender.Sender, cmd sender.PendingCommand, status, output string) {
 	uuStatus := collector.CollectUnattendedUpgrades()
 	fastStatus, fastErr := collector.CollectAPTFast(ctx)
@@ -189,5 +186,4 @@ func reportRunUUTerminal(ctx context.Context, s *sender.Sender, cmd sender.Pendi
 	}); err != nil {
 		slog.Warn("failed to report uu command result", "err", err)
 	}
-	go refreshAptStatusDetached(s, cmd.Action)
 }

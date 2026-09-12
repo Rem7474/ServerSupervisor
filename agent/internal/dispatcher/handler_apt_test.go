@@ -14,9 +14,7 @@ import (
 
 // fakeAgentServer records every /api/agent/command/result body posted to it,
 // so a test can inspect exactly what a handler reported without a real
-// ServerSupervisor server. /api/agent/apt-status is accepted but not
-// recorded — it's posted from handleApt's/reportRunUUTerminal's detached
-// goroutine, which this test doesn't wait on or assert against.
+// ServerSupervisor server.
 func fakeAgentServer(t *testing.T) (*httptest.Server, func() []map[string]any) {
 	t.Helper()
 	var mu sync.Mutex
