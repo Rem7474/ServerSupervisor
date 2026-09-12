@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
 )
@@ -27,5 +29,19 @@ func respondError(c *gin.Context, err error) {
 			body["params"] = e.Params
 		}
 	}
+	// Recorded on gin's own c.Errors for RequestLogger (internal/api/
+	// middleware.go) to attach to the access-log line: e.Message alone is a
+	// generic "internal server error" for an apperr.Internal (by design,
+	// hiding the cause from the client), and even for a non-hidden error
+	// (e.g. BadGateway) the access log otherwise only ever recorded
+	// status/method/path/latency — never *why* a request failed, which left
+	// a docker-logs-only operator with nothing to diagnose a 502 from an
+	// upstream dependency (Proxmox, SMTP, ntfy...) beyond the fact that it
+	// happened.
+	detail := e.Error()
+	if wrapped := errors.Unwrap(e); wrapped != nil {
+		detail = wrapped.Error()
+	}
+	_ = c.Error(errors.New(detail)) // return value is gin's own *gin.Error wrapper, nothing to check here
 	c.JSON(e.HTTPStatus, body)
 }
