@@ -234,6 +234,16 @@ func RequestLogger() gin.HandlerFunc {
 		if query != "" {
 			attrs = append(attrs, slog.String("query", query))
 		}
+		// respondError (internal/handlers/httperr.go) records the underlying
+		// error detail via c.Error — for an apperr.Internal that's the real
+		// cause behind the generic "internal server error" the client sees;
+		// for anything else (e.g. a Proxmox/SMTP/ntfy 502) it's simply the
+		// detail the access log never carried before. Only the last matters:
+		// a handler can only ever reach one respondError call per request.
+		if len(c.Errors) > 0 {
+			detail := strings.ReplaceAll(strings.ReplaceAll(c.Errors.Last().Error(), "\n", ""), "\r", "")
+			attrs = append(attrs, slog.String("error_detail", detail))
+		}
 		if status >= 500 {
 			slog.LogAttrs(c.Request.Context(), slog.LevelError, "request", toLogAttrs(attrs)...)
 		} else if status >= 400 {
