@@ -530,10 +530,10 @@ func scanMetricsSummary(rows *sql.Rows) ([]models.SystemMetricsSummary, error) {
 // installed, or installed into a schema outside search_path) is treated as
 // "not a hypertable" rather than propagated: every caller already has a
 // plain-table fallback, and the point of this check is precisely to avoid
-// ever issuing a hypertable-only function call (hypertable_approximate_row_
-// count, add/remove_retention_policy, ...) that would otherwise fail with a
-// noisy "function does not exist" at the Postgres log level on an install
-// where migration 064's hypertable conversion never ran (timescaledb wasn't
+// ever issuing a hypertable-only function call (approximate_row_count,
+// add/remove_retention_policy, ...) that would otherwise fail with a noisy
+// "function does not exist" at the Postgres log level on an install where
+// migration 064's hypertable conversion never ran (timescaledb wasn't
 // available at the time) or the extension has since become unreachable.
 func (db *DB) isHypertable(ctx context.Context, table string) bool {
 	var exists bool
@@ -557,7 +557,7 @@ func (db *DB) UpdateMetricsRetentionPolicy(ctx context.Context, days int) error 
 			continue
 		}
 		if _, err := db.conn.ExecContext(ctx,
-			`SELECT remove_retention_policy($1, if_not_exists => true)`, table); err != nil {
+			`SELECT remove_retention_policy($1::regclass, if_exists => true)`, table); err != nil {
 			return fmt.Errorf("remove retention policy for %s: %w", table, err)
 		}
 		if _, err := db.conn.ExecContext(ctx,
@@ -573,7 +573,7 @@ func (db *DB) CountMetrics(ctx context.Context) (int64, error) {
 	var count int64
 	if db.isHypertable(ctx, "system_metrics") {
 		if err := db.conn.QueryRowContext(ctx,
-			`SELECT * FROM hypertable_approximate_row_count('system_metrics')`).Scan(&count); err == nil {
+			`SELECT approximate_row_count('system_metrics'::regclass)`).Scan(&count); err == nil {
 			return count, nil
 		}
 	}
