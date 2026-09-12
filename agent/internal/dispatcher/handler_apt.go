@@ -57,7 +57,7 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 		reportRunning(ctx, s, cmd)
 		output, err := collector.RunUnattendedUpgrades(stream)
 		status, output := finaliseUUResult(err, output)
-		reportUUTerminal(ctx, s, cmd, status, output)
+		reportRunUUTerminal(ctx, s, cmd, status, output)
 		return
 	}
 
@@ -150,6 +150,38 @@ func reportUUTerminal(ctx context.Context, s *sender.Sender, cmd sender.PendingC
 		CommandID:          cmd.ID,
 		Status:             status,
 		Output:             output,
+		UnattendedUpgrades: uuStatus,
+	}); err != nil {
+		slog.Warn("failed to report uu command result", "err", err)
+	}
+}
+
+// reportRunUUTerminal is run_uu's own variant of reportUUTerminal: unlike
+// install/toggle/configure, a manual "Lancer maintenant" can itself install
+// pending upgrades, so it also bundles a fast, CVE-free CollectAPTFast()
+// package count — same synchronous treatment the default apt branch already
+// gives update/upgrade/full-upgrade/autoremove. Without this, the
+// pending-package KPI depended entirely on the agent's next periodic report
+// to catch up; worse, that fallback never actually fired either, because
+// CollectUnattendedUpgrades above reads from the same run-log cursor
+// (readNewUURuns) the periodic report checks before deciding to refresh apt
+// status — this command's own call already consumes the "new run" the
+// periodic report was waiting to see. Deliberately doesn't also kick off a
+// CVE-enriched detached resnapshot the way the default branch does: that
+// refresh is a slower, best-effort improvement to the security_updates/
+// cve_list detail already covered by the agent's regular periodic report,
+// not something this specific staleness bug needed.
+func reportRunUUTerminal(ctx context.Context, s *sender.Sender, cmd sender.PendingCommand, status, output string) {
+	uuStatus := collector.CollectUnattendedUpgrades()
+	fastStatus, fastErr := collector.CollectAPTFast(ctx)
+	if fastErr != nil {
+		slog.Warn("fast apt status collection failed", "action", cmd.Action, "err", fastErr)
+	}
+	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+		CommandID:          cmd.ID,
+		Status:             status,
+		Output:             output,
+		AptStatus:          fastStatus,
 		UnattendedUpgrades: uuStatus,
 	}); err != nil {
 		slog.Warn("failed to report uu command result", "err", err)
