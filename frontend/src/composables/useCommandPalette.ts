@@ -1,7 +1,7 @@
 import { ref, computed, onMounted, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { IconServer, IconBrandDocker, IconBell, IconWorld } from '@tabler/icons-vue'
+import { IconServer, IconBrandDocker, IconBell, IconWorld, IconDeviceDesktop } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { useHostsStore } from '../stores/hosts'
 import { useAlertRulesStore } from '../stores/alertRules'
@@ -10,6 +10,7 @@ import type { DockerContainer } from '../types/docker'
 import type { NetworkNPMEntry, NetworkProxmoxGuestIP } from '../types/network'
 import { visibleNavSections } from '../config/navigation'
 import { getAlertMetricMeta } from '../utils/alertMetrics'
+import { getEntityStateLabel } from '../utils/statusClasses'
 
 export interface PaletteResult {
   key: string
@@ -17,13 +18,14 @@ export interface PaletteResult {
   sublabel: string
   icon: Component
   to: string
-  group: 'navigation' | 'hosts' | 'containers' | 'alerts' | 'domains'
+  group: 'navigation' | 'hosts' | 'containers' | 'guests' | 'alerts' | 'domains'
 }
 
 export const PALETTE_GROUP_LABEL_KEYS: Record<PaletteResult['group'], string> = {
   navigation: 'common.commandPaletteGroupNavigation',
   hosts: 'common.commandPaletteGroupHosts',
   containers: 'common.commandPaletteGroupContainers',
+  guests: 'common.commandPaletteGroupGuests',
   alerts: 'common.commandPaletteGroupAlerts',
   domains: 'common.commandPaletteGroupDomains',
 }
@@ -181,6 +183,47 @@ export function useCommandPalette() {
       }))
   })
 
+  // Searches the same live Proxmox guest inventory domainResults below reads
+  // for its resolved chain (ensureIPInventoryLoaded, fired once from open())
+  // — but as a first-class result group, not just an enrichment of a
+  // matching NPM entry: a guest with no reverse-proxy domain pointing at it
+  // was previously unreachable from the palette at all. Matches name, VMID,
+  // any live IP, or a domain name of an NPM proxy host confirmed-resolved to
+  // this guest (the same matched_type/matched_id correlation domainResults
+  // itself relies on) — so "search a domain, land on the guest it points to"
+  // works from this group too, not only from a "Domaines" hit.
+  const guestResults = computed<PaletteResult[]>(() => {
+    const q = query.value.trim().toLowerCase()
+    if (!q) return []
+    return proxmoxGuestIPs.value
+      .map((g) => {
+        const domains = npmEntries.value
+          .filter((n) => n.matched_type === 'proxmox_guest' && n.matched_id === g.guest_id)
+          .flatMap((n) => n.domain_names || [])
+        return { guest: g, domains }
+      })
+      .filter(({ guest: g, domains }) =>
+        g.name?.toLowerCase().includes(q) ||
+        String(g.vmid).includes(q) ||
+        (g.ip_addresses || []).some((ip) => ip.includes(q)) ||
+        domains.some((d) => d.toLowerCase().includes(q))
+      )
+      .slice(0, MAX_RESULTS_PER_GROUP)
+      .map(({ guest: g, domains }) => {
+        let sublabel = `${g.node} · ${getEntityStateLabel(g.status)}`
+        if (g.host_name) sublabel += ` → ${g.host_name}`
+        if (domains.length) sublabel += ` · ${domains.join(', ')}`
+        return {
+          key: `guest:${g.guest_id}`,
+          label: g.name || `#${g.vmid}`,
+          sublabel,
+          icon: IconDeviceDesktop,
+          to: `/proxmox/guests/${g.guest_id}`,
+          group: 'guests' as const,
+        }
+      })
+  })
+
   // No per-rule route exists (editing happens via a modal on /alerts itself,
   // not a dedicated page) — every match deep-links to the Règles tab, where
   // the matched rule is still visible in the list to open from there.
@@ -255,6 +298,7 @@ export function useCommandPalette() {
     ...navResults.value,
     ...hostResults.value,
     ...containerResults.value,
+    ...guestResults.value,
     ...alertResults.value,
     ...domainResults.value,
   ])

@@ -146,6 +146,7 @@
   "commandPaletteGroupNavigation": "Navigation",
   "commandPaletteGroupHosts": "Hosts",
   "commandPaletteGroupContainers": "Containers",
+  "commandPaletteGroupGuests": "Proxmox VMs / Containers",
   "commandPaletteGroupAlerts": "Alerts",
   "commandPaletteGroupDomains": "Domains",
   "commandPaletteDisabledLabel": "Disabled",
