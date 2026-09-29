@@ -203,12 +203,12 @@ export function useAccount() {
 
   function switchToHistorique() {
     activeTab.value = 'historique'
-    if (!allCommands.value.length && !cmdsLoading.value) loadMyCommands()
+    if (!allCommands.value.length && !cmdsLoading.value) void loadMyCommands()
   }
 
   onMounted(() => {
-    loadProfile()
-    loadMyCommands()
+    void loadProfile()
+    void loadMyCommands()
   })
 
   onUnmounted(() => { closeStream() })
