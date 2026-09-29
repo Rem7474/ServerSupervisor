@@ -1,22 +1,26 @@
 <template>
   <CommandLogPanel
-    mode="custom"
+    :mode="terminal ? 'custom' : 'log'"
     :show="show"
-    :hide-fab="hideFab"
-    :title="t('proxmox.consoleTitle', { name: guestName || guestId })"
+    :command="command"
+    :empty-text="emptyText"
+    :clearable="clearable"
+    :title="terminal ? t('proxmox.consoleTitle', { name: guestName || guestId }) : logTitle"
     wrapper-class="side-panel side-panel-terminal"
     @close="handleClose"
     @open="$emit('open')"
+    @clear="$emit('clear')"
   >
     <template #title-suffix>
       <span
+        v-if="terminal"
         :class="statusBadgeClass"
         class="ms-2"
       >{{ statusLabel }}</span>
     </template>
     <template #header-actions>
       <button
-        v-if="status !== 'connecting' && status !== 'connected'"
+        v-if="terminal && status !== 'connecting' && status !== 'connected'"
         type="button"
         class="btn btn-sm btn-ghost-secondary"
         @click="connect"
@@ -145,20 +149,33 @@ import { useProxmoxConsole } from '../../composables/useProxmoxConsole'
 import { useStatusBadge } from '../../composables/useStatusBadge'
 import { useModalChrome } from '../../composables/useModalChrome'
 
+// One side panel hosts either this guest's terminal (`terminal`, the default)
+// or a command-output log (`terminal` false, fed by `command`), so a page that
+// offers both keeps a single panel and a single reopen button. `show` is the
+// panel's visibility whichever content it holds.
 const props = withDefaults(defineProps<{
   guestId: string
   guestName?: string
   show?: boolean
-  hideFab?: boolean
+  terminal?: boolean
+  command?: Record<string, unknown> | null
+  logTitle?: string
+  emptyText?: string
+  clearable?: boolean
 }>(), {
   guestName: '',
   show: false,
-  hideFab: false,
+  terminal: true,
+  command: null,
+  logTitle: '',
+  emptyText: '',
+  clearable: false,
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'open'): void
+  (e: 'clear'): void
 }>()
 
 const { t } = useI18n()
@@ -310,7 +327,7 @@ function connect(): void {
 // hides a static log). Reopening (the "Rouvrir" button, or the parent
 // re-showing the panel) starts a fresh session via connect().
 function handleClose(): void {
-  closeSocket()
+  if (props.terminal) closeSocket()
   emit('close')
 }
 
@@ -370,7 +387,9 @@ function teardownTerminal(): void {
   fitAddon = null
 }
 
-watch(() => props.show, (visible) => {
+const terminalVisible = computed(() => props.show && props.terminal)
+
+watch(terminalVisible, (visible) => {
   if (!visible) return
   if (!term) {
     void mountTerminal()

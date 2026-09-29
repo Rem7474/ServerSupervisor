@@ -80,8 +80,15 @@
       </div>
 
       <div class="card-body d-flex flex-column flex-fill p-0 console-body">
-        <slot v-if="mode === 'custom'" />
-        <template v-else>
+        <!-- v-show, not v-if: a hosted terminal (xterm) must survive a switch to
+             the log view and back, or its DOM node and scrollback are lost. -->
+        <div
+          v-show="mode === 'custom'"
+          class="d-flex flex-column flex-fill console-custom"
+        >
+          <slot />
+        </div>
+        <template v-if="mode === 'log'">
           <!-- Empty state -->
           <div
             v-if="!command"
@@ -172,7 +179,7 @@
 
   <!-- Floating reopen button -->
   <button
-    v-show="!show && !hideFab"
+    v-show="!show"
     type="button"
     class="btn btn-primary console-fab"
     @click="$emit('open')"
@@ -225,14 +232,12 @@ const props = withDefaults(defineProps<{
   // app shares the same card/header/FAB shell instead of each screen
   // inventing its own.
   mode?: 'log' | 'custom'
-  hideFab?: boolean
 }>(), {
   command: null,
   show: false,
   wrapperClass: '',
   clearable: false,
   mode: 'log',
-  hideFab: false,
 })
 
 defineEmits<{
@@ -319,6 +324,10 @@ function download(): void {
 
 <style scoped>
 .console-body {
+  min-height: 0;
+}
+
+.console-custom {
   min-height: 0;
 }
 

@@ -696,20 +696,27 @@
         </EntityTabShell>
       </div>
 
+      <!-- One side panel for both consoles: once the host has an LXC console the
+           panel is the ProxmoxConsole wrapper, which shows either the terminal
+           or the live command log, so there is a single panel and reopen button. -->
       <ProxmoxConsoleLazy
         v-if="hasLxcConsole && hasOpenedLxcConsole"
         :guest-id="proxmoxLink?.guest_id"
         :guest-name="proxmoxLink?.guest_name || ''"
-        :show="showLxcConsole"
-        :hide-fab="sharedConsoleFab"
-        @close="showLxcConsole = false"
-        @open="showLxcConsole = true"
+        :show="showLxcConsole || showConsole"
+        :terminal="consoleKind === 'lxc'"
+        :command="(liveCommand as any)"
+        :log-title="t('host.consoleLive')"
+        :empty-text="t('host.noActiveConsole')"
+        :clearable="true"
+        @open="reopenConsole"
+        @close="closeActiveConsole"
+        @clear="clearConsoleOutput"
       />
-
       <CommandLogPanel
+        v-else
         :command="(liveCommand as any)"
         :show="showConsole"
-        :hide-fab="sharedConsoleFab"
         :title="t('host.consoleLive')"
         :empty-text="t('host.noActiveConsole')"
         wrapper-class="side-panel"
@@ -718,19 +725,6 @@
         @close="closeConsoleAndStream"
         @clear="clearConsoleOutput"
       />
-
-      <button
-        v-if="sharedConsoleFab && !showConsole && !showLxcConsole"
-        type="button"
-        class="btn btn-primary console-fab"
-        @click="reopenLastConsole"
-      >
-        <IconChevronRight
-          :size="24"
-          class="icon me-1"
-        />
-        {{ t('host.consoleTabLabel') }}
-      </button>
     </div>
 
     <!-- Add permission modal -->
@@ -825,7 +819,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { IconChevronRight, IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
+import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import { useModalChrome } from '../composables/useModalChrome'
 import RelativeTime from '../components/RelativeTime.vue'
@@ -1025,31 +1019,30 @@ const hasLxcConsole = computed(() => {
 const ProxmoxConsoleLazy = defineAsyncComponent(() => import('../components/proxmox/ProxmoxConsole.vue'))
 const showLxcConsole = ref(false)
 const hasOpenedLxcConsole = ref(false)
-// Once the LXC console exists, both panels would render the same fixed reopen
-// button on top of each other; one shared button reopens whichever was open last.
-const sharedConsoleFab = computed(() => hasLxcConsole.value && hasOpenedLxcConsole.value)
-const lastConsole = ref<'live' | 'lxc'>('live')
-// Only one console panel is shown at a time: opening one takes over the slot
-// of the other instead of squeezing both side by side.
+// A single panel holds either console; `consoleKind` is which one it shows
+// (and which one the reopen button brings back). Opening one closes the other.
+const consoleKind = ref<'live' | 'lxc'>('live')
 watch(showConsole, (open) => {
   if (!open) return
-  lastConsole.value = 'live'
+  consoleKind.value = 'live'
   showLxcConsole.value = false
 })
-watch(showLxcConsole, (open) => {
-  if (!open) return
-  lastConsole.value = 'lxc'
-  showConsole.value = false
-})
-
-function reopenLastConsole(): void {
-  if (lastConsole.value === 'lxc') showLxcConsole.value = true
-  else showConsole.value = true
-}
 
 function openLxcConsole(): void {
   hasOpenedLxcConsole.value = true
+  consoleKind.value = 'lxc'
   showLxcConsole.value = true
+  showConsole.value = false
+}
+
+function reopenConsole(): void {
+  if (consoleKind.value === 'lxc') showLxcConsole.value = true
+  else showConsole.value = true
+}
+
+function closeActiveConsole(): void {
+  if (consoleKind.value === 'lxc') showLxcConsole.value = false
+  else closeConsoleAndStream()
 }
 
 watch(activeTab, (tab) => {
@@ -1125,13 +1118,6 @@ const hostTabs = computed<EntityTab[]>(() => {
 </script>
 
 <style scoped>
-.console-fab {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  z-index: 100;
-}
-
 :deep(.side-panel) {
   transition: width 0.3s ease-in-out;
   overflow: hidden;

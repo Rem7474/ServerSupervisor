@@ -9,10 +9,11 @@ vi.mock('../components/proxmox/ProxmoxConsole.vue', () => ({
   __esModule: true,
   default: defineComponent({
     name: 'ProxmoxConsoleStub',
-    props: { guestId: { type: String, default: '' }, guestName: { type: String, default: '' }, show: Boolean },
-    emits: ['close', 'open'],
+    props: { guestId: { type: String, default: '' }, guestName: { type: String, default: '' }, show: Boolean, terminal: { type: Boolean, default: true } },
+    emits: ['close', 'open', 'clear'],
     setup(props, { emit }) {
-      return () => h('div', { class: 'console-stub', 'data-guest': props.guestId, 'data-show': String(props.show) }, [
+      return () => h('div', { class: 'console-stub', 'data-guest': props.guestId, 'data-show': String(props.show), 'data-terminal': String(props.terminal) }, [
+        h('button', { class: 'console-stub-reopen', onClick: () => emit('open') }),
         h('button', { class: 'console-stub-close', onClick: () => emit('close') }),
       ])
     },
@@ -351,33 +352,36 @@ describe('HostDetailView — tabs', () => {
     expect(wrapper.find('.console-stub').attributes('data-show')).toBe('true')
   })
 
-  it('shows one shared console button once the LXC console was opened, and reopens the last-used panel', async () => {
+  it('hosts the live log and the LXC terminal in one panel, and reopens whichever was used last', async () => {
     const api = baseUseHostDetail()
     api.auth = reactive({ isAdmin: true, username: 'alice' })
     api.proxmoxLink = ref({ status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', guest_name: 'ct-web', node_name: 'pve1', vmid: 101 })
     useHostDetailMock.mockReturnValue(api)
     const wrapper = mount(HostDetailView, { global: { stubs } })
-    expect(wrapper.find('button.console-fab').exists()).toBe(false)
 
     api.activeTab.value = 'console'
     await nextTick()
     await flushPromises()
-    expect(wrapper.find('button.console-fab').exists()).toBe(false)
+    expect(wrapper.findAll('.console-stub')).toHaveLength(1)
+    expect(wrapper.find('.console-stub').attributes('data-terminal')).toBe('true')
 
     await wrapper.find('.console-stub-close').trigger('click')
-    expect(wrapper.findAll('button.console-fab')).toHaveLength(1)
-    await wrapper.find('button.console-fab').trigger('click')
+    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('false')
+    await wrapper.find('.console-stub-reopen').trigger('click')
     expect(wrapper.find('.console-stub').attributes('data-show')).toBe('true')
+    expect(wrapper.find('.console-stub').attributes('data-terminal')).toBe('true')
 
     await wrapper.find('.console-stub-close').trigger('click')
     api.showConsole.value = true
     await nextTick()
-    expect(wrapper.find('button.console-fab').exists()).toBe(false)
+    expect(wrapper.findAll('.console-stub')).toHaveLength(1)
+    expect(wrapper.find('.console-stub').attributes('data-terminal')).toBe('false')
+    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('true')
+
     api.showConsole.value = false
     await nextTick()
-    await wrapper.find('button.console-fab').trigger('click')
+    await wrapper.find('.console-stub-reopen').trigger('click')
     expect(api.showConsole.value).toBe(true)
-    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('false')
   })
 
   it('replaces an already-open live console when the LXC console opens, and vice versa', async () => {
@@ -392,12 +396,12 @@ describe('HostDetailView — tabs', () => {
     api.activeTab.value = 'console'
     await nextTick()
     await flushPromises()
-    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('true')
+    expect(wrapper.find('.console-stub').attributes('data-terminal')).toBe('true')
     expect(api.showConsole.value).toBe(false)
 
     api.showConsole.value = true
     await nextTick()
-    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('false')
+    expect(wrapper.find('.console-stub').attributes('data-terminal')).toBe('false')
   })
 
   it('does not mount a console for a non-admin even if the Console tab key is active', async () => {
