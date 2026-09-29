@@ -139,11 +139,17 @@ describe('CommandLogPanel', () => {
       expect(wrapper.find('.my-terminal').exists()).toBe(true)
     })
   })
-  it('hides the FAB reopen button when hideFab is set, so two panels do not stack their buttons', async () => {
-    const wrapper = mount(CommandLogPanel, { props: { show: false, title: 'Console Live', hideFab: true } })
-    expect(wrapper.find('.console-fab').attributes('style')).toContain('display: none')
-    await wrapper.setProps({ hideFab: false })
-    expect(wrapper.find('.console-fab').attributes('style') ?? '').not.toContain('display: none')
+  it('keeps the custom slot mounted when the mode switches to log', async () => {
+    const wrapper = mount(CommandLogPanel, {
+      props: { show: true, mode: 'custom' },
+      slots: { default: '<div class="hosted-terminal" />' },
+    })
+    const terminal = wrapper.find('.hosted-terminal').element
+    await wrapper.setProps({ mode: 'log' })
+    expect(wrapper.find('.hosted-terminal').element).toBe(terminal)
+    expect(wrapper.find('.console-custom').attributes('style')).toContain('display: none')
+    await wrapper.setProps({ mode: 'custom' })
+    expect(wrapper.find('.console-custom').attributes('style') ?? '').not.toContain('display: none')
   })
 
 })

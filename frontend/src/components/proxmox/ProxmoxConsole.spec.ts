@@ -114,6 +114,29 @@ describe('ProxmoxConsole', () => {
     wrapper.unmount()
   })
 
+  it('shows a command log without starting the terminal when terminal is false, and closing it leaves the PVE session alone', async () => {
+    const wrapper = mount(ProxmoxConsole, {
+      props: {
+        guestId: 'g1',
+        show: true,
+        terminal: false,
+        logTitle: 'Console Live',
+        command: { host_name: 'web1', module: 'apt', action: 'update', status: 'completed', output: 'done' },
+      },
+    })
+    await flushPromises()
+
+    expect(openMock).not.toHaveBeenCalled()
+    expect(termOpenMock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Console Live')
+    expect(wrapper.text()).toContain('done')
+
+    await wrapper.find('button[title="Fermer"]').trigger('click')
+    expect(closeMock).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
   it('a plain show-prop toggle (not the close button) does not close the socket', async () => {
     statusRef.value = 'connected'
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
