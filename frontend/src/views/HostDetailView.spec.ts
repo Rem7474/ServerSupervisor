@@ -351,6 +351,35 @@ describe('HostDetailView — tabs', () => {
     expect(wrapper.find('.console-stub').attributes('data-show')).toBe('true')
   })
 
+  it('shows one shared console button once the LXC console was opened, and reopens the last-used panel', async () => {
+    const api = baseUseHostDetail()
+    api.auth = reactive({ isAdmin: true, username: 'alice' })
+    api.proxmoxLink = ref({ status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', guest_name: 'ct-web', node_name: 'pve1', vmid: 101 })
+    useHostDetailMock.mockReturnValue(api)
+    const wrapper = mount(HostDetailView, { global: { stubs } })
+    expect(wrapper.find('button.console-fab').exists()).toBe(false)
+
+    api.activeTab.value = 'console'
+    await nextTick()
+    await flushPromises()
+    expect(wrapper.find('button.console-fab').exists()).toBe(false)
+
+    await wrapper.find('.console-stub-close').trigger('click')
+    expect(wrapper.findAll('button.console-fab')).toHaveLength(1)
+    await wrapper.find('button.console-fab').trigger('click')
+    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('true')
+
+    await wrapper.find('.console-stub-close').trigger('click')
+    api.showConsole.value = true
+    await nextTick()
+    expect(wrapper.find('button.console-fab').exists()).toBe(false)
+    api.showConsole.value = false
+    await nextTick()
+    await wrapper.find('button.console-fab').trigger('click')
+    expect(api.showConsole.value).toBe(true)
+    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('false')
+  })
+
   it('does not mount a console for a non-admin even if the Console tab key is active', async () => {
     const api = baseUseHostDetail()
     api.proxmoxLink = ref({ status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', node_name: 'pve1', vmid: 101 })

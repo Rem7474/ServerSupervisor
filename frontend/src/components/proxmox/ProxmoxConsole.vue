@@ -2,6 +2,7 @@
   <CommandLogPanel
     mode="custom"
     :show="show"
+    :hide-fab="hideFab"
     :title="t('proxmox.consoleTitle', { name: guestName || guestId })"
     wrapper-class="side-panel side-panel-terminal"
     @close="handleClose"
@@ -148,9 +149,11 @@ const props = withDefaults(defineProps<{
   guestId: string
   guestName?: string
   show?: boolean
+  hideFab?: boolean
 }>(), {
   guestName: '',
   show: false,
+  hideFab: false,
 })
 
 const emit = defineEmits<{
