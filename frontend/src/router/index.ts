@@ -86,9 +86,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/account/security',
-    name: 'AccountSecurity',
-    component: () => import('../views/AccountSecurityView.vue'),
-    meta: { requiresAuth: true },
+    redirect: { path: '/account', query: { tab: 'connexions' } },
   },
   {
     path: '/users',

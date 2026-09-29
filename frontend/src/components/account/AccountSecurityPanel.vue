@@ -1,33 +1,5 @@
 <template>
   <div>
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-      <div>
-        <div class="page-pretitle">
-          <router-link
-            to="/"
-            class="text-decoration-none"
-          >
-            {{ t('account.dashboardBreadcrumb') }}
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <router-link
-            to="/account"
-            class="text-decoration-none"
-          >
-            {{ t('common.myAccount') }}
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <span>{{ t('account.accountSecurityBreadcrumb') }}</span>
-        </div>
-        <h2 class="page-title">
-          {{ t('account.mfaAuthTitle') }}
-        </h2>
-        <div class="text-secondary">
-          {{ t('account.securityConfigSubtitle') }}
-        </div>
-      </div>
-    </div>
-
     <!-- MFA card -->
     <div
       class="card mb-4"
@@ -413,10 +385,10 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { IconClock, IconCopy, IconDeviceDesktop, IconKey, IconX } from '@tabler/icons-vue'
-import ConnectionsTable from '../components/common/ConnectionsTable.vue'
-import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import { useAccountSecurity } from '../composables/useAccountSecurity'
-import { useDateFormatter } from '../composables/useDateFormatter'
+import ConnectionsTable from '../common/ConnectionsTable.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
+import { useAccountSecurity } from '../../composables/useAccountSecurity'
+import { useDateFormatter } from '../../composables/useDateFormatter'
 
 const { t } = useI18n()
 const { formatExactDate, formatRelativeTime } = useDateFormatter()

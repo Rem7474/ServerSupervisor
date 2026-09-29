@@ -26,7 +26,8 @@ export function useAccount() {
   const auth = useAuthStore()
 
   const signal = useAbortSignal()
-  const activeTab = ref('profil')
+  const requestedTab = new URLSearchParams(window.location.search).get('tab')
+  const activeTab = ref(requestedTab === 'connexions' ? 'connexions' : 'profil')
   const showConsole = ref(false)
 
   const profile = ref<Profile | null>(null)
