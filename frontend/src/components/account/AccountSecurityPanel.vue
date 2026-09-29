@@ -103,8 +103,12 @@
                   </button>
                 </div>
                 <div class="mb-3">
-                  <label class="form-label">{{ t('account.totpCodeLabel') }}</label>
+                  <label
+                    class="form-label"
+                    for="mfa-verify-code"
+                  >{{ t('account.totpCodeLabel') }}</label>
                   <input
+                    id="mfa-verify-code"
                     v-model="verifyCode"
                     type="text"
                     class="form-control"
@@ -154,8 +158,12 @@
               {{ t('account.disableMfaButton') }}
             </div>
             <div class="mb-3">
-              <label class="form-label">{{ t('account.passwordLabel') }}</label>
+              <label
+                class="form-label"
+                for="mfa-disable-password"
+              >{{ t('account.passwordLabel') }}</label>
               <input
+                id="mfa-disable-password"
                 v-model="disablePassword"
                 type="password"
                 class="form-control"
@@ -235,6 +243,13 @@
           v-else-if="webauthnCredentials.length"
           class="table table-vcenter mb-3"
         >
+          <thead class="visually-hidden">
+            <tr>
+              <th>{{ t('account.passkeyColumnName') }}</th>
+              <th>{{ t('account.passkeyColumnDetails') }}</th>
+              <th>{{ t('account.passkeyColumnActions') }}</th>
+            </tr>
+          </thead>
           <tbody>
             <tr
               v-for="cred in webauthnCredentials"
@@ -275,8 +290,12 @@
           v-if="addingPasskey"
           class="border rounded p-3"
         >
-          <label class="form-label">{{ t('account.keyNameLabel') }}</label>
+          <label
+            class="form-label"
+            for="passkey-name"
+          >{{ t('account.keyNameLabel') }}</label>
           <input
+            id="passkey-name"
             v-model="newPasskeyName"
             type="text"
             class="form-control mb-3"
