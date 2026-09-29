@@ -297,6 +297,22 @@ describe('HostDetailView — tabs', () => {
     const wrapper = mount(HostDetailView, { global: { stubs } })
     expect(wrapper.find('.nav-tabs').text()).not.toContain('Système')
   })
+
+  it('shows the Console tab only for an admin on a host confirmed-linked to an LXC guest', () => {
+    const linked = { status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', guest_name: 'ct-web', node_name: 'pve1', vmid: 101 }
+    const tabsFor = (isAdmin: boolean, link: AnyRecord | null) => {
+      const api = baseUseHostDetail()
+      api.auth = reactive({ isAdmin, username: 'alice' })
+      api.proxmoxLink = ref(link)
+      useHostDetailMock.mockReturnValue(api)
+      return mount(HostDetailView, { global: { stubs } }).find('.nav-tabs').text()
+    }
+    expect(tabsFor(true, linked)).toContain('Console')
+    expect(tabsFor(false, linked)).not.toContain('Console')
+    expect(tabsFor(true, { ...linked, status: 'suggested' })).not.toContain('Console')
+    expect(tabsFor(true, { ...linked, guest_type: 'qemu' })).not.toContain('Console')
+    expect(tabsFor(true, null)).not.toContain('Console')
+  })
 })
 
 describe('HostDetailView — permissions tab', () => {

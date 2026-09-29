@@ -670,8 +670,40 @@
               </div>
             </div>
           </template>
+          <template #console>
+            <div class="card">
+              <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                  <div class="fw-medium">
+                    {{ proxmoxLink?.guest_name || `VMID ${proxmoxLink?.vmid}` }}
+                    <span class="text-secondary small">({{ proxmoxLink?.node_name }})</span>
+                  </div>
+                  <div class="text-secondary small">
+                    {{ t('host.consoleTabDescription') }}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-outline-primary"
+                  :disabled="showLxcConsole"
+                  @click="openLxcConsole"
+                >
+                  {{ t('host.consoleTabOpen') }}
+                </button>
+              </div>
+            </div>
+          </template>
         </EntityTabShell>
       </div>
+
+      <ProxmoxConsoleLazy
+        v-if="hasLxcConsole && hasOpenedLxcConsole"
+        :guest-id="proxmoxLink?.guest_id"
+        :guest-name="proxmoxLink?.guest_name || ''"
+        :show="showLxcConsole"
+        @close="showLxcConsole = false"
+        @open="showLxcConsole = true"
+      />
 
       <CommandLogPanel
         :command="(liveCommand as any)"
@@ -776,7 +808,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
@@ -969,6 +1001,25 @@ const hostAlertsLink = computed(() => ({
 // `exposition`/`taches-personnalisees`/`planifiees` each emit a count the
 // view renders as a badge or a KPI, so deferring them would blank that count
 // until first visit.
+// The PVE console (termproxy) exists for LXC only, needs an admin session, and
+// is addressed by the Proxmox guest a confirmed link points at.
+const hasLxcConsole = computed(() => {
+  const link = proxmoxLink.value
+  return !!auth.isAdmin && !!link && link.status === 'confirmed' && link.guest_type === 'lxc'
+})
+const ProxmoxConsoleLazy = defineAsyncComponent(() => import('../components/proxmox/ProxmoxConsole.vue'))
+const showLxcConsole = ref(false)
+const hasOpenedLxcConsole = ref(false)
+
+function openLxcConsole(): void {
+  hasOpenedLxcConsole.value = true
+  showLxcConsole.value = true
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'console' && hasLxcConsole.value && !hasOpenedLxcConsole.value) openLxcConsole()
+})
+
 const hostTabs = computed<EntityTab[]>(() => {
   const securityUpdates = aptStatus.value?.security_updates || 0
   const pendingPackages = aptStatus.value?.pending_packages || 0
@@ -1029,6 +1080,9 @@ const hostTabs = computed<EntityTab[]>(() => {
     badges: tasksCount.value ? [{ value: tasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
   })
   tabs.push({ key: 'timeline', label: 'Timeline', lazy: true })
+  if (hasLxcConsole.value) {
+    tabs.push({ key: 'console', label: t('host.consoleTabLabel') })
+  }
 
   return tabs
 })
