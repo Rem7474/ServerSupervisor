@@ -380,6 +380,26 @@ describe('HostDetailView — tabs', () => {
     expect(wrapper.find('.console-stub').attributes('data-show')).toBe('false')
   })
 
+  it('replaces an already-open live console when the LXC console opens, and vice versa', async () => {
+    const api = baseUseHostDetail()
+    api.auth = reactive({ isAdmin: true, username: 'alice' })
+    api.proxmoxLink = ref({ status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', guest_name: 'ct-web', node_name: 'pve1', vmid: 101 })
+    useHostDetailMock.mockReturnValue(api)
+    const wrapper = mount(HostDetailView, { global: { stubs } })
+
+    api.showConsole.value = true
+    await nextTick()
+    api.activeTab.value = 'console'
+    await nextTick()
+    await flushPromises()
+    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('true')
+    expect(api.showConsole.value).toBe(false)
+
+    api.showConsole.value = true
+    await nextTick()
+    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('false')
+  })
+
   it('does not mount a console for a non-admin even if the Console tab key is active', async () => {
     const api = baseUseHostDetail()
     api.proxmoxLink = ref({ status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', node_name: 'pve1', vmid: 101 })

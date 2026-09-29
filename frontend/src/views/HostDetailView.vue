@@ -1029,8 +1029,18 @@ const hasOpenedLxcConsole = ref(false)
 // button on top of each other; one shared button reopens whichever was open last.
 const sharedConsoleFab = computed(() => hasLxcConsole.value && hasOpenedLxcConsole.value)
 const lastConsole = ref<'live' | 'lxc'>('live')
-watch(showConsole, (open) => { if (open) lastConsole.value = 'live' })
-watch(showLxcConsole, (open) => { if (open) lastConsole.value = 'lxc' })
+// Only one console panel is shown at a time: opening one takes over the slot
+// of the other instead of squeezing both side by side.
+watch(showConsole, (open) => {
+  if (!open) return
+  lastConsole.value = 'live'
+  showLxcConsole.value = false
+})
+watch(showLxcConsole, (open) => {
+  if (!open) return
+  lastConsole.value = 'lxc'
+  showConsole.value = false
+})
 
 function reopenLastConsole(): void {
   if (lastConsole.value === 'lxc') showLxcConsole.value = true
