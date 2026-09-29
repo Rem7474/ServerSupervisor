@@ -113,6 +113,27 @@ body {
   overflow-x: hidden;
 }
 
+/* Tabler 1.6 ships a neutral (chroma-0) gray scale; the app's dark theme is
+   built on the blue-tinted scale of earlier Tabler releases. */
+:root {
+  --tblr-gray-50: #f9fafb;
+  --tblr-gray-100: #f3f4f6;
+  --tblr-gray-200: #e5e7eb;
+  --tblr-gray-300: #d1d5db;
+  --tblr-gray-400: #9ca3af;
+  --tblr-gray-500: #6b7280;
+  --tblr-gray-600: #4b5563;
+  --tblr-gray-700: #374151;
+  --tblr-gray-800: #1f2937;
+  --tblr-gray-900: #111827;
+  --tblr-gray-950: #030712;
+}
+
+[data-bs-theme="dark"] {
+  --tblr-border-color: #2e3c51;
+  --tblr-border-color-translucent: rgba(72, 110, 149, 0.14);
+}
+
 :root {
   --z-index-toast: 1090;
   --z-index-popover: 1070;
