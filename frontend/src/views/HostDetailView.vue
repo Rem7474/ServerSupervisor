@@ -701,6 +701,7 @@
         :guest-id="proxmoxLink?.guest_id"
         :guest-name="proxmoxLink?.guest_name || ''"
         :show="showLxcConsole"
+        :hide-fab="sharedConsoleFab"
         @close="showLxcConsole = false"
         @open="showLxcConsole = true"
       />
@@ -708,6 +709,7 @@
       <CommandLogPanel
         :command="(liveCommand as any)"
         :show="showConsole"
+        :hide-fab="sharedConsoleFab"
         :title="t('host.consoleLive')"
         :empty-text="t('host.noActiveConsole')"
         wrapper-class="side-panel"
@@ -716,6 +718,19 @@
         @close="closeConsoleAndStream"
         @clear="clearConsoleOutput"
       />
+
+      <button
+        v-if="sharedConsoleFab && !showConsole && !showLxcConsole"
+        type="button"
+        class="btn btn-primary console-fab"
+        @click="reopenLastConsole"
+      >
+        <IconChevronRight
+          :size="24"
+          class="icon me-1"
+        />
+        {{ t('host.consoleTabLabel') }}
+      </button>
     </div>
 
     <!-- Add permission modal -->
@@ -810,7 +825,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
+import { IconChevronRight, IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import { useModalChrome } from '../composables/useModalChrome'
 import RelativeTime from '../components/RelativeTime.vue'
@@ -1010,6 +1025,17 @@ const hasLxcConsole = computed(() => {
 const ProxmoxConsoleLazy = defineAsyncComponent(() => import('../components/proxmox/ProxmoxConsole.vue'))
 const showLxcConsole = ref(false)
 const hasOpenedLxcConsole = ref(false)
+// Once the LXC console exists, both panels would render the same fixed reopen
+// button on top of each other; one shared button reopens whichever was open last.
+const sharedConsoleFab = computed(() => hasLxcConsole.value && hasOpenedLxcConsole.value)
+const lastConsole = ref<'live' | 'lxc'>('live')
+watch(showConsole, (open) => { if (open) lastConsole.value = 'live' })
+watch(showLxcConsole, (open) => { if (open) lastConsole.value = 'lxc' })
+
+function reopenLastConsole(): void {
+  if (lastConsole.value === 'lxc') showLxcConsole.value = true
+  else showConsole.value = true
+}
 
 function openLxcConsole(): void {
   hasOpenedLxcConsole.value = true
@@ -1089,6 +1115,13 @@ const hostTabs = computed<EntityTab[]>(() => {
 </script>
 
 <style scoped>
+.console-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 100;
+}
+
 :deep(.side-panel) {
   transition: width 0.3s ease-in-out;
   overflow: hidden;
