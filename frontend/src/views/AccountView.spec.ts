@@ -4,14 +4,17 @@ import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../i18n'
 import { useAuthStore } from '../stores/auth'
 
-const { getProfile, getCommandsHistory, changePassword } = vi.hoisted(() => ({
+const { getProfile, getCommandsHistory, changePassword, getMFAStatus, getLoginEvents, listWebAuthnCredentials } = vi.hoisted(() => ({
+  getMFAStatus: vi.fn(),
+  getLoginEvents: vi.fn(),
+  listWebAuthnCredentials: vi.fn(),
   getProfile: vi.fn(),
   getCommandsHistory: vi.fn(),
   changePassword: vi.fn(),
 }))
 
 vi.mock('../api', () => ({
-  default: { getProfile, getCommandsHistory, changePassword },
+  default: { getProfile, getCommandsHistory, changePassword, getMFAStatus, getLoginEvents, listWebAuthnCredentials },
   getApiErrorMessage: (e: unknown, fallback?: string) =>
     (e as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback || String(e),
 }))
@@ -32,6 +35,9 @@ describe('AccountView', () => {
     useAuthStore().setAuth({ role: 'admin', username: 'admin' } as never, 'admin')
     getProfile.mockResolvedValue({ data: { username: 'admin', role: 'admin', mfa_enabled: false, created_at: '2026-01-01T00:00:00Z' } })
     getCommandsHistory.mockResolvedValue({ data: { commands: [] } })
+    getMFAStatus.mockResolvedValue({ data: { mfa_enabled: false } })
+    getLoginEvents.mockResolvedValue({ data: { events: [] } })
+    listWebAuthnCredentials.mockResolvedValue({ data: { credentials: [] } })
   })
 
   it('renders the translated header, tabs and profile card', async () => {
@@ -83,6 +89,30 @@ describe('AccountView', () => {
     expect(wrapper.text()).toContain('Commande')
     expect(wrapper.text()).toContain('Durée')
     expect(wrapper.text()).toContain('Aucune activité récente')
+  })
+
+  it('shows the security panel inside the tab strip when the Connexions tab is selected', async () => {
+    const wrapper = mount(AccountView, mountOpts)
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Authentification multi-facteur')
+
+    await wrapper.findAll('button.nav-link')[2].trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('button.nav-link')[2].classes()).toContain('active')
+    expect(wrapper.findAll('button.nav-link')).toHaveLength(3)
+    expect(wrapper.text()).toContain('Authentification multi-facteur')
+    expect(wrapper.text()).toContain('Historique de connexion')
+  })
+
+  it('opens the Connexions tab from the profile MFA button', async () => {
+    const wrapper = mount(AccountView, mountOpts)
+    await flushPromises()
+
+    await wrapper.findAll('button.btn-outline-secondary').find((b) => b.text() === 'Gérer le MFA du compte')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('button.nav-link')[2].classes()).toContain('active')
   })
 
   it('translates to English when the locale is switched', async () => {

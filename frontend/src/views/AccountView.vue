@@ -65,12 +65,14 @@
         </button>
       </li>
       <li class="nav-item">
-        <router-link
-          to="/account/security"
+        <button
+          type="button"
           class="nav-link"
+          :class="{ active: activeTab === 'connexions' }"
+          @click="activeTab = 'connexions'"
         >
           {{ t('account.connectionsTab') }}
-        </router-link>
+        </button>
       </li>
     </ul>
 
@@ -156,12 +158,13 @@
                   {{ profile?.mfa_enabled ? t('account.activeWord') : t('account.inactiveWord') }}
                 </span>
               </div>
-              <router-link
-                to="/account/security"
+              <button
+                type="button"
                 class="btn btn-outline-secondary w-100"
+                @click="activeTab = 'connexions'"
               >
                 {{ t('account.manageMfaButton') }}
-              </router-link>
+              </button>
             </div>
           </div>
         </div>
@@ -400,12 +403,16 @@
         @open="showConsole = true"
       />
     </div>
+
+    <!-- ── Onglet Connexions ── -->
+    <AccountSecurityPanel v-if="activeTab === 'connexions'" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
+import AccountSecurityPanel from '../components/account/AccountSecurityPanel.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'

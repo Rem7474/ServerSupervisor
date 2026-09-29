@@ -81,7 +81,7 @@ const props = withDefaults(defineProps<{
   events?: LoginEvent[]
   loading?: boolean
   // Audit's admin-wide view lists events across every user and needs the
-  // extra column; the account-scoped views (AccountView, AccountSecurityView)
+  // extra column; the account-scoped views (AccountView, AccountSecurityPanel)
   // only ever show the current user's own events.
   showUsername?: boolean
 }>(), {
