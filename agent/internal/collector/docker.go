@@ -376,6 +376,11 @@ func formatDuration(d time.Duration) string {
 }
 
 func parseImageTag(fullImage string) (image, tag string) {
+	// A pinned reference is repo[:tag]@sha256:<hex>; the digest's own colon
+	// must not be mistaken for the tag separator.
+	if at := strings.Index(fullImage, "@"); at >= 0 {
+		fullImage = fullImage[:at]
+	}
 	// Handle images with registry prefix (e.g., ghcr.io/org/image:tag)
 	lastColon := strings.LastIndex(fullImage, ":")
 	if lastColon == -1 || strings.Contains(fullImage[lastColon:], "/") {

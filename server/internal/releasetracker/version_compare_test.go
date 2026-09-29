@@ -133,6 +133,24 @@ func TestResolveContainerVersion(t *testing.T) {
 			want:     "v1.2.3",
 		},
 		{
+			name:     "numeric major tag is kept as is",
+			imageTag: "9",
+			labels:   map[string]string{"org.opencontainers.image.version": "9.9.9"},
+			want:     "9",
+		},
+		{
+			name:     "moving channel tag resolves to the OCI version label",
+			imageTag: "release",
+			labels:   map[string]string{"org.opencontainers.image.version": "v3.2.2"},
+			want:     "v3.2.2",
+		},
+		{
+			name:     "moving channel tag without any label stays the tag",
+			imageTag: "release",
+			labels:   nil,
+			want:     "release",
+		},
+		{
 			name:     "latest falls back to OCI version label",
 			imageTag: "latest",
 			labels:   map[string]string{"org.opencontainers.image.version": "2.4.6"},
