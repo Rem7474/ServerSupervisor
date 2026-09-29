@@ -1,10 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { ref, reactive, computed } from 'vue'
+import { mount, flushPromises } from '@vue/test-utils'
+import { ref, reactive, computed, defineComponent, h, nextTick } from 'vue'
 import { setLocale } from '../i18n'
 
 const { addToast } = vi.hoisted(() => ({ addToast: vi.fn() }))
 vi.mock('../composables/useGlobalToast', () => ({ addToast }))
+vi.mock('../components/proxmox/ProxmoxConsole.vue', () => ({
+  __esModule: true,
+  default: defineComponent({
+    name: 'ProxmoxConsoleStub',
+    props: { guestId: { type: String, default: '' }, guestName: { type: String, default: '' }, show: Boolean },
+    emits: ['close', 'open'],
+    setup(props, { emit }) {
+      return () => h('div', { class: 'console-stub', 'data-guest': props.guestId, 'data-show': String(props.show) }, [
+        h('button', { class: 'console-stub-close', onClick: () => emit('close') }),
+      ])
+    },
+  }),
+}))
 
 // Mirrors useHostDetail.ts's own local AnyRecord — the real composable
 // keeps these fields untyped (WS-fed JSON), so the mock does too.
@@ -296,6 +309,57 @@ describe('HostDetailView — tabs', () => {
     useHostDetailMock.mockReturnValue(api)
     const wrapper = mount(HostDetailView, { global: { stubs } })
     expect(wrapper.find('.nav-tabs').text()).not.toContain('Système')
+  })
+
+  it('shows the Console tab only for an admin on a host confirmed-linked to an LXC guest', () => {
+    const linked = { status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', guest_name: 'ct-web', node_name: 'pve1', vmid: 101 }
+    const tabsFor = (isAdmin: boolean, link: AnyRecord | null) => {
+      const api = baseUseHostDetail()
+      api.auth = reactive({ isAdmin, username: 'alice' })
+      api.proxmoxLink = ref(link)
+      useHostDetailMock.mockReturnValue(api)
+      return mount(HostDetailView, { global: { stubs } }).find('.nav-tabs').text()
+    }
+    expect(tabsFor(true, linked)).toContain('Console')
+    expect(tabsFor(false, linked)).not.toContain('Console')
+    expect(tabsFor(true, { ...linked, status: 'suggested' })).not.toContain('Console')
+    expect(tabsFor(true, { ...linked, guest_type: 'qemu' })).not.toContain('Console')
+    expect(tabsFor(true, null)).not.toContain('Console')
+  })
+
+  it('opens the linked guest console when the Console tab is selected, and reopens it from the button after a close', async () => {
+    const api = baseUseHostDetail()
+    api.auth = reactive({ isAdmin: true, username: 'alice' })
+    api.proxmoxLink = ref({ status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', guest_name: 'ct-web', node_name: 'pve1', vmid: 101 })
+    useHostDetailMock.mockReturnValue(api)
+    const wrapper = mount(HostDetailView, { global: { stubs } })
+    expect(wrapper.find('.console-stub').exists()).toBe(false)
+
+    api.activeTab.value = 'console'
+    await nextTick()
+    await flushPromises()
+    const panel = wrapper.find('.console-stub')
+    expect(panel.attributes('data-guest')).toBe('g1')
+    expect(panel.attributes('data-show')).toBe('true')
+
+    await wrapper.find('.console-stub-close').trigger('click')
+    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('false')
+
+    const openButton = wrapper.findAll('button').find((b) => b.text() === 'Ouvrir la console')!
+    expect(openButton.attributes('disabled')).toBeUndefined()
+    await openButton.trigger('click')
+    expect(wrapper.find('.console-stub').attributes('data-show')).toBe('true')
+  })
+
+  it('does not mount a console for a non-admin even if the Console tab key is active', async () => {
+    const api = baseUseHostDetail()
+    api.proxmoxLink = ref({ status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', node_name: 'pve1', vmid: 101 })
+    useHostDetailMock.mockReturnValue(api)
+    const wrapper = mount(HostDetailView, { global: { stubs } })
+    api.activeTab.value = 'console'
+    await nextTick()
+    await flushPromises()
+    expect(wrapper.find('.console-stub').exists()).toBe(false)
   })
 })
 

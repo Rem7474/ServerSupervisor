@@ -262,6 +262,10 @@ func (c *Client) OpenLXCConsole(ctx context.Context, node string, vmid int, pveU
 		_ = conn.Close()
 		return nil, fmt.Errorf("clear handshake read deadline: %w", err)
 	}
+	if err := conn.SetWriteDeadline(time.Time{}); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("clear handshake write deadline: %w", err)
+	}
 
 	return &TermSession{conn: conn}, nil
 }

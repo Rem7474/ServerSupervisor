@@ -102,7 +102,7 @@ html {
    job. */
 @media (min-width: 992px) {
   .side-panel.side-panel-terminal {
-    height: calc(var(--console-vh, 100vh) - 2rem);
+    height: min(calc(var(--console-vh, 100vh) - 2rem), 45rem);
   }
 }
 
