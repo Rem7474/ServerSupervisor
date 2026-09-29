@@ -4,11 +4,23 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log/slog"
+	"net/mail"
 	"net/smtp"
 	"strings"
 
 	"github.com/serversupervisor/server/internal/config"
 )
+
+// envelopeAddress returns the bare address for an SMTP MAIL FROM / RCPT TO
+// command. Control characters are stripped first so a value can never smuggle
+// extra SMTP commands, then the result must parse as a single RFC 5322 address.
+func envelopeAddress(value string) (string, error) {
+	addr, err := mail.ParseAddress(sanitizeHeader(value))
+	if err != nil {
+		return "", fmt.Errorf("invalid email address: %w", err)
+	}
+	return addr.Address, nil
+}
 
 func sanitizeHeader(value string) string {
 	// Remove CR, LF, and other control characters to prevent header injection.
@@ -36,6 +48,17 @@ func (n *notifier) SendSMTP(cfg *config.Config, from, to, subject, body string) 
 	if cfg.SMTPHost == "" || cfg.SMTPPort == 0 {
 		slog.Error("notify: SMTP host/port not configured")
 		return fmt.Errorf("SMTP not configured")
+	}
+
+	envFrom, err := envelopeAddress(from)
+	if err != nil {
+		slog.Error("notify: SMTP sender address rejected", slog.Any("err", err))
+		return err
+	}
+	envTo, err := envelopeAddress(to)
+	if err != nil {
+		slog.Error("notify: SMTP recipient address rejected", slog.Any("err", err))
+		return err
 	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, cfg.SMTPPort)
@@ -79,11 +102,11 @@ func (n *notifier) SendSMTP(cfg *config.Config, from, to, subject, body string) 
 			return err
 		}
 	}
-	if err := c.Mail(from); err != nil {
+	if err := c.Mail(envFrom); err != nil {
 		slog.Error("notify: SMTP MAIL FROM failed", slog.Any("err", err))
 		return err
 	}
-	if err := c.Rcpt(to); err != nil {
+	if err := c.Rcpt(envTo); err != nil {
 		slog.Error("notify: SMTP RCPT TO failed", slog.Any("err", err))
 		return err
 	}
