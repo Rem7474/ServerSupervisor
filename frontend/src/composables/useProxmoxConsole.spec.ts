@@ -51,6 +51,8 @@ class FakeWebSocket {
 // Minimal fake standing in for an xterm.js Terminal — just enough surface
 // (onData/write) for the composable to bind to.
 class FakeTerminal {
+  cols = 100
+  rows = 30
   written: (string | Uint8Array)[] = []
   private handler: ((data: string) => void) | null = null
 
@@ -98,6 +100,7 @@ describe('useProxmoxConsole', () => {
     open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
     const socket = FakeWebSocket.instances[0]
     socket.open()
+    socket.sent.length = 0 // drop the size announced on open
 
     term.type('ls -la\n')
 
@@ -112,6 +115,7 @@ describe('useProxmoxConsole', () => {
     })
     const socket = FakeWebSocket.instances[0]
     socket.open()
+    socket.sent.length = 0 // drop the size announced on open
 
     term.type('c')
     term.type('x')
@@ -125,6 +129,7 @@ describe('useProxmoxConsole', () => {
     open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
     const socket = FakeWebSocket.instances[0]
     socket.open()
+    socket.sent.length = 0 // drop the size announced on open
 
     sendInput('\u0003')
 
@@ -171,9 +176,21 @@ describe('useProxmoxConsole', () => {
     const socket = FakeWebSocket.instances[0]
     socket.open()
 
+    socket.sent.length = 0
     resize(120, 40)
 
     expect(socket.sent).toEqual([JSON.stringify({ type: 'resize', cols: 120, rows: 40 })])
+  })
+
+  it('announces the terminal size as soon as the socket opens', () => {
+    const { open } = useProxmoxConsole()
+    const term = new FakeTerminal()
+    open('guest-1', term as unknown as import('@xterm/xterm').Terminal)
+    const socket = FakeWebSocket.instances[0]
+
+    socket.open()
+
+    expect(socket.sent).toEqual([JSON.stringify({ type: 'resize', cols: 100, rows: 30 })])
   })
 
   it('surfaces a console_error control message without writing it to the terminal', () => {

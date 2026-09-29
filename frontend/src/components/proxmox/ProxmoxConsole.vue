@@ -283,6 +283,18 @@ function sendArrow(sequence: string): void {
   ctrlArmed.value = false
 }
 
+// xterm.js turns Ctrl+V into a literal ^V for the shell and Ctrl+C into ^C,
+// so neither pastes nor copies. Returning false hands the key back to the
+// browser: Ctrl+V then fires a native paste event, and Ctrl+C with a
+// selection copies it. Without a selection Ctrl+C stays the interrupt key.
+function handleKeyEvent(e: KeyboardEvent): boolean {
+  if (e.type !== 'keydown' || !e.ctrlKey || e.altKey || e.metaKey) return true
+  const key = e.key.toLowerCase()
+  if (key === 'v') return false
+  if (key === 'c' && term?.hasSelection()) return false
+  return true
+}
+
 function connect(): void {
   if (!term) return
   ctrlArmed.value = false
@@ -337,6 +349,7 @@ async function mountTerminal(): Promise<void> {
   fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
   term.open(containerEl.value)
+  term.attachCustomKeyEventHandler(handleKeyEvent)
   scheduleFit()
 
   connect()
