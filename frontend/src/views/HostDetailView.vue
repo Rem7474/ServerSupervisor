@@ -708,6 +708,7 @@
       <CommandLogPanel
         :command="(liveCommand as any)"
         :show="showConsole"
+        :hide-fab="hasLxcConsole && hasOpenedLxcConsole"
         :title="t('host.consoleLive')"
         :empty-text="t('host.noActiveConsole')"
         wrapper-class="side-panel"

@@ -139,4 +139,9 @@ describe('CommandLogPanel', () => {
       expect(wrapper.find('.my-terminal').exists()).toBe(true)
     })
   })
+  it('hides the FAB reopen button when hideFab is set, so two panels do not stack their buttons', () => {
+    const wrapper = mount(CommandLogPanel, { props: { show: false, title: 'Console Live', hideFab: true } })
+    expect(wrapper.find('.console-fab').isVisible()).toBe(false)
+  })
+
 })

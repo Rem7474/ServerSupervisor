@@ -172,7 +172,7 @@
 
   <!-- Floating reopen button -->
   <button
-    v-show="!show"
+    v-show="!show && !hideFab"
     type="button"
     class="btn btn-primary console-fab"
     @click="$emit('open')"
@@ -225,12 +225,14 @@ const props = withDefaults(defineProps<{
   // app shares the same card/header/FAB shell instead of each screen
   // inventing its own.
   mode?: 'log' | 'custom'
+  hideFab?: boolean
 }>(), {
   command: null,
   show: false,
   wrapperClass: '',
   clearable: false,
   mode: 'log',
+  hideFab: false,
 })
 
 defineEmits<{
