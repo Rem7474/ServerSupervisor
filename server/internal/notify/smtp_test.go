@@ -116,3 +116,12 @@ func TestSendSMTP_RejectsInjectedRecipientBeforeConnecting(t *testing.T) {
 		t.Fatalf("err = %v, want an invalid email address error", err)
 	}
 }
+
+func TestSendSMTP_RejectsInvalidSender(t *testing.T) {
+	cfg := &config.Config{SMTPHost: "127.0.0.1", SMTPPort: 1}
+
+	err := New().SendSMTP(cfg, "not an address", "ops@example.com", "s", "b")
+	if err == nil || !strings.Contains(err.Error(), "invalid email address") {
+		t.Fatalf("err = %v, want an invalid email address error", err)
+	}
+}
