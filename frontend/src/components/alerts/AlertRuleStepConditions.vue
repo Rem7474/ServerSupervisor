@@ -476,6 +476,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import EmptyState from '../EmptyState.vue'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
+import { formatDateTimeSeconds } from '../../utils/formatters'
 
 interface TestResultRow {
   host_id: string
@@ -505,7 +506,7 @@ const emit = defineEmits<{
   (e: 'update:form', value: AlertRuleFormData): void
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 type Severity = 'warn' | 'crit'
 
@@ -629,7 +630,6 @@ function formatTestValue(value: number): string {
 }
 
 function formatDate(dateStr?: string): string {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString(locale.value)
+  return formatDateTimeSeconds(dateStr, '')
 }
 </script>

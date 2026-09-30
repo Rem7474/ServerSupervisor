@@ -6,6 +6,8 @@ import {
   formatDate,
   formatDateLong,
   formatDateTime,
+  formatDateTimeSeconds,
+  formatTime,
   formatDurationSecs,
   formatNumber,
   formatUptime,
@@ -36,6 +38,12 @@ describe('formatters', () => {
     expect(formatUptime(90061)).toBe('1d 1h')
     // Sub-day uptimes carry no localized unit.
     expect(formatUptime(4200)).toBe('1h 10m')
+    expect(formatUptime(600)).toBe('10m')
+  })
+
+  it('formatUptime treats a zero/missing uptime as not reported', () => {
+    expect(formatUptime(0)).toBe('N/A')
+    expect(formatUptime(undefined, '—')).toBe('—')
   })
 
   describe('locale-sensitive formatting', () => {
@@ -53,6 +61,25 @@ describe('formatters', () => {
       expect(formatDateLong(dt)).toContain('septembre')
       setLocale('en')
       expect(formatDateLong(dt)).toContain('September')
+    })
+
+    it('formatDateTimeSeconds keeps the seconds and survives bad input', () => {
+      expect(formatDateTimeSeconds(dt)).toMatch(/:00$/)
+      expect(formatDateTimeSeconds('not a date')).toBe('not a date')
+      expect(formatDateTimeSeconds(null)).toBe('-')
+      expect(formatDateTimeSeconds('', '')).toBe('')
+      expect(formatDateTimeSeconds(0)).not.toBe('-')
+    })
+
+    it('formatTime follows the UI locale, not the browser one', () => {
+      expect(formatTime(dt)).not.toMatch(/[AP]M/)
+      expect(formatTime(dt, true).split(':')).toHaveLength(3)
+      setLocale('en')
+      expect(formatTime(dt)).toMatch(/[AP]M/)
+    })
+
+    it('formatDateTime honours a custom empty value', () => {
+      expect(formatDateTime(undefined, '—')).toBe('—')
     })
 
     it('formatDateTime switches to a 12-hour clock in English', () => {

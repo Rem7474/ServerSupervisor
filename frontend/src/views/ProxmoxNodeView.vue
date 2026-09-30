@@ -191,7 +191,7 @@
                 {{ t('proxmox.uptimeLabel') }}
               </div>
               <div class="h3 mb-0">
-                {{ formatUptime(node.uptime) }}
+                {{ formatUptime(node.uptime, '—') }}
               </div>
             </div>
 
@@ -575,9 +575,10 @@ import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue
 import { useProxmoxNode } from '../composables/useProxmoxNode'
 import { useModalChrome } from '../composables/useModalChrome'
 import { getMetricColorClass, getTemperatureColorClass } from '../utils/metricColor'
+import { formatDateTime, formatUptime } from '../utils/formatters'
 
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const {
   node,
@@ -740,19 +741,8 @@ function formatBytes(bytes: number | undefined): string {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
 }
 
-function formatUptime(seconds: number | undefined): string {
-  if (!seconds) return '—'
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}${t('proxmox.daySuffix')} ${h}h`
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
-
 function formatDate(iso: string | undefined): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '—')
 }
 </script>
 

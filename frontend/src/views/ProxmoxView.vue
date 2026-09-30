@@ -492,9 +492,10 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useProxmox } from '../composables/useProxmox'
 import { getMetricColorClass } from '../utils/metricColor'
 import type { ProxmoxNode } from '../types/proxmox'
+import { formatDateTime } from '../utils/formatters'
 
 const auth = useAuthStore()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const {
   summary,
@@ -559,8 +560,7 @@ function formatBytes(bytes: number | undefined): string {
 }
 
 function formatDate(iso: string | undefined): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '—')
 }
 </script>
 

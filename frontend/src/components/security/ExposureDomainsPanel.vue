@@ -33,7 +33,7 @@
                 {{ t('security.requestsPeriodLabel', { period: periodLabel }) }}
               </div>
               <div class="h3 mb-0">
-                {{ exposure.total_requests.toLocaleString(locale) }}
+                {{ formatNumber(exposure.total_requests) }}
               </div>
             </div>
           </div>
@@ -48,7 +48,7 @@
                 class="h3 mb-0"
                 :class="exposure.total_suspicious_requests > 0 ? 'text-warning' : ''"
               >
-                {{ exposure.total_suspicious_requests.toLocaleString(locale) }}
+                {{ formatNumber(exposure.total_suspicious_requests) }}
               </div>
             </div>
           </div>
@@ -63,7 +63,7 @@
                 class="h3 mb-0"
                 :class="exposure.total_blocked_requests > 0 ? 'text-danger' : ''"
               >
-                {{ exposure.total_blocked_requests.toLocaleString(locale) }}
+                {{ formatNumber(exposure.total_blocked_requests) }}
               </div>
             </div>
           </div>
@@ -168,22 +168,22 @@
                 >—</span>
               </td>
               <td class="text-end">
-                {{ row.d.requests.toLocaleString(locale) }}
+                {{ formatNumber(row.d.requests) }}
               </td>
               <td class="text-end">
                 {{ formatBytes(row.d.bytes) }}
               </td>
               <td class="text-end text-muted">
-                {{ row.d.errors_4xx.toLocaleString(locale) }} / {{ row.d.errors_5xx.toLocaleString(locale) }}
+                {{ formatNumber(row.d.errors_4xx) }} / {{ formatNumber(row.d.errors_5xx) }}
               </td>
               <td class="text-end">
                 <span :class="row.d.suspicious_requests > 0 ? 'text-warning fw-medium' : 'text-muted'">
-                  {{ row.d.suspicious_requests.toLocaleString(locale) }}
+                  {{ formatNumber(row.d.suspicious_requests) }}
                 </span>
               </td>
               <td class="text-end">
                 <span :class="row.d.blocked_requests > 0 ? 'text-danger fw-medium' : 'text-muted'">
-                  {{ row.d.blocked_requests.toLocaleString(locale) }}
+                  {{ formatNumber(row.d.blocked_requests) }}
                 </span>
               </td>
             </tr>
@@ -228,7 +228,7 @@ import { useSslCertificates } from '../../composables/useSslCertificates'
 import type { HostExposure, HostExposedDomain } from '../../types/host'
 import type { UptimeProbe } from '../../types/uptime'
 import type { SSLCertificate } from '../../types/ssl'
-import { formatBytes, formatDateTime } from '../../utils/formatters'
+import { formatBytes, formatDateTime, formatNumber } from '../../utils/formatters'
 
 const props = defineProps<{
   exposure: HostExposure | null
@@ -243,7 +243,7 @@ const props = defineProps<{
   subjectLabel: string
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const domainModal = useDomainDetails()
 
 function openDomain(domain: string): void {

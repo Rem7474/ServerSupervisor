@@ -18,6 +18,7 @@ import dayjs from '../utils/dayjs'
 import { useReactiveApexChartPalette } from '../utils/apexChartTheme'
 import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
 import { getMetricColorClass } from '../utils/metricColor'
+import { formatUptime } from '../utils/formatters'
 
 interface DashboardCveSummary {
   critical_count?: number
@@ -447,14 +448,6 @@ export function useDashboard() {
     } finally {
       aptLoading.value = ''
     }
-  }
-
-  function formatUptime(seconds: number | null | undefined) {
-    if (seconds == null) return 'N/A'
-    const days = Math.floor(seconds / 86400)
-    const hours = Math.floor((seconds % 86400) / 3600)
-    if (days > 0) return `${days}j ${hours}h`
-    return `${hours}h ${Math.floor((seconds % 3600) / 60)}m`
   }
 
   // A 0 CPU/RAM reading means "no metrics yet" (the agent never reports a

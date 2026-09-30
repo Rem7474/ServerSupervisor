@@ -463,6 +463,7 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { DomainDetailsFilterKey, DomainDetailsSortKey } from '../../composables/useDomainDetails'
 import { httpStatusClass } from '../../utils/statusClasses'
+import { formatDateTimeSeconds } from '../../utils/formatters'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for the ad-hoc GetDomainDetails aggregate (no Go model)
 type AnyRecord = Record<string, any>
@@ -532,9 +533,7 @@ function formatBytes(bytes: number): string {
 }
 
 function formatDate(v: string): string {
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return v || '-'
-  return d.toLocaleString()
+  return formatDateTimeSeconds(v)
 }
 
 </script>

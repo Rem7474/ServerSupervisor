@@ -5,6 +5,7 @@ import apiClient, { getApiErrorMessage } from '../api'
 import { isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import { i18n } from '../i18n'
+import { formatNumber } from '../utils/formatters'
 
 export function useSettings() {
   const route = useRoute()
@@ -114,11 +115,6 @@ export function useSettings() {
   const cleaningAuditLogs = ref(false)
   const auditCleanMessage = ref('')
   const auditCleanSuccess = ref(false)
-
-  function formatNumber(n: number | undefined): string {
-    if (!n) return '0'
-    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-  }
 
   async function fetchSettings(): Promise<void> {
     try {
