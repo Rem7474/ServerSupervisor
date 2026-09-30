@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../i18n'
 
 const { getReleaseTracker, getHosts, getReleaseTrackerVersionHistory, getReleaseTrackerExecutions } = vi.hoisted(() => ({
@@ -41,6 +42,7 @@ function baseTracker(overrides: Record<string, unknown> = {}) {
 
 describe('ReleaseTrackerDetailView', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     setLocale('fr')
     getReleaseTracker.mockResolvedValue({ data: { tracker: baseTracker(), executions: [] } })

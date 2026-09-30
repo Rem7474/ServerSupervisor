@@ -422,5 +422,7 @@
   "markAllReadError": "Erreur lors du marquage",
   "incidentAcknowledgedToast": "Incident pris en charge",
   "incidentAcknowledgeError": "Impossible d'accuser réception",
-  "templateApplyFailedCount": "{failed} échec | {failed} échecs"
+  "templateApplyFailedCount": "{failed} échec | {failed} échecs",
+  "notificationBellEnableHint": "Recevoir les alertes même quand l’onglet est fermé",
+  "notificationBellEnableButton": "Activer"
 }

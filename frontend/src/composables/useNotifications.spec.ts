@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { setLocale } from '../i18n'
 
@@ -71,5 +71,31 @@ describe('useNotifications — resolveIncident toasts', () => {
     await api.resolveIncident({ id: 'alert:1', type: 'alert_incident' } as never)
 
     expect(toasts.some((t) => t.message === 'Incident resolved' && t.type === 'success')).toBe(true)
+  })
+})
+
+describe('useNotifications — browser notification permission', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    getNotifications.mockResolvedValue({ data: { notifications: [], read_at: null } })
+  })
+
+  it('does not prompt for permission when the app loads', async () => {
+    const { api } = await mountHost()
+    await flushPromises()
+    expect(Notification.requestPermission).not.toHaveBeenCalled()
+    expect(api.browserPermission.value).toBe('default')
+  })
+
+  it('prompts only when the user asks, and remembers the answer', async () => {
+    vi.mocked(Notification.requestPermission).mockResolvedValueOnce('denied')
+    const { api } = await mountHost()
+    await flushPromises()
+
+    await api.enableBrowserNotifications()
+
+    expect(Notification.requestPermission).toHaveBeenCalledTimes(1)
+    expect(api.browserPermission.value).toBe('denied')
   })
 })

@@ -213,7 +213,7 @@
             <label class="form-label">{{ t('runbooks.stepsOrderedLabel') }}</label>
             <div
               v-for="(step, index) in form.steps"
-              :key="index"
+              :key="stepKey(step)"
               class="border rounded p-2 mb-2"
             >
               <div class="row g-2 align-items-end">
@@ -569,4 +569,18 @@ function formatDate(dateStr: string | undefined | null): string {
 onMounted(async () => {
   await Promise.all([loadRunbooks(), hostsStore.fetchHosts()])
 })
+
+// Stable per-step key, so removing a step doesn't hand the next step's row
+// (and its DispatchStepEditor state) to a different step. Kept outside the
+// step objects so the saved payload is unchanged.
+const stepKeys = new WeakMap<object, number>()
+let nextStepKey = 0
+function stepKey(step: object): number {
+  let key = stepKeys.get(step)
+  if (key === undefined) {
+    key = ++nextStepKey
+    stepKeys.set(step, key)
+  }
+  return key
+}
 </script>
