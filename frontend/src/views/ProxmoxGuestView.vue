@@ -370,7 +370,7 @@ import { useProxmoxGuest } from '../composables/useProxmoxGuest'
 import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses'
 import { getMetricColorClass } from '../utils/metricColor'
 import { AsyncApexChart as ApexChart } from '../utils/apexChartTheme'
-import { formatUptime } from '../utils/formatters'
+import { formatUptime, formatBytes as formatBytesShared } from '../utils/formatters'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -449,20 +449,9 @@ const guestPrimaryIp = computed(() => {
   return ''
 })
 
-
 function formatBytes(bytes: number): string {
-  if (!bytes) return '0 B'
-  const unitKeys = ['proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
-  let i = 0
-  let v = bytes
-  while (v >= 1024 && i < unitKeys.length) {
-    v /= 1024
-    i++
-  }
-  const unit = i === 0 ? 'B' : t(unitKeys[i - 1])
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
+  return formatBytesShared(bytes || 0)
 }
-
 </script>
 
 <style scoped>

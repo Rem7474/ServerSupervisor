@@ -492,7 +492,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useProxmox } from '../composables/useProxmox'
 import { getMetricColorClass } from '../utils/metricColor'
 import type { ProxmoxNode } from '../types/proxmox'
-import { formatDateTime } from '../utils/formatters'
+import { formatDateTime, formatBytes as formatBytesShared } from '../utils/formatters'
 
 const auth = useAuthStore()
 const { t } = useI18n()
@@ -550,13 +550,7 @@ function ramTextColor(used: number, total: number): string {
 }
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes) return '0 B'
-  const unitKeys = ['proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
-  let i = 0
-  let v = bytes
-  while (v >= 1024 && i < unitKeys.length) { v /= 1024; i++ }
-  const unit = i === 0 ? 'B' : t(unitKeys[i - 1])
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
+  return formatBytesShared(bytes || 0)
 }
 
 function formatDate(iso: string | undefined): string {

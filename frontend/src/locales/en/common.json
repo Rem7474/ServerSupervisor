@@ -1,4 +1,10 @@
 {
+  "byteUnitB": "B",
+  "byteUnitKB": "KB",
+  "byteUnitMB": "MB",
+  "byteUnitGB": "GB",
+  "byteUnitTB": "TB",
+  "byteUnitPB": "PB",
   "never": "Never",
   "justNow": "just now",
   "secondsAgo": "{n}s ago",

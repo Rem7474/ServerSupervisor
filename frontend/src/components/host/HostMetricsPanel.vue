@@ -177,7 +177,7 @@ import dayjs from '../../utils/dayjs'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
 import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, formatChartTimestamp, chartTimeDetail } from '../../utils/chartTimeAxis'
 import { getMetricColorClass, getTemperatureColorClass } from '../../utils/metricColor'
-import { formatUptime } from '../../utils/formatters'
+import { formatUptime, formatBytes as formatBytesShared } from '../../utils/formatters'
 
 interface MetricsData {
   cpu_cores?: number
@@ -315,11 +315,7 @@ function buildMemChartOptions(): ApexOptions {
 }
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  return formatBytesShared(bytes || 0)
 }
 
 function cpuColor(pct: number | undefined): string {

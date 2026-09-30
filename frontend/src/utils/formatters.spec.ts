@@ -18,10 +18,21 @@ describe('formatters', () => {
     setLocale('fr')
   })
 
-  it('formatBytes', () => {
-    expect(formatBytes(0)).toBe('0 B')
-    expect(formatBytes(1024)).toBe('1.0 KB')
+  it('formatBytes uses translated units and the locale decimal separator', () => {
+    expect(formatBytes(0)).toBe('0 o')
+    expect(formatBytes(512)).toBe('512 o')
+    expect(formatBytes(1536)).toBe('1,5 Ko')
+    expect(formatBytes(5 * 1024 ** 3)).toBe('5,0 Go')
+    expect(formatBytes(2 * 1024 ** 5)).toBe('2,0 Po')
+    setLocale('en')
+    expect(formatBytes(1536)).toBe('1.5 KB')
+    expect(formatBytes(1023)).toBe('1023 B')
+  })
+
+  it('formatBytes shows the empty value only for a missing count', () => {
     expect(formatBytes(null)).toBe('-')
+    expect(formatBytes(undefined, '—')).toBe('—')
+    expect(formatBytes(Number.NaN)).toBe('-')
   })
 
   it('formatDurationSecs', () => {
