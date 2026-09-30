@@ -185,5 +185,7 @@
   "unknownDomainLabel": "(unknown)",
   "worldMapHitsCount": "{count} hit | {count} hits",
   "humanSeriesLabel": "Human",
-  "botSeriesLabel": "Bot/scan"
+  "botSeriesLabel": "Bot/scan",
+  "period7dLabel": "7d",
+  "period30dLabel": "30d"
 }

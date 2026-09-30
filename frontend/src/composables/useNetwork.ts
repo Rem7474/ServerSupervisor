@@ -10,6 +10,7 @@ import type { WSNetworkSnapshot } from '../types/ws'
 import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../types/network'
 import type { NetworkGuestNode, NetworkService } from '../components/network/buildNetworkElements'
 import { formatBytes as formatBytesShared } from '../utils/formatters'
+import { buildDiscoveredPortsByHost, ensureHostPortConfig, type HostPortEntry } from '../utils/networkPorts'
 
 export function useNetwork() {
   const hosts = ref<any[]>([])
@@ -27,7 +28,7 @@ export function useNetwork() {
   const internetLabel = ref('Internet')
   const internetIp = ref('')
   const networkServices = ref<any[]>([])
-  const hostPortConfig = ref<any[]>([])
+  const hostPortConfig = ref<HostPortEntry[]>([])
   const nodePositions = ref<Record<string, { x: number; y: number }>>({})
   const topologyConfigLoaded = ref(false)
   const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -130,33 +131,7 @@ export function useNetwork() {
   }
 
   // ─── Computed: port discovery ──────────────────────────────────────────────
-  const discoveredPortsByHost = computed<Record<string, any[]>>(() => {
-    const map: Record<string, any[]> = {}
-    for (const container of containers.value) {
-      const mappings = container.port_mappings || []
-      for (const mapping of mappings) {
-        const hostId = container.host_id
-        if (!hostId) continue
-        const hostPort = mapping.host_port || 0
-        const containerPort = mapping.container_port || 0
-        const portNumber = hostPort || containerPort
-        if (!portNumber) continue
-        const protocol = (mapping.protocol || 'tcp').toLowerCase()
-        if (!map[hostId]) map[hostId] = []
-        const key = `${portNumber}-${protocol}`
-        const existing = map[hostId].find((entry: any) => entry.key === key)
-        if (existing) {
-          if (container.name && !existing.containers.includes(container.name)) existing.containers.push(container.name)
-          continue
-        }
-        map[hostId].push({ key, port: portNumber, protocol, internal: hostPort === 0, containers: container.name ? [container.name] : [] })
-      }
-    }
-    for (const host of hosts.value) {
-      if (!map[host.id]) map[host.id] = []
-    }
-    return map
-  })
+  const discoveredPortsByHost = computed(() => buildDiscoveredPortsByHost(containers.value, hosts.value))
 
   const hostPortOverrides = computed<Record<string, any>>(() => {
     const overrides: Record<string, any> = {}
@@ -305,33 +280,6 @@ export function useNetwork() {
     return formatBytesShared(bytes)
   }
 
-  function ensureHostPortConfig(): void {
-    const known = new Set(hostPortConfig.value.map((item) => item.hostId))
-    for (const host of hosts.value) {
-      if (known.has(host.id)) continue
-      hostPortConfig.value.push({ hostId: host.id, ports: {} })
-    }
-    for (const [hostId, ports] of Object.entries(discoveredPortsByHost.value)) {
-      const entry = getHostPortEntry(hostId)
-      for (const port of ports) {
-        const portKey = String(port.port)
-        if (!entry.ports[portKey]) {
-          entry.ports[portKey] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
-        }
-      }
-    }
-  }
-
-  function getHostPortEntry(hostId: string): any {
-    let entry = hostPortConfig.value.find((item) => item.hostId === hostId)
-    if (!entry) {
-      entry = { hostId, ports: {} }
-      hostPortConfig.value.push(entry)
-    }
-    if (!entry.ports) entry.ports = {}
-    return entry
-  }
-
   function onNodePositionsUpdate(positions: Record<string, { x: number; y: number }>): void {
     nodePositions.value = positions
     debouncedSave()
@@ -343,7 +291,7 @@ export function useNetwork() {
       const res = await apiClient.getNetworkSnapshot()
       hosts.value = res.data?.hosts || []
       containers.value = res.data?.containers || []
-      ensureHostPortConfig()
+      ensureHostPortConfig(hostPortConfig.value, hosts.value, discoveredPortsByHost.value)
     } catch {
       // ignore
     }
@@ -393,7 +341,7 @@ export function useNetwork() {
     prevTrafficTime.value = now
     hosts.value = newHosts
     containers.value = payload.containers || []
-    ensureHostPortConfig()
+    ensureHostPortConfig(hostPortConfig.value, hosts.value, discoveredPortsByHost.value)
   })
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
