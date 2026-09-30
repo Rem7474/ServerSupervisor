@@ -57,6 +57,17 @@ describe('WebhookExecutionList', () => {
     expect(wrapper.find('[title="Voir le payload reçu"]').exists()).toBe(true)
   })
 
+  it('links to the audit log with a named icon button, and offers the payload only for webhooks', () => {
+    const execution = { id: '1', triggered_at: '2026-01-01T00:00:00Z', status: 'completed', command_id: 'cmd-1', raw_payload: '{}' }
+    const tracker = mount(WebhookExecutionList, { props: { kind: 'tracker', executions: [execution] }, global: { stubs } })
+    const link = tracker.find('a[href="/audit?command=cmd-1"]')
+    expect(link.attributes('aria-label')).toBe('Voir les logs')
+    expect(tracker.find('button[aria-label="Voir le payload reçu"]').exists()).toBe(false)
+
+    const webhook = mount(WebhookExecutionList, { props: { kind: 'webhook', executions: [execution] }, global: { stubs } })
+    expect(webhook.find('a[href="/audit?command=cmd-1"]').exists()).toBe(true)
+  })
+
   it('shows a translated refresh button when showRefresh is set', () => {
     const wrapper = mount(WebhookExecutionList, { props: { executions: [], showRefresh: true }, global: { stubs } })
     expect(wrapper.text()).toContain('Actualiser')

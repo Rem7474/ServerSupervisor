@@ -625,32 +625,3 @@ function close(): void {
 }
 </script>
 
-<style scoped>
-.tracker-type-card {
-  display: block;
-  width: 100%;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--tblr-border-color);
-  cursor: pointer;
-  transition: border-color 0.18s ease, background-color 0.18s ease;
-}
-
-.tracker-type-card--active {
-  border-color: var(--tblr-primary);
-  background: var(--tblr-primary-lt);
-}
-
-.tracker-type-card--idle {
-  border-color: var(--tblr-border-color);
-  background: transparent;
-}
-
-.tracker-type-input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-</style>

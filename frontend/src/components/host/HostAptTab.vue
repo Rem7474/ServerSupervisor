@@ -1,8 +1,5 @@
 <template>
-  <div
-    v-if="aptStatus"
-    class="card"
-  >
+  <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
         {{ t('host.aptTitle') }}
@@ -23,37 +20,42 @@
           />
           apt update
         </button>
-        <button
-          type="button"
-          class="btn btn-primary"
-          :disabled="!!aptCmdLoading"
-          @click="$emit('run-apt-command', 'upgrade')"
-        >
-          <span
-            v-if="aptCmdLoading === 'upgrade'"
-            class="spinner-border spinner-border-sm me-1"
-          />
-          apt upgrade
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline-danger"
-          :disabled="!!aptCmdLoading"
-          @click="$emit('run-apt-command', 'dist-upgrade')"
-        >
-          <span
-            v-if="aptCmdLoading === 'dist-upgrade'"
-            class="spinner-border spinner-border-sm me-1"
-          />
-          apt dist-upgrade
-        </button>
+        <template v-if="aptStatus">
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="!!aptCmdLoading"
+            @click="$emit('run-apt-command', 'upgrade')"
+          >
+            <span
+              v-if="aptCmdLoading === 'upgrade'"
+              class="spinner-border spinner-border-sm me-1"
+            />
+            apt upgrade
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-danger"
+            :disabled="!!aptCmdLoading"
+            @click="$emit('run-apt-command', 'dist-upgrade')"
+          >
+            <span
+              v-if="aptCmdLoading === 'dist-upgrade'"
+              class="spinner-border spinner-border-sm me-1"
+            />
+            apt dist-upgrade
+          </button>
+        </template>
       </div>
       <span
         v-else
         class="text-secondary small"
       >{{ t('host.aptReadOnlyMode') }}</span>
     </div>
-    <div class="card-body">
+    <div
+      v-if="aptStatus"
+      class="card-body"
+    >
       <div class="row row-cards">
         <div class="col-md-4">
           <div class="card card-sm">
@@ -118,38 +120,10 @@
         :packages="pendingPackages"
       />
     </div>
-  </div>
-  <div
-    v-else
-    class="card"
-  >
-    <div class="card-header d-flex align-items-center justify-content-between">
-      <h3 class="card-title">
-        {{ t('host.aptTitle') }}
-      </h3>
-      <div
-        v-if="canRunApt"
-        class="btn-group btn-group-sm"
-      >
-        <button
-          type="button"
-          class="btn btn-outline-secondary"
-          :disabled="!!aptCmdLoading"
-          @click="$emit('run-apt-command', 'update')"
-        >
-          <span
-            v-if="aptCmdLoading === 'update'"
-            class="spinner-border spinner-border-sm me-1"
-          />
-          apt update
-        </button>
-      </div>
-      <span
-        v-else
-        class="text-secondary small"
-      >{{ t('host.aptReadOnlyMode') }}</span>
-    </div>
-    <div class="card-body text-secondary small">
+    <div
+      v-else
+      class="card-body text-secondary small"
+    >
       {{ t('host.aptNoDataPrefix') }} <strong>apt update</strong> {{ t('host.aptNoDataSuffix') }}
     </div>
   </div>

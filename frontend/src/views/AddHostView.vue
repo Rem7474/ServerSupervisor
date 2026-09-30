@@ -396,49 +396,11 @@ const {
   flex-shrink: 0;
 }
 
-.host-success {
-  background: var(--ss-panel-medium);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: 14px;
-  padding: 20px;
-  color: var(--ss-text-on-dark);
-}
-
-.host-success-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
 
 .host-success-grid {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.4fr);
   gap: 16px;
-}
-
-.host-success-card {
-  background: var(--ss-panel-strong);
-  border: 1px solid var(--ss-border-default);
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.host-success-key {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.host-success-key code {
-  display: block;
-  background: rgba(2, 6, 23, 0.6);
-  color: var(--ss-text-strong);
-  padding: 8px 10px;
-  border-radius: 8px;
-  flex: 1;
-  word-break: break-all;
 }
 
 .host-success-config {
