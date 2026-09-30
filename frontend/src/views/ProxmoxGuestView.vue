@@ -69,7 +69,7 @@
             >{{ linkMsg }}</span>
           </div>
           <div class="text-secondary">
-            {{ t('proxmox.nodeUptimeSummary', { node: guest.node_name, vmid: guest.vmid, uptime: formatUptime(guest.uptime) }) }}
+            {{ t('proxmox.nodeUptimeSummary', { node: guest.node_name, vmid: guest.vmid, uptime: formatUptime(guest.uptime, '—') }) }}
           </div>
         </div>
         <div
@@ -370,6 +370,7 @@ import { useProxmoxGuest } from '../composables/useProxmoxGuest'
 import { getEntityStateClass, getEntityStateLabel } from '../utils/statusClasses'
 import { getMetricColorClass } from '../utils/metricColor'
 import { AsyncApexChart as ApexChart } from '../utils/apexChartTheme'
+import { formatUptime } from '../utils/formatters'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -460,16 +461,6 @@ function formatBytes(bytes: number): string {
   }
   const unit = i === 0 ? 'B' : t(unitKeys[i - 1])
   return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
-}
-
-function formatUptime(seconds: number): string {
-  if (!seconds) return '—'
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}${t('proxmox.daySuffix')} ${h}h`
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
 }
 
 </script>

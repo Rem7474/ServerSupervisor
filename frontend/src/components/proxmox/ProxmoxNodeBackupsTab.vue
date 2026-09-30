@@ -176,8 +176,9 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { getExecutionStateClass, getExecutionStateLabel } from '../../utils/statusClasses'
 import { compareValues } from '../../utils/sort'
 import type { ProxmoxBackupJob, ProxmoxBackupRun } from '../../types/proxmox'
+import { formatDateTime } from '../../utils/formatters'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const props = defineProps<{
   jobs: ProxmoxBackupJob[]
@@ -221,8 +222,7 @@ function showsDetail(run: ProxmoxBackupRun): boolean {
 }
 
 function formatDate(iso?: string): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '—')
 }
 </script>
 

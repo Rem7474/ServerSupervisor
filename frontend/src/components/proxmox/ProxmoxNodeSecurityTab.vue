@@ -111,10 +111,11 @@ import { getApiErrorMessage } from '../../api/client'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { IconShieldCheck } from '@tabler/icons-vue'
+import { formatDateTimeSeconds } from '../../utils/formatters'
 
 type SyslogItem = Record<string, any>
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const props = defineProps<{
   nodeId: string
@@ -231,7 +232,7 @@ function formatSyslogTime(item: SyslogItem): string {
   if (!raw) return '—'
   const ms = typeof raw === 'number' ? (raw < 1_000_000_000_000 ? raw * 1000 : raw) : Date.parse(raw)
   if (!Number.isFinite(ms)) return '—'
-  return new Date(ms).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'medium' })
+  return formatDateTimeSeconds(ms)
 }
 
 function syslogLevelBadgeClass(item: SyslogItem): string {

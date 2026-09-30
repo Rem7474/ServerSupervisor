@@ -109,7 +109,7 @@
                 {{ t('security.suspiciousRequestsLabel') }}
               </div>
               <div class="h2 mb-0 text-warning">
-                {{ (threats.suspicious_requests || 0).toLocaleString(locale) }}
+                {{ formatNumber(threats.suspicious_requests || 0) }}
               </div>
             </div>
           </div>
@@ -121,7 +121,7 @@
                 {{ t('security.suspiciousIpsLabel') }}
               </div>
               <div class="h2 mb-0 text-warning">
-                {{ (threats.suspicious_ips || 0).toLocaleString(locale) }}
+                {{ formatNumber(threats.suspicious_ips || 0) }}
               </div>
             </div>
           </div>
@@ -133,7 +133,7 @@
                 {{ t('security.targetedDomainsLabel') }}
               </div>
               <div class="h2 mb-0 text-warning">
-                {{ (threats.targeted_hosts || 0).toLocaleString(locale) }}
+                {{ formatNumber(threats.targeted_hosts || 0) }}
               </div>
             </div>
           </div>
@@ -145,7 +145,7 @@
                 {{ t('security.blockedIpsTitle') }}
               </div>
               <div class="h2 mb-0 text-success">
-                {{ (threats.blocked_ips || 0).toLocaleString(locale) }}
+                {{ formatNumber(threats.blocked_ips || 0) }}
               </div>
             </div>
           </div>
@@ -208,13 +208,13 @@
                       {{ ip.ip }}
                     </td>
                     <td class="text-end">
-                      {{ (ip.hits || 0).toLocaleString(locale) }}
+                      {{ formatNumber(ip.hits || 0) }}
                     </td>
                     <td class="text-end">
-                      {{ (ip.unique_paths || 0).toLocaleString(locale) }}
+                      {{ formatNumber(ip.unique_paths || 0) }}
                     </td>
                     <td class="text-end">
-                      {{ (ip.host_count || 0).toLocaleString(locale) }}
+                      {{ formatNumber(ip.host_count || 0) }}
                     </td>
                     <td>
                       <span
@@ -294,7 +294,7 @@
                     {{ p.category || 'Unknown' }}
                   </div>
                 </div>
-                <span class="badge bg-warning-lt text-warning flex-shrink-0">{{ (p.hits || 0).toLocaleString(locale) }}</span>
+                <span class="badge bg-warning-lt text-warning flex-shrink-0">{{ formatNumber(p.hits || 0) }}</span>
               </div>
             </div>
             <div
@@ -363,7 +363,7 @@
                       <span class="badge bg-azure-lt text-azure">{{ item.country_code || '--' }}</span>
                     </td>
                     <td class="text-end">
-                      {{ (item.hits || 0).toLocaleString(locale) }}
+                      {{ formatNumber(item.hits || 0) }}
                     </td>
                   </tr>
                 </tbody>
@@ -416,7 +416,7 @@
                       {{ h.host_name || h.host_id || '—' }}
                     </td>
                     <td class="text-end">
-                      {{ (h.hits || 0).toLocaleString(locale) }}
+                      {{ formatNumber(h.hits || 0) }}
                     </td>
                   </tr>
                 </tbody>
@@ -469,10 +469,10 @@
                       {{ m.ip }}
                     </td>
                     <td class="text-end">
-                      {{ (m.host_count || 0).toLocaleString(locale) }}
+                      {{ formatNumber(m.host_count || 0) }}
                     </td>
                     <td class="text-end">
-                      {{ (m.hits || 0).toLocaleString(locale) }}
+                      {{ formatNumber(m.hits || 0) }}
                     </td>
                     <td class="text-end">
                       <button
@@ -502,7 +502,7 @@
                 {{ t('security.crowdsecBlockedIpsTitle') }}
               </h3>
               <span class="badge bg-success-lt text-success fs-4">
-                {{ t('security.activeDecisionsCountBadge', { n: crowdSecTotal.toLocaleString(locale) }) }}
+                {{ t('security.activeDecisionsCountBadge', { n: formatNumber(crowdSecTotal) }) }}
               </span>
             </div>
             <div class="table-responsive scroll-table">
@@ -613,7 +613,7 @@
               v-if="crowdSecTotal > crowdSecIPs.length"
               class="card-footer text-secondary small"
             >
-              {{ t('security.firstEntriesDisplayedLabel', { shown: crowdSecIPs.length, total: crowdSecTotal.toLocaleString(locale) }) }}
+              {{ t('security.firstEntriesDisplayedLabel', { shown: crowdSecIPs.length, total: formatNumber(crowdSecTotal) }) }}
             </div>
           </div>
         </div>
@@ -674,11 +674,12 @@ import TimeRangePicker from '../common/TimeRangePicker.vue'
 import { useBot } from '../../composables/useBot'
 import { usePagination } from '../../composables/usePagination'
 import { compareValues } from '../../utils/sort'
+import { formatNumber } from '../../utils/formatters'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const {
   periodOptions,

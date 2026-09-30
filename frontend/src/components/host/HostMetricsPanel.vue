@@ -177,6 +177,7 @@ import dayjs from '../../utils/dayjs'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
 import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
 import { getMetricColorClass, getTemperatureColorClass } from '../../utils/metricColor'
+import { formatUptime } from '../../utils/formatters'
 
 interface MetricsData {
   cpu_cores?: number
@@ -319,15 +320,6 @@ function formatBytes(bytes: number | undefined): string {
   const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-}
-
-function formatUptime(seconds: number | undefined): string {
-  if (!seconds) return 'N/A'
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  if (days > 0) return t('host.metricsUptimeDaysHours', { days, hours })
-  const mins = Math.floor((seconds % 3600) / 60)
-  return `${hours}h ${mins}m`
 }
 
 function cpuColor(pct: number | undefined): string {

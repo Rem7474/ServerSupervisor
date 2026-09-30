@@ -6,6 +6,7 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { useCommandStream } from './useCommandStream'
 import { execBadgeColor } from '../utils/statusClasses'
 import { gitProviderBadgeClass } from '../utils/categoryBadges'
+import { formatDate, formatDateTimeSeconds } from '../utils/formatters'
 
 interface TrackerCmd {
   id: string
@@ -145,7 +146,7 @@ interface UseGitWebhooksPageApi {
 }
 
 export function useGitWebhooksPage(): UseGitWebhooksPageApi {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const dialog = useConfirmDialog()
   const route = useRoute()
   const router = useRouter()
@@ -477,13 +478,11 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   }
 
   function formatRelative(dateStr: string): string {
-    if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleString(locale.value)
+    return formatDateTimeSeconds(dateStr)
   }
 
   function formatDateOnly(dateStr?: string): string {
-    if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleDateString(locale.value)
+    return formatDate(dateStr)
   }
 
   function cooldownRemainingMs(tracker: ReleaseTracker): number {
@@ -524,7 +523,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     const detectedAt = new Date(tracker.last_release_detected_at).getTime()
     if (!Number.isFinite(detectedAt)) return '-'
     const eta = new Date(detectedAt + (hours * 60 * 60 * 1000))
-    return eta.toLocaleString(locale.value)
+    return formatDateTimeSeconds(eta)
   }
 
   // ── Tracker "live console" (command output streaming) ──────────────────────

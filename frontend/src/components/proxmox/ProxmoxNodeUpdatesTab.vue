@@ -55,8 +55,9 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import EmptyState from '../EmptyState.vue'
+import { formatDateTime } from '../../utils/formatters'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 defineProps<{
   pendingUpdates?: number
@@ -69,7 +70,6 @@ defineProps<{
 const emit = defineEmits<{ (e: 'refresh-apt'): void }>()
 
 function formatDate(iso?: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '—')
 }
 </script>
