@@ -3,7 +3,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
-import { useCommandLogViewer } from './useCommandLogViewer'
+import { useCommandLogViewer, patchRow } from './useCommandLogViewer'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { ReleaseTracker, ReleaseTrackerExecution, ReleaseTrackerRequest, ReleaseVersionHistoryItem } from '../types/tracker'
@@ -44,19 +44,8 @@ export function useReleaseTrackerDetail() {
 
   // Console for one execution's command; keeps the executions list's status
   // badge in step with what the console shows.
-  const {
-    selected: selectedCmd,
-    visible: showConsole,
-    show: showCommand,
-    close: clearExecutionLogs,
-  } = useCommandLogViewer<CmdRow>({
-    onStatus(commandId, status) {
-      const idx = executions.value.findIndex((e) => e.command_id === commandId)
-      if (idx === -1) return
-      const next = [...executions.value]
-      next[idx] = { ...next[idx], status }
-      executions.value = next
-    },
+  const { selected: selectedCmd, visible: showConsole, showById, close: clearExecutionLogs } = useCommandLogViewer<CmdRow>({
+    onStatus: (commandId, status) => patchRow(executions, (e) => e.command_id === commandId, { status }),
   })
 
   const canRunManually = computed(() => {
@@ -178,12 +167,7 @@ export function useReleaseTrackerDetail() {
 
 
   async function openExecutionLogs(commandId: string): Promise<void> {
-    try {
-      const res = await api.getCommandStatus(commandId)
-      showCommand(res.data as unknown as CmdRow)
-    } catch {
-      error.value = t('webhooks.couldNotLoadCommandLogsError')
-    }
+    if (!(await showById(commandId))) error.value = t('webhooks.couldNotLoadCommandLogsError')
   }
 
   async function runManually(): Promise<void> {

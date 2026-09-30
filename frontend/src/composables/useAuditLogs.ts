@@ -9,7 +9,7 @@ import { getApiErrorMessage } from '../api/client'
 import { useStatusBadge } from './useStatusBadge'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { moduleLabel, moduleClass, remoteCommandModuleOptions } from '../utils/moduleMeta'
-import { useCommandLogViewer } from './useCommandLogViewer'
+import { useCommandLogViewer, patchRow } from './useCommandLogViewer'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
 import type { AuditLog, LoginEvent } from '../types/generated'
 import { AuditCategoryAlert, AuditCategoryAuth, AuditCategoryCommand, AuditCategorySettings } from '../types/generated'
@@ -121,11 +121,7 @@ export function useAuditLogs() {
 
   // Keeps the command list row in step with the console while it streams.
   function syncCmdInList(commandId: string, status: string, output?: string): void {
-    const idx = cmds.value.findIndex((c) => c.id === commandId)
-    if (idx === -1) return
-    const next = [...cmds.value]
-    next[idx] = { ...next[idx], status, ...(output ? { output } : {}) }
-    cmds.value = next
+    patchRow(cmds, (c) => c.id === commandId, { status, ...(output ? { output } : {}) })
   }
 
   const {

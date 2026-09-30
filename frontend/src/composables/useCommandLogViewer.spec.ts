@@ -11,6 +11,9 @@ const stream = vi.hoisted(() => ({
   closeStream: vi.fn(),
 }))
 
+const getCommandStatus = vi.hoisted(() => vi.fn())
+vi.mock('../api', () => ({ default: { getCommandStatus } }))
+
 vi.mock('./useCommandStream', () => ({
   useCommandStream: () => ({
     openCommandStream: (id: string, handlers: Handlers) => {
@@ -21,7 +24,8 @@ vi.mock('./useCommandStream', () => ({
   }),
 }))
 
-import { useCommandLogViewer } from './useCommandLogViewer'
+import { ref } from 'vue'
+import { useCommandLogViewer, patchRow } from './useCommandLogViewer'
 
 type Row = { id: string; status?: string; output?: string; host_name?: string }
 
@@ -29,6 +33,7 @@ describe('useCommandLogViewer', () => {
   beforeEach(() => {
     stream.opened = []
     stream.closeStream.mockReset()
+    getCommandStatus.mockReset()
   })
 
   it('shows a finished command without opening a stream', () => {
@@ -82,5 +87,63 @@ describe('useCommandLogViewer', () => {
     expect(stream.closeStream).toHaveBeenCalledTimes(3)
     expect(viewer.selected.value).toBeNull()
     expect(viewer.visible.value).toBe(false)
+  })
+})
+
+describe('useCommandLogViewer — partial stream messages', () => {
+  beforeEach(() => {
+    stream.opened = []
+  })
+
+  it('keeps the known status and output when a message omits them', () => {
+    const viewer = useCommandLogViewer<Row>()
+    viewer.show({ id: 'c1', status: 'running', output: 'so far\n' })
+    const h = stream.opened[0].handlers
+
+    h.onInit?.({ status: '' })
+    expect(viewer.selected.value).toMatchObject({ status: 'running', output: 'so far\n' })
+
+    h.onStatus?.({ status: '' })
+    expect(viewer.selected.value).toMatchObject({ status: 'running', output: 'so far\n' })
+  })
+})
+
+describe('useCommandLogViewer — showById', () => {
+  beforeEach(() => {
+    stream.opened = []
+    getCommandStatus.mockReset()
+  })
+
+  it('fetches the command, shows it and follows it when still running', async () => {
+    getCommandStatus.mockResolvedValue({ data: { id: 'c9', status: 'running', output: '' } })
+    const viewer = useCommandLogViewer<Row>()
+    await expect(viewer.showById('c9')).resolves.toBe(true)
+    expect(getCommandStatus).toHaveBeenCalledWith('c9')
+    expect(viewer.visible.value).toBe(true)
+    expect(stream.opened.map((s) => s.id)).toEqual(['c9'])
+  })
+
+  it('reports a failed fetch and leaves the console closed', async () => {
+    getCommandStatus.mockRejectedValue(new Error('gone'))
+    const viewer = useCommandLogViewer<Row>()
+    await expect(viewer.showById('c9')).resolves.toBe(false)
+    expect(viewer.visible.value).toBe(false)
+  })
+})
+
+describe('patchRow', () => {
+  it('replaces the matching row with a patched copy and leaves the rest', () => {
+    const rows = ref([{ id: 'a', status: 'running' }, { id: 'b', status: 'running' }])
+    const before = rows.value
+    patchRow(rows, (r) => r.id === 'b', { status: 'failed' })
+    expect(rows.value).toEqual([{ id: 'a', status: 'running' }, { id: 'b', status: 'failed' }])
+    expect(rows.value).not.toBe(before)
+  })
+
+  it('does nothing when no row matches', () => {
+    const rows = ref([{ id: 'a', status: 'running' }])
+    const before = rows.value
+    patchRow(rows, (r) => r.id === 'zz', { status: 'failed' })
+    expect(rows.value).toBe(before)
   })
 })

@@ -530,19 +530,15 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   const {
     selected: selectedTrackerCmd,
     visible: showTrackerConsole,
-    show: showTrackerCommand,
+    showById: showTrackerCommand,
     close: closeTrackerLogs,
   } = useCommandLogViewer<TrackerCmd>()
 
 
 
+  // A vanished command history entry leaves the page as it is.
   async function openTrackerLogs(commandId: string): Promise<void> {
-    try {
-      const res = await api.getCommandStatus(commandId)
-      showTrackerCommand(res.data as unknown as TrackerCmd)
-    } catch {
-      // Keep page usable even if command history entry vanished.
-    }
+    await showTrackerCommand(commandId)
   }
 
   return {

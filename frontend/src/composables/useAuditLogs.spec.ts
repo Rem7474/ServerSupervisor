@@ -133,6 +133,25 @@ describe('useAuditLogs', () => {
     expect(api.selectedCmd.value).toBeNull()
   })
 
+  it('updates the command list row when the followed command finishes', async () => {
+    const sockets: FakeWebSocket[] = []
+    vi.stubGlobal('WebSocket', class extends FakeWebSocket {
+      constructor() { super(); sockets.push(this) }
+    })
+    getCommandsHistory.mockResolvedValue({
+      data: { commands: [{ id: 'c1', status: 'running', output: '', created_at: '2026-01-01T00:00:00Z' }], total: 1 },
+    })
+    const api = mountHost()
+    await flushPromises()
+
+    api.openLogViewer(api.sortedCmds.value[0] as never)
+    const ws = sockets[sockets.length - 1]
+    ws.onmessage?.({ data: JSON.stringify({ type: 'cmd_status_update', command_id: 'c1', status: 'completed', output: 'done' }) })
+
+    expect(api.selectedCmd.value).toMatchObject({ status: 'completed', output: 'done' })
+    expect(api.sortedCmds.value[0]).toMatchObject({ id: 'c1', status: 'completed', output: 'done' })
+  })
+
   it('clears the command list on a fetch error', async () => {
     getCommandsHistory.mockRejectedValue(new Error('down'))
     const api = mountHost()

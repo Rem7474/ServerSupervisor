@@ -1,4 +1,5 @@
 import { ref, type Ref, type UnwrapRef } from 'vue'
+import api from '../api'
 import { useCommandStream } from './useCommandStream'
 
 /** The fields of a remote_commands row the log viewer reads and patches. */
@@ -20,11 +21,25 @@ interface UseCommandLogViewerApi<T extends CommandLogRow> {
   selected: Ref<UnwrapRef<T> | null>
   visible: Ref<boolean>
   show: (command: T) => void
+  /** Fetches the command by id, then shows it; resolves false if the fetch failed. */
+  showById: (commandId: string) => Promise<boolean>
   close: () => void
 }
 
 function isLive(status: string | undefined): boolean {
   return status === 'pending' || status === 'running'
+}
+
+/**
+ * Replaces the first row matching `match` with a patched copy, so a list
+ * rendered from `rows` re-renders. No-op when no row matches.
+ */
+export function patchRow<R>(rows: Ref<R[]>, match: (row: R) => boolean, patch: Partial<R>): void {
+  const idx = rows.value.findIndex(match)
+  if (idx === -1) return
+  const next = [...rows.value]
+  next[idx] = { ...next[idx], ...patch }
+  rows.value = next
 }
 
 /**
@@ -67,11 +82,21 @@ export function useCommandLogViewer<T extends CommandLogRow>(options: UseCommand
     if (isLive(command.status)) follow(command.id)
   }
 
+  async function showById(commandId: string): Promise<boolean> {
+    try {
+      const res = await api.getCommandStatus(commandId)
+      show(res.data as unknown as T)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   function close(): void {
     closeStream()
     selected.value = null
     visible.value = false
   }
 
-  return { selected, visible, show, close }
+  return { selected, visible, show, showById, close }
 }

@@ -135,6 +135,32 @@ describe('useReleaseTrackerDetail', () => {
     expect(api.error.value).toBe('Impossible de charger les logs de la commande.')
   })
 
+  it('updates the execution badge when its followed command finishes', async () => {
+    const sockets: { onmessage: ((ev: { data: string }) => void) | null }[] = []
+    vi.stubGlobal('WebSocket', class {
+      onopen = null
+      onmessage: ((ev: { data: string }) => void) | null = null
+      onclose = null
+      onerror = null
+      constructor() { sockets.push(this) }
+      close() { /* no-op */ }
+    })
+    getReleaseTracker.mockResolvedValue({
+      data: { tracker: baseTracker(), executions: [{ id: 'e1', command_id: 'c1', status: 'running' }] },
+    })
+    getReleaseTrackerExecutions.mockResolvedValue({ data: { executions: [{ id: 'e1', command_id: 'c1', status: 'running' }] } })
+    getCommandStatus.mockResolvedValue({ data: { id: 'c1', status: 'running', output: '' } })
+    const api = mountHost()
+    await flushPromises()
+
+    await api.openExecutionLogs('c1')
+    sockets[sockets.length - 1].onmessage?.({ data: JSON.stringify({ type: 'cmd_status_update', command_id: 'c1', status: 'completed' }) })
+
+    expect(api.selectedCmd.value?.status).toBe('completed')
+    expect(api.executions.value[0].status).toBe('completed')
+    vi.unstubAllGlobals()
+  })
+
   it('refuses a manual run when disabled and reports the translated reason', async () => {
     getReleaseTracker.mockResolvedValue({ data: { tracker: baseTracker({ host_id: '', custom_task_id: '' }), executions: [] } })
     const api = mountHost()
