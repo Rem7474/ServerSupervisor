@@ -13,13 +13,23 @@ vi.mock('../../api', () => ({
 }))
 
 import AlertRuleModal from './AlertRuleModal.vue'
+import type { AlertMetricCapability, AlertRuleCapabilities } from '../../types/alert'
 
-const capabilities = {
-  metrics: [
-    { metric: 'cpu', label: 'CPU', icon: '', supports_host_filter: true },
-    { metric: 'memory', label: 'Mémoire', icon: '', supports_host_filter: true },
-  ],
-  proxmox_scope: { connections: [], nodes: [], storages: [], guests: [], disks: [] },
+function metric(key: string, label: string): AlertMetricCapability {
+  return {
+    metric: key, label, unit: '%', icon: '', badge_class: '',
+    supports_threshold: true, supports_duration: true, supports_host_filter: true,
+  }
+}
+
+const agentMetrics = [metric('cpu', 'CPU'), metric('memory', 'Mémoire')]
+const capabilities: AlertRuleCapabilities = {
+  metrics: agentMetrics,
+  agent_metrics: agentMetrics,
+  proxmox_metrics: [],
+  synthetic_metrics: [],
+  docker_metrics: [],
+  proxmox_scope: { modes: [], connections: [], nodes: [], storages: [], guests: [], disks: [] },
 }
 
 function mountModal(props: Record<string, unknown> = {}) {

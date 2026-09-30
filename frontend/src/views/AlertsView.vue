@@ -50,7 +50,7 @@
     >
       <template #warroom>
         <WarRoomPanel
-          :incidents="(incidents as any)"
+          :incidents="incidents"
           :loading="incidentsLoading"
           :error="incidentsError"
           :is-admin="auth.isAdmin"
@@ -63,23 +63,23 @@
 
       <template #rules>
         <AlertRuleList
-          :rules="(rules as any)"
-          :hosts="(hosts as any)"
+          :rules="rules"
+          :hosts="hosts"
           :loading="loading"
           :fetched="fetched"
           :error="saveError"
           :is-admin="auth.isAdmin"
-          :format-date="(formatDate as any)"
+          :format-date="formatDate"
           @add="startAddAlert"
-          @edit="(startEditAlert as any)"
-          @toggle="(onToggleEnabled as any)"
-          @delete="(deleteAlert as any)"
+          @edit="startEditAlert"
+          @toggle="onToggleEnabled"
+          @delete="deleteAlert"
         />
       </template>
 
       <template #releases>
         <AlertReleaseSummary
-          :trackers="(trackers as any)"
+          :trackers="trackers"
           :loading="trackersLoading"
           :error="trackersError"
         />
@@ -87,7 +87,7 @@
 
       <template #incidents>
         <AlertIncidentList
-          :incidents="(incidents as any)"
+          :incidents="incidents"
           :loading="incidentsLoading"
           :error="incidentsError"
           :active-incident-count="activeIncidentCount"
@@ -123,7 +123,7 @@
     <AlertRuleTemplateModal
       :visible="showTemplateModal"
       :template="editingTemplate"
-      :agent-metrics="(capabilities?.agent_metrics as any) || []"
+      :agent-metrics="capabilities?.agent_metrics || []"
       :saving="templateSaving"
       :error="templateSaveError"
       @close="closeTemplateModal"
@@ -132,7 +132,7 @@
     <AlertRuleTemplateApplyModal
       :visible="showApplyModal"
       :template="applyingTemplate"
-      :hosts="(hosts as any)"
+      :hosts="hosts"
       :applying="applying"
       :error="applyError"
       :result="applyResult"
@@ -143,15 +143,15 @@
     <ErrorBoundary :title="t('alerts.ruleFormLoadErrorTitle')">
       <AlertRuleModal
         :visible="showModal"
-        :rule="(editingRule as any)"
-        :hosts="(hosts as any)"
-        :capabilities="(capabilities as any)"
+        :rule="editingRule"
+        :hosts="hosts"
+        :capabilities="capabilities"
         :capabilities-loading="capabilitiesLoading"
         :capabilities-error="capabilitiesError"
         :saving="saving"
         :error="saveError"
         @close="closeModal"
-        @submit="(saveAlert as any)"
+        @submit="saveAlert"
       />
     </ErrorBoundary>
   </div>
