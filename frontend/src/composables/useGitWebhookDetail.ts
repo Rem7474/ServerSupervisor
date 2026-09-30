@@ -9,6 +9,7 @@ import { useAbortSignal } from './useAbortSignal'
 import type { GitWebhook, GitWebhookExecution, GitWebhookRequest } from '../types/webhook'
 import type { Host } from '../types/host'
 import type { WebhookFormData } from './useWebhookForm'
+import { gitProviderBadgeClass, notificationChannelBadgeClass } from '../utils/categoryBadges'
 
 interface CmdRow { id: string; status?: string; output?: string; [key: string]: unknown }
 
@@ -151,23 +152,11 @@ export function useGitWebhookDetail() {
   }
 
   function providerBadge(provider: string): string {
-    const map: Record<string, string> = {
-      github:  'bg-blue-lt text-blue',
-      gitlab:  'bg-orange-lt text-orange',
-      gitea:   'bg-teal-lt text-teal',
-      forgejo: 'bg-purple-lt text-purple',
-      custom:  'bg-secondary-lt text-secondary',
-    }
-    return map[provider] || 'bg-secondary-lt text-secondary'
+    return gitProviderBadgeClass(provider)
   }
 
   function channelBadge(ch: string): string {
-    const map: Record<string, string> = {
-      smtp:    'bg-blue-lt text-blue',
-      ntfy:    'bg-orange-lt text-orange',
-      browser: 'bg-purple-lt text-purple',
-    }
-    return map[ch] || 'bg-secondary-lt text-secondary'
+    return notificationChannelBadgeClass(ch)
   }
 
   onMounted(load)

@@ -405,7 +405,7 @@
                     <td>
                       <span
                         class="badge"
-                        :class="statusClass(r.status)"
+                        :class="httpStatusClass(r.status)"
                       >{{ r.status }}</span>
                       <span
                         v-if="r.blocked"
@@ -462,6 +462,7 @@ import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { DomainDetailsFilterKey, DomainDetailsSortKey } from '../../composables/useDomainDetails'
+import { httpStatusClass } from '../../utils/statusClasses'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for the ad-hoc GetDomainDetails aggregate (no Go model)
 type AnyRecord = Record<string, any>
@@ -536,12 +537,6 @@ function formatDate(v: string): string {
   return d.toLocaleString()
 }
 
-function statusClass(status: number): string {
-  if (status >= 200 && status < 300) return 'bg-success-lt text-success'
-  if (status >= 300 && status < 400) return 'bg-warning-lt text-warning'
-  if (status >= 400) return 'bg-danger-lt text-danger'
-  return 'bg-secondary-lt text-secondary'
-}
 </script>
 
 <style scoped>

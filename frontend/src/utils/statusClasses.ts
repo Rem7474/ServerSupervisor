@@ -135,3 +135,47 @@ export function execBadgeColor(
   const full = getExecutionStateClass(status)
   return full === 'badge bg-secondary-lt text-secondary' ? fallback : full.replace('badge ', '')
 }
+
+// ─── HTTP status codes ────────────────────────────────────────────────────────
+
+/**
+ * Badge color for an HTTP status code, matching TrafficStatusChart's donut
+ * (2xx green, 3xx blue, 4xx amber, 5xx red) so a table row and the chart
+ * slice it belongs to read as the same thing.
+ */
+export function httpStatusClass(code: number | null | undefined): string {
+  if (code == null) return 'bg-secondary-lt text-secondary'
+  if (code >= 500 && code < 600) return 'bg-danger-lt text-danger'
+  if (code >= 400) return 'bg-warning-lt text-warning'
+  if (code >= 300) return 'bg-primary-lt text-primary'
+  if (code >= 200) return 'bg-success-lt text-success'
+  return 'bg-secondary-lt text-secondary'
+}
+
+// ─── Synthetic monitoring (uptime probes, SSL certificates) ───────────────────
+
+type Tone = 'success' | 'warning' | 'danger' | 'secondary'
+
+function toneClass(tone: Tone, variant: 'badge' | 'text'): string {
+  return variant === 'text' ? `text-${tone}` : `bg-${tone}-lt text-${tone}`
+}
+
+/** Uptime probe last check: up → green, down → red, anything else neutral. */
+export function probeStatusClass(status: string | null | undefined, variant: 'badge' | 'text' = 'badge'): string {
+  if (status === 'up') return toneClass('success', variant)
+  if (status === 'down') return toneClass('danger', variant)
+  return toneClass('secondary', variant)
+}
+
+/**
+ * Days until an SSL certificate expires: ≤ 7 red, ≤ 30 amber. An expired
+ * certificate (negative days) gets a solid red badge so it stands out from
+ * one that merely expires soon.
+ */
+export function sslDaysClass(days: number | null | undefined, variant: 'badge' | 'text' = 'badge'): string {
+  if (days == null) return toneClass('secondary', variant)
+  if (days < 0) return variant === 'text' ? 'text-danger' : 'bg-danger text-white'
+  if (days <= 7) return toneClass('danger', variant)
+  if (days <= 30) return toneClass('warning', variant)
+  return toneClass('success', variant)
+}

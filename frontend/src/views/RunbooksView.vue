@@ -342,7 +342,7 @@
                       <td>
                         <span
                           class="badge"
-                          :class="executionBadgeClass(exec.status)"
+                          :class="execBadgeColor(exec.status)"
                         >{{ executionStatusLabel(exec.status) }}</span>
                       </td>
                       <td>{{ exec.triggered_by }}</td>
@@ -380,7 +380,7 @@
                                 <span
                                   v-if="s.status"
                                   class="badge"
-                                  :class="executionBadgeClass(s.status)"
+                                  :class="execBadgeColor(s.status)"
                                 >{{ executionStatusLabel(s.status) }}
                                   <span
                                     v-if="s.status === 'running' || s.status === 'pending'"
@@ -460,6 +460,7 @@ import {
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useModalChrome } from '../composables/useModalChrome'
 import type { Runbook, RunbookStepCreate } from '../types/generated'
+import { execBadgeColor } from '../utils/statusClasses'
 
 const {
   hostsStore, runbooks, loading, fetched, error,
@@ -552,12 +553,6 @@ function executionStatusLabel(status: string): string {
   return status || t('common.statusUnknown')
 }
 
-function executionBadgeClass(status: string): string {
-  if (status === 'completed') return 'bg-success-lt text-success'
-  if (status === 'failed') return 'bg-danger-lt text-danger'
-  if (status === 'running' || status === 'pending') return 'bg-primary-lt text-primary'
-  return 'bg-secondary-lt text-secondary'
-}
 
 function formatDate(dateStr: string | undefined | null): string {
   if (!dateStr) return ''

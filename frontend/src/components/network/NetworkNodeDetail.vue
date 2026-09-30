@@ -293,6 +293,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconHome } from '@tabler/icons-vue'
+import { hostStatusClass } from '../../utils/formatHostStatus'
 
 interface SelectedNode {
   type?: string
@@ -453,13 +454,7 @@ const typeTagClass = computed(() => {
   return 'badge bg-secondary-lt text-secondary'
 })
 
-const statusBadgeClass = computed(() => {
-  const status = hostData.value?.status || props.selectedNode?.status
-  if (status === 'online') return 'status status-success'
-  if (status === 'warning') return 'status status-warning'
-  if (status === 'offline') return 'status status-danger'
-  return 'status status-secondary'
-})
+const statusBadgeClass = computed(() => hostStatusClass(hostData.value?.status || props.selectedNode?.status || ''))
 
 function formatBytes(bytes: number | undefined): string {
   if (!bytes && bytes !== 0) return '-'

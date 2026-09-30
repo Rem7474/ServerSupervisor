@@ -10,6 +10,7 @@ import type { ReleaseTracker, ReleaseTrackerExecution, ReleaseTrackerRequest, Re
 import type { ComposeProject } from '../types/docker'
 import type { Host } from '../types/host'
 import type { WebhookFormData } from './useWebhookForm'
+import { gitProviderBadgeClass } from '../utils/categoryBadges'
 
 interface CmdRow { id: string; status?: string; output?: string; [key: string]: unknown }
 // The API enriches the tracker with the resolved release URL (not in the Go model).
@@ -274,14 +275,7 @@ export function useReleaseTrackerDetail() {
   }
 
   function providerBadge(provider: string): string {
-    const map: Record<string, string> = {
-      github: 'bg-blue-lt text-blue',
-      gitlab: 'bg-orange-lt text-orange',
-      gitea: 'bg-teal-lt text-teal',
-      forgejo: 'bg-purple-lt text-purple',
-      custom: 'bg-secondary-lt text-secondary',
-    }
-    return map[provider] || 'bg-secondary-lt text-secondary'
+    return gitProviderBadgeClass(provider)
   }
 
   onMounted(() => {

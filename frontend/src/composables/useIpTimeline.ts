@@ -1,6 +1,7 @@
 import { ref, computed, watch, toValue, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { WebLogIPTimelineRow } from '../types/security'
+import { httpStatusClass } from '../utils/statusClasses'
 
 export interface TimelineBucket {
   key: string
@@ -69,15 +70,6 @@ function formatBucketLabel(startMs: number, bucketMs: number): string {
   const d = new Date(startMs)
   if (bucketMs < 60 * 1000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-/** Tailwind/Tabler badge class for an individual HTTP status code. */
-export function statusClass(status: number): string {
-  if (status >= 500 && status < 600) return 'bg-danger-lt text-danger'
-  if (status >= 400 && status < 500) return 'bg-warning-lt text-warning'
-  if (status >= 200 && status < 300) return 'bg-success-lt text-success'
-  if (status >= 300 && status < 400) return 'bg-primary-lt text-primary'
-  return 'bg-secondary-lt text-secondary'
 }
 
 export function formatDate(v: string): string {
@@ -340,7 +332,7 @@ export function useIpTimeline(
     toggleBucketFilter,
     // display helpers
     bucketToneClass,
-    statusClass,
+    statusClass: httpStatusClass,
     formatDate,
     truncate,
   }
