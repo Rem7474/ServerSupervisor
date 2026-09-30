@@ -235,19 +235,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import { npmApi } from '../../api/npm'
 import type { NPMConnection } from '../../types/npm'
 import { getApiErrorMessage } from '../../api/client'
-import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import { useConnectionCrud } from '../../composables/useConnectionCrud'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { formatDateTime } from '../../utils/formatters'
 
 const { t } = useI18n()
-const { confirm } = useConfirmDialog()
 
 withDefaults(defineProps<{
   authIsAdmin?: boolean
@@ -264,99 +263,38 @@ interface NPMForm {
   poll_interval_sec: number
 }
 
-const connections = ref<NPMConnection[]>([])
-const loading = ref(false)
-const showForm = ref(false)
-const editingId = ref<string | null>(null)
-const saving = ref(false)
-const testing = ref(false)
-const formMsg = ref('')
-const formOk = ref(false)
-const listMsg = ref('')
-const listOk = ref(false)
-
-const emptyForm = (): NPMForm => ({
-  name: '',
-  api_url: '',
-  identity: '',
-  secret: '',
-  enabled: true,
-  poll_interval_sec: 3600,
-})
-
-const form = ref<NPMForm>(emptyForm())
-
-async function load(): Promise<void> {
-  loading.value = true
-  try {
-    const res = await npmApi.listConnections()
-    connections.value = res.data.connections ?? []
-  } catch {
-    // silently ignore
-  } finally {
-    loading.value = false
-  }
-}
-
-function openAddForm(): void {
-  editingId.value = null
-  form.value = emptyForm()
-  formMsg.value = ''
-  showForm.value = true
-}
-
-function openEditForm(conn: NPMConnection): void {
-  editingId.value = conn.id
-  form.value = {
+const {
+  items: connections, loading, showForm, editingId, form, saving, formMsg, formOk, listMsg, listOk,
+  openAddForm, openEditForm, cancelForm, save, remove, runListAction,
+} = useConnectionCrud<NPMConnection, NPMForm>({
+  list: async () => (await npmApi.listConnections()).data.connections ?? [],
+  create: (f) => npmApi.createConnection(f),
+  update: (id, f) => npmApi.updateConnection(id, f),
+  remove: (id) => npmApi.deleteConnection(id),
+  emptyForm: () => ({ name: '', api_url: '', identity: '', secret: '', enabled: true, poll_interval_sec: 3600 }),
+  toForm: (conn) => ({
     name: conn.name,
     api_url: conn.api_url,
     identity: conn.identity,
     secret: '',
     enabled: conn.enabled ?? true,
     poll_interval_sec: conn.poll_interval_sec ?? 3600,
-  }
-  formMsg.value = ''
-  showForm.value = true
-}
+  }),
+  validate: (f, editing) => {
+    if (!f.name || !f.api_url || !f.identity) return t('settings.nameUrlIdentityRequired')
+    if (!editing && !f.secret) return t('settings.passwordRequiredOnCreate')
+    return ''
+  },
+  keys: {
+    created: 'settings.connectionCreated',
+    updated: 'settings.connectionUpdated',
+    deleted: 'settings.connectionDeleted',
+    deleteTitle: 'settings.deleteNpmConnectionTitle',
+    deleteMessage: 'settings.deleteNpmConnectionMsg',
+  },
+})
 
-function cancelForm(): void {
-  showForm.value = false
-  formMsg.value = ''
-  editingId.value = null
-}
-
-async function save(): Promise<void> {
-  if (!form.value.name || !form.value.api_url || !form.value.identity) {
-    formMsg.value = t('settings.nameUrlIdentityRequired')
-    formOk.value = false
-    return
-  }
-  saving.value = true
-  formMsg.value = ''
-  try {
-    if (editingId.value) {
-      await npmApi.updateConnection(editingId.value, form.value)
-    } else {
-      if (!form.value.secret) {
-        formMsg.value = t('settings.passwordRequiredOnCreate')
-        formOk.value = false
-        saving.value = false
-        return
-      }
-      await npmApi.createConnection(form.value)
-    }
-    formMsg.value = editingId.value ? t('settings.connectionUpdated') : t('settings.connectionCreated')
-    formOk.value = true
-    await load()
-    showForm.value = false
-    editingId.value = null
-  } catch (e: unknown) {
-    formMsg.value = getApiErrorMessage(e, t('settings.saveError'))
-    formOk.value = false
-  } finally {
-    saving.value = false
-  }
-}
+const testing = ref(false)
 
 async function testForm(): Promise<void> {
   if (!form.value.api_url || !form.value.identity || !form.value.secret) {
@@ -372,13 +310,8 @@ async function testForm(): Promise<void> {
       identity: form.value.identity,
       secret: form.value.secret,
     })
-    if (res.data.success) {
-      formMsg.value = t('settings.connectionSuccessful')
-      formOk.value = true
-    } else {
-      formMsg.value = res.data.error || t('settings.connectionFailed')
-      formOk.value = false
-    }
+    formOk.value = !!res.data.success
+    formMsg.value = res.data.success ? t('settings.connectionSuccessful') : (res.data.error || t('settings.connectionFailed'))
   } catch (e: unknown) {
     formMsg.value = getApiErrorMessage(e, t('settings.networkError'))
     formOk.value = false
@@ -387,39 +320,11 @@ async function testForm(): Promise<void> {
   }
 }
 
-async function refreshNow(conn: NPMConnection): Promise<void> {
-  try {
-    await npmApi.refreshNow(conn.id)
-    listMsg.value = t('settings.refreshTriggeredFor', { name: conn.name })
-    listOk.value = true
-    setTimeout(load, 3000)
-  } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, t('settings.genericErrorPeriod'))
-    listOk.value = false
-  }
-}
-
-async function remove(conn: NPMConnection): Promise<void> {
-  const confirmed = await confirm({
-    title: t('settings.deleteNpmConnectionTitle'),
-    message: t('settings.deleteNpmConnectionMsg', { name: conn.name }),
-    variant: 'danger',
-  })
-  if (!confirmed) return
-  try {
-    await npmApi.deleteConnection(conn.id)
-    await load()
-    listMsg.value = t('settings.connectionDeleted')
-    listOk.value = true
-  } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, t('settings.deleteError'))
-    listOk.value = false
-  }
+function refreshNow(conn: NPMConnection): Promise<void> {
+  return runListAction(() => npmApi.refreshNow(conn.id), t('settings.refreshTriggeredFor', { name: conn.name }))
 }
 
 function formatDate(iso: string | undefined): string {
   return formatDateTime(iso, '—')
 }
-
-onMounted(load)
 </script>
