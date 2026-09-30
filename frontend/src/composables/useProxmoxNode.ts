@@ -180,9 +180,9 @@ export function useProxmoxNode() {
       sensorSourceHostId.value = node.value?.cpu_temp_source_host_id || node.value?.fan_rpm_source_host_id || ''
       await loadSensorSourceCandidates()
       // fire-and-forget: live status + RRD charts + peer nodes load in parallel
-      loadLiveStatus()
-      loadRRD('hour')
-      loadPeerNodes()
+      void loadLiveStatus()
+      void loadRRD('hour')
+      void loadPeerNodes()
       // A tab restored from a ?tab= deep link (page refresh / direct link)
       // never goes through the shell's click handler (ProxmoxNodeView's
       // onTabClick) — the only other place these lazy per-tab loaders were
@@ -190,9 +190,9 @@ export function useProxmoxNode() {
       // domains) and the Services list silently stayed empty after a hard
       // refresh landing directly on one of those tabs. Mirror onTabClick's
       // own logic here for whichever tab was actually restored.
-      if (tab.value === 'vms' || tab.value === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackups() }
-      else if (tab.value === 'services') loadServices()
-      else if (tab.value === 'backups') loadBackups()
+      if (tab.value === 'vms' || tab.value === 'lxc') { void loadGuestNetworks(); void loadGuestExposure(); void loadBackups() }
+      else if (tab.value === 'services') void loadServices()
+      else if (tab.value === 'backups') void loadBackups()
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, t('proxmox.genericLoadError'))
     } finally {
@@ -358,8 +358,8 @@ export function useProxmoxNode() {
       liveStatus.value = res.data
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
-      const ax = e as { response?: { data?: { error?: string }; status?: number } }
-      liveStatusError.value = ax.response?.data?.error || t('proxmox.liveStatusErrorTemplate', { status: ax.response?.status ?? '' })
+      const status = (e as { response?: { status?: number } }).response?.status ?? ''
+      liveStatusError.value = getApiErrorMessage(e, t('proxmox.liveStatusErrorTemplate', { status }))
     } finally {
       liveStatusLoading.value = false
     }
@@ -435,7 +435,7 @@ export function useProxmoxNode() {
           pollTimer = setTimeout(poll, 3000)
         }
       }
-      poll()
+      void poll()
     })
   }
 
@@ -447,7 +447,7 @@ export function useProxmoxNode() {
       const upid = res.data?.upid
       aptRefreshMsg.value = upid ? t('proxmox.taskLaunchedLogsMessage') : (res.data?.message || t('proxmox.taskLaunchedMessage'))
       aptRefreshOk.value = true
-      if (upid) startPollingTask(upid, { action: 'apt update' })
+      if (upid) void startPollingTask(upid, { action: 'apt update' })
     } catch (e: unknown) {
       aptRefreshMsg.value = getApiErrorMessage(e, t('proxmox.aptUpdateLaunchError'))
       aptRefreshOk.value = false
@@ -547,7 +547,7 @@ export function useProxmoxNode() {
       const upid = res.data?.upid
       migrateModal.value.open = false
       if (upid) {
-        startPollingTask(upid, { action: 'migrate', label: `${m.guest.name || m.guest.vmid} → ${m.target}` })
+        void startPollingTask(upid, { action: 'migrate', label: `${m.guest.name || m.guest.vmid} → ${m.target}` })
       }
     } catch (e: unknown) {
       m.error = getApiErrorMessage(e, t('proxmox.migrationLaunchError'))
@@ -557,8 +557,8 @@ export function useProxmoxNode() {
   }
 
   onMounted(() => {
-    load()
-    liveStatusTimer = setInterval(() => { if (autoRefresh.value) loadLiveStatus() }, LIVE_STATUS_REFRESH_SEC * 1000)
+    void load()
+    liveStatusTimer = setInterval(() => { if (autoRefresh.value) void loadLiveStatus() }, LIVE_STATUS_REFRESH_SEC * 1000)
   })
   onUnmounted(() => {
     stopPolling()

@@ -1,7 +1,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
-import { isApiAbort } from '../api/client'
+import { isApiAbort, getApiErrorMessage } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { ProxmoxSummary, ProxmoxNode, ProxmoxConnection } from '../types/proxmox'
 
@@ -129,13 +129,13 @@ export function useProxmox() {
       if (instRes.status === 'fulfilled') {
         instances.value = instRes.value.data
       } else if (instRes.reason?.response?.status !== 403) {
-        error.value = instRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
+        error.value = getApiErrorMessage(instRes.reason, t('proxmox.genericLoadError'))
       }
       if (sumRes.status === 'rejected' && sumRes.reason?.response?.status !== 403) {
-        error.value = sumRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
+        error.value = getApiErrorMessage(sumRes.reason, t('proxmox.genericLoadError'))
       }
       if (nodesRes.status === 'rejected' && nodesRes.reason?.response?.status !== 403) {
-        error.value = nodesRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
+        error.value = getApiErrorMessage(nodesRes.reason, t('proxmox.genericLoadError'))
       }
     } finally {
       loading.value = false
@@ -146,7 +146,7 @@ export function useProxmox() {
   function startRefreshTimer(): void {
     stopRefreshTimer()
     refreshTimer = setInterval(() => {
-      if (autoRefresh.value) load()
+      if (autoRefresh.value) void load()
     }, PROXMOX_REFRESH_SEC * 1000)
   }
 
@@ -154,7 +154,7 @@ export function useProxmox() {
     if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }
 
-  onMounted(() => { load(); startRefreshTimer() })
+  onMounted(() => { void load(); startRefreshTimer() })
   onUnmounted(stopRefreshTimer)
 
   return {
