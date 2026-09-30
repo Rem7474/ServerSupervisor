@@ -46,6 +46,30 @@ describe('HostMetricsPanel', () => {
     expect(wrapper.text()).toContain('1.23')
   })
 
+  // Shared thresholds (utils/metricColor): yellow only above 75 %, and a
+  // zero/missing reading means "no metrics yet", not an idle host.
+  it('colors CPU and RAM with the shared usage thresholds', async () => {
+    const wrapper = mount(HostMetricsPanel, {
+      props: { hostId: 'h1', metrics: { ...baseMetrics, cpu_usage_percent: 72, memory_percent: 80 } },
+      ...mountOpts,
+    })
+    await flushPromises()
+    const [cpu, ram] = wrapper.findAll('.h2.mb-0')
+    expect(cpu.classes()).toContain('text-success')
+    expect(ram.classes()).toContain('text-warning')
+  })
+
+  it('keeps CPU and RAM neutral before the first metrics arrive', async () => {
+    const wrapper = mount(HostMetricsPanel, {
+      props: { hostId: 'h1', metrics: { ...baseMetrics, cpu_usage_percent: 0, memory_percent: undefined } },
+      ...mountOpts,
+    })
+    await flushPromises()
+    const [cpu, ram] = wrapper.findAll('.h2.mb-0')
+    expect(cpu.classes()).toContain('text-secondary')
+    expect(ram.classes()).toContain('text-secondary')
+  })
+
   it('formats uptime as hours/minutes when under a day', async () => {
     const wrapper = mount(HostMetricsPanel, {
       props: { hostId: 'h1', metrics: { ...baseMetrics, uptime: 3900 } },
