@@ -631,3 +631,73 @@ code {
   background: rgba(255,255,255,0.04);
   color: #94a3b8;
 }
+
+/* Radio-button cards (webhook update action, release-tracker type). */
+.tracker-type-card {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--tblr-border-color);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.tracker-type-card--active {
+  border-color: var(--tblr-primary);
+  background: var(--tblr-primary-lt);
+}
+
+.tracker-type-card--idle {
+  border-color: var(--tblr-border-color);
+  background: transparent;
+}
+
+.tracker-type-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Newly registered host(s) with their API key — AddHostView and the
+   network-discovery panel it renders. */
+.host-success {
+  background: var(--ss-panel-medium);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 14px;
+  padding: 20px;
+  color: var(--ss-text-on-dark);
+}
+
+.host-success-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.host-success-card {
+  background: var(--ss-panel-strong);
+  border: 1px solid var(--ss-border-default);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.host-success-key {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.host-success-key code {
+  display: block;
+  background: rgba(2, 6, 23, 0.6);
+  color: var(--ss-text-strong);
+  padding: 8px 10px;
+  border-radius: 8px;
+  flex: 1;
+  word-break: break-all;
+}

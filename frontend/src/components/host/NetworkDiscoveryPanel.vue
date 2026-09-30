@@ -255,42 +255,8 @@ function finish(): void {
 </script>
 
 <style scoped>
-.host-success {
-  background: var(--ss-panel-medium);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: 14px;
-  padding: 20px;
-  color: var(--ss-text-on-dark);
-}
-
+/* Tighter than the shared .host-success-header (style.css): the panel sits in a list. */
 .host-success-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   margin-bottom: 8px;
-}
-
-.host-success-card {
-  background: var(--ss-panel-strong);
-  border: 1px solid var(--ss-border-default);
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.host-success-key {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.host-success-key code {
-  display: block;
-  background: rgba(2, 6, 23, 0.6);
-  color: var(--ss-text-strong);
-  padding: 8px 10px;
-  border-radius: 8px;
-  flex: 1;
-  word-break: break-all;
 }
 </style>
