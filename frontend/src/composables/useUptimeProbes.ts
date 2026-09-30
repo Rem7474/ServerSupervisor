@@ -5,6 +5,7 @@ import { npmApi } from '../api/npm'
 import type { UptimeProbe } from '../types/uptime'
 import { useConfirmDialog } from './useConfirmDialog'
 import { usePagination } from './usePagination'
+import { getApiErrorMessage } from '../api/client'
 
 type Probe = UptimeProbe
 
@@ -146,8 +147,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       if (withStats) fetchAllProbeStats()
       fetchAllProbeHistory()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
-        || (e as { message?: string })?.message || t('monitoring.probeLoadError')
+      error.value = getApiErrorMessage(e, t('monitoring.probeLoadError'))
     } finally {
       loadingProbes.value = false
     }
@@ -189,7 +189,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       await api.checkUptimeProbeNow(p.id)
       await fetchProbes()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.checkFailedError')
+      error.value = getApiErrorMessage(e, t('monitoring.checkFailedError'))
     } finally {
       checkingProbeId.value = ''
     }
@@ -241,7 +241,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       closeProbeModal()
       await fetchProbes()
     } catch (e: unknown) {
-      probeFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.saveErrorGeneric')
+      probeFormError.value = getApiErrorMessage(e, t('monitoring.saveErrorGeneric'))
     } finally {
       savingProbe.value = false
     }
@@ -270,7 +270,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       await api.deleteUptimeProbe(p.id)
       await fetchProbes()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.deleteFailedError')
+      error.value = getApiErrorMessage(e, t('monitoring.deleteFailedError'))
     }
   }
 

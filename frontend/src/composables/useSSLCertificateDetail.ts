@@ -2,7 +2,7 @@ import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
-import { isApiAbort } from '../api/client'
+import { isApiAbort, getApiErrorMessage } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { SSLCertificate, SSLCertificateEvent } from '../types/ssl'
 import dayjs from '../utils/dayjs'
@@ -86,7 +86,7 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       if (isApiAbort(e)) return
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.sslLoadCertError')
+      error.value = getApiErrorMessage(e, t('monitoring.sslLoadCertError'))
     } finally {
       loading.value = false
     }

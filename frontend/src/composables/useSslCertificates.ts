@@ -6,6 +6,7 @@ import type { SSLCertificate } from '../types/ssl'
 import { useConfirmDialog } from './useConfirmDialog'
 import dayjs from '../utils/dayjs'
 import { usePagination } from './usePagination'
+import { getApiErrorMessage } from '../api/client'
 
 type SSLCert = SSLCertificate
 
@@ -109,7 +110,7 @@ export function useSslCertificates() {
       lastUpdatedAt.value = new Date()
       error.value = ''
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.sslLoadCertsError')
+      error.value = getApiErrorMessage(e, t('monitoring.sslLoadCertsError'))
     } finally {
       loadingCerts.value = false
     }
@@ -121,7 +122,7 @@ export function useSslCertificates() {
       await api.checkSSLCertificateNow(c.id)
       await fetchCerts()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.checkFailedError')
+      error.value = getApiErrorMessage(e, t('monitoring.checkFailedError'))
     } finally {
       checkingCertId.value = ''
     }
@@ -168,7 +169,7 @@ export function useSslCertificates() {
       closeCertModal()
       await fetchCerts()
     } catch (e: unknown) {
-      certFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.saveErrorGeneric')
+      certFormError.value = getApiErrorMessage(e, t('monitoring.saveErrorGeneric'))
     } finally {
       savingCert.value = false
     }
@@ -195,7 +196,7 @@ export function useSslCertificates() {
       await api.deleteSSLCertificate(c.id)
       await fetchCerts()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.deleteFailedError')
+      error.value = getApiErrorMessage(e, t('monitoring.deleteFailedError'))
     }
   }
 

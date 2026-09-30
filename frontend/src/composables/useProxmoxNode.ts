@@ -358,8 +358,8 @@ export function useProxmoxNode() {
       liveStatus.value = res.data
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
-      const ax = e as { response?: { data?: { error?: string }; status?: number } }
-      liveStatusError.value = ax.response?.data?.error || t('proxmox.liveStatusErrorTemplate', { status: ax.response?.status ?? '' })
+      const status = (e as { response?: { status?: number } }).response?.status ?? ''
+      liveStatusError.value = getApiErrorMessage(e, t('proxmox.liveStatusErrorTemplate', { status }))
     } finally {
       liveStatusLoading.value = false
     }

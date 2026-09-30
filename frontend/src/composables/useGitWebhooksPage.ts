@@ -219,10 +219,6 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     return data?.webhook ?? {}
   }
 
-  function readError(err: unknown, fallback: string): string {
-    return getApiErrorMessage(err, fallback)
-  }
-
   onMounted(async () => {
     cooldownTimer = window.setInterval(() => {
       nowTick.value = Date.now()
@@ -286,7 +282,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       const response = await api.getGitWebhooks()
       webhooks.value = response.data.webhooks || []
     } catch (err: unknown) {
-      error.value = readError(err, t('webhooks.loadWebhooksError'))
+      error.value = getApiErrorMessage(err, t('webhooks.loadWebhooksError'))
     } finally {
       loadingWebhooks.value = false
     }
@@ -300,7 +296,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       trackers.value = response.data.trackers || []
       ensureRunningRefresh()
     } catch (err: unknown) {
-      error.value = readError(err, t('webhooks.loadTrackersError'))
+      error.value = getApiErrorMessage(err, t('webhooks.loadTrackersError'))
     } finally {
       loadingTrackers.value = false
     }
@@ -350,7 +346,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       closeWebhookModal()
       await loadWebhooks()
     } catch (err: unknown) {
-      modalError.value = readError(err, t('common.error'))
+      modalError.value = getApiErrorMessage(err, t('common.error'))
     } finally {
       saving.value = false
     }
@@ -361,7 +357,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.updateGitWebhook(webhook.id, { ...webhook, enabled: !webhook.enabled })
       await loadWebhooks()
     } catch (err: unknown) {
-      error.value = readError(err, t('common.error'))
+      error.value = getApiErrorMessage(err, t('common.error'))
     }
   }
 
@@ -376,7 +372,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.deleteGitWebhook(webhook.id)
       await loadWebhooks()
     } catch (err: unknown) {
-      error.value = readError(err, t('webhooks.deleteError'))
+      error.value = getApiErrorMessage(err, t('webhooks.deleteError'))
     }
   }
 
@@ -421,7 +417,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       closeTrackerModal()
       await loadTrackers()
     } catch (err: unknown) {
-      modalError.value = readError(err, t('common.error'))
+      modalError.value = getApiErrorMessage(err, t('common.error'))
     } finally {
       saving.value = false
     }
@@ -432,7 +428,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.updateReleaseTracker(tracker.id, { ...tracker, enabled: !tracker.enabled })
       await loadTrackers()
     } catch (err: unknown) {
-      error.value = readError(err, t('common.error'))
+      error.value = getApiErrorMessage(err, t('common.error'))
     }
   }
 
@@ -441,7 +437,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.checkReleaseTrackerNow(tracker.id)
       setTimeout(() => loadTrackers(), 2000)
     } catch (err: unknown) {
-      error.value = readError(err, t('common.error'))
+      error.value = getApiErrorMessage(err, t('common.error'))
     }
   }
 
@@ -456,7 +452,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.deleteReleaseTracker(tracker.id)
       await loadTrackers()
     } catch (err: unknown) {
-      error.value = readError(err, t('webhooks.deleteError'))
+      error.value = getApiErrorMessage(err, t('webhooks.deleteError'))
     }
   }
 
