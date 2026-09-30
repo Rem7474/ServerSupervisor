@@ -167,24 +167,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
-import { getApiErrorMessage } from '../../api/client'
-import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import type { RegistryCredential } from '../../types/tracker'
+import { useConnectionCrud } from '../../composables/useConnectionCrud'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 const { t } = useI18n()
-const { confirm } = useConfirmDialog()
-
-interface Credential {
-  id: string
-  name: string
-  registry_host: string
-  username: string
-}
 
 interface CredentialForm {
   name: string
@@ -199,111 +190,30 @@ withDefaults(defineProps<{
   authIsAdmin: false,
 })
 
-const credentials = ref<Credential[]>([])
-const loading = ref(false)
-const showForm = ref(false)
-const editingId = ref<string | null>(null)
-const saving = ref(false)
-const formMsg = ref('')
-const formOk = ref(false)
-const listMsg = ref('')
-const listOk = ref(false)
-
-const emptyForm = (): CredentialForm => ({
-  name: '',
-  registry_host: '',
-  username: '',
-  password: '',
+const {
+  items: credentials, loading, showForm, editingId, form, saving, formMsg, formOk, listMsg, listOk,
+  openAddForm, openEditForm, cancelForm, save, remove,
+} = useConnectionCrud<RegistryCredential, CredentialForm>({
+  list: async () => {
+    const data = (await api.getRegistryCredentials()).data
+    return Array.isArray(data?.credentials) ? data.credentials : []
+  },
+  create: (f) => api.createRegistryCredential(f),
+  update: (id, f) => api.updateRegistryCredential(id, f),
+  remove: (id) => api.deleteRegistryCredential(id),
+  emptyForm: () => ({ name: '', registry_host: '', username: '', password: '' }),
+  toForm: (cred) => ({ name: cred.name, registry_host: cred.registry_host, username: cred.username, password: '' }),
+  validate: (f, editing) => {
+    if (!f.name || !f.registry_host || !f.username) return t('settings.nameHostUserRequired')
+    if (!editing && !f.password) return t('settings.passwordRequiredOnCreate')
+    return ''
+  },
+  keys: {
+    created: 'settings.credentialCreated',
+    updated: 'settings.credentialUpdated',
+    deleted: 'settings.credentialDeleted',
+    deleteTitle: 'settings.deleteCredentialTitle',
+    deleteMessage: 'settings.deleteCredentialMsg',
+  },
 })
-
-const form = ref<CredentialForm>(emptyForm())
-
-async function load(): Promise<void> {
-  loading.value = true
-  try {
-    const res = await api.getRegistryCredentials()
-    credentials.value = Array.isArray(res.data?.credentials) ? res.data.credentials : []
-  } catch {
-    // silently ignore
-  } finally {
-    loading.value = false
-  }
-}
-
-function openAddForm(): void {
-  editingId.value = null
-  form.value = emptyForm()
-  formMsg.value = ''
-  showForm.value = true
-}
-
-function openEditForm(cred: Credential): void {
-  editingId.value = cred.id
-  form.value = {
-    name: cred.name,
-    registry_host: cred.registry_host,
-    username: cred.username,
-    password: '',
-  }
-  formMsg.value = ''
-  showForm.value = true
-}
-
-function cancelForm(): void {
-  showForm.value = false
-  formMsg.value = ''
-  editingId.value = null
-}
-
-async function save(): Promise<void> {
-  if (!form.value.name || !form.value.registry_host || !form.value.username) {
-    formMsg.value = t('settings.nameHostUserRequired')
-    formOk.value = false
-    return
-  }
-  if (!editingId.value && !form.value.password) {
-    formMsg.value = t('settings.passwordRequiredOnCreate')
-    formOk.value = false
-    return
-  }
-  saving.value = true
-  formMsg.value = ''
-  try {
-    if (editingId.value) {
-      await api.updateRegistryCredential(editingId.value, form.value)
-    } else {
-      await api.createRegistryCredential(form.value)
-    }
-    formMsg.value = editingId.value ? t('settings.credentialUpdated') : t('settings.credentialCreated')
-    formOk.value = true
-    await load()
-    showForm.value = false
-    editingId.value = null
-  } catch (e: unknown) {
-    formMsg.value = getApiErrorMessage(e, t('settings.saveError'))
-    formOk.value = false
-  } finally {
-    saving.value = false
-  }
-}
-
-async function remove(cred: Credential): Promise<void> {
-  const confirmed = await confirm({
-    title: t('settings.deleteCredentialTitle'),
-    message: t('settings.deleteCredentialMsg', { name: cred.name }),
-    variant: 'danger',
-  })
-  if (!confirmed) return
-  try {
-    await api.deleteRegistryCredential(cred.id)
-    await load()
-    listMsg.value = t('settings.credentialDeleted')
-    listOk.value = true
-  } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, t('settings.deleteError'))
-    listOk.value = false
-  }
-}
-
-onMounted(load)
 </script>
