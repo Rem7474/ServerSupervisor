@@ -575,7 +575,7 @@ import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue
 import { useProxmoxNode } from '../composables/useProxmoxNode'
 import { useModalChrome } from '../composables/useModalChrome'
 import { getMetricColorClass, getTemperatureColorClass } from '../utils/metricColor'
-import { formatDateTime, formatUptime } from '../utils/formatters'
+import { formatDateTime, formatUptime, formatBytes as formatBytesShared } from '../utils/formatters'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -733,12 +733,7 @@ function storageColor(used: number, total: number): string {
 }
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes) return '0 B'
-  const unitKeys = ['proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
-  let i = 0, v = bytes
-  while (v >= 1024 && i < unitKeys.length) { v /= 1024; i++ }
-  const unit = i === 0 ? 'B' : t(unitKeys[i - 1])
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
+  return formatBytesShared(bytes || 0)
 }
 
 function formatDate(iso: string | undefined): string {

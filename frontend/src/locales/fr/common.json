@@ -1,4 +1,10 @@
 {
+  "byteUnitB": "o",
+  "byteUnitKB": "Ko",
+  "byteUnitMB": "Mo",
+  "byteUnitGB": "Go",
+  "byteUnitTB": "To",
+  "byteUnitPB": "Po",
   "never": "Jamais",
   "justNow": "il y a quelques secondes",
   "secondsAgo": "il y a {n}s",

@@ -73,22 +73,14 @@ import { useI18n } from 'vue-i18n'
 import type { ProxmoxStorage } from '../../types/proxmox'
 import EmptyState from '../EmptyState.vue'
 import { getMetricColorClass } from '../../utils/metricColor'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 const { t } = useI18n()
 
 defineProps<{ storages: ProxmoxStorage[] }>()
 
 function formatBytes(bytes: number): string {
-  if (!bytes) return '0 B'
-  const unitKeys = ['', 'proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
-  let i = 0
-  let v = bytes
-  while (v >= 1024 && i < unitKeys.length - 1) {
-    v /= 1024
-    i++
-  }
-  const unit = i === 0 ? 'B' : t(unitKeys[i])
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
+  return formatBytesShared(bytes || 0)
 }
 
 function storagePct(s: ProxmoxStorage): string {

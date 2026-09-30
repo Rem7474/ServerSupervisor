@@ -444,6 +444,7 @@ import { useI18n } from 'vue-i18n'
 import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../../types/network'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 interface PortMapping {
   host_port?: number | string
@@ -636,16 +637,7 @@ const sortedNpmEntries = computed(() =>
 )
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes && bytes !== 0) return '-'
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let value = bytes / 1024
-  let idx = 0
-  while (value >= 1024 && idx < units.length - 1) {
-    value /= 1024
-    idx += 1
-  }
-  return `${value.toFixed(1)} ${units[idx]}`
+  return formatBytesShared(bytes)
 }
 </script>
 

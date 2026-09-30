@@ -81,13 +81,24 @@ export function formatUptime(seconds: NumberInput, empty = 'N/A'): string {
   return `${mins}m`
 }
 
-/** Format bytes to a human-readable string (KB, MB, GB). */
-export function formatBytes(bytes: NumberInput): string {
-  if (!bytes && bytes !== 0) return '-'
-  if (bytes === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+const BYTE_UNIT_KEYS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'].map((u) => `common.byteUnit${u}`)
+
+/**
+ * Format a byte count (base 1024) with translated units ("1,5 Go" in French,
+ * "1.5 GB" in English): whole bytes, one decimal from kilobytes up. A missing
+ * value is `empty`; callers that treat "unknown" as zero pass `bytes || 0`.
+ */
+export function formatBytes(bytes: NumberInput, empty = '-'): string {
+  if (bytes == null || Number.isNaN(bytes)) return empty
+  let value = Math.max(0, bytes)
+  let i = 0
+  while (value >= 1024 && i < BYTE_UNIT_KEYS.length - 1) {
+    value /= 1024
+    i++
+  }
+  const digits = i === 0 ? 0 : 1
+  const n = new Intl.NumberFormat(localeTag(), { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false }).format(value)
+  return `${n} ${i18n.global.t(BYTE_UNIT_KEYS[i])}`
 }
 
 /** Format an integer with the active locale's grouping separator. */

@@ -294,6 +294,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconHome } from '@tabler/icons-vue'
 import { hostStatusClass } from '../../utils/formatHostStatus'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 interface SelectedNode {
   type?: string
@@ -457,13 +458,7 @@ const typeTagClass = computed(() => {
 const statusBadgeClass = computed(() => hostStatusClass(hostData.value?.status || props.selectedNode?.status || ''))
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes && bytes !== 0) return '-'
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let value = bytes / 1024
-  let idx = 0
-  while (value >= 1024 && idx < units.length - 1) { value /= 1024; idx++ }
-  return `${value.toFixed(1)} ${units[idx]}`
+  return formatBytesShared(bytes)
 }
 
 function copyUrl(url: string): void {

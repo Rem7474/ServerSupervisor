@@ -41,7 +41,7 @@ describe('HostMetricsPanel', () => {
     expect(wrapper.text()).toContain('42.6%')
     expect(wrapper.text()).toContain('Intel Xeon')
     expect(wrapper.text()).toContain('55.4%')
-    expect(wrapper.text()).toContain('4 GiB / 8 GiB')
+    expect(wrapper.text()).toContain('4,0 Go / 8,0 Go')
     expect(wrapper.text()).toContain('1j 1h')
     expect(wrapper.text()).toContain('1.23')
   })
