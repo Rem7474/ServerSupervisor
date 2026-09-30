@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, breakLargeGaps } from './chartTimeAxis'
+import { setLocale } from '../i18n'
+import {
+  clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, breakLargeGaps,
+  chartTimeDetail, formatChartTimestamp,
+} from './chartTimeAxis'
 
 describe('clampTimestamp', () => {
   afterEach(() => {
@@ -91,5 +95,53 @@ describe('breakLargeGaps', () => {
   it('handles a single point with no next to compare against', () => {
     const points = [{ x: 0, y: 1 }]
     expect(breakLargeGaps(points, 50)).toEqual(points)
+  })
+})
+
+describe('chartTimeDetail', () => {
+  it.each([
+    [1, 'time'],
+    [24, 'time'],
+    [25, 'dayTime'],
+    [720, 'dayTime'],
+    [721, 'day'],
+  ])('%sh → %s', (hours, detail) => {
+    expect(chartTimeDetail(hours)).toBe(detail)
+  })
+})
+
+describe('formatChartTimestamp', () => {
+  // Local time so the expected wall-clock values don't depend on the runner's TZ.
+  const ts = new Date(2026, 8, 30, 14, 5, 9).getTime()
+
+  afterEach(() => setLocale('fr'))
+
+  it('orders day and month by UI locale instead of a hardcoded DD/MM', () => {
+    setLocale('fr')
+    expect(formatChartTimestamp(ts, 'day')).toBe('30/09')
+    expect(formatChartTimestamp(ts, 'dayTime')).toBe('30/09 14:05')
+    setLocale('en')
+    expect(formatChartTimestamp(ts, 'day')).toBe('09/30')
+    expect(formatChartTimestamp(ts, 'time')).toMatch(/^02:05\sPM$/)
+  })
+
+  it('shows seconds only when asked', () => {
+    setLocale('fr')
+    expect(formatChartTimestamp(ts, 'time')).toBe('14:05')
+    expect(formatChartTimestamp(ts, 'timeSeconds')).toBe('14:05:09')
+  })
+
+  it('accepts ms, numeric strings (ApexCharts axis values), ISO strings and Dates', () => {
+    setLocale('fr')
+    const iso = new Date(ts).toISOString()
+    for (const v of [ts, String(ts), iso, new Date(ts)]) {
+      expect(formatChartTimestamp(v, 'time')).toBe('14:05')
+    }
+  })
+
+  it('returns an empty label for missing or invalid input', () => {
+    expect(formatChartTimestamp(undefined, 'time')).toBe('')
+    expect(formatChartTimestamp('', 'time')).toBe('')
+    expect(formatChartTimestamp('garbage', 'time')).toBe('')
   })
 })
