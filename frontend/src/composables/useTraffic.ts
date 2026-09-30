@@ -7,6 +7,7 @@ import { looksLikeIP } from '../utils/network'
 import { useDomainDetails } from './useDomainDetails'
 import type { WebLogIPTimelineRow } from '../types/security'
 import type { TimeRangeModel } from '../types/timeRange'
+import { httpStatusClass } from '../utils/statusClasses'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
@@ -127,13 +128,6 @@ export function useTraffic() {
     const d = new Date(v)
     if (Number.isNaN(d.getTime())) return v || '-'
     return d.toLocaleString()
-  }
-
-  function statusClass(status: number): string {
-    if (status >= 200 && status < 300) return 'bg-success-lt text-success'
-    if (status >= 300 && status < 400) return 'bg-warning-lt text-warning'
-    if (status >= 400) return 'bg-danger-lt text-danger'
-    return 'bg-secondary-lt text-secondary'
   }
 
 
@@ -309,7 +303,7 @@ export function useTraffic() {
     numberFormat,
     formatBytes,
     formatDate,
-    statusClass,
+    statusClass: httpStatusClass,
     hostWidth,
     onRangeChange,
     loadAll,

@@ -5,6 +5,7 @@ import api, { getApiErrorMessage } from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useCommandStream } from './useCommandStream'
 import { execBadgeColor } from '../utils/statusClasses'
+import { gitProviderBadgeClass } from '../utils/categoryBadges'
 
 interface TrackerCmd {
   id: string
@@ -468,14 +469,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   }
 
   function providerBadge(provider: string): string {
-    const map: Record<string, string> = {
-      github: 'bg-blue-lt text-blue',
-      gitlab: 'bg-orange-lt text-orange',
-      gitea: 'bg-teal-lt text-teal',
-      forgejo: 'bg-purple-lt text-purple',
-      custom: 'bg-secondary-lt text-secondary',
-    }
-    return map[provider] || 'bg-secondary-lt text-secondary'
+    return gitProviderBadgeClass(provider)
   }
 
   function execStatusBadge(status: string): string {

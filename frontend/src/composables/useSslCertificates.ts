@@ -7,6 +7,7 @@ import { useConfirmDialog } from './useConfirmDialog'
 import dayjs from '../utils/dayjs'
 import { usePagination } from './usePagination'
 import { getApiErrorMessage } from '../api/client'
+import { sslDaysClass } from '../utils/statusClasses'
 
 type SSLCert = SSLCertificate
 
@@ -95,11 +96,7 @@ export function useSslCertificates() {
   }
 
   function daysBadge(d: number | null | undefined): string {
-    if (d == null) return 'bg-secondary-lt text-secondary'
-    if (d < 0) return 'bg-danger text-white'
-    if (d <= 7) return 'bg-danger-lt text-danger'
-    if (d <= 30) return 'bg-warning-lt text-warning'
-    return 'bg-success-lt text-success'
+    return sslDaysClass(d)
   }
 
   async function fetchCerts(): Promise<void> {
