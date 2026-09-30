@@ -567,6 +567,7 @@ import { useI18n } from 'vue-i18n'
 import { IconPlus, IconRefresh } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import { buildDiscoveredPortsByHost, createDefaultPortSetting, ensureHostPortConfig, getHostPortEntry, type HostPortEntry, type PortSetting } from '../../utils/networkPorts'
 
 interface NetworkService {
   id: string
@@ -580,30 +581,6 @@ interface NetworkService {
   linkToProxy: boolean
   linkToAuthelia: boolean
   exposedToInternet: boolean
-}
-
-interface PortSetting {
-  name: string
-  domain: string
-  path: string
-  enabled: boolean
-  linkToProxy: boolean
-  linkToAuthelia: boolean
-  exposedToInternet: boolean
-  externalPort: number | null
-}
-
-interface HostPortEntry {
-  hostId: string
-  ports: Record<string, PortSetting>
-}
-
-interface DiscoveredPort {
-  key: string
-  port: number
-  protocol: string
-  internal: boolean
-  containers: string[]
 }
 
 interface PortMapping {
@@ -649,38 +626,8 @@ const props = withDefaults(defineProps<{
 const { t } = useI18n()
 const dialog = useConfirmDialog()
 
-const discoveredPortsByHost = computed<Record<string, DiscoveredPort[]>>(() => {
-  const map: Record<string, DiscoveredPort[]> = {}
-  for (const container of props.containers) {
-    const mappings = container.port_mappings || []
-    for (const mapping of mappings) {
-      const hostId = container.host_id
-      if (!hostId) continue
 
-      const hostPort = mapping.host_port || 0
-      const containerPort = mapping.container_port || 0
-      const portNumber = hostPort || containerPort
-      if (!portNumber) continue
-
-      const protocol = (mapping.protocol || 'tcp').toLowerCase()
-      if (!map[hostId]) map[hostId] = []
-      const key = `${portNumber}-${protocol}`
-      const existing = map[hostId].find((entry) => entry.key === key)
-      if (existing) {
-        if (container.name && !existing.containers.includes(container.name)) existing.containers.push(container.name)
-        continue
-      }
-
-      map[hostId].push({ key, port: portNumber, protocol, internal: hostPort === 0, containers: container.name ? [container.name] : [] })
-    }
-  }
-
-  for (const host of props.hosts) {
-    if (!map[host.id]) map[host.id] = []
-  }
-
-  return map
-})
+const discoveredPortsByHost = computed(() => buildDiscoveredPortsByHost(props.containers, props.hosts))
 
 // Ports available for the proxy-host and authelia-host dropdowns
 const proxyHostPorts = computed(() => {
@@ -700,7 +647,7 @@ watch(autheliaHostId, () => { autheliaPortId.value = '' })
 watch(
   [() => props.hosts, discoveredPortsByHost],
   () => {
-    ensureHostPortConfig()
+    ensureHostPortConfig(hostPortConfig.value, props.hosts, discoveredPortsByHost.value)
   },
   { deep: true, immediate: true }
 )
@@ -762,48 +709,17 @@ function isPortModified(hostId: string, portNumber: number): boolean {
 }
 
 function resetPortSetting(hostId: string, portNumber: number): void {
-  const entry = getHostPortEntry(hostId)
+  const entry = getHostPortEntry(hostPortConfig.value, hostId)
   entry.ports[String(portNumber)] = createDefaultPortSetting()
 }
 
 function getPortSetting(hostId: string, portNumber: number): PortSetting {
-  const entry = getHostPortEntry(hostId)
+  const entry = getHostPortEntry(hostPortConfig.value, hostId)
   const key = String(portNumber)
   if (!entry.ports[key]) {
     entry.ports[key] = createDefaultPortSetting()
   }
   return entry.ports[key]
-}
-
-function ensureHostPortConfig(): void {
-  const known = new Set(hostPortConfig.value.map((item) => item.hostId))
-  for (const host of props.hosts) {
-    if (known.has(host.id)) continue
-    hostPortConfig.value.push({ hostId: host.id, ports: {} })
-  }
-  for (const [hostId, ports] of Object.entries(discoveredPortsByHost.value)) {
-    const entry = getHostPortEntry(hostId)
-    for (const port of ports) {
-      const portKey = String(port.port)
-      if (!entry.ports[portKey]) {
-        entry.ports[portKey] = createDefaultPortSetting()
-      }
-    }
-  }
-}
-
-function getHostPortEntry(hostId: string): HostPortEntry {
-  let entry = hostPortConfig.value.find((item) => item.hostId === hostId)
-  if (!entry) {
-    entry = { hostId, ports: {} }
-    hostPortConfig.value.push(entry)
-  }
-  if (!entry.ports) entry.ports = {}
-  return entry
-}
-
-function createDefaultPortSetting(): PortSetting {
-  return { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
 }
 
 function addServiceRow(): void {
