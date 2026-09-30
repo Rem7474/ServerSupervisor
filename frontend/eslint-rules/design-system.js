@@ -111,9 +111,45 @@ export const noNativeConfirm = {
   },
 }
 
+// An icon-only button has no text for a screen reader to announce; `title`
+// alone is a hover hint that assistive tech handles inconsistently.
+// frontend/CLAUDE.md's button table asks for both `title` and `aria-label`.
+function attributeName(attr) {
+  if (!attr.directive) return attr.key?.name
+  // `:aria-label="..."` → v-bind with argument "aria-label"
+  return attr.key?.name?.name === 'bind' ? attr.key.argument?.name : undefined
+}
+
+export const iconButtonNeedsLabel = {
+  meta: {
+    type: 'problem',
+    docs: {
+      description: 'require aria-label on icon-only buttons (btn-icon, btn-close)',
+    },
+    schema: [],
+  },
+  create(context) {
+    return defineVisitor(context, {
+      VElement(node) {
+        if (!['button', 'a', 'router-link'].includes(node.rawName)) return
+        const attrs = node.startTag.attributes
+        const cls = attrs.find((a) => !a.directive && a.key?.name === 'class')
+        const value = cls?.value?.value || ''
+        if (!/\bbtn-(?:icon|close)\b/.test(value)) return
+        if (attrs.some((a) => attributeName(a) === 'aria-label' || attributeName(a) === 'aria-labelledby')) return
+        context.report({
+          node: node.startTag,
+          message: `Icon-only button ("${value}") needs an aria-label (bind it to the same text as its title) — see frontend/CLAUDE.md's Buttons table.`,
+        })
+      },
+    })
+  },
+}
+
 export default {
   rules: {
     'no-forbidden-tabler-class': noForbiddenTablerClass,
     'no-native-confirm': noNativeConfirm,
+    'icon-button-needs-label': iconButtonNeedsLabel,
   },
 }

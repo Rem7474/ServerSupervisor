@@ -40,6 +40,7 @@
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
               :title="t('common.commandLogDownloadTooltip')"
+              :aria-label="t('common.commandLogDownloadTooltip')"
               :disabled="!command"
               @click="download"
             >
@@ -54,6 +55,7 @@
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
               :title="t('common.commandLogClearTooltip')"
+              :aria-label="t('common.commandLogClearTooltip')"
               :disabled="!command"
               @click="$emit('clear')"
             >
@@ -69,6 +71,7 @@
             type="button"
             class="btn btn-icon btn-sm btn-ghost-secondary"
             :title="t('common.close')"
+            :aria-label="t('common.close')"
             @click="$emit('close')"
           >
             <IconX
@@ -235,6 +238,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   command: null,
   show: false,
+  title: undefined,
+  emptyText: undefined,
   wrapperClass: '',
   clearable: false,
   mode: 'log',

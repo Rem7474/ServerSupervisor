@@ -104,6 +104,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-success py-0 px-1 notification-resolve-btn"
                   :title="t('alerts.notificationBellResolveAction')"
+                  :aria-label="t('alerts.notificationBellResolveAction')"
                   :disabled="resolvingId === item.id"
                   @click.stop="resolveIncident(item)"
                 >

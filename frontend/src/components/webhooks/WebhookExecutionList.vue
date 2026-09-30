@@ -101,6 +101,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('proxmox.viewLogsTooltip')"
+                  :aria-label="t('proxmox.viewLogsTooltip')"
                   @click="$emit('open-logs', execution.command_id)"
                 >
                   <IconFileText :size="14" />
@@ -162,6 +163,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('proxmox.viewLogsTooltip')"
+                  :aria-label="t('proxmox.viewLogsTooltip')"
                   @click="$emit('open-logs', execution.command_id)"
                 >
                   <IconFileText :size="14" />
@@ -183,6 +185,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('webhooks.viewReceivedPayloadTooltip')"
+                  :aria-label="t('webhooks.viewReceivedPayloadTooltip')"
                   @click="$emit('open-payload', execution.raw_payload)"
                 >
                   <IconBraces :size="14" />
@@ -255,6 +258,8 @@ const props = withDefaults(defineProps<{
   executions: () => [],
   loading: false,
   kind: 'webhook',
+  title: undefined,
+  emptyText: undefined,
   showRefresh: false,
   logsMode: 'link',
 })

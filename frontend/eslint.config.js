@@ -108,6 +108,7 @@ export default [
     rules: {
       'local/no-forbidden-tabler-class': 'error',
       'local/no-native-confirm': 'error',
+      'local/icon-button-needs-label': 'error',
     },
   },
   {
@@ -133,6 +134,13 @@ export default [
     ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    // Specs mount small inline host components next to the one under test.
+    files: ['**/*.spec.ts', '**/*.browser.test.ts'],
+    rules: {
+      'vue/one-component-per-file': 'off',
     },
   },
   {

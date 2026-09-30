@@ -241,6 +241,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('settings.edit')"
+                  :aria-label="t('settings.edit')"
                   @click="openEditForm(inst)"
                 >
                   <IconPencil
@@ -252,6 +253,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('settings.testTooltip')"
+                  :aria-label="t('settings.testTooltip')"
                   @click="testById(inst)"
                 >
                   <IconClock
@@ -263,6 +265,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-primary"
                   :title="t('settings.pollNowTooltip')"
+                  :aria-label="t('settings.pollNowTooltip')"
                   @click="pollNow(inst)"
                 >
                   <IconRefresh
@@ -274,6 +277,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-danger"
                   :title="t('settings.delete')"
+                  :aria-label="t('settings.delete')"
                   @click="remove(inst)"
                 >
                   <IconTrash
