@@ -87,7 +87,7 @@ export function useTraffic() {
     const fromApi = traffic.value.top_proxy_hosts || []
     if (fromApi.length) return fromApi
     return topDomains.value.map((d: AnyRecord) => ({
-      vhost: d.domain || '(unknown)',
+      vhost: d.domain || '',
       hits: d.hits || 0,
     }))
   })

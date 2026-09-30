@@ -5,7 +5,7 @@
         v-if="count > 0"
         class="bulk-action-bar"
         role="toolbar"
-        :aria-label="t('common.bulkActionsAriaLabel', { count })"
+        :aria-label="t('common.bulkActionsAriaLabel', { count }, count)"
       >
         <span class="bulk-action-bar__count">
           <IconCheck

@@ -6,7 +6,7 @@
           to="/"
           class="text-decoration-none"
         >
-          Dashboard
+          {{ t('nav.sections.control.items.dashboard') }}
         </router-link>
         <span class="text-muted mx-1">/</span>
         <span>{{ t('settings.pageTitle') }}</span>

@@ -116,7 +116,7 @@
   "connected": "Connectée",
   "disconnected": "Déconnectée",
   "auditLogs": "Logs audit",
-  "entriesCount": "{count} entrées",
+  "entriesCount": "{count} entrée | {count} entrées",
   "storedMetrics": "Métriques stockées",
   "pointsCount": "{count} points",
   "registeredHosts": "Hôtes enregistrés",

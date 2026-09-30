@@ -145,7 +145,7 @@
             :disabled="!selected.size || adding"
             @click="addSelected"
           >
-            {{ adding ? t('host.discoveryAdding') : t('host.discoveryAddButton', { count: selected.size }) }}
+            {{ adding ? t('host.discoveryAdding') : t('host.discoveryAddButton', { count: selected.size }, selected.size) }}
           </button>
         </template>
       </template>
@@ -158,7 +158,7 @@
     >
       <div class="host-success-header">
         <div class="fw-semibold">
-          {{ t('host.discoveryHostsAddedCount', { count: createdCount }) }}
+          {{ t('host.discoveryHostsAddedCount', { count: createdCount }, createdCount) }}
         </div>
         <button
           type="button"

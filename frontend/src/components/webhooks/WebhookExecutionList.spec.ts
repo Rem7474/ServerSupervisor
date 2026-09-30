@@ -28,7 +28,7 @@ describe('WebhookExecutionList', () => {
       expect(wrapper.text()).toContain(label)
     }
     expect(wrapper.text()).toContain('Terminé')
-    expect(wrapper.find('a.badge').attributes('title')).toBe("2 alerte(s) déclenchée(s) sur l'hôte dans les 15 min suivant ce déploiement")
+    expect(wrapper.find('a.badge').attributes('title')).toBe("2 alertes déclenchées sur l'hôte dans les 15 min suivant ce déploiement")
   })
 
   it('renders the translated webhook-kind column headers and payload tooltip', () => {
