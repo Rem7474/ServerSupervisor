@@ -31,7 +31,7 @@
             class="mt-2 pt-2 border-top d-flex align-items-center gap-2"
           >
             <span class="text-muted small">Temp:</span>
-            <span :class="['text-sm fw-semibold', tempColor(metrics.cpu_temperature)]">
+            <span :class="['text-sm fw-semibold', getTemperatureColorClass(metrics.cpu_temperature)]">
               {{ `${(metrics.cpu_temperature ?? 0).toFixed(1)}°C` }}
             </span>
           </div>
@@ -176,6 +176,7 @@ import { fetchMetricsHistory, type MetricsHistoryPoint } from '../../composables
 import dayjs from '../../utils/dayjs'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
 import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
+import { getMetricColorClass, getTemperatureColorClass } from '../../utils/metricColor'
 
 interface MetricsData {
   cpu_cores?: number
@@ -330,24 +331,11 @@ function formatUptime(seconds: number | undefined): string {
 }
 
 function cpuColor(pct: number | undefined): string {
-  if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-danger'
-  if (pct > 70) return 'text-warning'
-  return 'text-success'
+  return pct ? getMetricColorClass(pct) : 'text-secondary'
 }
 
 function memColor(pct: number | undefined): string {
-  if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-danger'
-  if (pct > 75) return 'text-warning'
-  return 'text-success'
-}
-
-function tempColor(temp: number | undefined): string {
-  if (!temp) return 'text-secondary'
-  if (temp >= 85) return 'text-danger'
-  if (temp >= 70) return 'text-warning'
-  return 'text-success'
+  return pct ? getMetricColorClass(pct) : 'text-secondary'
 }
 
 function formatChartTime(timestamp: number | string | undefined): string {

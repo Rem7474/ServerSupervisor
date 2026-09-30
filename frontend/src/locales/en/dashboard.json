@@ -12,7 +12,7 @@
   "stateColumn": "State",
   "diskColumn": "Disk",
   "lastActivityColumn": "Last activity",
-  "cpuTooltip": "Green < 70% · Yellow 70-90% · Red > 90%",
+  "cpuTooltip": "Green < 75% · Yellow 75-90% · Red > 90%",
   "ramDiskTooltip": "Green < 75% · Yellow 75-90% · Red > 90%",
   "aptPendingTooltip": "Pending APT packages",
   "unnamed": "Unnamed",
