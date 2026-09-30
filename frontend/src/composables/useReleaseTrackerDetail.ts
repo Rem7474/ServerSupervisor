@@ -3,7 +3,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
-import { useCommandStream } from './useCommandStream'
+import { useCommandLogViewer, patchRow } from './useCommandLogViewer'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { ReleaseTracker, ReleaseTrackerExecution, ReleaseTrackerRequest, ReleaseVersionHistoryItem } from '../types/tracker'
@@ -31,8 +31,6 @@ export function useReleaseTrackerDetail() {
   const historyLoading = ref(false)
   const checking = ref(false)
   const running = ref(false)
-  const selectedCmd = ref<CmdRow | null>(null)
-  const showConsole = ref(false)
   const nowTick = ref(Date.now())
   let cooldownTimer: number | null = null
 
@@ -44,7 +42,11 @@ export function useReleaseTrackerDetail() {
   const saving = ref(false)
   const modalError = ref('')
 
-  const { openCommandStream, closeStream } = useCommandStream()
+  // Console for one execution's command; keeps the executions list's status
+  // badge in step with what the console shows.
+  const { selected: selectedCmd, visible: showConsole, showById, close: clearExecutionLogs } = useCommandLogViewer<CmdRow>({
+    onStatus: (commandId, status) => patchRow(executions, (e) => e.command_id === commandId, { status }),
+  })
 
   const canRunManually = computed(() => {
     if (!tracker.value) return false
@@ -162,60 +164,10 @@ export function useReleaseTrackerDetail() {
     } catch { /* ignore */ }
   }
 
-  function clearExecutionLogs(): void {
-    closeStream()
-    selectedCmd.value = null
-    showConsole.value = false
-  }
 
-  function connectExecutionStream(commandId: string): void {
-    openCommandStream(commandId, {
-      onInit(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          status: payload.status || selectedCmd.value.status,
-          output: payload.output ?? selectedCmd.value.output,
-        }
-      },
-      onChunk(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          output: (selectedCmd.value.output || '') + (payload.chunk || ''),
-        }
-      },
-      onStatus(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          status: payload.status || selectedCmd.value.status,
-          output: payload.output ?? selectedCmd.value.output,
-        }
-
-        const idx = executions.value.findIndex((e: ReleaseTrackerExecution) => e.command_id === commandId)
-        if (idx !== -1) {
-          const next = [...executions.value]
-          next[idx] = { ...next[idx], status: payload.status || next[idx].status }
-          executions.value = next
-        }
-      },
-    })
-  }
 
   async function openExecutionLogs(commandId: string): Promise<void> {
-    closeStream()
-    try {
-      const res = await api.getCommandStatus(commandId)
-      const cmd = res.data
-      selectedCmd.value = cmd as unknown as CmdRow
-      showConsole.value = true
-      if (cmd?.status === 'pending' || cmd?.status === 'running') {
-        connectExecutionStream(commandId)
-      }
-    } catch {
-      error.value = t('webhooks.couldNotLoadCommandLogsError')
-    }
+    if (!(await showById(commandId))) error.value = t('webhooks.couldNotLoadCommandLogsError')
   }
 
   async function runManually(): Promise<void> {
@@ -289,7 +241,6 @@ export function useReleaseTrackerDetail() {
       window.clearInterval(cooldownTimer)
       cooldownTimer = null
     }
-    closeStream()
   })
 
   return {
