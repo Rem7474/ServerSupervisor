@@ -144,8 +144,8 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       probes.value = data?.probes || []
       lastUpdatedAt.value = new Date()
       error.value = ''
-      if (withStats) fetchAllProbeStats()
-      fetchAllProbeHistory()
+      if (withStats) void fetchAllProbeStats()
+      void fetchAllProbeHistory()
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, t('monitoring.probeLoadError'))
     } finally {
@@ -286,8 +286,8 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined
   onMounted(() => {
-    fetchProbes()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) fetchProbes() }, REFRESH_SEC * 1000)
+    void fetchProbes()
+    refreshTimer = setInterval(() => { if (autoRefresh.value) void fetchProbes() }, REFRESH_SEC * 1000)
   })
   onUnmounted(() => {
     if (refreshTimer) clearInterval(refreshTimer)

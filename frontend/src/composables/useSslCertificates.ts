@@ -212,8 +212,8 @@ export function useSslCertificates() {
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined
   onMounted(() => {
-    fetchCerts()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) fetchCerts() }, REFRESH_SEC * 1000)
+    void fetchCerts()
+    refreshTimer = setInterval(() => { if (autoRefresh.value) void fetchCerts() }, REFRESH_SEC * 1000)
   })
   onUnmounted(() => {
     if (refreshTimer) clearInterval(refreshTimer)

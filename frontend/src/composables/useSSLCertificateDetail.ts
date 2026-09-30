@@ -110,8 +110,8 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined
   onMounted(() => {
-    fetchAll()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) fetchAll() }, REFRESH_SEC * 1000)
+    void fetchAll()
+    refreshTimer = setInterval(() => { if (autoRefresh.value) void fetchAll() }, REFRESH_SEC * 1000)
   })
   onUnmounted(() => {
     if (refreshTimer) clearInterval(refreshTimer)

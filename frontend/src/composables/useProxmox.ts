@@ -146,7 +146,7 @@ export function useProxmox() {
   function startRefreshTimer(): void {
     stopRefreshTimer()
     refreshTimer = setInterval(() => {
-      if (autoRefresh.value) load()
+      if (autoRefresh.value) void load()
     }, PROXMOX_REFRESH_SEC * 1000)
   }
 
@@ -154,7 +154,7 @@ export function useProxmox() {
     if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }
 
-  onMounted(() => { load(); startRefreshTimer() })
+  onMounted(() => { void load(); startRefreshTimer() })
   onUnmounted(stopRefreshTimer)
 
   return {
