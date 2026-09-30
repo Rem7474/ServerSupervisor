@@ -234,6 +234,7 @@
                       class="btn btn-icon btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
                       :title="t('account.viewLogsTooltip')"
+                      :aria-label="t('account.viewLogsTooltip')"
                       @click="openLogViewer(cmd)"
                     >
                       <IconList

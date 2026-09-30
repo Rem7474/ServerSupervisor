@@ -100,6 +100,7 @@
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
               :title="t('proxmox.viewLogsTooltip')"
+              :aria-label="t('proxmox.viewLogsTooltip')"
               @click="emit('view-logs', { upid: task.upid, action: task.task_type, label: task.object_id })"
             >
               <IconList

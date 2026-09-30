@@ -16,6 +16,7 @@
             </h5>
             <button
               type="button"
+              :aria-label="t('common.close')"
               class="btn-close"
               @click="close"
             />
@@ -164,7 +165,8 @@
                 v-if="testing"
                 class="spinner-border spinner-border-sm me-2"
               />
-              <IconCircleCheck v-else
+              <IconCircleCheck
+                v-else
                 :size="16"
                 class="icon me-1"
               />

@@ -171,6 +171,7 @@
                         type="button"
                         class="btn btn-icon btn-sm btn-ghost-secondary"
                         :title="t('security.copyIpTooltip')"
+                        :aria-label="t('security.copyIpTooltip')"
                         @click.stop="copyIP(c.ip)"
                       >
                         <IconCheck
@@ -191,6 +192,7 @@
                         :class="blockState?.[c.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-secondary'"
                         :disabled="blockState?.[c.ip] === 'loading' || !c.host_id"
                         :title="!c.host_id ? t('security.hostNotFoundTooltip') : blockState?.[c.ip] === 'error' ? t('security.errorRetryTooltip') : t('security.blockIpTooltip', { ip: c.ip })"
+                        :aria-label="!c.host_id ? t('security.hostNotFoundTooltip') : blockState?.[c.ip] === 'error' ? t('security.errorRetryTooltip') : t('security.blockIpTooltip', { ip: c.ip })"
                         @click.stop="$emit('block-ip', { ip: c.ip, hostId: c.host_id })"
                       >
                         <span
@@ -360,6 +362,7 @@
                           type="button"
                           class="btn btn-icon btn-sm btn-ghost-secondary"
                           :title="t('security.copyIpTooltip')"
+                          :aria-label="t('security.copyIpTooltip')"
                           @click="copyIP(r.ip)"
                         >
                           <IconCheck
@@ -380,6 +383,7 @@
                           :class="blockState?.[r.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-secondary'"
                           :disabled="blockState?.[r.ip] === 'loading' || !r.host_id"
                           :title="!r.host_id ? t('security.hostNotFoundTooltip') : blockState?.[r.ip] === 'error' ? t('security.errorRetryTooltip') : t('security.blockIpTooltip', { ip: r.ip })"
+                          :aria-label="!r.host_id ? t('security.hostNotFoundTooltip') : blockState?.[r.ip] === 'error' ? t('security.errorRetryTooltip') : t('security.blockIpTooltip', { ip: r.ip })"
                           @click="$emit('block-ip', { ip: r.ip, hostId: r.host_id })"
                         >
                           <span

@@ -375,6 +375,7 @@
                     class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="resolvingId === row.item.id"
                     :title="t('alerts.warRoomCloseTooltip')"
+                    :aria-label="t('alerts.warRoomCloseTooltip')"
                     @click="$emit('resolve', row.item)"
                   >
                     <span

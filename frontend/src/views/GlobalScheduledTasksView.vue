@@ -298,6 +298,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
                     :title="t('scheduledTasks.executionHistoryTooltip')"
+                    :aria-label="t('scheduledTasks.executionHistoryTooltip')"
                     @click="openHistory(task)"
                   >
                     <IconClock
@@ -329,6 +330,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
                     :title="t('scheduledTasks.editButton')"
+                    :aria-label="t('scheduledTasks.editButton')"
                     @click="openEdit(task)"
                   >
                     <IconPencil
@@ -341,6 +343,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-danger"
                     :title="t('scheduledTasks.deleteButton')"
+                    :aria-label="t('scheduledTasks.deleteButton')"
                     @click="confirmDelete(task)"
                   >
                     <IconTrash
@@ -410,6 +413,7 @@
               </h5>
               <button
                 type="button"
+                :aria-label="t('common.close')"
                 class="btn-close"
                 @click="createModalOpen = false"
               />
@@ -523,6 +527,7 @@
               </h5>
               <button
                 type="button"
+                :aria-label="t('common.close')"
                 class="btn-close"
                 @click="editTask = null"
               />
@@ -633,6 +638,7 @@
               </div>
               <button
                 type="button"
+                :aria-label="t('common.close')"
                 class="btn-close"
                 @click="historyTask = null"
               />

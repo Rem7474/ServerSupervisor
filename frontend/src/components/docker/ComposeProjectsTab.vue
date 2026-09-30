@@ -225,6 +225,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('docker.configTooltip')"
+                  :aria-label="t('docker.configTooltip')"
                   @click="selectedProject = p"
                 >
                   <IconFile
