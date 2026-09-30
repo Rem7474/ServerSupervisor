@@ -205,7 +205,10 @@ import AlertRuleStepSource from './AlertRuleStepSource.vue'
 import AlertRuleStepConditions from './AlertRuleStepConditions.vue'
 import AlertRuleStepNotifications from './AlertRuleStepNotifications.vue'
 import { useAlertRuleForm, type AlertRuleInput } from '../../composables/useAlertRuleForm'
-import type { AlertRulePayload as ApiAlertRulePayload } from '../../types/alert'
+import type {
+  AlertRule, AlertRulePayload as ApiAlertRulePayload, AlertRuleCapabilities, AlertMetricCapability,
+  AlertDockerCapabilities, AlertDockerHostScope, AlertHostCapabilities,
+} from '../../types/alert'
 import { useModalChrome } from '../../composables/useModalChrome'
 import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
 import { ALERT_RULE_PRESETS, type AlertRulePreset } from '../../utils/alertRulePresets'
@@ -214,36 +217,6 @@ import { getApiErrorMessage } from '../../api/client'
 interface Host {
   id: string
   name?: string
-}
-
-interface MetricMeta {
-  metric: string
-  label: string
-  icon?: string
-  unit?: string
-  supports_host_filter?: boolean
-}
-
-interface ProxmoxScopeItem {
-  id: string | number
-  name?: string
-  [key: string]: unknown
-}
-
-interface Capabilities {
-  metrics?: MetricMeta[]
-  proxmox_scope?: {
-    connections?: ProxmoxScopeItem[]
-    nodes?: ProxmoxScopeItem[]
-    storages?: ProxmoxScopeItem[]
-    guests?: ProxmoxScopeItem[]
-    disks?: ProxmoxScopeItem[]
-  }
-}
-
-interface AlertRule {
-  id?: string | number
-  [key: string]: unknown
 }
 
 interface TestResult {
@@ -256,16 +229,11 @@ interface TestResults {
   [key: string]: unknown
 }
 
-interface HostMetrics {
-  metrics?: MetricMeta[]
-  [key: string]: unknown
-}
-
 const props = withDefaults(defineProps<{
   visible?: boolean
   rule?: AlertRule | null
   hosts?: Host[]
-  capabilities?: Capabilities | null
+  capabilities?: AlertRuleCapabilities | null
   capabilitiesLoading?: boolean
   capabilitiesError?: string
   saving?: boolean
@@ -283,7 +251,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', payload: unknown): void
+  (e: 'submit', payload: ApiAlertRulePayload): void
 }>()
 
 const { t } = useI18n()
@@ -295,7 +263,7 @@ const browserPermission = ref<NotificationPermission | 'unsupported'>(
   typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
 )
 const step = ref(1)
-const hostMetrics = ref<HostMetrics | null>(null)
+const hostMetrics = ref<AlertHostCapabilities | null>(null)
 const hostMetricsLoading = ref(false)
 const hostMetricsError = ref('')
 
@@ -323,8 +291,8 @@ const metricCards = computed(() => {
   const fromCapabilities = props.capabilities?.metrics
   if (Array.isArray(fromCapabilities) && fromCapabilities.length > 0) {
     return fromCapabilities
-      .filter((metric: MetricMeta) => matchesSource(metric.metric))
-      .map((metric: MetricMeta) => ({
+      .filter((metric: AlertMetricCapability) => matchesSource(metric.metric))
+      .map((metric: AlertMetricCapability) => ({
         value: metric.metric,
         label: metric.label,
         icon: metric.icon || getAlertMetricMeta(metric.metric).icon,
@@ -342,17 +310,13 @@ const proxmoxStorages = computed(() => props.capabilities?.proxmox_scope?.storag
 const proxmoxGuests = computed(() => props.capabilities?.proxmox_scope?.guests || [])
 const proxmoxDisks = computed(() => props.capabilities?.proxmox_scope?.disks || [])
 
-interface DockerContainer { id: string; name: string; image: string; state: string }
-interface DockerProject { name: string; services: string[] }
-interface DockerHostOption { host_id: string; host_name: string; containers: DockerContainer[]; projects: DockerProject[] }
-
-const dockerCapabilities = ref<{ hosts: DockerHostOption[] } | null>(null)
+const dockerCapabilities = ref<AlertDockerCapabilities | null>(null)
 const dockerCapabilitiesLoading = ref(false)
-const dockerHosts = computed<DockerHostOption[]>(() => dockerCapabilities.value?.hosts || [])
+const dockerHosts = computed<AlertDockerHostScope[]>(() => dockerCapabilities.value?.hosts || [])
 
-const metricMetaByKey = computed<Record<string, MetricMeta>>(() => {
+const metricMetaByKey = computed<Record<string, AlertMetricCapability>>(() => {
   const items = props.capabilities?.metrics || []
-  return Object.fromEntries(items.map((item: MetricMeta) => [item.metric, item]))
+  return Object.fromEntries(items.map((item) => [item.metric, item]))
 })
 
 const metricAllowsStorageScope = computed(() => form.value.metric === 'proxmox_storage_percent')
@@ -448,7 +412,7 @@ watch(
       const response = await apiClient.getDockerAlertCapabilities()
       dockerCapabilities.value = response.data
     } catch {
-      dockerCapabilities.value = { hosts: [] }
+      dockerCapabilities.value = { metrics: [], hosts: [] }
     } finally {
       dockerCapabilitiesLoading.value = false
     }
@@ -562,11 +526,18 @@ onUnmounted(() => {
   if (autoTestTimer) clearTimeout(autoTestTimer)
 })
 
+// The form payload keeps explicit nulls for cleared hysteresis values and
+// scopes (the server treats null as "unset"), where the API type only says
+// optional — convert in this one place.
+function apiPayload(): ApiAlertRulePayload {
+  return buildPayload() as unknown as ApiAlertRulePayload
+}
+
 async function submit() {
   if (channelBrowser.value && typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
     browserPermission.value = await Notification.requestPermission()
   }
-  emit('submit', buildPayload())
+  emit('submit', apiPayload())
 }
 
 async function testAlert(): Promise<void> {
@@ -575,7 +546,7 @@ async function testAlert(): Promise<void> {
   testResults.value = null
   testError.value = ''
   try {
-    const response = await apiClient.testAlertRule(buildPayload() as unknown as ApiAlertRulePayload)
+    const response = await apiClient.testAlertRule(apiPayload())
     testResults.value = response.data
   } catch (err: unknown) {
     testResults.value = null
@@ -594,7 +565,7 @@ async function downloadTestLogs(): Promise<void> {
   if (downloadingLogs.value || !canDownloadTestLogs.value) return
   downloadingLogs.value = true
   try {
-    const response = await apiClient.downloadAlertRuleTestLogs(buildPayload() as unknown as ApiAlertRulePayload)
+    const response = await apiClient.downloadAlertRuleTestLogs(apiPayload())
     const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
