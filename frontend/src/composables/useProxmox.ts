@@ -1,9 +1,10 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { isApiAbort, getApiErrorMessage } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { ProxmoxSummary, ProxmoxNode, ProxmoxConnection } from '../types/proxmox'
+import { useAutoRefresh } from './useAutoRefresh'
 
 const PROXMOX_REFRESH_SEC = 30
 
@@ -16,9 +17,7 @@ export function useProxmox() {
   const filterConnection = ref('')
   const loading = ref(true)
   const error = ref('')
-  const autoRefresh = ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
-  let refreshTimer: ReturnType<typeof setInterval> | null = null
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => load(), { intervalSec: PROXMOX_REFRESH_SEC })
   const nodeSortKey = ref<string>('node_name')
   const nodeSortDir = ref<'asc' | 'desc'>('asc')
 
@@ -143,19 +142,7 @@ export function useProxmox() {
     }
   }
 
-  function startRefreshTimer(): void {
-    stopRefreshTimer()
-    refreshTimer = setInterval(() => {
-      if (autoRefresh.value) void load()
-    }, PROXMOX_REFRESH_SEC * 1000)
-  }
-
-  function stopRefreshTimer(): void {
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
-  }
-
-  onMounted(() => { void load(); startRefreshTimer() })
-  onUnmounted(stopRefreshTimer)
+  onMounted(() => { void load() })
 
   return {
     summary,

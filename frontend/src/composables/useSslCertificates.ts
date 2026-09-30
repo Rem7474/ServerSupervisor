@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { npmApi } from '../api/npm'
@@ -8,6 +8,7 @@ import dayjs from '../utils/dayjs'
 import { usePagination } from './usePagination'
 import { getApiErrorMessage } from '../api/client'
 import { sslDaysClass } from '../utils/statusClasses'
+import { useAutoRefresh } from './useAutoRefresh'
 
 type SSLCert = SSLCertificate
 
@@ -27,8 +28,7 @@ export function useSslCertificates() {
   const { t } = useI18n()
   const dialog = useConfirmDialog()
 
-  const autoRefresh = ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => fetchCerts(), { intervalSec: REFRESH_SEC })
   const error = ref('')
 
   const certs = ref<SSLCert[]>([])
@@ -207,14 +207,7 @@ export function useSslCertificates() {
 
   watch(certSort, resetCertPage, { deep: true })
 
-  let refreshTimer: ReturnType<typeof setInterval> | undefined
-  onMounted(() => {
-    void fetchCerts()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) void fetchCerts() }, REFRESH_SEC * 1000)
-  })
-  onUnmounted(() => {
-    if (refreshTimer) clearInterval(refreshTimer)
-  })
+  onMounted(() => { void fetchCerts() })
 
   return {
     REFRESH_SEC,
