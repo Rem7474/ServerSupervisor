@@ -92,7 +92,7 @@ export function useSslCertificates() {
   function daysLabel(d: number | null | undefined): string {
     if (d == null) return t('monitoring.sslCertStatusUnknown')
     if (d < 0) return t('monitoring.sslDaysExpiredWithCount', { days: Math.abs(d) })
-    return `${d}j`
+    return `${d}${t('common.dayUnitShort')}`
   }
 
   function daysBadge(d: number | null | undefined): string {

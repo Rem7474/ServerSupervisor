@@ -71,7 +71,7 @@ describe('AlertRuleTemplateApplyModal', () => {
     const wrapper = mount(AlertRuleTemplateApplyModal, {
       props: { visible: true, template, hosts, result: { created_rule_ids: [1, 2], errors: {} } },
     })
-    expect(wrapper.text()).toContain('2 règle(s) créée(s).')
+    expect(wrapper.text()).toContain('2 règles créées.')
     expect(wrapper.text()).toContain('Fermer')
     expect(wrapper.text()).not.toContain('Annuler')
   })

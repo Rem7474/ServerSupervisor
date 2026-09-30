@@ -86,7 +86,7 @@
                 class="badge bg-warning-lt text-warning ms-1"
                 :title="getComposeUpdates(p).map(v => t('docker.updateAvailableTooltipItem', { image: v.docker_image, version: v.latest_version })).join('\n')"
               >
-                {{ t('docker.updatesCountBadge', { count: getComposeUpdates(p).length }) }}
+                {{ t('docker.updatesCountBadge', { count: getComposeUpdates(p).length }, getComposeUpdates(p).length) }}
               </span>
               <div
                 v-if="getComposeUpdates(p).length > 0"

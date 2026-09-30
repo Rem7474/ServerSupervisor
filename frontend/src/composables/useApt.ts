@@ -398,7 +398,7 @@ export function useApt() {
         const failed = failedCommands.map((item: AptCommandResult) => hostNameById.get(item.host_id ?? "") || (item.host_id ?? ""))
         const launchedMsg = launched.length === 1
           ? t('apt.commandLaunchedOnHost', { command, host: launched[0] })
-          : t('apt.commandLaunchedOnHosts', { command, count: launched.length })
+          : t('apt.commandLaunchedOnHosts', { command, count: launched.length }, launched.length)
         const msg = launched.length > 0
           ? `${launchedMsg}${failed.length ? t('apt.commandFailedOnList', { list: failed.join(', ') }) : ''}`
           : t('apt.commandNoneLaunched', { command })

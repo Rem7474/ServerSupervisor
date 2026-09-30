@@ -188,7 +188,7 @@
                     <span
                       v-if="item.to === '/proxmox' && suggestedProxmoxLinksCount > 0"
                       class="badge bg-azure-lt text-azure ms-1"
-                      :title="t('common.proxmoxSuggestedLinks', { count: suggestedProxmoxLinksCount })"
+                      :title="t('common.proxmoxSuggestedLinks', { count: suggestedProxmoxLinksCount }, suggestedProxmoxLinksCount)"
                     >{{ suggestedProxmoxLinksCount }}</span>
                   </router-link>
                 </div>

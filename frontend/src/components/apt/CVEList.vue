@@ -18,7 +18,7 @@
     </div>
 
     <div class="text-secondary small mb-2">
-      {{ t('apt.cveCountLabel', { count: cveGroups.length }) }} • {{ t('apt.impactedPackagesLabel', { count: impactedPackageCount }, impactedPackageCount) }}
+      {{ t('apt.cveCountLabel', { count: cveGroups.length }, cveGroups.length) }} • {{ t('apt.impactedPackagesLabel', { count: impactedPackageCount }, impactedPackageCount) }}
     </div>
     
     <div class="cve-groups">

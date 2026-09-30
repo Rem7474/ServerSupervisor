@@ -90,7 +90,7 @@
                   v-if="execution.alerts_after_count"
                   to="/alerts?tab=incidents"
                   class="badge bg-danger-lt text-danger ms-1 text-decoration-none"
-                  :title="t('webhooks.alertsTriggeredTooltip', { n: execution.alerts_after_count })"
+                  :title="t('webhooks.alertsTriggeredTooltip', { n: execution.alerts_after_count }, Number(execution.alerts_after_count) || 0)"
                 >
                   ⚠ {{ execution.alerts_after_count }}
                 </router-link>

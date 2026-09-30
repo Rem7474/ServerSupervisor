@@ -70,7 +70,7 @@ describe('HostAptTab', () => {
       })
       expect(wrapper.text()).toContain('Activé')
       expect(wrapper.text()).toContain('Redémarrage requis')
-      expect(wrapper.text()).toContain('3 paquet(s) installé(s)')
+      expect(wrapper.text()).toContain('3 paquets installés')
     })
 
     it('shows the disabled badge and no-run-recorded fallback', () => {

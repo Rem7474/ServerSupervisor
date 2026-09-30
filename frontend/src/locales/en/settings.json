@@ -116,7 +116,7 @@
   "connected": "Connected",
   "disconnected": "Disconnected",
   "auditLogs": "Audit logs",
-  "entriesCount": "{count} entries",
+  "entriesCount": "{count} entry | {count} entries",
   "storedMetrics": "Stored metrics",
   "pointsCount": "{count} points",
   "registeredHosts": "Registered hosts",
