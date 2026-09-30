@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { setLocale } from '../../i18n'
 
@@ -12,6 +12,7 @@ vi.mock('../../api', () => ({
   },
 }))
 
+import apiClient from '../../api'
 import AlertRuleModal from './AlertRuleModal.vue'
 import type { AlertMetricCapability, AlertRuleCapabilities } from '../../types/alert'
 
@@ -155,5 +156,46 @@ describe('AlertRuleModal (characterization)', () => {
     await nextTick()
 
     expect((wrapper.find('input[placeholder="Ex: CPU élevé sur serveur web"]').element as HTMLInputElement).value).toBe('CPU élevé')
+  })
+
+  it('"Tester" sends the rule being edited and shows the API error when the test fails', async () => {
+    // Earlier tests leave mounted modals whose step-2 preview timers can still
+    // fire, so only calls carrying this rule's name are counted.
+    const name = 'Tester rule'
+    const testAlertRule = vi.mocked(apiClient.testAlertRule)
+    const callsForRule = () => testAlertRule.mock.calls.filter(([p]) => (p as { name?: string }).name === name)
+    testAlertRule.mockImplementation(async (payload) => {
+      if ((payload as { name?: string }).name === name) throw { response: { data: { error: 'métrique inconnue' } } }
+      return { data: { results: [] } } as never
+    })
+    const rule = {
+      id: 1, name, source_type: 'agent', metric: 'cpu', operator: '>',
+      threshold_warn: 70, threshold_crit: 85, duration: 0, actions: { channels: [] },
+    }
+    // Entering step 2 schedules this modal's automatic preview test; fake
+    // timers let it run before the manual click is counted.
+    vi.useFakeTimers()
+    try {
+      const wrapper = mountModal({ rule })
+      await nextTick()
+      for (let i = 0; i < 2; i++) {
+        await wrapper.findAll('button').find((b) => b.text().includes('Suivant'))!.trigger('click')
+        await nextTick()
+      }
+      await vi.runAllTimersAsync()
+      await flushPromises()
+      const before = callsForRule().length
+
+      await wrapper.findAll('button').find((b) => b.text() === 'Tester')!.trigger('click')
+      await flushPromises()
+
+      expect(callsForRule().length - before).toBe(1)
+      const calls = callsForRule()
+      expect(calls[calls.length - 1][0]).toMatchObject({ metric: 'cpu', threshold_crit: 85 })
+      expect(wrapper.text()).toContain('métrique inconnue')
+    } finally {
+      vi.useRealTimers()
+      testAlertRule.mockImplementation(async () => ({ data: { results: [] } }) as never)
+    }
   })
 })
