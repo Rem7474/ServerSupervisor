@@ -7,9 +7,10 @@ import { useCommandLogViewer, patchRow } from './useCommandLogViewer'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { GitWebhook, GitWebhookExecution, GitWebhookRequest } from '../types/webhook'
-import type { Host } from '../types/host'
 import type { WebhookFormData } from './useWebhookForm'
 import { gitProviderBadgeClass, notificationChannelBadgeClass } from '../utils/categoryBadges'
+import { storeToRefs } from 'pinia'
+import { useHostsStore } from '../stores/hosts'
 
 interface CmdRow { id: string; status?: string; output?: string; [key: string]: unknown }
 
@@ -21,7 +22,8 @@ export function useGitWebhookDetail() {
 
   const webhook = ref<GitWebhook | null>(null)
   const executions = ref<GitWebhookExecution[]>([])
-  const hosts = ref<Host[]>([])
+  // Shared, TTL-cached host list (stores/hosts) rather than a private copy.
+  const { hosts } = storeToRefs(useHostsStore())
   const loading = ref(false)
   const error = ref('')
   const revealedSecret = ref('')
@@ -50,10 +52,9 @@ export function useGitWebhookDetail() {
     loading.value = true
     error.value = ''
     try {
-      const [whRes, hostsRes] = await Promise.all([api.getGitWebhook(id, signal), api.getHosts(signal)])
+      const [whRes] = await Promise.all([api.getGitWebhook(id, signal), useHostsStore().fetchHosts()])
       webhook.value = whRes.data.webhook
       executions.value = whRes.data.executions || []
-      hosts.value = hostsRes.data || []
     } catch (e: unknown) {
       if (isApiAbort(e)) return
       error.value = getApiErrorMessage(e, t('webhooks.loadErrorGeneric'))
