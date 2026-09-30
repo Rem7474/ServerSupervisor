@@ -26,12 +26,12 @@
             >
               <IconCopy
                 v-if="!copied"
-                :size="18"
+                :size="16"
                 class="icon"
               />
               <IconCheck
                 v-else
-                :size="18"
+                :size="16"
                 class="icon text-success"
               />
             </button>
@@ -45,7 +45,7 @@
               @click="download"
             >
               <IconDownload
-                :size="18"
+                :size="16"
                 class="icon"
               />
             </button>
@@ -60,7 +60,7 @@
               @click="$emit('clear')"
             >
               <IconTrash
-                :size="18"
+                :size="16"
                 class="icon"
               />
             </button>

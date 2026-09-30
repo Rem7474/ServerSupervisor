@@ -338,12 +338,10 @@
                 class="m-0 p-3 small"
                 style="max-height: 60vh; overflow-y: auto; background: var(--ss-panel-solid-darker); color: var(--ss-text-on-dark); border-radius: 0 0 4px 0;"
               >{{ selectedProject.raw_config }}</pre>
-              <div
+              <EmptyState
                 v-else
-                class="p-4 text-secondary text-center"
-              >
-                {{ t('docker.configNotAvailable') }}
-              </div>
+                :title="t('docker.configNotAvailable')"
+              />
             </div>
           </div>
         </div>

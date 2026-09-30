@@ -23,10 +23,10 @@ type Tone =
 // everywhere else, instead of mixing in Tabler's separate success/danger/
 // warning tint set.
 const toneClasses: Record<Tone, string> = {
-  success: 'bg-green-lt text-green',
-  warning: 'bg-yellow-lt text-yellow',
-  danger: 'bg-red-lt text-red',
-  info: 'bg-blue-lt text-blue',
+  success: 'bg-success-lt text-success',
+  warning: 'bg-warning-lt text-warning',
+  danger: 'bg-danger-lt text-danger',
+  info: 'bg-primary-lt text-primary',
   secondary: 'bg-secondary-lt text-secondary',
   orange: 'bg-orange-lt text-orange',
   cyan: 'bg-cyan-lt text-cyan',
