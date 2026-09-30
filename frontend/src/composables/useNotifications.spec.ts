@@ -1,16 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { setLocale } from '../i18n'
 
-const { resolveAlertIncident, markNotificationsRead, getNotifications } = vi.hoisted(() => ({
+const {
+  resolveAlertIncident, markNotificationsRead, getNotifications, getPushVapidPublicKey, subscribePush,
+} = vi.hoisted(() => ({
   resolveAlertIncident: vi.fn(),
   markNotificationsRead: vi.fn(),
   getNotifications: vi.fn(),
+  getPushVapidPublicKey: vi.fn(),
+  subscribePush: vi.fn(),
 }))
 
 vi.mock('../api', () => ({
-  default: { resolveAlertIncident, markNotificationsRead, getNotifications },
+  default: { resolveAlertIncident, markNotificationsRead, getNotifications, getPushVapidPublicKey, subscribePush },
 }))
 
 vi.mock('./useWebSocket', () => ({
@@ -97,5 +101,82 @@ describe('useNotifications — browser notification permission', () => {
 
     expect(Notification.requestPermission).toHaveBeenCalledTimes(1)
     expect(api.browserPermission.value).toBe('denied')
+    expect(getPushVapidPublicKey).not.toHaveBeenCalled()
+  })
+
+  describe('with push support', () => {
+    const subscribe = vi.fn()
+
+    beforeEach(() => {
+      subscribe.mockResolvedValue({ toJSON: () => ({ endpoint: 'https://push.example/1' }) })
+      getPushVapidPublicKey.mockResolvedValue({ data: { public_key: 'AAAA' } })
+      subscribePush.mockResolvedValue({ data: {} })
+      vi.stubGlobal('PushManager', class {})
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: { ready: Promise.resolve({ pushManager: { getSubscription: async () => null, subscribe } }) },
+      })
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      Reflect.deleteProperty(navigator, 'serviceWorker')
+      Object.assign(Notification, { permission: 'default' })
+    })
+
+    it('subscribes to push once the user grants permission', async () => {
+      vi.mocked(Notification.requestPermission).mockImplementationOnce(async () => {
+        Object.assign(Notification, { permission: 'granted' })
+        return 'granted'
+      })
+      const { api } = await mountHost()
+      await flushPromises()
+      expect(subscribePush).not.toHaveBeenCalled()
+
+      await api.enableBrowserNotifications()
+
+      expect(api.browserPermission.value).toBe('granted')
+      expect(subscribe).toHaveBeenCalledTimes(1)
+      expect(subscribePush).toHaveBeenCalledWith({ endpoint: 'https://push.example/1' })
+    })
+  })
+
+  it('follows a permission change made in the browser settings', async () => {
+    const status = { state: 'prompt', onchange: null as (() => void) | null }
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: async () => status },
+    })
+    try {
+      const { api } = await mountHost()
+      await flushPromises()
+      expect(api.browserPermission.value).toBe('default')
+
+      Object.assign(Notification, { permission: 'denied' })
+      status.state = 'denied'
+      status.onchange?.()
+
+      expect(api.browserPermission.value).toBe('denied')
+    } finally {
+      Reflect.deleteProperty(navigator, 'permissions')
+      Object.assign(Notification, { permission: 'default' })
+    }
+  })
+
+  it('reports an unsupported browser and never prompts there', async () => {
+    const original = Notification
+    vi.stubGlobal('Notification', undefined)
+    try {
+      const { api } = await mountHost()
+      await flushPromises()
+      expect(api.browserPermission.value).toBe('unsupported')
+
+      await api.enableBrowserNotifications()
+
+      expect(api.browserPermission.value).toBe('unsupported')
+      expect(original.requestPermission).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
