@@ -49,7 +49,7 @@
       </div>
     </div>
     <div
-      v-if="loading"
+      v-if="loading && !events.length"
       class="card-body"
     >
       <LoadingSkeleton variant="table" />

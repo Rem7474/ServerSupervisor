@@ -23,7 +23,7 @@
       </div>
     </div>
     <div
-      v-if="loading"
+      v-if="loading && !processes.length"
       class="card-body"
     >
       <LoadingSkeleton
@@ -48,7 +48,7 @@
       </div>
     </div>
     <div
-      v-if="processes.length && !loading"
+      v-if="processes.length"
       class="card-body"
     >
       <ProcessesTable :processes="processes" />
