@@ -93,7 +93,7 @@
                 <div class="progress progress-xs flex-grow-1 proxmox-progress-min-60">
                   <div
                     class="progress-bar"
-                    :class="wearoutColor(d.wearout)"
+                    :class="getWearoutColorClass(d.wearout)"
                     :style="`width:${d.wearout}%`"
                   />
                 </div>
@@ -118,6 +118,7 @@ import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import type { ProxmoxDisk } from '../../types/proxmox'
 import { compareValues } from '../../utils/sort'
+import { getWearoutColorClass } from '../../utils/metricColor'
 
 const { t } = useI18n()
 
@@ -156,12 +157,6 @@ function formatBytes(bytes: number): string {
   }
   const unit = i === 0 ? 'B' : t(unitKeys[i])
   return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
-}
-
-function wearoutColor(wearout: number): string {
-  if (wearout < 20) return 'bg-danger'
-  if (wearout < 50) return 'bg-warning'
-  return 'bg-success'
 }
 </script>
 
