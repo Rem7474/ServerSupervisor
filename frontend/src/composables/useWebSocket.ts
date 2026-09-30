@@ -69,6 +69,19 @@ export function useWebSocket<TPayload = unknown>(
     return Math.min(2000 * Math.pow(2, retryCount.value), 30000)
   }
 
+  // Terminal failure: report it and drop the socket without letting its
+  // onclose schedule a retry — the retry path would overwrite the error
+  // status with 'reconnecting' and loop against a server that keeps refusing.
+  function failWithoutRetry(message: string): void {
+    wsStatus.value = 'error'
+    wsError.value = message
+    if (ws) {
+      ws.onclose = null
+      ws.close()
+      ws = null
+    }
+  }
+
   function connect(): void {
     if (!auth.isAuthenticated) return
     manualClose = false
@@ -109,9 +122,7 @@ export function useWebSocket<TPayload = unknown>(
 
         // Auth error from server (invalid/expired token)
         if (payload.type === 'auth_error') {
-          wsStatus.value = 'error'
-          wsError.value = i18n.global.t('common.wsAuthRefused')
-          ws!.close()
+          failWithoutRetry(i18n.global.t('common.wsAuthRefused'))
           return
         }
 
