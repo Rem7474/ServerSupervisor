@@ -587,12 +587,10 @@
             style="min-height: 200px; max-height: 400px; overflow-y: auto;"
           >
             <div v-if="inspectTab === 'env'">
-              <div
+              <EmptyState
                 v-if="Object.keys(inspectTarget.env_vars || {}).length === 0"
-                class="text-secondary text-center py-3"
-              >
-                {{ t('docker.noEnvVars') }}
-              </div>
+                :title="t('docker.noEnvVars')"
+              />
               <table
                 v-else
                 class="table table-sm table-vcenter"
@@ -617,12 +615,10 @@
               </table>
             </div>
             <div v-if="inspectTab === 'volumes'">
-              <div
+              <EmptyState
                 v-if="!(inspectTarget.volumes || []).length"
-                class="text-secondary text-center py-3"
-              >
-                {{ t('docker.noVolumes') }}
-              </div>
+                :title="t('docker.noVolumes')"
+              />
               <ul
                 v-else
                 class="list-unstyled mb-0"
@@ -637,12 +633,10 @@
               </ul>
             </div>
             <div v-if="inspectTab === 'networks'">
-              <div
+              <EmptyState
                 v-if="!(inspectTarget.networks || []).length"
-                class="text-secondary text-center py-3"
-              >
-                {{ t('docker.noNetworks') }}
-              </div>
+                :title="t('docker.noNetworks')"
+              />
               <div
                 v-else
                 class="d-flex flex-wrap gap-2 pt-1"

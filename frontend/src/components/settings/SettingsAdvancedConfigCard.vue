@@ -44,7 +44,7 @@
             <div class="row align-items-center">
               <div class="col-auto">
                 <span class="bg-primary text-white avatar">
-                  <IconAdjustments :size="20" />
+                  <IconAdjustments :size="24" />
                 </span>
               </div>
               <div class="col">
@@ -66,7 +66,7 @@
             <div class="row align-items-center">
               <div class="col-auto">
                 <span class="bg-azure text-white avatar">
-                  <IconBrandDocker :size="20" />
+                  <IconBrandDocker :size="24" />
                 </span>
               </div>
               <div class="col">
@@ -88,7 +88,7 @@
             <div class="row align-items-center">
               <div class="col-auto">
                 <span class="bg-success text-white avatar">
-                  <IconDatabase :size="20" />
+                  <IconDatabase :size="24" />
                 </span>
               </div>
               <div class="col">
@@ -116,7 +116,7 @@
                   :class="localMetrics.conflict > 0 ? 'bg-danger text-white' : 'bg-secondary text-white'"
                   class="avatar"
                 >
-                  <IconAlertTriangle :size="20" />
+                  <IconAlertTriangle :size="24" />
                 </span>
               </div>
               <div class="col">
@@ -268,7 +268,7 @@
             <h3 class="card-title d-flex align-items-center gap-2 mb-0">
               <component
                 :is="categoryIcon(group.category)"
-                :size="18"
+                :size="16"
                 class="text-primary"
               />
               {{ t(`config.categories.${group.category}`) }}
@@ -330,7 +330,7 @@
                       :title="t('config.warnings.restartNotice')"
                     >
                       <IconReload
-                        :size="12"
+                        :size="14"
                         class="me-1"
                       />
                       {{ t('config.badges.restartRequired') }}
@@ -340,7 +340,7 @@
                       class="badge bg-secondary-lt text-secondary"
                     >
                       <IconLock
-                        :size="12"
+                        :size="14"
                         class="me-1"
                       />
                       {{ t('config.badges.secret') }}
@@ -361,14 +361,14 @@
                       v-if="entry.source === 'env'"
                       class="badge bg-azure text-white d-inline-flex align-items-center gap-1"
                     >
-                      <IconBrandDocker :size="12" />
+                      <IconBrandDocker :size="14" />
                       {{ t('config.sources.env') }}
                     </span>
                     <span
                       v-else-if="entry.source === 'ui'"
                       class="badge bg-success text-white d-inline-flex align-items-center gap-1"
                     >
-                      <IconDatabase :size="12" />
+                      <IconDatabase :size="14" />
                       {{ t('config.sources.ui') }}
                     </span>
                     <span
@@ -383,7 +383,7 @@
                       class="badge bg-danger text-white d-inline-flex align-items-center gap-1"
                       :title="t('config.warnings.conflictMessage', { uiVal: entry.ui_value, envVal: entry.env_value })"
                     >
-                      <IconAlertTriangle :size="12" />
+                      <IconAlertTriangle :size="14" />
                       {{ t('config.badges.conflict') }}
                     </span>
                   </div>
@@ -478,7 +478,7 @@
                     class="text-danger small mt-1"
                   >
                     <IconAlertTriangle
-                      :size="12"
+                      :size="14"
                       class="me-1"
                     />
                     {{ t('config.warnings.conflictMessage', { uiVal: entry.ui_value, envVal: entry.env_value }) }}
@@ -488,7 +488,7 @@
                     class="text-muted small mt-1"
                   >
                     <IconInfoCircle
-                      :size="12"
+                      :size="14"
                       class="me-1"
                     />
                     {{ t('config.warnings.envNotice') }}

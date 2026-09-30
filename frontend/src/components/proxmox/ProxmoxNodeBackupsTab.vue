@@ -23,17 +23,15 @@
         <div class="fw-semibold mb-2">
           {{ t('proxmox.configuredJobsLabel') }}
         </div>
-        <div
+        <EmptyState
           v-if="!jobs.length"
-          class="text-secondary small"
-        >
-          {{ t('proxmox.noBackupJobsText') }}
-        </div>
+          :title="t('proxmox.noBackupJobsText')"
+        />
         <div
           v-else
           class="table-responsive scroll-table"
         >
-          <table class="table table-sm table-vcenter card-table mb-0">
+          <table class="table table-sm table-vcenter card-table">
             <thead>
               <tr>
                 <th>{{ t('proxmox.jobColumn') }}</th>
@@ -88,7 +86,7 @@
           v-else
           class="table-responsive scroll-table"
         >
-          <table class="table table-sm table-vcenter card-table mb-0">
+          <table class="table table-sm table-vcenter card-table">
             <thead>
               <tr>
                 <th>

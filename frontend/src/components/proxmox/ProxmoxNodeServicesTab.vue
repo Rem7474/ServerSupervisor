@@ -68,7 +68,7 @@
       v-if="filteredServices.length"
       class="table-responsive scroll-table"
     >
-      <table class="table table-vcenter card-table mb-0">
+      <table class="table table-vcenter card-table">
         <thead>
           <tr>
             <th>{{ t('proxmox.serviceColumn') }}</th>
