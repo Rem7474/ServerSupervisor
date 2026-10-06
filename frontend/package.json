@@ -20,7 +20,7 @@
     "test:browser:coverage": "vitest run --config vitest.browser.config.ts --coverage"
   },
   "dependencies": {
-    "@tabler/core": "^1.6.0",
+    "@tabler/core": "^1.6.1",
     "@tabler/icons-vue": "^3.47.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
@@ -34,7 +34,7 @@
     "pinia": "^4.0.3",
     "topojson-client": "^3.1.0",
     "vue": "^3.5.43",
-    "vue-i18n": "^11.4.12",
+    "vue-i18n": "^11.4.13",
     "vue-router": "^5.3.1",
     "vue3-apexcharts": "^1.11.1",
     "world-atlas": "^2.0.2"
