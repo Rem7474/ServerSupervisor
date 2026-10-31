@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { npmApi } from '../api/npm'
@@ -7,6 +7,7 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { usePagination } from './usePagination'
 import { getApiErrorMessage } from '../api/client'
 import { probeStatusClass } from '../utils/statusClasses'
+import { useAutoRefresh } from './useAutoRefresh'
 
 type Probe = UptimeProbe
 
@@ -54,8 +55,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
   const { t } = useI18n()
   const dialog = useConfirmDialog()
 
-  const autoRefresh = ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => fetchProbes(), { intervalSec: REFRESH_SEC })
   const error = ref('')
 
   const probes = ref<Probe[]>([])
@@ -282,14 +282,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
 
   watch(probeSort, resetProbePage, { deep: true })
 
-  let refreshTimer: ReturnType<typeof setInterval> | undefined
-  onMounted(() => {
-    void fetchProbes()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) void fetchProbes() }, REFRESH_SEC * 1000)
-  })
-  onUnmounted(() => {
-    if (refreshTimer) clearInterval(refreshTimer)
-  })
+  onMounted(() => { void fetchProbes() })
 
   return {
     REFRESH_SEC,

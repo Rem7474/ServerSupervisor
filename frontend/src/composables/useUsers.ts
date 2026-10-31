@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from './useConfirmDialog'
@@ -6,6 +6,7 @@ import apiClient from '../api'
 import dayjs from '../utils/dayjs'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
+import { useAutoRefresh } from './useAutoRefresh'
 
 interface User {
   id: string
@@ -28,9 +29,9 @@ export function useUsers() {
   const loading = ref(false)
   const saving = ref(false)
   const creatingUser = ref(false)
-  const autoRefresh = ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
-  let refreshTimer: ReturnType<typeof setInterval> | null = null
+  // A tick is skipped while a role change/delete is in flight: saveRole and
+  // deleteUser refetch themselves once the confirm dialog + request settle.
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => fetchUsers(), { intervalSec: USERS_REFRESH_SEC, skip: () => saving.value })
 
   const newUserForm = ref({
     username: '',
@@ -75,20 +76,6 @@ export function useUsers() {
     } finally {
       loading.value = false
     }
-  }
-
-  function startRefreshTimer(): void {
-    stopRefreshTimer()
-    refreshTimer = setInterval(() => {
-      // Skip a tick while a role change/delete is in flight to avoid
-      // refetching mid-mutation (saveRole/deleteUser already refetch
-      // themselves once the confirm dialog + request settle).
-      if (autoRefresh.value && !saving.value) fetchUsers()
-    }, USERS_REFRESH_SEC * 1000)
-  }
-
-  function stopRefreshTimer(): void {
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }
 
   async function createUser(): Promise<void> {
@@ -171,11 +158,7 @@ export function useUsers() {
     }
   }
 
-  onMounted(() => {
-    fetchUsers()
-    startRefreshTimer()
-  })
-  onUnmounted(stopRefreshTimer)
+  onMounted(() => { void fetchUsers() })
 
   return {
     auth,
