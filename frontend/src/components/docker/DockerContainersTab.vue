@@ -723,6 +723,7 @@ import {
   getComposeInfo as getComposeInfoFromLabels,
   isComposeContainer as isComposeContainerFromLabels,
 } from '../../utils/dockerCompose'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 interface Container {
   id: string
@@ -902,11 +903,7 @@ function stateRank(state: string | undefined): number {
 }
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  return formatBytesShared(bytes || 0)
 }
 
 function openTracker(trackerId: string | undefined): void {

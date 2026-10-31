@@ -259,6 +259,7 @@ import { useBackup } from '../../composables/useBackup'
 import type { BackupRun } from '../../composables/useBackup'
 import { RESTIC_BACKUP_DOC_URL as configDocURL } from '../../utils/docLinks'
 import { getExecutionStateClass, getExecutionStateLabel } from '../../utils/statusClasses'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -322,15 +323,7 @@ function formatDuration(seconds: number): string {
 }
 
 function formatBytes(bytes: number | null | undefined): string {
-  if (bytes == null) return '—'
-  const units = [t('host.unitByte'), t('host.unitKB'), t('host.unitMB'), t('host.unitGB'), t('host.unitTB')]
-  let value = bytes
-  let unitIndex = 0
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024
-    unitIndex++
-  }
-  return `${value.toFixed(1)} ${units[unitIndex]}`
+  return formatBytesShared(bytes, '—')
 }
 
 onMounted(() => {

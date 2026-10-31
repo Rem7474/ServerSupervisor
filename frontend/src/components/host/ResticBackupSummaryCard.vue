@@ -70,6 +70,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { getExecutionStateClass, getExecutionStateLabel } from '../../utils/statusClasses'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 // Mirrors agent/internal/collector.ResticBackupSummary — the terminal Output
 // of a module=restic action=run_backup command. Same shape (and same field
@@ -106,14 +107,6 @@ function formatDuration(seconds: number): string {
 }
 
 function formatBytes(bytes: number | null | undefined): string {
-  if (bytes == null) return '—'
-  const units = [t('host.unitByte'), t('host.unitKB'), t('host.unitMB'), t('host.unitGB'), t('host.unitTB')]
-  let value = bytes
-  let unitIndex = 0
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024
-    unitIndex++
-  }
-  return `${value.toFixed(1)} ${units[unitIndex]}`
+  return formatBytesShared(bytes, '—')
 }
 </script>

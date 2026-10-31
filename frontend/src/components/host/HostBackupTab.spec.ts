@@ -244,7 +244,7 @@ describe('HostBackupTab', () => {
 
     expect(wrapper.find('.badge.bg-warning-lt').exists()).toBe(true)
     expect(wrapper.text()).toContain('2h3min')
-    expect(wrapper.text()).toContain('5.0 Mo')
+    expect(wrapper.text()).toContain('5,0 Mo')
     // An unrecognized run status falls back to the default secondary badge class.
     const statusBadges = wrapper.findAll('tbody .badge')
     expect(statusBadges[0].classes()).toContain('bg-secondary-lt')

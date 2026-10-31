@@ -9,6 +9,7 @@ import { useWebSocket } from './useWebSocket'
 import type { WSNetworkSnapshot } from '../types/ws'
 import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../types/network'
 import type { NetworkGuestNode, NetworkService } from '../components/network/buildNetworkElements'
+import { formatBytes as formatBytesShared } from '../utils/formatters'
 
 export function useNetwork() {
   const hosts = ref<any[]>([])
@@ -301,13 +302,7 @@ export function useNetwork() {
   const prevTrafficTime = ref<number | null>(null)
 
   function formatBytes(bytes: number | undefined): string {
-    if (!bytes && bytes !== 0) return '-'
-    if (bytes < 1024) return `${bytes} B`
-    const units = ['KB', 'MB', 'GB', 'TB']
-    let value = bytes / 1024
-    let idx = 0
-    while (value >= 1024 && idx < units.length - 1) { value /= 1024; idx++ }
-    return `${value.toFixed(1)} ${units[idx]}`
+    return formatBytesShared(bytes)
   }
 
   function ensureHostPortConfig(): void {

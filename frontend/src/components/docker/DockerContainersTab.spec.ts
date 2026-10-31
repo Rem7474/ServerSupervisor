@@ -297,7 +297,7 @@ describe('DockerContainersTab inspect modal', () => {
     await networksTab!.trigger('click')
     expect(wrapper.text()).toContain('bridge')
     expect(wrapper.text()).toContain('I/O réseau (cumulatif)')
-    expect(wrapper.text()).toContain('2 KiB')
+    expect(wrapper.text()).toContain('2,0 Ko')
   })
 
   it('shows no-network message and hides the I/O panel when there is no traffic', async () => {

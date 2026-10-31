@@ -7,7 +7,7 @@ import { useDomainDetails } from './useDomainDetails'
 import type { WebLogIPTimelineRow } from '../types/security'
 import type { TimeRangeModel } from '../types/timeRange'
 import { httpStatusClass } from '../utils/statusClasses'
-import { formatNumber, formatDateTimeSeconds } from '../utils/formatters'
+import { formatNumber, formatDateTimeSeconds, formatBytes as formatBytesShared } from '../utils/formatters'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
@@ -111,16 +111,7 @@ export function useTraffic() {
   }
 
   function formatBytes(bytes: number): string {
-    const value = Number(bytes) || 0
-    if (value < 1024) return `${value} B`
-    const units = ['KB', 'MB', 'GB', 'TB']
-    let size = value / 1024
-    let unit = 0
-    while (size >= 1024 && unit < units.length - 1) {
-      size /= 1024
-      unit++
-    }
-    return `${size.toFixed(1)} ${units[unit]}`
+    return formatBytesShared(Number(bytes) || 0)
   }
 
   function formatDate(v: string): string {

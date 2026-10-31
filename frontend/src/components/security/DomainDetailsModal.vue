@@ -463,7 +463,7 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { DomainDetailsFilterKey, DomainDetailsSortKey } from '../../composables/useDomainDetails'
 import { httpStatusClass } from '../../utils/statusClasses'
-import { formatDateTimeSeconds } from '../../utils/formatters'
+import { formatDateTimeSeconds, formatBytes as formatBytesShared } from '../../utils/formatters'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for the ad-hoc GetDomainDetails aggregate (no Go model)
 type AnyRecord = Record<string, any>
@@ -520,16 +520,7 @@ function copyIP(ip: string): void {
 const hasData = computed(() => typeof props.details?.hits !== 'undefined')
 
 function formatBytes(bytes: number): string {
-  const value = Number(bytes) || 0
-  if (value < 1024) return `${value} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let size = value / 1024
-  let unit = 0
-  while (size >= 1024 && unit < units.length - 1) {
-    size /= 1024
-    unit++
-  }
-  return `${size.toFixed(1)} ${units[unit]}`
+  return formatBytesShared(Number(bytes) || 0)
 }
 
 function formatDate(v: string): string {

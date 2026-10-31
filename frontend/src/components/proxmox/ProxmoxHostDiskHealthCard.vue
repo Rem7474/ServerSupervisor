@@ -111,6 +111,7 @@ import { IconDisc } from '@tabler/icons-vue'
 import { useProxmoxHostDisks } from '../../composables/useProxmoxHostDisks'
 import { smartStatusTone } from '../../utils/diskHealth'
 import { getWearoutColorClass } from '../../utils/metricColor'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 const { t } = useI18n()
 
@@ -124,15 +125,7 @@ const { disks, loading, load } = useProxmoxHostDisks(props.hostId)
 onMounted(load)
 
 function formatBytes(bytes: number): string {
-  if (!bytes || bytes <= 0) return 'N/A'
-  const unitKeys = ['proxmox.byteUnitBytes', 'proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera', 'proxmox.byteUnitPeta']
-  let value = bytes
-  let i = 0
-  while (value >= 1024 && i < unitKeys.length - 1) {
-    value /= 1024
-    i++
-  }
-  return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${t(unitKeys[i])}`
+  return bytes > 0 ? formatBytesShared(bytes) : 'N/A'
 }
 </script>
 

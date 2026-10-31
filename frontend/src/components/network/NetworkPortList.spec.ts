@@ -78,8 +78,8 @@ describe('NetworkPortList', () => {
       },
       ...mountOpts,
     })
-    expect(wrapper.text()).toContain('2.0 KB')
-    expect(wrapper.text()).toContain('1.0 KB')
+    expect(wrapper.text()).toContain('2,0 Ko')
+    expect(wrapper.text()).toContain('1,0 Ko')
     expect(wrapper.text()).toContain('1 hôte')
   })
 
