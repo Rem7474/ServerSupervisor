@@ -73,17 +73,17 @@
                 >
                   <IconClipboard
                     v-if="ev.type === 'audit'"
-                    :size="12"
+                    :size="14"
                     class="icon"
                   />
                   <IconTerminal2
                     v-else-if="ev.type === 'command'"
-                    :size="12"
+                    :size="14"
                     class="icon"
                   />
                   <IconAlertTriangle
                     v-else
-                    :size="12"
+                    :size="14"
                     class="icon"
                   />
                 </span>

@@ -154,7 +154,7 @@
           <span class="detail-key">Internet</span>
           <span
             v-if="selectedNode?.isInternetExposed"
-            class="badge bg-orange-lt text-orange"
+            class="badge bg-warning-lt text-warning"
           >
             {{ selectedNode?.externalPort ? t('network.nodeExposedWithPort', { port: selectedNode.externalPort }) : t('network.nodeExposedLabel') }}
           </span>
@@ -192,7 +192,7 @@
             >auth</span>
             <span
               v-if="svc.exposedToInternet"
-              class="badge bg-orange-lt text-orange ms-1"
+              class="badge bg-warning-lt text-warning ms-1"
             >inet</span>
           </span>
           <span
@@ -221,7 +221,7 @@
               >auth</span>
               <span
                 v-if="p.isInternetExposed"
-                class="badge bg-orange-lt text-orange ms-1"
+                class="badge bg-warning-lt text-warning ms-1"
               >inet</span>
             </template>
           </span>

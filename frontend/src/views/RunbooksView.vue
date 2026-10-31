@@ -365,7 +365,7 @@
                         colspan="4"
                         class="bg-dark-subtle"
                       >
-                        <table class="table table-sm mb-0">
+                        <table class="table table-vcenter table-sm mb-0">
                           <thead>
                             <tr>
                               <th>#</th>

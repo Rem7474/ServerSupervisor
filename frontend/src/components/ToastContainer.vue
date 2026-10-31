@@ -17,22 +17,22 @@
           <div class="toast-body d-flex align-items-center gap-2">
             <IconCircleCheck
               v-if="toast.type === 'success'"
-              :size="18"
+              :size="16"
               class="ss-toast-icon flex-shrink-0"
             />
             <IconCircleX
               v-else-if="toast.type === 'error'"
-              :size="18"
+              :size="16"
               class="ss-toast-icon flex-shrink-0"
             />
             <IconAlertTriangle
               v-else-if="toast.type === 'warning'"
-              :size="18"
+              :size="16"
               class="ss-toast-icon flex-shrink-0"
             />
             <IconInfoCircle
               v-else
-              :size="18"
+              :size="16"
               class="ss-toast-icon flex-shrink-0"
             />
             <span class="flex-fill ss-toast-message">{{ toast.message }}</span>

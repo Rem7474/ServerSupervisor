@@ -4,7 +4,7 @@
       <div class="d-flex align-items-center gap-2">
         <!-- Proxmox logo-style icon -->
         <IconDeviceDesktop
-          :size="20"
+          :size="24"
           class="text-orange"
         />
         <h3 class="card-title mb-0">

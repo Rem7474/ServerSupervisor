@@ -58,7 +58,7 @@
                 :aria-label="t('common.searchAriaLabel')"
                 @click="paletteToggle"
               >
-                <IconSearch :size="18" />
+                <IconSearch :size="16" />
               </button>
               <NotificationBell />
               <div
@@ -74,7 +74,7 @@
                   </span>
                   <span class="d-none d-md-inline me-2">{{ auth.username }}</span>
                   <IconUser
-                    :size="18"
+                    :size="16"
                     class="d-sm-none"
                   />
                   <span class="caret d-none d-sm-inline" />
@@ -206,7 +206,7 @@
       >
         <div class="container-xl d-flex align-items-center gap-2">
           <IconAlertTriangle
-            :size="20"
+            :size="24"
             class="icon flex-shrink-0"
           />
           <span v-if="!isOnline">{{ t('common.offlineNetwork') }}</span>

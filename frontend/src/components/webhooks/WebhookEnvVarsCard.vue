@@ -4,7 +4,7 @@
       {{ t('webhooks.injectedVarsInScriptLabel') }}
     </div>
     <div class="table-responsive">
-      <table class="table table-sm mb-0">
+      <table class="table table-vcenter table-sm mb-0">
         <tbody>
           <tr
             v-for="variable in envVars"

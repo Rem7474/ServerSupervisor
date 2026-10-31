@@ -32,7 +32,7 @@
               class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2"
               @click="loginWithOIDC"
             >
-              <IconKey :size="18" />
+              <IconKey :size="16" />
               <span>{{ t('auth.signInWithProvider', { provider: oidcStatus.display_name || 'SSO / OpenID Connect' }) }}</span>
             </button>
           </div>

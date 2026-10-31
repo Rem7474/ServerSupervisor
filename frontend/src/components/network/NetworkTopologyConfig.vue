@@ -400,7 +400,7 @@
               >{{ t('network.configAutheliaCountBadge', { count: countAutheliaLinked(host.id) }) }}</span>
               <span
                 v-if="countInternetExposed(host.id) > 0"
-                class="badge bg-orange-lt text-orange text-xs"
+                class="badge bg-warning-lt text-warning text-xs"
               >{{ t('network.configInternetCountBadge', { count: countInternetExposed(host.id) }) }}</span>
             </div>
           </div>

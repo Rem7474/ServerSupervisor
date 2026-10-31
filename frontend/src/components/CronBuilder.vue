@@ -144,7 +144,7 @@
         class="form-hint text-primary"
       >
         <IconClock
-          :size="12"
+          :size="14"
           class="me-1"
         />
         {{ preview }}

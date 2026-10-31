@@ -367,12 +367,12 @@
                         >
                           <IconCheck
                             v-if="copiedIP === r.ip"
-                            :size="12"
+                            :size="14"
                             class="icon text-success"
                           />
                           <IconCopy
                             v-else
-                            :size="12"
+                            :size="14"
                             class="icon"
                           />
                         </button>
@@ -392,7 +392,7 @@
                           />
                           <IconBan
                             v-else
-                            :size="12"
+                            :size="14"
                             class="icon"
                           />
                         </button>

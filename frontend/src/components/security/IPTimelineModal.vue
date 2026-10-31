@@ -78,12 +78,10 @@
           v-if="loading"
           variant="list"
         />
-        <div
+        <EmptyState
           v-else-if="!timeline.length"
-          class="text-center py-4 text-secondary"
-        >
-          {{ t('security.noRequestsTitle') }}
-        </div>
+          :title="t('security.noRequestsTitle')"
+        />
         <template v-else>
           <div class="timeline-frieze border-bottom px-3 py-3">
             <div class="timeline-controls d-flex align-items-center justify-content-between mb-2 gap-2">
@@ -293,6 +291,7 @@ import { useIpTimeline } from '../../composables/useIpTimeline'
 import { useModalChrome } from '../../composables/useModalChrome'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import type { WebLogIPTimelineRow } from '../../types/security'
+import EmptyState from '../EmptyState.vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },

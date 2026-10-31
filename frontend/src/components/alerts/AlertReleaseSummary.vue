@@ -131,7 +131,7 @@
               >—</span>
               <div
                 v-if="tracker.drift_detected"
-                class="badge bg-orange-lt text-orange mt-1"
+                class="badge bg-warning-lt text-warning mt-1"
                 :title="t('alerts.driftDetectedTitle')"
               >
                 {{ t('alerts.driftDetectedBadge') }}

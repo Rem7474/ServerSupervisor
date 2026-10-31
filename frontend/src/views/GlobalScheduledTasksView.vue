@@ -145,7 +145,7 @@
         v-else
         class="table-responsive scroll-table"
       >
-        <table class="table table-vcenter table-hover card-table mb-0">
+        <table class="table table-vcenter table-hover card-table">
           <thead>
             <tr>
               <th
