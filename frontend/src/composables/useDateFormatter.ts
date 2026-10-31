@@ -1,5 +1,6 @@
 import { i18n } from '../i18n'
 import dayjs from '../utils/dayjs'
+import { formatDateTime, formatDateTimeSeconds } from '../utils/formatters'
 
 type DateInput = string | Date | null | undefined
 
@@ -44,12 +45,11 @@ export function useDateFormatter(): UseDateFormatterApi {
 
   function formatExactDate(date: DateInput, emptyValue: string = '-'): string {
     if (!date || date === '0001-01-01T00:00:00Z') return emptyValue
-    return dayjs.utc(date).local().format('DD/MM/YYYY HH:mm')
+    return formatDateTime(date, emptyValue)
   }
 
   function formatLocaleDateTime(date: DateInput, emptyValue: string = ''): string {
-    if (!date) return emptyValue
-    return new Date(date).toLocaleString(i18n.global.locale.value)
+    return formatDateTimeSeconds(date, emptyValue)
   }
 
   return {

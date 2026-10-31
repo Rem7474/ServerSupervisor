@@ -93,7 +93,7 @@
               </span>
             </td>
             <td class="text-secondary">
-              {{ proc.mem_rss_kb.toLocaleString() }}
+              {{ formatNumber(proc.mem_rss_kb) }}
             </td>
             <td>
               <span
@@ -127,6 +127,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import SortableHeader from '../common/SortableHeader.vue'
 import type { HostProcess } from '../../composables/useHostProcesses'
+import { formatNumber } from '../../utils/formatters'
 
 type SortKey = keyof HostProcess
 

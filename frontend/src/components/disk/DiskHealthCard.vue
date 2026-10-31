@@ -72,7 +72,7 @@
               >N/A</span>
             </td>
             <td>
-              <span v-if="disk.power_on_hours > 0">{{ disk.power_on_hours.toLocaleString() }}h</span>
+              <span v-if="disk.power_on_hours > 0">{{ formatNumber(disk.power_on_hours) }}h</span>
               <span
                 v-else
                 class="text-muted"
@@ -86,7 +86,7 @@
               <span :class="{ 'text-danger fw-medium': (disk.uncorrectable_sectors ?? 0) > 0 }">{{ disk.uncorrectable_sectors ?? 0 }}</span>
             </td>
             <td>
-              <span v-if="(disk.power_cycles ?? 0) > 0">{{ disk.power_cycles!.toLocaleString() }}</span>
+              <span v-if="(disk.power_cycles ?? 0) > 0">{{ formatNumber(disk.power_cycles) }}</span>
               <span
                 v-else
                 class="text-muted"
@@ -126,6 +126,7 @@ import EmptyState from '../EmptyState.vue'
 import BadgePill from '../common/BadgePill.vue'
 import { useDiskHealth, type DiskHealth } from '../../composables/useDiskHealth'
 import { smartStatusTone } from '../../utils/diskHealth'
+import { formatNumber } from '../../utils/formatters'
 
 const { t } = useI18n()
 

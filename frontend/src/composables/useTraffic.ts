@@ -1,6 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
@@ -8,6 +7,7 @@ import { useDomainDetails } from './useDomainDetails'
 import type { WebLogIPTimelineRow } from '../types/security'
 import type { TimeRangeModel } from '../types/timeRange'
 import { httpStatusClass } from '../utils/statusClasses'
+import { formatNumber, formatDateTimeSeconds } from '../utils/formatters'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
@@ -20,7 +20,6 @@ interface TimeseriesPoint {
 }
 
 export function useTraffic() {
-  const { locale } = useI18n()
   const hostsStore = useHostsStore()
   const route = useRoute()
   const router = useRouter()
@@ -108,7 +107,7 @@ export function useTraffic() {
   })
 
   function numberFormat(v: number): string {
-    return new Intl.NumberFormat(locale.value).format(Number(v) || 0)
+    return formatNumber(v)
   }
 
   function formatBytes(bytes: number): string {
@@ -125,9 +124,7 @@ export function useTraffic() {
   }
 
   function formatDate(v: string): string {
-    const d = new Date(v)
-    if (Number.isNaN(d.getTime())) return v || '-'
-    return d.toLocaleString()
+    return formatDateTimeSeconds(v)
   }
 
 

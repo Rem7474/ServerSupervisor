@@ -122,7 +122,6 @@
   "backupProfilesGroupLabel": "Profiles",
   "backupGroupsGroupLabel": "Groups",
   "metricsMemoryTitle": "Memory",
-  "metricsUptimeDaysHours": "{days}d {hours}h",
   "aptTitle": "APT - System updates",
   "aptReadOnlyMode": "Read-only mode",
   "aptPendingPackagesLabel": "Pending packages",

@@ -241,8 +241,9 @@ import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import { formatDateTime } from '../../utils/formatters'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const { confirm } = useConfirmDialog()
 
 withDefaults(defineProps<{
@@ -414,8 +415,7 @@ async function remove(conn: NPMConnection): Promise<void> {
 }
 
 function formatDate(iso: string | undefined): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '—')
 }
 
 onMounted(load)

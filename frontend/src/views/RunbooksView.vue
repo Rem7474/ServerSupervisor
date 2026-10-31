@@ -461,6 +461,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useModalChrome } from '../composables/useModalChrome'
 import type { Runbook, RunbookStepCreate } from '../types/generated'
 import { execBadgeColor } from '../utils/statusClasses'
+import { formatDateTimeSeconds } from '../utils/formatters'
 
 const {
   hostsStore, runbooks, loading, fetched, error,
@@ -471,7 +472,7 @@ const {
   selectedStepCommand, showStepLogPanel, openStepLogs, closeStepLogs,
 } = useRunbooks()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const editModalRef = ref<HTMLElement | null>(null)
 const historyModalRef = ref<HTMLElement | null>(null)
@@ -555,8 +556,7 @@ function executionStatusLabel(status: string): string {
 
 
 function formatDate(dateStr: string | undefined | null): string {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString(locale.value)
+  return formatDateTimeSeconds(dateStr, '')
 }
 
 onMounted(async () => {

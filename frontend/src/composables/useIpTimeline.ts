@@ -2,6 +2,7 @@ import { ref, computed, watch, toValue, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { WebLogIPTimelineRow } from '../types/security'
 import { httpStatusClass } from '../utils/statusClasses'
+import { formatTime, formatDateTimeSeconds } from '../utils/formatters'
 
 export interface TimelineBucket {
   key: string
@@ -67,15 +68,11 @@ function statusFamilyBadgeClass(family: string): string {
 }
 
 function formatBucketLabel(startMs: number, bucketMs: number): string {
-  const d = new Date(startMs)
-  if (bucketMs < 60 * 1000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return formatTime(startMs, bucketMs < 60 * 1000)
 }
 
 export function formatDate(v: string): string {
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return v || '-'
-  return d.toLocaleString()
+  return formatDateTimeSeconds(v)
 }
 
 export function truncate(s: string, max: number): string {
@@ -185,8 +182,8 @@ export function useIpTimeline(
       .map((b): TimelineBucket => ({
         ...b,
         label: formatBucketLabel(b.startMs, timelineBucketMs.value),
-        rangeLabel: `${new Date(b.startMs).toLocaleString()} → ${new Date(b.endMs).toLocaleString()}`,
-        title: `${new Date(b.startMs).toLocaleString()} (${b.count} req)`,
+        rangeLabel: `${formatDateTimeSeconds(b.startMs)} → ${formatDateTimeSeconds(b.endMs)}`,
+        title: `${formatDateTimeSeconds(b.startMs)} (${b.count} req)`,
       }))
   })
 
@@ -265,7 +262,7 @@ export function useIpTimeline(
         return {
           key,
           label: bucket?.label || formatBucketLabel(start, timelineBucketMs.value),
-          rangeLabel: bucket?.rangeLabel || `${new Date(start).toLocaleString()} → ${new Date(end).toLocaleString()}`,
+          rangeLabel: bucket?.rangeLabel || `${formatDateTimeSeconds(start)} → ${formatDateTimeSeconds(end)}`,
           count: groupRows.length,
           errorCount,
           uniquePaths,

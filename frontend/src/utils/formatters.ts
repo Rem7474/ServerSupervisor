@@ -17,9 +17,31 @@ export function formatDate(dt: DateInput): string {
 }
 
 /** Format an ISO date string as a short date + time (locale order). */
-export function formatDateTime(dt: DateInput): string {
-  if (!dt) return '-'
+export function formatDateTime(dt: DateInput, empty = '-'): string {
+  if (!dt) return empty
   return new Date(dt).toLocaleString(localeTag(), { dateStyle: 'short', timeStyle: 'short' })
+}
+
+/**
+ * Short date + time with seconds, for event timestamps (requests, syslog
+ * lines, executions). An unparseable string is shown as-is rather than
+ * "Invalid Date".
+ */
+export function formatDateTimeSeconds(dt: DateInput, empty = '-'): string {
+  if (!dt && dt !== 0) return empty
+  const d = new Date(dt)
+  if (Number.isNaN(d.getTime())) return typeof dt === 'string' ? dt : empty
+  return d.toLocaleString(localeTag(), { dateStyle: 'short', timeStyle: 'medium' })
+}
+
+/** Time of day only (hours and minutes, optionally seconds). */
+export function formatTime(dt: DateInput, withSeconds = false): string {
+  if (!dt && dt !== 0) return '-'
+  return new Date(dt).toLocaleTimeString(localeTag(), {
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(withSeconds ? { second: '2-digit' } : {}),
+  })
 }
 
 /** Format an ISO date string as a long date (e.g. "25 février 2026" / "February 25, 2026"). */
@@ -45,14 +67,18 @@ export function formatDurationSecs(seconds: NumberInput): string {
   return `${s}s`
 }
 
-/** Format an uptime in seconds, e.g. "3j 4h" (fr) / "3d 4h" (en), or "4h 10m". */
-export function formatUptime(seconds: NumberInput): string {
-  if (seconds == null) return 'N/A'
+/**
+ * Format an uptime in seconds: "3j 4h" (fr) / "3d 4h" (en), "4h 10m", or
+ * "10m" under an hour. A missing or zero uptime (never reported) is `empty`.
+ */
+export function formatUptime(seconds: NumberInput, empty = 'N/A'): string {
+  if (!seconds) return empty
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
-  if (days > 0) return `${days}${i18n.global.t('common.dayUnitShort')} ${hours}h`
   const mins = Math.floor((seconds % 3600) / 60)
-  return `${hours}h ${mins}m`
+  if (days > 0) return `${days}${i18n.global.t('common.dayUnitShort')} ${hours}h`
+  if (hours > 0) return `${hours}h ${mins}m`
+  return `${mins}m`
 }
 
 /** Format bytes to a human-readable string (KB, MB, GB). */
