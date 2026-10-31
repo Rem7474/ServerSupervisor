@@ -215,6 +215,8 @@
                 </button>
                 <button
                   type="button"
+                  :title="t('common.delete')"
+                  :aria-label="t('common.delete')"
                   class="btn btn-icon btn-sm btn-ghost-danger ms-auto"
                   @click="confirmDeleteWebhook(webhook)"
                 >
@@ -461,6 +463,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('webhooks.checkNowButton')"
+                  :aria-label="t('webhooks.checkNowButton')"
                   @click="checkNow(tracker)"
                 >
                   <IconRefresh :size="14" />
@@ -475,6 +478,8 @@
                 </button>
                 <button
                   type="button"
+                  :title="t('common.delete')"
+                  :aria-label="t('common.delete')"
                   class="btn btn-icon btn-sm btn-ghost-danger ms-auto"
                   @click="confirmDeleteTracker(tracker)"
                 >

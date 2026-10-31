@@ -106,6 +106,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-success"
                     :title="t('runbooks.runButton')"
+                    :aria-label="t('runbooks.runButton')"
                     :disabled="runningIds.has(rb.id)"
                     @click="handleRun(rb)"
                   >
@@ -123,6 +124,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
                     :title="t('runbooks.historyButton')"
+                    :aria-label="t('runbooks.historyButton')"
                     @click="openHistory(rb)"
                   >
                     <IconHistory
@@ -134,6 +136,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
                     :title="t('runbooks.editButton')"
+                    :aria-label="t('runbooks.editButton')"
                     @click="startEdit(rb)"
                   >
                     <IconPencil
@@ -145,6 +148,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-danger"
                     :title="t('runbooks.deleteButton')"
+                    :aria-label="t('runbooks.deleteButton')"
                     @click="handleDelete(rb)"
                   >
                     <IconTrash
@@ -175,6 +179,7 @@
             </h5>
             <button
               type="button"
+              :aria-label="t('common.close')"
               class="btn-close"
               @click="closeModal"
             />
@@ -228,8 +233,9 @@
                 <div class="col-auto">
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-danger"
+                    class="btn btn-icon btn-sm btn-ghost-danger"
                     :title="t('runbooks.removeStepTooltip')"
+                    :aria-label="t('runbooks.removeStepTooltip')"
                     @click="form.steps.splice(index, 1)"
                   >
                     <IconTrash
@@ -301,6 +307,7 @@
             </h5>
             <button
               type="button"
+              :aria-label="t('common.close')"
               class="btn-close"
               @click="closeHistory"
             />

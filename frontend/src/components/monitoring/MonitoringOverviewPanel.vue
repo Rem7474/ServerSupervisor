@@ -336,6 +336,7 @@
             </h5>
             <button
               type="button"
+              :aria-label="t('common.close')"
               class="btn-close"
               :disabled="savingProbe || savingCert"
               @click="closeCreateModal"

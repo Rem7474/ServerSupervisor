@@ -191,6 +191,7 @@
             class="btn btn-icon btn-sm btn-outline-danger"
             :disabled="linkSaving"
             :title="t('host.deleteLinkTooltip')"
+            :aria-label="t('host.deleteLinkTooltip')"
             @click="deleteLink"
           >
             <IconTrash
@@ -647,6 +648,7 @@
                           type="button"
                           class="btn btn-icon btn-sm btn-ghost-danger"
                           :title="t('host.revokeTooltip')"
+                          :aria-label="t('host.revokeTooltip')"
                           @click="revokePermission(p.username)"
                         >
                           <IconX
@@ -745,6 +747,7 @@
             </h5>
             <button
               type="button"
+              :aria-label="t('common.close')"
               class="btn-close"
               @click="addPermModal = false"
             />

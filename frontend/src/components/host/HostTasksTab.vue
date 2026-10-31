@@ -141,6 +141,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
                     :title="t('host.viewLogsTooltip')"
+                    :aria-label="t('host.viewLogsTooltip')"
                     @click="openTaskLogs(task)"
                   >
                     <IconList
@@ -219,6 +220,7 @@
               </h5>
               <button
                 type="button"
+                :aria-label="t('common.close')"
                 class="btn-close"
                 @click="closeTaskModal"
               />
@@ -322,6 +324,7 @@
           </div>
           <button
             type="button"
+            :aria-label="t('common.close')"
             class="btn-close me-2 m-auto"
             @click="taskRunResult = null"
           />

@@ -184,6 +184,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('settings.edit')"
+                  :aria-label="t('settings.edit')"
                   @click="openEditForm(conn)"
                 >
                   <IconPencil
@@ -196,6 +197,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('settings.refreshNowTooltip')"
+                  :aria-label="t('settings.refreshNowTooltip')"
                   @click="refreshNow(conn)"
                 >
                   <IconRefresh
@@ -208,6 +210,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-danger"
                   :title="t('settings.delete')"
+                  :aria-label="t('settings.delete')"
                   @click="remove(conn)"
                 >
                   <IconTrash

@@ -354,6 +354,7 @@
                       type="button"
                       class="btn btn-icon btn-sm btn-ghost-secondary"
                       :title="t('host.viewLogsTooltip')"
+                      :aria-label="t('host.viewLogsTooltip')"
                       :disabled="!run.log_snippet"
                       @click="$emit('uu-log', run)"
                     >

@@ -62,6 +62,7 @@ withDefaults(defineProps<{
   ctaLabel: '',
   ctaTo: '',
   iconSize: 48,
+  icon: undefined,
 })
 defineEmits<{
   (e: 'cta'): void

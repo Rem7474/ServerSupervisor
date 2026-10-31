@@ -89,6 +89,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           :title="t('proxmox.upArrowTooltip')"
+          :aria-label="t('proxmox.upArrowTooltip')"
           @click="sendArrow('\u001b[A')"
         >
           <IconArrowUp
@@ -101,6 +102,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           :title="t('proxmox.downArrowTooltip')"
+          :aria-label="t('proxmox.downArrowTooltip')"
           @click="sendArrow('\u001b[B')"
         >
           <IconArrowDown
@@ -113,6 +115,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           :title="t('proxmox.leftArrowTooltip')"
+          :aria-label="t('proxmox.leftArrowTooltip')"
           @click="sendArrow('\u001b[D')"
         >
           <IconArrowLeft
@@ -125,6 +128,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           :title="t('proxmox.rightArrowTooltip')"
+          :aria-label="t('proxmox.rightArrowTooltip')"
           @click="sendArrow('\u001b[C')"
         >
           <IconArrowRight

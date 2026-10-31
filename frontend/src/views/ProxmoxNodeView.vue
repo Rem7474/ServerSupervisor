@@ -487,6 +487,7 @@
               </h5>
               <button
                 type="button"
+                :aria-label="t('common.close')"
                 class="btn-close"
                 @click="migrateModal.open = false"
               />

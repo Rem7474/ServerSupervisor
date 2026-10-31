@@ -31,6 +31,7 @@
           </button>
           <button
             type="button"
+            :aria-label="t('common.close')"
             class="btn-close"
             @click="$emit('close')"
           />

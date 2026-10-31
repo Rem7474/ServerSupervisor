@@ -108,6 +108,8 @@ const props = withDefaults(defineProps<{
   fanChart: null,
   timeframe: 'hour',
   loading: false,
+  tempEmptyText: undefined,
+  fanEmptyText: undefined,
   error: '',
 })
 
