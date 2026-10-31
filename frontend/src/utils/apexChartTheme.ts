@@ -121,6 +121,38 @@ function isDarkRgbColor(color: string): boolean {
   return luminance < 0.5
 }
 
+// Tabler 1.6 declares its palette in oklch(), and getComputedStyle() hands
+// that back untouched (`oklch(0.546 0.1724 254.2)`). ApexCharts can only
+// derive a translucent fill (`fill.opacity`) from hex/rgb input — given an
+// oklch string it paints the area at full opacity — and the rgb-only parsing
+// in this file (isDarkRgbColor, toRgba) misreads it as "not dark" and falls
+// back to the light-theme defaults. A 1x1 canvas parses any color syntax the
+// browser supports, so reading the pixel back yields a plain sRGB value.
+let colorProbeCtx: CanvasRenderingContext2D | null | undefined
+
+function toSrgbString(color: string): string {
+  if (/^(#|rgba?\()/i.test(color)) return color
+  if (typeof document === 'undefined') return color
+  try {
+    if (colorProbeCtx === undefined) {
+      colorProbeCtx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+    }
+    const ctx = colorProbeCtx
+    if (!ctx) return color
+    // An unparseable assignment is ignored by the canvas, so seed a sentinel
+    // and detect the no-op instead of reading back a stale color.
+    ctx.fillStyle = '#010203'
+    ctx.fillStyle = color
+    if (ctx.fillStyle === '#010203') return color
+    ctx.clearRect(0, 0, 1, 1)
+    ctx.fillRect(0, 0, 1, 1)
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
+    return a === 255 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`
+  } catch {
+    return color
+  }
+}
+
 // Resolves any CSS color value — including a var() chain — to a concrete
 // rgb()/rgba() string, via an off-screen probe element. Needed because
 // ApexCharts (like Chart.js before it) consumes plain color strings, not
@@ -143,7 +175,7 @@ function resolveCssColorForCanvas(color: string, fallback: string): string {
   if (!resolved || resolved === 'rgba(0, 0, 0, 0)' || resolved === 'transparent') {
     return fallback
   }
-  return resolved
+  return toSrgbString(resolved)
 }
 
 function toRgba(color: string, alpha: number, fallback: string): string {
