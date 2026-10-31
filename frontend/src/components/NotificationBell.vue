@@ -1,7 +1,7 @@
 <template>
   <div
     ref="bellRef"
-    class="dropdown"
+    class="dropdown notification-bell"
   >
     <!-- Bell button -->
     <button
@@ -233,9 +233,30 @@ onUnmounted(() => {
  */
 .notification-dropdown {
   top: calc(100% + 8px);
+  /* .dropdown-menu ships `left: 0`; with `right: 0` also set and a fixed
+     width the over-constrained box resolves on `left`, so the panel opened
+     rightward from the bell and ran off-screen on a phone. */
+  left: auto;
   right: 0;
   width: 380px;
   max-width: calc(100vw - 1rem);
+}
+
+/* Below the sm breakpoint the bell sits mid-header, so anchoring to it can't
+   fit a 380px panel. Releasing the wrapper's `position: relative` makes the
+   panel resolve against the full-width navbar instead, and the two side
+   offsets then stretch it across the viewport. */
+@media (max-width: 575px) {
+  .notification-bell {
+    position: static;
+  }
+
+  .notification-dropdown {
+    left: 0.5rem;
+    right: 0.5rem;
+    width: auto;
+    max-width: none;
+  }
 }
 
 .notification-bell-btn {

@@ -182,13 +182,15 @@
     v-show="!show"
     type="button"
     class="btn btn-primary console-fab"
+    :title="displayTitle"
+    :aria-label="displayTitle"
     @click="$emit('open')"
   >
     <IconChevronRight
       :size="24"
-      class="icon me-1"
+      class="icon console-fab-icon"
     />
-    {{ displayTitle }}
+    <span class="console-fab-label">{{ displayTitle }}</span>
   </button>
 </template>
 
@@ -391,5 +393,31 @@ function download(): void {
   bottom: 1.5rem;
   right: 1.5rem;
   z-index: 100;
+}
+
+.console-fab-icon + .console-fab-label {
+  margin-inline-start: 0.25rem;
+}
+
+/* On a phone the labelled pill covers a full table row; collapse it to a
+   round icon-only button (the label stays as title/aria-label). */
+@media (max-width: 767px) {
+  .console-fab {
+    width: 3rem;
+    height: 3rem;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+    bottom: 1rem;
+    right: 1rem;
+  }
+
+  .console-fab-label {
+    display: none;
+  }
+
+  .console-fab-icon {
+    margin: 0;
+  }
 }
 </style>

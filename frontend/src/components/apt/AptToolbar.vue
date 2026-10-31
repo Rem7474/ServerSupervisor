@@ -6,7 +6,7 @@
     @update:search="search = $event"
   >
     <template #right>
-      <div class="btn-group">
+      <div class="btn-group apt-filters">
         <button
           v-for="f in filterOptions"
           :key="f.value"
@@ -170,4 +170,19 @@ const selectAllLabel = computed(() =>
 
 <style scoped>
 .sort-select { width: auto; }
+
+/* Five joined buttons are wider than a phone; let them wrap as separate
+   pills instead of clipping the last one. */
+@media (max-width: 575px) {
+  .apt-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .apt-filters > .btn {
+    flex: 0 0 auto;
+    border-radius: var(--tblr-btn-border-radius, var(--tblr-border-radius));
+  }
+}
 </style>

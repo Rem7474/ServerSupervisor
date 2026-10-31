@@ -159,7 +159,7 @@
                 >
               </label>
             </td>
-            <td class="fw-semibold">
+            <td class="fw-semibold text-nowrap">
               {{ c.name }}
             </td>
             <td>

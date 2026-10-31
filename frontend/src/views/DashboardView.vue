@@ -24,7 +24,7 @@
           :size="14"
           class="icon"
         />
-        <span class="d-none d-sm-inline ms-1">{{ t('dashboard.addHost') }}</span>
+        <span class="ms-1">{{ t('dashboard.addHost') }}</span>
       </router-link>
     </div>
 

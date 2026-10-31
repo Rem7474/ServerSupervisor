@@ -106,6 +106,13 @@ html {
   }
 }
 
+/* The reopen button of a console panel (CommandLogPanel.vue) is fixed to the
+   viewport corner; leave room under the footer so the last row and the
+   footer line can scroll clear of it. */
+body:has(.console-fab:not([style*="display: none"])) .page-wrapper {
+  padding-bottom: 4rem;
+}
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -489,6 +496,19 @@ select:-webkit-autofill:focus {
    it, so scrolling a long list doesn't scroll the column headers out of
    view. Apply alongside .table-responsive (which only handles horizontal
    overflow on its own). */
+/* On a phone a wide table scrolls sideways with nothing to say so: paint a
+   soft edge on the side that still has content. `local` attachments move
+   with the scroll, so each fade disappears once that end is reached. */
+@media (max-width: 767px) {
+  .table-responsive {
+    background:
+      linear-gradient(to right, var(--tblr-bg-surface) 30%, transparent) left center / 2rem 100% no-repeat local,
+      linear-gradient(to left, var(--tblr-bg-surface) 30%, transparent) right center / 2rem 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 45%), transparent) left center / 0.75rem 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 45%), transparent) right center / 0.75rem 100% no-repeat scroll;
+  }
+}
+
 .scroll-table {
   max-height: 70vh;
   overflow-y: auto;
