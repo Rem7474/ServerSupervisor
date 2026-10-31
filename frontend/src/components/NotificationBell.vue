@@ -43,6 +43,19 @@
           {{ t('alerts.notificationBellMarkAllRead') }}
         </button>
       </div>
+      <div
+        v-if="browserPermission === 'default'"
+        class="d-flex align-items-center justify-content-between gap-2 px-3 py-2 border-bottom small"
+      >
+        <span class="text-secondary">{{ t('alerts.notificationBellEnableHint') }}</span>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          @click.stop="enableBrowserNotifications"
+        >
+          {{ t('alerts.notificationBellEnableButton') }}
+        </button>
+      </div>
 
       <!-- List -->
       <div class="notification-list-scroll">
@@ -202,6 +215,8 @@ const {
   notificationResolved,
   notificationTitle,
   notificationRoute,
+  browserPermission,
+  enableBrowserNotifications,
 } = useNotifications()
 
 function toggleOpen(): void {

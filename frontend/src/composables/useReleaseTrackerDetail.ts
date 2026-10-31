@@ -8,9 +8,10 @@ import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { ReleaseTracker, ReleaseTrackerExecution, ReleaseTrackerRequest, ReleaseVersionHistoryItem } from '../types/tracker'
 import type { ComposeProject } from '../types/docker'
-import type { Host } from '../types/host'
 import type { WebhookFormData } from './useWebhookForm'
 import { gitProviderBadgeClass } from '../utils/categoryBadges'
+import { storeToRefs } from 'pinia'
+import { useHostsStore } from '../stores/hosts'
 
 interface CmdRow { id: string; status?: string; output?: string; [key: string]: unknown }
 // The API enriches the tracker with the resolved release URL (not in the Go model).
@@ -25,7 +26,8 @@ export function useReleaseTrackerDetail() {
   const tracker = ref<TrackerView | null>(null)
   const executions = ref<ReleaseTrackerExecution[]>([])
   const versionHistory = ref<ReleaseVersionHistoryItem[]>([])
-  const hosts = ref<Host[]>([])
+  // Shared, TTL-cached host list (stores/hosts) rather than a private copy.
+  const { hosts } = storeToRefs(useHostsStore())
   const loading = ref(false)
   const error = ref('')
   const historyLoading = ref(false)
@@ -113,10 +115,9 @@ export function useReleaseTrackerDetail() {
     loading.value = true
     error.value = ''
     try {
-      const [res, hostsRes] = await Promise.all([api.getReleaseTracker(id, signal), api.getHosts(signal)])
+      const [res] = await Promise.all([api.getReleaseTracker(id, signal), useHostsStore().fetchHosts()])
       tracker.value = res.data.tracker
       executions.value = res.data.executions || []
-      hosts.value = hostsRes.data || []
     } catch (e: unknown) {
       if (isApiAbort(e)) return
       error.value = getApiErrorMessage(e, t('webhooks.loadErrorGeneric'))

@@ -422,5 +422,7 @@
   "markAllReadError": "Could not mark them as read",
   "incidentAcknowledgedToast": "Incident acknowledged",
   "incidentAcknowledgeError": "Could not acknowledge",
-  "templateApplyFailedCount": "{failed} failure | {failed} failures"
+  "templateApplyFailedCount": "{failed} failure | {failed} failures",
+  "notificationBellEnableHint": "Get alerts even when this tab is closed",
+  "notificationBellEnableButton": "Enable"
 }

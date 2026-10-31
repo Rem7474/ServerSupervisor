@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../i18n'
 
 const api = vi.hoisted(() => ({
@@ -55,6 +56,7 @@ const networkError = { isAxiosError: true, message: 'Network Error' }
 
 describe('useGitWebhooksPage — locale-dependent formatting', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     setLocale('fr')
     resetApi()
   })
@@ -90,6 +92,7 @@ describe('useGitWebhooksPage — error reporting', () => {
   const tracker = { id: 't1', name: 'app', enabled: true } as never
 
   beforeEach(() => {
+    setActivePinia(createPinia())
     setLocale('fr')
     resetApi()
   })

@@ -7,6 +7,8 @@ import { useCommandLogViewer } from './useCommandLogViewer'
 import { execBadgeColor } from '../utils/statusClasses'
 import { gitProviderBadgeClass } from '../utils/categoryBadges'
 import { formatDate, formatDateTimeSeconds } from '../utils/formatters'
+import { storeToRefs } from 'pinia'
+import { useHostsStore } from '../stores/hosts'
 
 interface TrackerCmd {
   id: string
@@ -156,7 +158,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   watch(activeTab, (tab) => {
     router.replace({ query: { ...route.query, tab } })
   })
-  const hosts: Ref<Host[]> = ref([])
+  // Shared, TTL-cached host list (stores/hosts) rather than a private copy.
+  const { hosts } = storeToRefs(useHostsStore())
   const error: Ref<string> = ref('')
   const saving: Ref<boolean> = ref(false)
   const modalError: Ref<string> = ref('')
@@ -305,12 +308,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   }
 
   async function loadHosts(): Promise<void> {
-    try {
-      const response = await api.getHosts()
-      hosts.value = response.data || []
-    } catch {
-      hosts.value = []
-    }
+    await useHostsStore().fetchHosts()
   }
 
   function openCreateWebhook(): void {
