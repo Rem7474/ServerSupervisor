@@ -72,6 +72,7 @@
 import { useI18n } from 'vue-i18n'
 import type { ProxmoxStorage } from '../../types/proxmox'
 import EmptyState from '../EmptyState.vue'
+import { getMetricColorClass } from '../../utils/metricColor'
 
 const { t } = useI18n()
 
@@ -97,10 +98,7 @@ function storagePct(s: ProxmoxStorage): string {
 
 function storageColor(used: number, total: number): string {
   if (!total) return 'bg-secondary'
-  const pct = used / total
-  if (pct > 0.85) return 'bg-danger'
-  if (pct > 0.6) return 'bg-warning'
-  return 'bg-primary'
+  return getMetricColorClass((used / total) * 100, 'bg')
 }
 </script>
 

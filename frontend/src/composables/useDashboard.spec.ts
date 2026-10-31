@@ -146,6 +146,24 @@ describe('useDashboard — summary chart series/options', () => {
   })
 })
 
+describe('useDashboard — host table colors', () => {
+  it('uses the shared 75/90 thresholds for CPU, RAM and disk', () => {
+    const { api } = mountUseDashboard()
+    expect(api.cpuColor(72)).toBe('text-success')
+    expect(api.cpuColor(76)).toBe('text-warning')
+    expect(api.memColor(91)).toBe('text-danger')
+    expect(api.diskColor(80)).toBe('text-warning')
+  })
+
+  it('keeps CPU/RAM neutral without metrics but colors a real 0 % disk', () => {
+    const { api } = mountUseDashboard()
+    expect(api.cpuColor(0)).toBe('text-secondary')
+    expect(api.memColor(undefined)).toBe('text-secondary')
+    expect(api.diskColor(0)).toBe('text-success')
+    expect(api.diskColor(null)).toBe('text-secondary')
+  })
+})
+
 describe('useDashboard — chartSources / cveTimestampText locale', () => {
   beforeEach(() => {
     vi.clearAllMocks()

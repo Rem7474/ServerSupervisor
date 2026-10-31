@@ -143,7 +143,7 @@
               </div>
               <div
                 class="h3 mb-1"
-                :class="tempColor(nodeCpuTempCurrent)"
+                :class="getTemperatureColorClass(nodeCpuTempCurrent)"
               >
                 {{ nodeCpuTempCurrent > 0 ? `${nodeCpuTempCurrent.toFixed(1)}°C` : '—' }}
               </div>
@@ -574,7 +574,7 @@ import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
 import { useProxmoxNode } from '../composables/useProxmoxNode'
 import { useModalChrome } from '../composables/useModalChrome'
-import { getMetricColorClass } from '../utils/metricColor'
+import { getMetricColorClass, getTemperatureColorClass } from '../utils/metricColor'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -719,13 +719,6 @@ function memPct(n: { mem_used?: number; mem_total?: number }): string | number {
 
 function cpuColor(usage: number): string {
   return getMetricColorClass(usage * 100, 'bg')
-}
-
-function tempColor(temp: number | undefined): string {
-  if (!temp) return 'text-secondary'
-  if (temp >= 85) return 'text-danger'
-  if (temp >= 70) return 'text-warning'
-  return 'text-success'
 }
 
 function ramColor(used: number, total: number): string {

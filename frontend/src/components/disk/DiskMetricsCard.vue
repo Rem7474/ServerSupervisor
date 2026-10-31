@@ -62,7 +62,7 @@
                 <div class="progress progress-xs flex-grow-1 disk-metrics-progress-min">
                   <div
                     class="progress-bar"
-                    :class="getProgressBarClass(metric.used_percent)"
+                    :class="getMetricColorClass(metric.used_percent, 'bg')"
                     :style="{ width: metric.used_percent + '%' }"
                   />
                 </div>
@@ -85,7 +85,7 @@
                 <div class="progress progress-xs flex-grow-1 disk-metrics-progress-min">
                   <div
                     class="progress-bar"
-                    :class="getProgressBarClass(metric.inodes_percent)"
+                    :class="getMetricColorClass(metric.inodes_percent, 'bg')"
                     :style="{ width: metric.inodes_percent + '%' }"
                   />
                 </div>
@@ -110,6 +110,7 @@ import { IconClock } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
 import { useDiskMetrics, type DiskMetric } from '../../composables/useDiskMetrics'
+import { getMetricColorClass } from '../../utils/metricColor'
 
 const { t } = useI18n()
 
@@ -129,13 +130,6 @@ onMounted(async () => {
 
 function formatGB(bytes: number): string {
   return `${bytes.toFixed(1)}G`
-}
-
-function getProgressBarClass(percent: number): string {
-  if (percent >= 90) return 'bg-danger'
-  if (percent >= 80) return 'bg-warning'
-  if (percent >= 70) return 'bg-primary'
-  return 'bg-success'
 }
 
 function forecastClass(days: number): string {

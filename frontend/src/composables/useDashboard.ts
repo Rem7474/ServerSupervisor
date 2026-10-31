@@ -17,6 +17,7 @@ import { formatRelativeTime } from './useDateFormatter'
 import dayjs from '../utils/dayjs'
 import { useReactiveApexChartPalette } from '../utils/apexChartTheme'
 import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
+import { getMetricColorClass } from '../utils/metricColor'
 
 interface DashboardCveSummary {
   critical_count?: number
@@ -456,25 +457,18 @@ export function useDashboard() {
     return `${hours}h ${Math.floor((seconds % 3600) / 60)}m`
   }
 
+  // A 0 CPU/RAM reading means "no metrics yet" (the agent never reports a
+  // true 0), so it stays neutral; a 0 % disk is a real value.
   function cpuColor(pct: number | null | undefined) {
-    if (!pct) return 'text-secondary'
-    if (pct > 90) return 'text-danger'
-    if (pct > 70) return 'text-warning'
-    return 'text-success'
+    return pct ? getMetricColorClass(pct) : 'text-secondary'
   }
 
   function memColor(pct: number | null | undefined) {
-    if (!pct) return 'text-secondary'
-    if (pct > 90) return 'text-danger'
-    if (pct > 75) return 'text-warning'
-    return 'text-success'
+    return pct ? getMetricColorClass(pct) : 'text-secondary'
   }
 
   function diskColor(pct: number | null | undefined) {
-    if (pct == null) return 'text-secondary'
-    if (pct > 90) return 'text-danger'
-    if (pct > 75) return 'text-warning'
-    return 'text-success'
+    return getMetricColorClass(pct)
   }
 
   function isAgentUpToDate(version: string) {
