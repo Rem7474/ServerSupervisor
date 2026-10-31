@@ -96,12 +96,12 @@ describe('NetworkDiscoveryPanel', () => {
     await nameInputs[0].setValue('switch-1')
 
     const addButton = wrapper.findAll('button').find((b) => b.text().includes('Ajouter'))
-    expect(addButton?.text()).toContain('Ajouter 1 hôte(s) sélectionné(s)')
+    expect(addButton?.text()).toContain('Ajouter 1 hôte sélectionné')
     await addButton?.trigger('click')
     await flushPromises()
 
     expect(registerHostsBulk).toHaveBeenCalledWith([{ name: 'switch-1', ip_address: '10.0.0.1' }])
-    expect(wrapper.text()).toContain('1 hôte(s) ajouté(s)')
+    expect(wrapper.text()).toContain('1 hôte ajouté')
     expect(wrapper.text()).toContain('secret-key')
   })
 

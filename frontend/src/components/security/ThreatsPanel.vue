@@ -291,7 +291,7 @@
                     {{ p.path }}
                   </div>
                   <div class="small text-secondary">
-                    {{ p.category || 'Unknown' }}
+                    {{ p.category || t('common.statusUnknown') }}
                   </div>
                 </div>
                 <span class="badge bg-warning-lt text-warning flex-shrink-0">{{ formatNumber(p.hits || 0) }}</span>

@@ -210,7 +210,7 @@
           class="mb-3 text-secondary small"
         >
           {{ t('host.uuLastRunPrefix') }} <strong>{{ formatDate(uuStatus.last_run_at) }}</strong>
-          — {{ t('host.uuLastRunPackagesSuffix', { count: uuStatus.last_run_packages }) }}
+          — {{ t('host.uuLastRunPackagesSuffix', { count: uuStatus.last_run_packages }, Number(uuStatus.last_run_packages) || 0) }}
         </div>
         <div
           v-else

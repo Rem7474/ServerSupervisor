@@ -122,7 +122,7 @@
       v-else-if="form.host_id && hostMetrics?.metrics && hostMetrics.metrics.length < (capabilities?.metrics?.length || 0)"
       class="alert alert-info py-2 small mb-2"
     >
-      {{ t('alerts.sourceHostMetricsCountInfo', { n: hostMetrics?.metrics?.length ?? 0 }) }}
+      {{ t('alerts.sourceHostMetricsCountInfo', { n: hostMetrics?.metrics?.length ?? 0 }, hostMetrics?.metrics?.length ?? 0) }}
     </div>
     <div class="metric-grid">
       <button

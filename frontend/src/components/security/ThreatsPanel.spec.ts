@@ -127,6 +127,22 @@ describe('ThreatsPanel', () => {
     expect(wrapper.find('[aria-label="Débloquer cette IP"]').exists()).toBe(true)
   })
 
+  it.each([
+    ['fr', 'Inconnu'],
+    ['en', 'Unknown'],
+  ])('labels a threat path without category in the UI language (%s)', async (locale, label) => {
+    setLocale(locale as 'fr' | 'en')
+    vi.mocked(apiClient.getWebLogsSummary).mockResolvedValue({
+      data: { threats: { ...threatsData.data.threats, top_paths: [{ path: '/.env', category: '', hits: 9 }] } },
+    } as never)
+    const wrapper = mount(ThreatsPanel, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    const row = wrapper.findAll('.top-path-row').find((el) => el.text().includes('/.env'))
+    expect(row?.find('.top-path-label .text-secondary').text()).toBe(label)
+  })
+
   it('translates to English when the locale is switched', async () => {
     setLocale('en')
     const wrapper = mount(ThreatsPanel, mountOpts)

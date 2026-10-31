@@ -107,7 +107,7 @@
                 </div>
               </div>
               <div class="small text-secondary">
-                {{ t('security.groupingSummary', { label: timelineBucketLabel, count: timelineBuckets.length }) }}
+                {{ t('security.groupingSummary', { label: timelineBucketLabel, count: timelineBuckets.length }, timelineBuckets.length) }}
                 <span
                   v-if="selectedInterval === 'auto'"
                   class="badge bg-azure-lt text-azure ms-1"
@@ -243,7 +243,7 @@
                         <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
                       </div>
                       <div class="timeline-event-path font-monospace small">
-                        {{ r.domain || '(unknown)' }} {{ r.path }}
+                        {{ r.domain || t('security.unknownDomainLabel') }} {{ r.path }}
                       </div>
                       <div class="timeline-event-meta small text-secondary">
                         <span><strong>{{ t('security.domainLabel') }}:</strong> {{ r.domain || '-' }}</span>

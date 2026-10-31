@@ -23,6 +23,7 @@
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
@@ -34,6 +35,8 @@ interface Point {
   bot?: number | string
   [key: string]: unknown
 }
+
+const { t } = useI18n()
 
 const props = defineProps<{
   timeseries: Point[]
@@ -51,8 +54,8 @@ function bucketLabel(ts: string): string {
 const categories = computed(() => props.timeseries.map((p) => bucketLabel(p.timestamp)))
 
 const series = computed(() => [
-  { name: 'Humain', data: props.timeseries.map((p) => Number(p.human) || 0) },
-  { name: 'Bot/scan', data: props.timeseries.map((p) => Number(p.bot) || 0) },
+  { name: t('security.humanSeriesLabel'), data: props.timeseries.map((p) => Number(p.human) || 0) },
+  { name: t('security.botSeriesLabel'), data: props.timeseries.map((p) => Number(p.bot) || 0) },
 ])
 
 // Built once (on first data arrival) rather than as a `computed` over

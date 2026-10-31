@@ -26,7 +26,7 @@
   "confirmExecuteOn": "Exécuter sur : {target} ?",
   "selectedHostsFallback": "les hôtes sélectionnés",
   "commandLaunchedOnHost": "apt {command} lancée sur {host}",
-  "commandLaunchedOnHosts": "apt {command} lancée sur {count} hôtes",
+  "commandLaunchedOnHosts": "apt {command} lancée sur {count} hôte | apt {command} lancée sur {count} hôtes",
   "commandFailedOnList": " — échec sur : {list}",
   "commandNoneLaunched": "apt {command} — aucune commande lancée",
   "updateAgentsTitle": "Mettre à jour les agents",

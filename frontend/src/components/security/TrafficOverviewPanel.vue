@@ -329,7 +329,7 @@
                   @keydown.space.prevent="h.vhost && openDomain(h.vhost)"
                 >
                   <div class="d-flex justify-content-between small mb-1">
-                    <span class="font-monospace">{{ h.vhost || h.host_name || '(unknown)' }}</span>
+                    <span class="font-monospace">{{ h.vhost || h.host_name || t('security.unknownDomainLabel') }}</span>
                     <span>{{ numberFormat(h.hits || 0) }}</span>
                   </div>
                   <div
@@ -387,7 +387,7 @@
                     @keydown.space.prevent="item.domain && openDomain(item.domain)"
                   >
                     <td class="font-monospace small">
-                      {{ item.domain || '(unknown)' }}
+                      {{ item.domain || t('security.unknownDomainLabel') }}
                     </td>
                     <td class="text-end">
                       {{ numberFormat(item.hits || 0) }}

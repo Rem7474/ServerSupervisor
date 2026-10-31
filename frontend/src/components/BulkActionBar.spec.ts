@@ -18,7 +18,7 @@ describe('BulkActionBar', () => {
     const wrapper = mount(BulkActionBar, { props: { count: 1 }, attachTo: document.body })
     const bar = document.querySelector('.bulk-action-bar') as HTMLElement
     expect(bar.textContent).toContain('1 hôte sélectionné')
-    expect(bar.getAttribute('aria-label')).toBe('Actions groupées — 1 hôte(s) sélectionné(s)')
+    expect(bar.getAttribute('aria-label')).toBe('Actions groupées — 1 hôte sélectionné')
     expect(bar.querySelector('.bulk-action-bar__close')?.getAttribute('aria-label')).toBe('Annuler la sélection')
     wrapper.unmount()
   })

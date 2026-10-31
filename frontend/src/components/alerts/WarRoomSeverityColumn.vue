@@ -55,7 +55,7 @@
                 :text="t('alerts.warRoomCorrelatedCountBadge', { count: correlatedCount(item) }, correlatedCount(item))"
                 tone="secondary"
                 compact
-                :title="t('alerts.warRoomCorrelatedCountTitle', { count: correlatedCount(item) })"
+                :title="t('alerts.warRoomCorrelatedCountTitle', { count: correlatedCount(item) }, correlatedCount(item))"
               />
             </div>
             <div class="text-muted small text-truncate">

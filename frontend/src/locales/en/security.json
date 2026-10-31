@@ -75,7 +75,7 @@
   "pageOfTotalResultsLabel": "Page {page} of {totalPages} — {total} results",
   "bucketLabelSeconds": "{n} seconds",
   "bucketLabelMinutes": "{n} minutes",
-  "bucketLabelHours": "{n} hour(s)",
+  "bucketLabelHours": "{n} hour | {n} hours",
   "statusFamily5xx": "5xx Server",
   "statusFamily4xx": "4xx Client",
   "statusFamily3xx": "3xx Redirect",
@@ -90,7 +90,7 @@
   "noRequestsTitle": "No request",
   "intervalLabel": "Interval:",
   "intervalGroupAriaLabel": "Timeline interval",
-  "groupingSummary": "Grouping: {label} · {count} slices",
+  "groupingSummary": "Grouping: {label} · {count} slice | Grouping: {label} · {count} slices",
   "autoTargetBadge": "Auto targets ~{n}",
   "focusModeButtonFocus": "Focus mode: selected slice",
   "focusModeButtonGlobal": "Global mode: all slices",
@@ -181,5 +181,9 @@
   "worldMapAriaLabel": "World map of traffic by country",
   "blockHostNotFound": "No host found to block {ip}",
   "blockIpSuccess": "IP {ip} blocked by CrowdSec ({duration})",
-  "blockIpError": "Could not block {ip}: {message}"
+  "blockIpError": "Could not block {ip}: {message}",
+  "unknownDomainLabel": "(unknown)",
+  "worldMapHitsCount": "{count} hit | {count} hits",
+  "humanSeriesLabel": "Human",
+  "botSeriesLabel": "Bot/scan"
 }

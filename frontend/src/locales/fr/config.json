@@ -15,7 +15,6 @@
     "total": "Paramètres totaux",
     "env": "Configurés via ENV",
     "ui": "Configurés via UI",
-    "default": "Valeurs par défaut",
     "conflicts": "Conflits détectés"
   },
   "sources": {
@@ -49,8 +48,6 @@
     "hideSecrets": "Masquer les secrets",
     "refresh": "Actualiser",
     "searchPlaceholder": "Rechercher par clé technique, variable d'environnement ou description...",
-    "filterCategory": "Catégorie",
-    "filterSource": "Source",
     "allSources": "Toutes les sources"
   },
   "warnings": {

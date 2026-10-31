@@ -89,7 +89,7 @@
             </div>
             <div v-else>
               <div class="alert alert-success">
-                {{ t('alerts.rulesCreatedMsg', { count: result.created_rule_ids?.length || 0 }) }}
+                {{ t('alerts.rulesCreatedMsg', { count: result.created_rule_ids?.length || 0 }, result.created_rule_ids?.length || 0) }}
               </div>
               <div
                 v-if="result.errors && Object.keys(result.errors).length > 0"

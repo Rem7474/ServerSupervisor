@@ -28,7 +28,18 @@ describe('WebhookExecutionList', () => {
       expect(wrapper.text()).toContain(label)
     }
     expect(wrapper.text()).toContain('Terminé')
-    expect(wrapper.find('a.badge').attributes('title')).toBe("2 alerte(s) déclenchée(s) sur l'hôte dans les 15 min suivant ce déploiement")
+    expect(wrapper.find('a.badge').attributes('title')).toBe("2 alertes déclenchées sur l'hôte dans les 15 min suivant ce déploiement")
+  })
+
+  it('uses the singular for a single triggered alert', () => {
+    const wrapper = mount(WebhookExecutionList, {
+      props: {
+        kind: 'tracker',
+        executions: [{ id: '1', triggered_at: '2026-01-01T00:00:00Z', tag_name: 'v1.0', status: 'completed', command_id: 'cmd-1', alerts_after_count: 1 }],
+      },
+      global: { stubs },
+    })
+    expect(wrapper.find('a.badge').attributes('title')).toBe("1 alerte déclenchée sur l'hôte dans les 15 min suivant ce déploiement")
   })
 
   it('renders the translated webhook-kind column headers and payload tooltip', () => {

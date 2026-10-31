@@ -159,7 +159,8 @@ export function useIpTimeline(
     const ms = timelineBucketMs.value
     if (ms < 60 * 1000) return t('security.bucketLabelSeconds', { n: Math.round(ms / 1000) })
     if (ms < 60 * 60 * 1000) return t('security.bucketLabelMinutes', { n: Math.round(ms / (60 * 1000)) })
-    return t('security.bucketLabelHours', { n: Math.round(ms / (60 * 60 * 1000)) })
+    const hours = Math.round(ms / (60 * 60 * 1000))
+    return t('security.bucketLabelHours', { n: hours }, hours)
   })
 
   const timelineBuckets = computed<TimelineBucket[]>(() => {
