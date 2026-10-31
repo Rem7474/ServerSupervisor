@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -560,19 +561,19 @@ func collectSmartData(device string) (DiskHealth, error) {
 					if !ok3 {
 						continue
 					}
-					rawValue := int64(rawVal)
+					rawValue := smartCount(rawVal)
 
 					switch id {
 					case 5: // Reallocated Sectors Count
-						health.ReallocatedSectors = int(rawValue)
+						health.ReallocatedSectors = rawValue
 					case 9: // Power On Hours
-						health.PowerOnHours = int(rawValue)
+						health.PowerOnHours = rawValue
 					case 12: // Power Cycle Count
-						health.PowerCycles = int(rawValue)
+						health.PowerCycles = rawValue
 					case 197: // Current Pending Sector Count
-						health.PendingSectors = int(rawValue)
+						health.PendingSectors = rawValue
 					case 198: // Offline Uncorrectable Sector Count
-						health.UncorrectableSectors = int(rawValue)
+						health.UncorrectableSectors = rawValue
 					}
 				}
 			}
@@ -640,22 +641,40 @@ func parseSmartText(device, output string) (DiskHealth, error) {
 		fields := strings.Fields(line)
 		if len(fields) >= 10 && len(fields[0]) > 0 && fields[0][0] >= '0' && fields[0][0] <= '9' {
 			id, _ := strconv.Atoi(fields[0])
-			rawValue, _ := strconv.ParseInt(fields[9], 10, 64)
+			rawValue := parseSMARTRawValue(fields[9])
 
 			switch id {
 			case 5:
-				health.ReallocatedSectors = int(rawValue)
+				health.ReallocatedSectors = rawValue
 			case 9:
-				health.PowerOnHours = int(rawValue)
+				health.PowerOnHours = rawValue
 			case 12:
-				health.PowerCycles = int(rawValue)
+				health.PowerCycles = rawValue
 			case 197:
-				health.PendingSectors = int(rawValue)
+				health.PendingSectors = rawValue
 			case 198:
-				health.UncorrectableSectors = int(rawValue)
+				health.UncorrectableSectors = rawValue
 			}
 		}
 	}
 
 	return health, nil
+}
+
+// smartCount converts a SMART raw counter to an int. Negative, non-finite or
+// out-of-int32 values yield 0 rather than a truncated or wrapped number.
+func smartCount(v float64) int {
+	if !(v >= 0 && v <= math.MaxInt32) {
+		return 0
+	}
+	return int(v)
+}
+
+// parseSMARTRawValue parses the raw-value column of smartctl's text output.
+func parseSMARTRawValue(field string) int {
+	v, err := strconv.ParseInt(field, 10, 32)
+	if err != nil {
+		return 0
+	}
+	return smartCount(float64(v))
 }
