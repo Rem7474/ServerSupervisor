@@ -31,7 +31,6 @@ export default {
         '**/components/alerts/AlertRuleModal.vue',
         '**/components/alerts/AlertRuleStepSource.vue',
         '**/components/host/CommandLogPanel.vue',
-        '**/components/host/NetworkDiscoveryPanel.vue',
         '**/components/network/NetworkNodeDetail.vue',
         '**/components/security/DomainDetailsModal.vue',
         '**/components/security/TrafficWorldMap.vue',

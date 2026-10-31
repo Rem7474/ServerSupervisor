@@ -95,30 +95,6 @@
                   ⚠ {{ execution.alerts_after_count }}
                 </router-link>
               </td>
-              <td>
-                <button
-                  v-if="execution.command_id && logsMode === 'inline'"
-                  type="button"
-                  class="btn btn-icon btn-sm btn-ghost-secondary"
-                  :title="t('proxmox.viewLogsTooltip')"
-                  :aria-label="t('proxmox.viewLogsTooltip')"
-                  @click="$emit('open-logs', execution.command_id)"
-                >
-                  <IconFileText :size="14" />
-                </button>
-                <router-link
-                  v-else-if="execution.command_id"
-                  :to="`/audit?command=${execution.command_id}`"
-                  class="btn btn-sm btn-ghost-secondary"
-                  :title="t('proxmox.viewLogsTooltip')"
-                >
-                  <IconFileText :size="14" />
-                </router-link>
-                <span
-                  v-else
-                  class="text-muted"
-                >—</span>
-              </td>
             </template>
             <template v-else>
               <td class="text-muted small text-nowrap">
@@ -157,41 +133,42 @@
                   :class="execStatusBadge(execution.status)"
                 >{{ commandStatusLabel(execution.status) }}</span>
               </td>
-              <td>
-                <button
-                  v-if="execution.command_id && logsMode === 'inline'"
-                  type="button"
-                  class="btn btn-icon btn-sm btn-ghost-secondary"
-                  :title="t('proxmox.viewLogsTooltip')"
-                  :aria-label="t('proxmox.viewLogsTooltip')"
-                  @click="$emit('open-logs', execution.command_id)"
-                >
-                  <IconFileText :size="14" />
-                </button>
-                <router-link
-                  v-else-if="execution.command_id"
-                  :to="`/audit?command=${execution.command_id}`"
-                  class="btn btn-sm btn-ghost-secondary"
-                  :title="t('proxmox.viewLogsTooltip')"
-                >
-                  <IconFileText :size="14" />
-                </router-link>
-                <span
-                  v-else
-                  class="text-muted"
-                >—</span>
-                <button
-                  v-if="execution.raw_payload"
-                  type="button"
-                  class="btn btn-icon btn-sm btn-ghost-secondary"
-                  :title="t('webhooks.viewReceivedPayloadTooltip')"
-                  :aria-label="t('webhooks.viewReceivedPayloadTooltip')"
-                  @click="$emit('open-payload', execution.raw_payload)"
-                >
-                  <IconBraces :size="14" />
-                </button>
-              </td>
             </template>
+            <td>
+              <button
+                v-if="execution.command_id && logsMode === 'inline'"
+                type="button"
+                class="btn btn-icon btn-sm btn-ghost-secondary"
+                :title="t('proxmox.viewLogsTooltip')"
+                :aria-label="t('proxmox.viewLogsTooltip')"
+                @click="$emit('open-logs', execution.command_id)"
+              >
+                <IconFileText :size="14" />
+              </button>
+              <router-link
+                v-else-if="execution.command_id"
+                :to="`/audit?command=${execution.command_id}`"
+                class="btn btn-icon btn-sm btn-ghost-secondary"
+                :title="t('proxmox.viewLogsTooltip')"
+                :aria-label="t('proxmox.viewLogsTooltip')"
+              >
+                <IconFileText :size="14" />
+              </router-link>
+              <span
+                v-else
+                class="text-muted"
+              >—</span>
+              <button
+                v-if="kind !== 'tracker' && execution.raw_payload"
+                type="button"
+                class="btn btn-icon btn-sm btn-ghost-secondary"
+                :title="t('webhooks.viewReceivedPayloadTooltip')"
+                :aria-label="t('webhooks.viewReceivedPayloadTooltip')"
+                @click="$emit('open-payload', execution.raw_payload)"
+              >
+                <IconBraces :size="14" />
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
