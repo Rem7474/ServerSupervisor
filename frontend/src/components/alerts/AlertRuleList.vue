@@ -163,7 +163,7 @@
                 v-for="channel in rule.actions?.channels"
                 :key="channel"
                 class="badge me-1"
-                :class="channelBadgeClass(channel)"
+                :class="notificationChannelBadgeClass(channel)"
               >
                 {{ channelLabel(channel) }}
               </span>
@@ -222,6 +222,7 @@ import SortableHeader from '../common/SortableHeader.vue'
 import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import { formatDurationSecs } from '../../utils/formatters'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
+import { notificationChannelBadgeClass } from '../../utils/categoryBadges'
 
 const { t } = useI18n()
 
@@ -277,23 +278,12 @@ interface AlertRule {
   docker_scope?: DockerScope
 }
 
-const CHANNEL_BADGE_CLASSES: Record<string, string> = {
-  browser: 'bg-green-lt text-green',
-  smtp: 'bg-azure-lt text-azure',
-  ntfy: 'bg-azure-lt text-azure',
-  notify: 'bg-purple-lt text-purple',
-}
-
 function channelLabel(channel: string): string {
   if (channel === 'browser') return t('alerts.channelBrowserLabel')
   if (channel === 'smtp') return t('alerts.channelEmail')
   if (channel === 'ntfy') return t('alerts.channelNtfyShort')
   if (channel === 'notify') return t('alerts.channelNotify')
   return channel
-}
-
-function channelBadgeClass(channel: string): string {
-  return CHANNEL_BADGE_CLASSES[channel] || 'bg-azure-lt text-azure'
 }
 
 const props = withDefaults(defineProps<{

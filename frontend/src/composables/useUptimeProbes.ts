@@ -6,6 +6,7 @@ import type { UptimeProbe } from '../types/uptime'
 import { useConfirmDialog } from './useConfirmDialog'
 import { usePagination } from './usePagination'
 import { getApiErrorMessage } from '../api/client'
+import { probeStatusClass } from '../utils/statusClasses'
 
 type Probe = UptimeProbe
 
@@ -119,10 +120,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
   })
 
   function probeBadge(p: Probe): string {
-    if (!p.enabled) return 'bg-secondary-lt text-secondary'
-    if (p.last_status === 'up') return 'bg-success-lt text-success'
-    if (p.last_status === 'down') return 'bg-danger-lt text-danger'
-    return 'bg-secondary-lt text-secondary'
+    return probeStatusClass(p.enabled ? p.last_status : null)
   }
 
   function probeStatusLabel(p: Probe): string {

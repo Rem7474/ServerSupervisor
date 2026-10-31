@@ -220,7 +220,7 @@
             v-for="ch in tracker.notify_channels"
             :key="ch"
             class="badge me-1"
-            :class="channelBadge(ch)"
+            :class="notificationChannelBadgeClass(ch)"
           >{{ ch }}</span>
         </dd>
         <dt class="col-5 text-muted">
@@ -257,6 +257,7 @@ import { IconPlayerPlay, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import { formatDateTime } from '../../utils/formatters'
 import type { ReleaseTracker } from '../../types/tracker'
+import { notificationChannelBadgeClass } from '../../utils/categoryBadges'
 
 const { t } = useI18n()
 
@@ -299,12 +300,4 @@ const releaseNotesURL = computed(() => {
   }
 })
 
-function channelBadge(ch: string): string {
-  const map: Record<string, string> = {
-    smtp: 'bg-blue-lt text-blue',
-    ntfy: 'bg-orange-lt text-orange',
-    browser: 'bg-purple-lt text-purple',
-  }
-  return map[ch] || 'bg-secondary-lt text-secondary'
-}
 </script>

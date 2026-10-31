@@ -6,6 +6,7 @@ import { isApiAbort, getApiErrorMessage } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { SSLCertificate, SSLCertificateEvent } from '../types/ssl'
 import dayjs from '../utils/dayjs'
+import { sslDaysClass } from '../utils/statusClasses'
 
 type SSLCert = SSLCertificate
 
@@ -59,12 +60,7 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
 
   const statusColor = computed(() => {
     if (!cert.value) return ''
-    const d = cert.value.days_remaining
-    if (d == null) return 'text-secondary'
-    if (d < 0) return 'text-danger'
-    if (d <= 7) return 'text-danger'
-    if (d <= 30) return 'text-warning'
-    return 'text-success'
+    return sslDaysClass(cert.value.days_remaining, 'text')
   })
 
   const daysColor = computed(() => statusColor.value)

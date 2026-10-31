@@ -6,6 +6,7 @@ import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import dayjs from '../utils/dayjs'
 import type { UptimeProbe, UptimeStats, UptimeHistoryBucket } from '../types/generated'
+import { probeStatusClass } from '../utils/statusClasses'
 
 // 1h/24h windows are dense enough that only the time-of-day matters; wider
 // windows (7j/30j) need the date too or every bucket label looks identical.
@@ -130,9 +131,7 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
 
   const statusColor = computed(() => {
     if (!probe.value) return ''
-    if (probe.value.last_status === 'up') return 'text-success'
-    if (probe.value.last_status === 'down') return 'text-danger'
-    return 'text-secondary'
+    return probeStatusClass(probe.value.last_status, 'text')
   })
 
   const autoRefresh = autoRefreshOverride ?? ref(true)
