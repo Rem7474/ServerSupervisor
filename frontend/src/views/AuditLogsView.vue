@@ -202,7 +202,7 @@
                   :key="cmd.id"
                   :class="{ 'table-active': selectedCmd?.id === cmd.id }"
                 >
-                  <td class="text-secondary small">
+                  <td class="text-secondary small text-nowrap">
                     {{ formatDate(cmd.created_at) }}
                   </td>
                   <td>
@@ -418,7 +418,7 @@
                 v-for="log in journalLogs"
                 :key="log.id"
               >
-                <td class="text-secondary small">
+                <td class="text-secondary small text-nowrap">
                   {{ formatDate(log.created_at) }}
                 </td>
                 <td>
