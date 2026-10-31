@@ -1,5 +1,4 @@
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import apiClient, { getApiErrorMessage } from '../api'
 import { addToast } from './useGlobalToast'
@@ -8,44 +7,17 @@ import { looksLikeIP } from '../utils/network'
 import { useDomainDetails } from './useDomainDetails'
 import { useConfirmDialog } from './useConfirmDialog'
 import type { WebLogIPTimelineRow } from '../types/security'
-import type { TimeRangeModel } from '../types/timeRange'
+import { useWebLogsFilters } from './useWebLogsFilters'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
 
 export function useBot() {
-  // period/source/hostId persist in the URL (?period=&source=&host_id=) so a
-  // refresh or a shared link keeps the filter instead of always resetting to
-  // "24h, all sources, all hosts" — same ?tab= idea HostDetailView already
-  // uses, applied to this page's filter bar instead of a tab.
-  const route = useRoute()
-  const router = useRouter()
   const dialog = useConfirmDialog()
   const { t } = useI18n()
 
-  const period = ref(typeof route.query.period === 'string' ? route.query.period : '24h')
-  const periodOptions = [
-    { value: '1h', label: '1h' },
-    { value: '24h', label: '24h' },
-    { value: '168h', label: '7j' },
-    { value: '720h', label: '30j' },
-  ]
+  const { period, source, hostId, from, to, timeRange, periodOptions, applyTimeRange, detailFilters } = useWebLogsFilters()
   const hostsStore = useHostsStore()
-
-  const source = ref(typeof route.query.source === 'string' ? route.query.source : '')
-  const hostId = ref(typeof route.query.host_id === 'string' ? route.query.host_id : '')
-  const from = ref<string | null>(typeof route.query.from === 'string' ? route.query.from : null)
-  const to = ref<string | null>(typeof route.query.to === 'string' ? route.query.to : null)
-  const timeRange = ref<TimeRangeModel>({
-    mode: from.value && to.value ? 'custom' : 'preset',
-    period: period.value,
-    from: from.value,
-    to: to.value,
-  })
-
-  watch([period, source, hostId, from, to], ([p, s, h, f, toVal]) => {
-    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined, from: f || undefined, to: toVal || undefined } })
-  })
 
   const loading = ref(false)
   const summary = ref<AnyRecord>({ threats: {} })
@@ -201,14 +173,7 @@ export function useBot() {
   }
 
   function onRangeChange(): void {
-    if (timeRange.value.mode === 'custom' && timeRange.value.from && timeRange.value.to) {
-      from.value = timeRange.value.from
-      to.value = timeRange.value.to
-    } else {
-      period.value = timeRange.value.period
-      from.value = null
-      to.value = null
-    }
+    applyTimeRange()
     void loadThreats()
   }
 
@@ -250,13 +215,7 @@ export function useBot() {
   // which 404s/500s since that string was never a real host.
   function openDomain(domain: string) {
     if (!domain) return
-    domainModal.open(domain, {
-      period: period.value,
-      hostId: hostId.value || undefined,
-      source: source.value || undefined,
-      from: from.value || undefined,
-      to: to.value || undefined,
-    })
+    domainModal.open(domain, detailFilters())
   }
 
   // Free-text search: routes to the domain or IP detail view depending on
