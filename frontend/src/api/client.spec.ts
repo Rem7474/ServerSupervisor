@@ -57,6 +57,53 @@ describe('api/client', () => {
     it('honours an explicit fallback over the generic one', () => {
       expect(getApiErrorMessage({}, 'Impossible de charger')).toBe('Impossible de charger')
     })
+
+    // The server's text follows the Accept-Language it received; a known
+    // i18nKey is resolved client-side so it always matches the UI language.
+    it('resolves a catalogued i18nKey in the UI language over the server text', () => {
+      const error = { response: { data: { error: 'node not found', i18nKey: 'NODE_NOT_FOUND' } } }
+      expect(getApiErrorMessage(error)).toBe('nœud non trouvé')
+      setLocale('en')
+      expect(getApiErrorMessage(error)).toBe('node not found')
+    })
+
+    it('interpolates i18nKey params', () => {
+      setLocale('en')
+      const error = { response: { data: { error: 'ignored', i18nKey: 'GIT_PROVIDER_ERROR', params: { status: '503' } } } }
+      expect(getApiErrorMessage(error)).toContain('503')
+    })
+
+    it('keeps the server text when the i18nKey is unknown to this frontend', () => {
+      const error = { response: { data: { error: 'upstream says no', i18nKey: 'NOT_A_REAL_KEY' } } }
+      expect(getApiErrorMessage(error)).toBe('upstream says no')
+    })
+
+    it('never shows axios transport jargon, only the translated fallback', () => {
+      const error = { isAxiosError: true, message: 'Network Error' }
+      expect(getApiErrorMessage(error, 'Impossible de charger')).toBe('Impossible de charger')
+    })
+
+    it('still shows the message of a plain thrown Error', () => {
+      expect(getApiErrorMessage(new Error('La création a été annulée.'))).toBe('La création a été annulée.')
+    })
+  })
+
+  describe('request interceptor', () => {
+    function runRequest(method = 'get'): Record<string, string> {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const handlers = (api.interceptors.request as any).handlers as {
+        fulfilled: (c: { method: string; headers: Record<string, string> }) => { headers: Record<string, string> }
+      }[]
+      const fulfilled = handlers.find((h) => h?.fulfilled)?.fulfilled
+      if (!fulfilled) throw new Error('no request interceptor registered')
+      return fulfilled({ method, headers: {} }).headers
+    }
+
+    it('sends the UI language, not the browser one, as Accept-Language', () => {
+      expect(runRequest()['Accept-Language']).toBe('fr-FR')
+      setLocale('en')
+      expect(runRequest('post')['Accept-Language']).toBe('en-US')
+    })
   })
 
   describe('response error interceptor', () => {

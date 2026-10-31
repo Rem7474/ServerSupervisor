@@ -51,10 +51,6 @@ vi.mock('../api', () => ({
   },
 }))
 
-vi.mock('../api/client', () => ({
-  getApiErrorMessage: (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback),
-}))
-
 import { useProxmoxNode } from './useProxmoxNode'
 
 function mountUseProxmoxNode() {

@@ -1,21 +1,11 @@
 import { ref, Ref } from 'vue'
 import { defineStore } from 'pinia'
 import apiClient from '../api'
+import { getApiErrorMessage } from '../api/client'
 import type { AlertRule } from '../types/alert'
 import { i18n } from '../i18n'
 
 const TTL_MS = 30_000 // 30 seconds
-
-function getErrorMessage(error: unknown): string {
-  if (typeof error === 'object' && error !== null) {
-    const response = 'response' in error ? (error as { response?: { data?: { error?: unknown } } }).response : undefined
-    const responseError = response?.data?.error
-    if (typeof responseError === 'string') return responseError
-    const message = 'message' in error ? (error as { message?: unknown }).message : undefined
-    if (typeof message === 'string') return message
-  }
-  return i18n.global.t('common.loadError')
-}
 
 export const useAlertRulesStore = defineStore('alertRules', () => {
   const rules: Ref<AlertRule[]> = ref([])
@@ -37,7 +27,7 @@ export const useAlertRulesStore = defineStore('alertRules', () => {
       fetchedAt.value = Date.now()
     } catch (e: unknown) {
       // Keep stale data on error
-      error.value = getErrorMessage(e)
+      error.value = getApiErrorMessage(e, i18n.global.t('common.loadError'))
     } finally {
       loading.value = false
       fetched.value = true
