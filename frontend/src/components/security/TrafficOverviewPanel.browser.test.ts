@@ -95,8 +95,9 @@ describe('TrafficOverviewPanel (browser / real render)', () => {
     // At least one country is shaded (has a non-default fill) from the data.
     const filled = Array.from(host.querySelectorAll('svg path.country'))
       .some((p) => {
-        const fill = p.getAttribute('fill') || ''
-        return fill !== '' && fill !== '#e9edf2'
+        // Countries with traffic get an inline data color; the rest keep the
+        // theme's default fill from the stylesheet.
+        return (p as SVGPathElement).style.fill !== ''
       })
     expect(filled).toBe(true)
   })

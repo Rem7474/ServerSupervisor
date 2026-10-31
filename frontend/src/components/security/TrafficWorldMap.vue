@@ -122,12 +122,11 @@ async function renderWorldMap() {
     .join('path')
     .attr('class', 'country')
     .attr('d', path as any)
-    .attr('fill', (d: AnyRecord) => {
+    .style('fill', (d: AnyRecord) => {
       const key = mapCountryKey(String(d?.properties?.name || ''))
       const hits = countryHits.get(key) || 0
-      return hits > 0 ? color(hits) : '#e9edf2'
+      return hits > 0 ? color(hits) : null
     })
-    .attr('stroke', '#ffffff')
     .attr('stroke-width', 0.6)
 
   // aria-label (not a <title>) so screen readers still get per-country
@@ -191,6 +190,8 @@ watch(
 }
 
 .world-map :deep(.country) {
+  fill: var(--ss-panel-solid);
+  stroke: var(--ss-border-default);
   transition: filter 0.1s ease-in-out, stroke-width 0.1s ease-in-out;
 }
 
