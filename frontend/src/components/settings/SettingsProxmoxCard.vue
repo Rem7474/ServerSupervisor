@@ -302,19 +302,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconClock, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
 import type { ProxmoxConnection, ProxmoxTestResult } from '../../types/proxmox'
 import { getApiErrorMessage } from '../../api/client'
-import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import { useConnectionCrud } from '../../composables/useConnectionCrud'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { formatDateTime } from '../../utils/formatters'
 
 const { t } = useI18n()
-const { confirm } = useConfirmDialog()
 
 // Use the shared domain type (the settings card only reads a subset of fields).
 type ProxmoxInstance = ProxmoxConnection
@@ -337,59 +336,16 @@ withDefaults(defineProps<{
   authIsAdmin: false,
 })
 
-const instances = ref<ProxmoxInstance[]>([])
-const loading = ref(false)
-const showForm = ref(false)
-const editingId = ref<string | null>(null)
-const saving = ref(false)
-const testing = ref(false)
-const formMsg = ref('')
-const formOk = ref(false)
-// Set alongside formOk only by test-result paths (formatTestResult's
-// 'warning' tone: API reachable but console misconfigured/unreachable) —
-// every other message path (save/create/delete/poll) leaves this false.
-const formWarn = ref(false)
-const listMsg = ref('')
-const listOk = ref(false)
-const listWarn = ref(false)
-
-const emptyForm = (): ProxmoxForm => ({
-  name: '',
-  api_url: '',
-  token_id: '',
-  token_secret: '',
-  insecure_skip_verify: false,
-  enabled: true,
-  poll_interval_sec: 60,
-  pve_username: '',
-  pve_password: '',
-})
-
-const form = ref<ProxmoxForm>(emptyForm())
-
-async function load(): Promise<void> {
-  loading.value = true
-  try {
-    const res = await api.getProxmoxInstances()
-    instances.value = res.data
-  } catch {
-    // silently ignore
-  } finally {
-    loading.value = false
-  }
-}
-
-function openAddForm(): void {
-  editingId.value = null
-  form.value = emptyForm()
-  formMsg.value = ''
-  formWarn.value = false
-  showForm.value = true
-}
-
-function openEditForm(inst: ProxmoxInstance): void {
-  editingId.value = inst.id
-  form.value = {
+const crud = useConnectionCrud<ProxmoxInstance, ProxmoxForm>({
+  list: async () => (await api.getProxmoxInstances()).data,
+  create: (f) => api.createProxmoxInstance(f),
+  update: (id, f) => api.updateProxmoxInstance(id, f),
+  remove: (id) => api.deleteProxmoxInstance(id),
+  emptyForm: () => ({
+    name: '', api_url: '', token_id: '', token_secret: '', insecure_skip_verify: false,
+    enabled: true, poll_interval_sec: 60, pve_username: '', pve_password: '',
+  }),
+  toForm: (inst) => ({
     name: inst.name,
     api_url: inst.api_url,
     token_id: inst.token_id,
@@ -399,51 +355,54 @@ function openEditForm(inst: ProxmoxInstance): void {
     poll_interval_sec: inst.poll_interval_sec ?? 60,
     pve_username: inst.pve_username ?? '',
     pve_password: '',
-  }
-  formMsg.value = ''
+  }),
+  validate: (f, editing) => {
+    if (!f.name || !f.api_url || !f.token_id) return t('settings.nameUrlTokenRequired')
+    if (!editing && !f.token_secret) return t('settings.tokenSecretRequiredOnCreate')
+    return ''
+  },
+  keys: {
+    created: 'settings.connectionCreated',
+    updated: 'settings.connectionUpdated',
+    deleted: 'settings.connectionDeleted',
+    deleteTitle: 'settings.deleteProxmoxConnectionTitle',
+    deleteMessage: 'settings.deleteProxmoxConnectionMsg',
+  },
+})
+const {
+  items: instances, loading, showForm, editingId, form, saving, formMsg, formOk, listMsg, listOk,
+} = crud
+
+const testing = ref(false)
+// Set alongside formOk only by test-result paths (formatTestResult's
+// 'warning' tone: API reachable but console misconfigured/unreachable) —
+// every other message path (save/create/delete/poll) clears it.
+const formWarn = ref(false)
+const listWarn = ref(false)
+
+function openAddForm(): void {
   formWarn.value = false
-  showForm.value = true
+  crud.openAddForm()
+}
+
+function openEditForm(inst: ProxmoxInstance): void {
+  formWarn.value = false
+  crud.openEditForm(inst)
 }
 
 function cancelForm(): void {
-  showForm.value = false
-  formMsg.value = ''
   formWarn.value = false
-  editingId.value = null
+  crud.cancelForm()
 }
 
-async function save(): Promise<void> {
-  if (!form.value.name || !form.value.api_url || !form.value.token_id) {
-    formMsg.value = t('settings.nameUrlTokenRequired')
-    formOk.value = false
-    return
-  }
-  saving.value = true
-  formMsg.value = ''
+function save(): Promise<void> {
   formWarn.value = false
-  try {
-    if (editingId.value) {
-      await api.updateProxmoxInstance(editingId.value, form.value)
-    } else {
-      if (!form.value.token_secret) {
-        formMsg.value = t('settings.tokenSecretRequiredOnCreate')
-        formOk.value = false
-        saving.value = false
-        return
-      }
-      await api.createProxmoxInstance(form.value)
-    }
-    formMsg.value = editingId.value ? t('settings.connectionUpdated') : t('settings.connectionCreated')
-    formOk.value = true
-    await load()
-    showForm.value = false
-    editingId.value = null
-  } catch (e: unknown) {
-    formMsg.value = getApiErrorMessage(e, t('settings.saveError'))
-    formOk.value = false
-  } finally {
-    saving.value = false
-  }
+  return crud.save()
+}
+
+function remove(inst: ProxmoxInstance): Promise<void> {
+  listWarn.value = false
+  return crud.remove(inst)
 }
 
 // Shared by testForm/testById: turns a ProxmoxTestResult into a single
@@ -469,6 +428,13 @@ function formatTestResult(result: ProxmoxTestResult): { message: string, tone: '
   }
 }
 
+function showFormResult(result: ProxmoxTestResult): void {
+  const { message, tone } = formatTestResult(result)
+  formMsg.value = message
+  formOk.value = tone !== 'danger'
+  formWarn.value = tone === 'warning'
+}
+
 async function testForm(): Promise<void> {
   testing.value = true
   formMsg.value = ''
@@ -478,11 +444,7 @@ async function testForm(): Promise<void> {
     // fields left blank on purpose (unchanged) are honored instead of being
     // sent empty and failing the test.
     if (editingId.value) {
-      const res = await api.testProxmoxInstanceById(editingId.value)
-      const { message, tone } = formatTestResult(res.data)
-      formMsg.value = message
-      formOk.value = tone !== 'danger'
-      formWarn.value = tone === 'warning'
+      showFormResult((await api.testProxmoxInstanceById(editingId.value)).data)
       return
     }
     if (!form.value.api_url || !form.value.token_id || !form.value.token_secret) {
@@ -498,10 +460,7 @@ async function testForm(): Promise<void> {
       pve_username: form.value.pve_username,
       pve_password: form.value.pve_password,
     })
-    const { message, tone } = formatTestResult(res.data)
-    formMsg.value = message
-    formOk.value = tone !== 'danger'
-    formWarn.value = tone === 'warning'
+    showFormResult(res.data)
   } catch (e: unknown) {
     formMsg.value = getApiErrorMessage(e, t('settings.networkError'))
     formOk.value = false
@@ -525,41 +484,12 @@ async function testById(inst: ProxmoxInstance): Promise<void> {
   }
 }
 
-async function pollNow(inst: ProxmoxInstance): Promise<void> {
+function pollNow(inst: ProxmoxInstance): Promise<void> {
   listWarn.value = false
-  try {
-    await api.pollProxmoxNow(inst.id)
-    listMsg.value = t('settings.collectTriggeredFor', { name: inst.name })
-    listOk.value = true
-    setTimeout(load, 3000)
-  } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, t('settings.genericErrorPeriod'))
-    listOk.value = false
-  }
-}
-
-async function remove(inst: ProxmoxInstance): Promise<void> {
-  const confirmed = await confirm({
-    title: t('settings.deleteProxmoxConnectionTitle'),
-    message: t('settings.deleteProxmoxConnectionMsg', { name: inst.name }),
-    variant: 'danger',
-  })
-  if (!confirmed) return
-  listWarn.value = false
-  try {
-    await api.deleteProxmoxInstance(inst.id)
-    await load()
-    listMsg.value = t('settings.connectionDeleted')
-    listOk.value = true
-  } catch (e: unknown) {
-    listMsg.value = getApiErrorMessage(e, t('settings.deleteError'))
-    listOk.value = false
-  }
+  return crud.runListAction(() => api.pollProxmoxNow(inst.id), t('settings.collectTriggeredFor', { name: inst.name }))
 }
 
 function formatDate(iso: string | undefined): string {
   return formatDateTime(iso, '—')
 }
-
-onMounted(load)
 </script>
