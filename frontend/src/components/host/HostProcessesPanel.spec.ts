@@ -43,6 +43,14 @@ describe('HostProcessesPanel', () => {
     expect(wrapper.findComponent({ name: 'LoadingSkeleton' }).exists()).toBe(true)
   })
 
+  it('keeps the process table instead of a skeleton while refreshing', () => {
+    processes.value = [{ pid: 1, name: 'init', cpu_pct: 0, mem_pct: 0.1, mem_rss_kb: 1024, user: 'root', state: 'S' }]
+    loading.value = true
+    const wrapper = mount(HostProcessesPanel, { props: { hostId: 'h1', canRun: true } })
+    expect(wrapper.findComponent({ name: 'ProcessesTable' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'LoadingSkeleton' }).exists()).toBe(false)
+  })
+
   it('shows an error message', () => {
     error.value = 'Impossible de parser la liste des processus'
     const wrapper = mount(HostProcessesPanel, { props: { hostId: 'h1', canRun: true } })

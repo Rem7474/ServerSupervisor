@@ -9,7 +9,7 @@
     />
 
     <div
-      v-if="loading"
+      v-if="loading && !probe"
       class="row row-cards"
     >
       <div class="col-12 col-md-3">

@@ -64,7 +64,7 @@
       </div>
     </div>
     <div
-      v-if="services.length && !loading"
+      v-if="services.length"
       class="card-body"
     >
       <SystemdTable

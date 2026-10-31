@@ -59,6 +59,25 @@ describe('HostSystemdPanel', () => {
     expect(wrapper.emitted('history-changed')).toBeTruthy()
   })
 
+  it('keeps the service table on screen while a reload is in flight', async () => {
+    sendSystemdCommand.mockResolvedValue({ data: { command_id: 'cmd1' } })
+    collectCommandOutput.mockResolvedValueOnce(JSON.stringify(services))
+    const wrapper = mount(HostSystemdPanel, { props: { hostId: 'h1', canRun: true } })
+    const loadBtn = () => wrapper.findAll('button').find((b) => /Charger les services|Chargement/.test(b.text()))!
+
+    await loadBtn().trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('nginx.service')
+
+    collectCommandOutput.mockReturnValueOnce(new Promise(() => {}))
+    await loadBtn().trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Chargement')
+    expect(wrapper.text()).toContain('nginx.service')
+    expect(wrapper.findComponent({ name: 'LoadingSkeleton' }).exists()).toBe(false)
+  })
+
   it('shows all services (active and inactive) when the "Tous" filter is selected', async () => {
     sendSystemdCommand.mockResolvedValue({ data: { command_id: 'cmd1' } })
     collectCommandOutput.mockResolvedValue(JSON.stringify(services))
