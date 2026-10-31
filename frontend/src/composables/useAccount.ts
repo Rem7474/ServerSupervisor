@@ -1,9 +1,9 @@
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { formatDateLong as formatDate, formatDateTime } from '../utils/formatters'
-import { useCommandStream } from './useCommandStream'
+import { useCommandLogViewer } from './useCommandLogViewer'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { RemoteCommand } from '../types/generated'
@@ -28,7 +28,6 @@ export function useAccount() {
   const signal = useAbortSignal()
   const requestedTab = new URLSearchParams(window.location.search).get('tab')
   const activeTab = ref(requestedTab === 'connexions' ? 'connexions' : 'profil')
-  const showConsole = ref(false)
 
   const profile = ref<Profile | null>(null)
 
@@ -87,9 +86,7 @@ export function useAccount() {
     allCommands.value.filter((c: CommandRow) => c.triggered_by === auth.username).slice(0, 50)
   )
 
-  const selectedCmd = ref<CommandRow | null>(null)
-
-  const { openCommandStream, closeStream } = useCommandStream()
+  const { selected: selectedCmd, visible: showConsole, show: showCommand, close: closeLogViewer } = useCommandLogViewer<CommandRow>()
   const { getStatusBadgeClass } = useStatusBadge()
 
   const roleBadgeClass = computed(() => {
@@ -122,32 +119,10 @@ export function useAccount() {
     return getStatusBadgeClass(status, 'badge bg-warning-lt text-warning')
   }
 
+  // Clicking the open row again closes the console.
   function openLogViewer(cmd: CommandRow): void {
     if (selectedCmd.value?.id === cmd.id) { closeLogViewer(); return }
-    closeLogViewer()
-    selectedCmd.value = { ...cmd }
-    showConsole.value = true
-    if (cmd.status === 'running' || cmd.status === 'pending') connectStream(cmd.id)
-  }
-
-  function closeLogViewer(): void {
-    closeStream()
-    selectedCmd.value = null
-    showConsole.value = false
-  }
-
-  function connectStream(commandId: string): void {
-    openCommandStream(commandId, {
-      onInit(p) {
-        if (selectedCmd.value) { selectedCmd.value.status = p.status; selectedCmd.value.output = p.output || '' }
-      },
-      onChunk(p) {
-        if (selectedCmd.value) selectedCmd.value.output = (selectedCmd.value.output || '') + p.chunk
-      },
-      onStatus(p) {
-        if (selectedCmd.value) { selectedCmd.value.status = p.status; if (p.output) selectedCmd.value.output = p.output }
-      },
-    })
+    showCommand(cmd)
   }
 
   function resetPwForm(): void {
@@ -211,7 +186,6 @@ export function useAccount() {
     void loadMyCommands()
   })
 
-  onUnmounted(() => { closeStream() })
 
   return {
     auth,
