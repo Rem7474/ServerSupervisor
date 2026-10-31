@@ -7,27 +7,10 @@ import apiClient, { getApiErrorMessage } from '../api'
 import { storeToRefs } from 'pinia'
 import type { Host } from '../types/host'
 import type { ReleaseTracker } from '../types/tracker'
-import type { AlertRule } from '../types/alert'
+import type { AlertRule, AlertRuleCapabilities, AlertRulePayload } from '../types/alert'
 import type { WSNotificationMessage } from '../types/ws'
 import { i18n } from '../i18n'
 
-interface AlertRuleCapabilities {
-  metrics: unknown[]
-  agent_metrics?: unknown[]
-  proxmox_metrics?: unknown[]
-  synthetic_metrics?: unknown[]
-  docker_metrics?: unknown[]
-  proxmox_scope: {
-    modes: string[]
-    connections: unknown[]
-    nodes: unknown[]
-    storages: unknown[]
-    guests: unknown[]
-    disks: unknown[]
-  }
-}
-
-type AlertRulePayload = Record<string, unknown>
 
 interface UseAlertsPageApi {
   alertsTab: Ref<string>
@@ -55,7 +38,7 @@ interface UseAlertsPageApi {
   toggleEnabled: (rule: AlertRule) => Promise<void>
   deleteAlert: (rule: AlertRule) => Promise<void>
   closeModal: () => void
-  formatDate: (dateStr: string) => string
+  formatDate: (dateStr: string | undefined) => string
   onWebSocketAlert: (payload: WSNotificationMessage) => void
 }
 
@@ -221,7 +204,7 @@ export function useAlertsPage(): UseAlertsPageApi {
     saveError.value = ''
   }
 
-  function formatDate(dateStr: string): string {
+  function formatDate(dateStr: string | undefined): string {
     return formatLocaleDateTime(dateStr)
   }
 
