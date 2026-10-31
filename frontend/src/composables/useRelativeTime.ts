@@ -38,10 +38,3 @@ export function useRelativeTime(dateInput: RelativeDateInput, updateInterval: nu
 
   return relativeText
 }
-
-/**
- * Utility function to format a date without reactivity.
- */
-export function formatRelativeTimeStatic(date: string | Date | null | undefined): string {
-  return formatRelativeTime(date, undefined, true)
-}
