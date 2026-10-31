@@ -55,20 +55,24 @@
     "@typescript-eslint/eslint-plugin": "^8.70.1",
     "@typescript-eslint/parser": "^8.57.2",
     "@vitejs/plugin-vue": "^6.0.9",
-    "@vitest/browser": "^4.1.11",
-    "@vitest/browser-playwright": "^4.1.7",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/browser": "^5.0.5",
+    "@vitest/browser-playwright": "^5.0.5",
+    "@vitest/coverage-v8": "^5.0.5",
     "@vue/test-utils": "^2.5.1",
     "eslint": "^10.11.0",
     "eslint-plugin-vue": "^10.11.1",
-    "happy-dom": "^20.14.5",
+    "happy-dom": "^21.0.4",
     "playwright": "^1.63.0",
     "postcss-html": "^2.0.0",
     "stylelint": "^17.15.0",
     "typescript": "^6.0.3",
-    "vite": "8.3.1",
-    "vitest": "^4.1.7",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
     "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.3.11"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1",
+    "glob": "^14.0.2"
   }
 }
