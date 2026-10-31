@@ -175,7 +175,7 @@ import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import { fetchMetricsHistory, type MetricsHistoryPoint } from '../../composables/useHostMetricsHistory'
 import dayjs from '../../utils/dayjs'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
-import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, formatChartTimestamp, chartTimeDetail } from '../../utils/chartTimeAxis'
 import { getMetricColorClass, getTemperatureColorClass } from '../../utils/metricColor'
 import { formatUptime } from '../../utils/formatters'
 
@@ -331,12 +331,7 @@ function memColor(pct: number | undefined): string {
 }
 
 function formatChartTime(timestamp: number | string | undefined): string {
-  if (!timestamp) return ''
-  const date = dayjs(timestamp)
-  if (!date.isValid()) return ''
-  if (chartHours.value <= 24) return date.format('HH:mm')
-  if (chartHours.value <= 720) return date.format('DD/MM HH:mm')
-  return date.format('DD/MM')
+  return formatChartTimestamp(timestamp, chartTimeDetail(chartHours.value))
 }
 
 function toChartPoint(metric: HistoryPoint, field: keyof HistoryPoint): { x: number; y: number } | null {

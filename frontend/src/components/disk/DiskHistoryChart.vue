@@ -85,7 +85,7 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import dayjs from '../../utils/dayjs'
 import { getApiErrorMessage } from '../../api/client'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
-import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, formatChartTimestamp, chartTimeDetail } from '../../utils/chartTimeAxis'
 
 interface ChartPoint {
   x: number
@@ -151,12 +151,7 @@ const fillPrediction = computed(() => {
 })
 
 function formatChartTime(timestamp: number | string | undefined): string {
-  if (!timestamp) return ''
-  const d = dayjs(timestamp)
-  if (!d.isValid()) return ''
-  if (chartHours.value <= 24) return d.format('HH:mm')
-  if (chartHours.value <= 720) return d.format('DD/MM HH:mm')
-  return d.format('DD/MM')
+  return formatChartTimestamp(timestamp, chartTimeDetail(chartHours.value))
 }
 
 // Built once (on first data load) rather than as a `computed` over `points`:

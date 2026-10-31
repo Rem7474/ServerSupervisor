@@ -8,7 +8,7 @@ import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
 import { getApexChartPalette } from '../utils/apexChartTheme'
-import { breakLargeGaps } from '../utils/chartTimeAxis'
+import { breakLargeGaps, formatChartTimestamp } from '../utils/chartTimeAxis'
 import type { ProxmoxGuestLink } from '../types/generated'
 
 export type { GuestPowerAction }
@@ -195,9 +195,7 @@ export function useProxmoxGuest() {
   }
 
   function formatChartTime(timestampMs: number): string {
-    const d = dayjs(timestampMs)
-    if (!d.isValid()) return ''
-    return hours.value >= 24 ? d.format('DD/MM HH:mm') : d.format('HH:mm')
+    return formatChartTimestamp(timestampMs, hours.value >= 24 ? 'dayTime' : 'time')
   }
 
   // Rebuilt on every load (not a `computed` over `series`, just a plain

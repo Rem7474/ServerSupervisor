@@ -4,14 +4,14 @@ import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
-import dayjs from '../utils/dayjs'
 import type { UptimeProbe, UptimeStats, UptimeHistoryBucket } from '../types/generated'
 import { probeStatusClass } from '../utils/statusClasses'
+import { formatChartTimestamp } from '../utils/chartTimeAxis'
 
 // 1h/24h windows are dense enough that only the time-of-day matters; wider
 // windows (7j/30j) need the date too or every bucket label looks identical.
 function formatBucketLabel(bucketStart: string, windowHours: number): string {
-  return dayjs(bucketStart).format(windowHours > 24 ? 'DD/MM HH:mm' : 'HH:mm:ss')
+  return formatChartTimestamp(bucketStart, windowHours > 24 ? 'dayTime' : 'timeSeconds')
 }
 
 interface ProbeResult {

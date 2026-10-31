@@ -16,7 +16,7 @@ import { translateError } from '../utils/translateError'
 import { formatRelativeTime } from './useDateFormatter'
 import dayjs from '../utils/dayjs'
 import { useReactiveApexChartPalette } from '../utils/apexChartTheme'
-import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, formatChartTimestamp, chartTimeDetail } from '../utils/chartTimeAxis'
 import { getMetricColorClass } from '../utils/metricColor'
 import { formatUptime } from '../utils/formatters'
 
@@ -362,12 +362,7 @@ export function useDashboard() {
   }
 
   function formatSummaryChartTime(timestamp?: number) {
-    if (!timestamp) return ''
-    const date = dayjs(timestamp)
-    if (!date.isValid()) return ''
-    if (summaryHours.value < 24) return date.format('HH:mm')
-    if (summaryHours.value < 720) return date.format('DD/MM HH:mm')
-    return date.format('DD/MM')
+    return formatChartTimestamp(timestamp, chartTimeDetail(summaryHours.value))
   }
 
   function toSummaryPoint(point: DashboardMetricPoint, key: 'cpu_avg' | 'memory_avg'): ChartPoint | null {

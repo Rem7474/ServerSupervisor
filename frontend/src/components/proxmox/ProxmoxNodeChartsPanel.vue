@@ -83,7 +83,7 @@ import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import RRDChartCard, { type RRDChartSeries } from './RRDChartCard.vue'
 import { getApexChartPalette } from '../../utils/apexChartTheme'
-import dayjs from '../../utils/dayjs'
+import { formatChartTimestamp } from '../../utils/chartTimeAxis'
 
 const { t } = useI18n()
 
@@ -131,11 +131,8 @@ function formatBytesPerSec(v: number | null | undefined): string {
 }
 
 function formatAxisTime(value: string): string {
-  const d = dayjs(Number(value))
-  if (!d.isValid()) return ''
-  if (props.timeframe === 'hour' || props.timeframe === 'day') return d.format('HH:mm')
-  if (props.timeframe === 'week') return d.format('DD/MM HH:mm')
-  return d.format('DD/MM')
+  if (props.timeframe === 'hour' || props.timeframe === 'day') return formatChartTimestamp(value, 'time')
+  return formatChartTimestamp(value, props.timeframe === 'week' ? 'dayTime' : 'day')
 }
 
 function baseChartOptions(palette: ReturnType<typeof getApexChartPalette>): ApexOptions {
