@@ -39,7 +39,7 @@
     "topojson-client": "^3.1.0",
     "vue": "^3.5.44",
     "vue-i18n": "^11.4.16",
-    "vue-router": "^5.3.1",
+    "vue-router": "^5.4.0",
     "vue3-apexcharts": "^1.11.3",
     "world-atlas": "^2.0.2"
   },
