@@ -70,6 +70,16 @@ describe('locales', () => {
     expect(mismatched).toEqual([])
   })
 
+  it('pluralizes single-count messages instead of writing "(s)"', () => {
+    // frontend/CLAUDE.md: a count goes through a "singular | plural" message
+    // and the third t() argument. Messages with two independent counters
+    // ({succeeded}/{failed}) can't use one plural switch and are not checked.
+    const offenders = [...Object.entries(FR), ...Object.entries(EN)]
+      .filter(([, v]) => /\{(count|n)\}/.test(v) && /\w\(s\)/.test(v))
+      .map(([k]) => k)
+    expect(offenders).toEqual([])
+  })
+
   it('exposes the same namespaces in both languages', () => {
     expect(Object.keys(fr as Messages).sort()).toEqual(Object.keys(en).sort())
   })

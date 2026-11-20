@@ -1,14 +1,16 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
-import { useCommandStream } from './useCommandStream'
+import { useCommandLogViewer, patchRow } from './useCommandLogViewer'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { GitWebhook, GitWebhookExecution, GitWebhookRequest } from '../types/webhook'
-import type { Host } from '../types/host'
 import type { WebhookFormData } from './useWebhookForm'
+import { gitProviderBadgeClass, notificationChannelBadgeClass } from '../utils/categoryBadges'
+import { storeToRefs } from 'pinia'
+import { useHostsStore } from '../stores/hosts'
 
 interface CmdRow { id: string; status?: string; output?: string; [key: string]: unknown }
 
@@ -20,17 +22,20 @@ export function useGitWebhookDetail() {
 
   const webhook = ref<GitWebhook | null>(null)
   const executions = ref<GitWebhookExecution[]>([])
-  const hosts = ref<Host[]>([])
+  // Shared, TTL-cached host list (stores/hosts) rather than a private copy.
+  const { hosts } = storeToRefs(useHostsStore())
   const loading = ref(false)
   const error = ref('')
   const revealedSecret = ref('')
-  const selectedCmd = ref<CmdRow | null>(null)
-  const showConsole = ref(false)
 
   const showModal = ref(false)
   const saving = ref(false)
   const modalError = ref('')
-  const { openCommandStream, closeStream } = useCommandStream()
+  // Console for one execution's command; keeps the executions list's status
+  // badge in step with what the console shows.
+  const { selected: selectedCmd, visible: showConsole, showById, close: clearExecutionLogs } = useCommandLogViewer<CmdRow>({
+    onStatus: (commandId, status) => patchRow(executions, (e) => e.command_id === commandId, { status }),
+  })
 
   const envVarKeys = [
     { name: 'SS_REPO_NAME', descKey: 'webhooks.repoNameFullDesc' },
@@ -47,10 +52,9 @@ export function useGitWebhookDetail() {
     loading.value = true
     error.value = ''
     try {
-      const [whRes, hostsRes] = await Promise.all([api.getGitWebhook(id, signal), api.getHosts(signal)])
+      const [whRes] = await Promise.all([api.getGitWebhook(id, signal), useHostsStore().fetchHosts()])
       webhook.value = whRes.data.webhook
       executions.value = whRes.data.executions || []
-      hosts.value = hostsRes.data || []
     } catch (e: unknown) {
       if (isApiAbort(e)) return
       error.value = getApiErrorMessage(e, t('webhooks.loadErrorGeneric'))
@@ -66,60 +70,10 @@ export function useGitWebhookDetail() {
     } catch { /* ignore */ }
   }
 
-  function clearExecutionLogs(): void {
-    closeStream()
-    selectedCmd.value = null
-    showConsole.value = false
-  }
 
-  function connectExecutionStream(commandId: string): void {
-    openCommandStream(commandId, {
-      onInit(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          status: payload.status || selectedCmd.value.status,
-          output: payload.output ?? selectedCmd.value.output,
-        }
-      },
-      onChunk(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          output: (selectedCmd.value.output || '') + (payload.chunk || ''),
-        }
-      },
-      onStatus(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          status: payload.status || selectedCmd.value.status,
-          output: payload.output ?? selectedCmd.value.output,
-        }
-
-        const idx = executions.value.findIndex((e: GitWebhookExecution) => e.command_id === commandId)
-        if (idx !== -1) {
-          const next = [...executions.value]
-          next[idx] = { ...next[idx], status: payload.status || next[idx].status }
-          executions.value = next
-        }
-      },
-    })
-  }
 
   async function openExecutionLogs(commandId: string): Promise<void> {
-    closeStream()
-    try {
-      const res = await api.getCommandStatus(commandId)
-      const cmd = res.data
-      selectedCmd.value = cmd as unknown as CmdRow
-      showConsole.value = true
-      if (cmd?.status === 'pending' || cmd?.status === 'running') {
-        connectExecutionStream(commandId)
-      }
-    } catch {
-      error.value = t('webhooks.couldNotLoadCommandLogsError')
-    }
+    if (!(await showById(commandId))) error.value = t('webhooks.couldNotLoadCommandLogsError')
   }
 
   function openEdit(): void {
@@ -151,29 +105,14 @@ export function useGitWebhookDetail() {
   }
 
   function providerBadge(provider: string): string {
-    const map: Record<string, string> = {
-      github:  'bg-blue-lt text-blue',
-      gitlab:  'bg-orange-lt text-orange',
-      gitea:   'bg-teal-lt text-teal',
-      forgejo: 'bg-purple-lt text-purple',
-      custom:  'bg-secondary-lt text-secondary',
-    }
-    return map[provider] || 'bg-secondary-lt text-secondary'
+    return gitProviderBadgeClass(provider)
   }
 
   function channelBadge(ch: string): string {
-    const map: Record<string, string> = {
-      smtp:    'bg-blue-lt text-blue',
-      ntfy:    'bg-orange-lt text-orange',
-      browser: 'bg-purple-lt text-purple',
-    }
-    return map[ch] || 'bg-secondary-lt text-secondary'
+    return notificationChannelBadgeClass(ch)
   }
 
   onMounted(load)
-  onUnmounted(() => {
-    closeStream()
-  })
 
   return {
     id,

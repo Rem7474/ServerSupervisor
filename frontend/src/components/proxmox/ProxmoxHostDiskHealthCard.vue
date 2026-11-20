@@ -81,7 +81,7 @@
                     <div class="progress progress-xs flex-grow-1 disk-wear-progress-min-60">
                       <div
                         class="progress-bar"
-                        :class="wearoutColor(disk.wearout)"
+                        :class="getWearoutColorClass(disk.wearout)"
                         :style="`width:${disk.wearout}%`"
                       />
                     </div>
@@ -110,6 +110,8 @@ import EmptyState from '../EmptyState.vue'
 import { IconDisc } from '@tabler/icons-vue'
 import { useProxmoxHostDisks } from '../../composables/useProxmoxHostDisks'
 import { smartStatusTone } from '../../utils/diskHealth'
+import { getWearoutColorClass } from '../../utils/metricColor'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 const { t } = useI18n()
 
@@ -123,25 +125,7 @@ const { disks, loading, load } = useProxmoxHostDisks(props.hostId)
 onMounted(load)
 
 function formatBytes(bytes: number): string {
-  if (!bytes || bytes <= 0) return 'N/A'
-  const unitKeys = ['proxmox.byteUnitBytes', 'proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera', 'proxmox.byteUnitPeta']
-  let value = bytes
-  let i = 0
-  while (value >= 1024 && i < unitKeys.length - 1) {
-    value /= 1024
-    i++
-  }
-  return `${value.toFixed(value >= 100 || i === 0 ? 0 : 1)} ${t(unitKeys[i])}`
-}
-
-// wearout is remaining life (100 = new, 0 = worn out) — same direction and
-// thresholds as ProxmoxNodeDisksTab.vue's own wearoutColor for the cluster
-// disks table, so a disk reads the same severity color whether it's shown
-// there or here.
-function wearoutColor(wearout: number): string {
-  if (wearout < 20) return 'bg-danger'
-  if (wearout < 50) return 'bg-warning'
-  return 'bg-success'
+  return bytes > 0 ? formatBytesShared(bytes) : 'N/A'
 }
 </script>
 

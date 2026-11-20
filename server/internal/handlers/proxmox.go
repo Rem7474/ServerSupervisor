@@ -38,6 +38,11 @@ func (h *ProxmoxHandler) PollOnce(ctx context.Context) {
 	h.svc.PollAll(ctx)
 }
 
+// proxmoxActor identifies the authenticated caller for the audit trail.
+func proxmoxActor(c *gin.Context) proxmoxsvc.Actor {
+	return proxmoxsvc.Actor{Username: c.GetString("username"), ClientIP: c.ClientIP()}
+}
+
 // renderProxmoxErr maps a service error to a response. When i18nNodeNotFound is
 // set, a 404 renders the localized CodeNodeNotFound payload (preserving the
 // original behavior of a few node endpoints); otherwise respondError is used.

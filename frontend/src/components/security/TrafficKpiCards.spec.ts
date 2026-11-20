@@ -24,7 +24,7 @@ describe('TrafficKpiCards', () => {
       expect(wrapper.text()).toContain(label)
     }
     expect(wrapper.text()).toContain('12')
-    expect(wrapper.text()).toContain('2.0 MB')
+    expect(wrapper.text()).toContain('2,0 Mo')
   })
 
   it('shows the translated "N/A" delta when no comparison data is available', () => {

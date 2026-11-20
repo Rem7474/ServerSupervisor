@@ -23,9 +23,11 @@
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ApexOptions } from 'apexcharts'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
+import { formatChartTimestamp } from '../../utils/chartTimeAxis'
 
 interface Point {
   timestamp: string
@@ -33,6 +35,8 @@ interface Point {
   bot?: number | string
   [key: string]: unknown
 }
+
+const { t } = useI18n()
 
 const props = defineProps<{
   timeseries: Point[]
@@ -44,18 +48,14 @@ const props = defineProps<{
 const chartRef = ref<ApexChartInstance | null>(null)
 
 function bucketLabel(ts: string): string {
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return ts
-  return props.period === '1h'
-    ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit' })
+  return formatChartTimestamp(ts, props.period === '1h' ? 'time' : 'dayHour') || ts
 }
 
 const categories = computed(() => props.timeseries.map((p) => bucketLabel(p.timestamp)))
 
 const series = computed(() => [
-  { name: 'Humain', data: props.timeseries.map((p) => Number(p.human) || 0) },
-  { name: 'Bot/scan', data: props.timeseries.map((p) => Number(p.bot) || 0) },
+  { name: t('security.humanSeriesLabel'), data: props.timeseries.map((p) => Number(p.human) || 0) },
+  { name: t('security.botSeriesLabel'), data: props.timeseries.map((p) => Number(p.bot) || 0) },
 ])
 
 // Built once (on first data arrival) rather than as a `computed` over

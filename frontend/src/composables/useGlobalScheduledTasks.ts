@@ -14,8 +14,7 @@ import type { ScheduledTaskWithHost, ScheduledTaskExecution } from '../types/tas
 import { getApiErrorMessage } from '../api/client'
 import { getExecutionStateClass } from '../utils/statusClasses'
 import { commandStatusLabel } from '../utils/commandStatus'
-import { i18n } from '../i18n'
-import { compareStrings } from '../utils/formatters'
+import { compareStrings, formatDateTime } from '../utils/formatters'
 
 const DEFAULT_CRON = '0 3 * * *'
 const TASKS_REFRESH_SEC = 30
@@ -25,8 +24,7 @@ function emptyCreateForm() {
 }
 
 function formatDate(iso: string | undefined): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleString(i18n.global.locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '')
 }
 
 function statusBadge(status: string | undefined): string {

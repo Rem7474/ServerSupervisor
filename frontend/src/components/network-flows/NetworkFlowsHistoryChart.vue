@@ -49,7 +49,7 @@ import dayjs from '../../utils/dayjs'
 import { formatBytes } from '../../utils/formatters'
 import { getApiErrorMessage } from '../../api/client'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
-import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, formatChartTimestamp } from '../../utils/chartTimeAxis'
 
 interface ChartPoint {
   x: number
@@ -97,11 +97,7 @@ function currentSpanHours(): number {
 }
 
 function formatChartTime(timestamp: number | string | undefined): string {
-  if (!timestamp) return ''
-  const d = dayjs(timestamp)
-  if (!d.isValid()) return ''
-  if (currentSpanHours() <= 24) return d.format('HH:mm')
-  return d.format('DD/MM HH:mm')
+  return formatChartTimestamp(timestamp, currentSpanHours() <= 24 ? 'time' : 'dayTime')
 }
 
 const chartOptions = shallowRef<ApexOptions | null>(null)

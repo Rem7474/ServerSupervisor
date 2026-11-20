@@ -5,6 +5,7 @@ import router from './router'
 import { currentLocale, ensureLocaleMessages, i18n } from './i18n'
 import '@tabler/core/dist/css/tabler.min.css'
 import '@tabler/core/dist/css/tabler-flags.min.css'
+import 'apexcharts/dist/apexcharts.css'
 import './style.css'
 
 type FatalDetail = {

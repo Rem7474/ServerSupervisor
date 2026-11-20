@@ -33,6 +33,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Tabler 1.6 themes through CSS light-dark(); lower targets make lightningcss
+    // rewrite it into custom-property toggles that ignore data-bs-theme on <body>.
+    cssTarget: ['chrome123', 'firefox120', 'safari17.5'],
     // No manualChunks: Rollup's default splitting respects the dynamic
     // import() boundaries that already exist in the codebase. The previous
     // manualChunks function grouped node_modules by package name, which

@@ -1,10 +1,13 @@
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { npmApi } from '../api/npm'
 import type { UptimeProbe } from '../types/uptime'
 import { useConfirmDialog } from './useConfirmDialog'
 import { usePagination } from './usePagination'
+import { getApiErrorMessage } from '../api/client'
+import { probeStatusClass } from '../utils/statusClasses'
+import { useAutoRefresh } from './useAutoRefresh'
 
 type Probe = UptimeProbe
 
@@ -52,8 +55,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
   const { t } = useI18n()
   const dialog = useConfirmDialog()
 
-  const autoRefresh = ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => fetchProbes(), { intervalSec: REFRESH_SEC })
   const error = ref('')
 
   const probes = ref<Probe[]>([])
@@ -118,10 +120,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
   })
 
   function probeBadge(p: Probe): string {
-    if (!p.enabled) return 'bg-secondary-lt text-secondary'
-    if (p.last_status === 'up') return 'bg-success-lt text-success'
-    if (p.last_status === 'down') return 'bg-danger-lt text-danger'
-    return 'bg-secondary-lt text-secondary'
+    return probeStatusClass(p.enabled ? p.last_status : null)
   }
 
   function probeStatusLabel(p: Probe): string {
@@ -143,11 +142,10 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       probes.value = data?.probes || []
       lastUpdatedAt.value = new Date()
       error.value = ''
-      if (withStats) fetchAllProbeStats()
-      fetchAllProbeHistory()
+      if (withStats) void fetchAllProbeStats()
+      void fetchAllProbeHistory()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
-        || (e as { message?: string })?.message || t('monitoring.probeLoadError')
+      error.value = getApiErrorMessage(e, t('monitoring.probeLoadError'))
     } finally {
       loadingProbes.value = false
     }
@@ -189,7 +187,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       await api.checkUptimeProbeNow(p.id)
       await fetchProbes()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.checkFailedError')
+      error.value = getApiErrorMessage(e, t('monitoring.checkFailedError'))
     } finally {
       checkingProbeId.value = ''
     }
@@ -241,7 +239,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       closeProbeModal()
       await fetchProbes()
     } catch (e: unknown) {
-      probeFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.saveErrorGeneric')
+      probeFormError.value = getApiErrorMessage(e, t('monitoring.saveErrorGeneric'))
     } finally {
       savingProbe.value = false
     }
@@ -270,7 +268,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       await api.deleteUptimeProbe(p.id)
       await fetchProbes()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.deleteFailedError')
+      error.value = getApiErrorMessage(e, t('monitoring.deleteFailedError'))
     }
   }
 
@@ -284,14 +282,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
 
   watch(probeSort, resetProbePage, { deep: true })
 
-  let refreshTimer: ReturnType<typeof setInterval> | undefined
-  onMounted(() => {
-    fetchProbes()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) fetchProbes() }, REFRESH_SEC * 1000)
-  })
-  onUnmounted(() => {
-    if (refreshTimer) clearInterval(refreshTimer)
-  })
+  onMounted(() => { void fetchProbes() })
 
   return {
     REFRESH_SEC,

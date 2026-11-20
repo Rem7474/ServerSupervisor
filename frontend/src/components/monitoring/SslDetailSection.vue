@@ -9,7 +9,7 @@
     />
 
     <div
-      v-if="loading"
+      v-if="loading && !cert"
       class="row row-cards"
     >
       <div class="col-12 col-md-3">

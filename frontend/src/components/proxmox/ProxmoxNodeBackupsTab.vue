@@ -23,17 +23,15 @@
         <div class="fw-semibold mb-2">
           {{ t('proxmox.configuredJobsLabel') }}
         </div>
-        <div
+        <EmptyState
           v-if="!jobs.length"
-          class="text-secondary small"
-        >
-          {{ t('proxmox.noBackupJobsText') }}
-        </div>
+          :title="t('proxmox.noBackupJobsText')"
+        />
         <div
           v-else
           class="table-responsive scroll-table"
         >
-          <table class="table table-sm table-vcenter card-table mb-0">
+          <table class="table table-sm table-vcenter card-table">
             <thead>
               <tr>
                 <th>{{ t('proxmox.jobColumn') }}</th>
@@ -88,7 +86,7 @@
           v-else
           class="table-responsive scroll-table"
         >
-          <table class="table table-sm table-vcenter card-table mb-0">
+          <table class="table table-sm table-vcenter card-table">
             <thead>
               <tr>
                 <th>
@@ -149,6 +147,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
                     :title="t('proxmox.viewLogsTooltip')"
+                    :aria-label="t('proxmox.viewLogsTooltip')"
                     @click="emit('view-logs', { upid: r.task_upid, action: 'vzdump', label: r.guest_name || `VM ${r.vmid}` })"
                   >
                     <IconList
@@ -176,8 +175,9 @@ import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { getExecutionStateClass, getExecutionStateLabel } from '../../utils/statusClasses'
 import { compareValues } from '../../utils/sort'
 import type { ProxmoxBackupJob, ProxmoxBackupRun } from '../../types/proxmox'
+import { formatDateTime } from '../../utils/formatters'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const props = defineProps<{
   jobs: ProxmoxBackupJob[]
@@ -221,8 +221,7 @@ function showsDetail(run: ProxmoxBackupRun): boolean {
 }
 
 function formatDate(iso?: string): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '—')
 }
 </script>
 

@@ -26,12 +26,12 @@
             >
               <IconCopy
                 v-if="!copied"
-                :size="18"
+                :size="16"
                 class="icon"
               />
               <IconCheck
                 v-else
-                :size="18"
+                :size="16"
                 class="icon text-success"
               />
             </button>
@@ -40,11 +40,12 @@
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
               :title="t('common.commandLogDownloadTooltip')"
+              :aria-label="t('common.commandLogDownloadTooltip')"
               :disabled="!command"
               @click="download"
             >
               <IconDownload
-                :size="18"
+                :size="16"
                 class="icon"
               />
             </button>
@@ -54,11 +55,12 @@
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
               :title="t('common.commandLogClearTooltip')"
+              :aria-label="t('common.commandLogClearTooltip')"
               :disabled="!command"
               @click="$emit('clear')"
             >
               <IconTrash
-                :size="18"
+                :size="16"
                 class="icon"
               />
             </button>
@@ -69,6 +71,7 @@
             type="button"
             class="btn btn-icon btn-sm btn-ghost-secondary"
             :title="t('common.close')"
+            :aria-label="t('common.close')"
             @click="$emit('close')"
           >
             <IconX
@@ -80,8 +83,15 @@
       </div>
 
       <div class="card-body d-flex flex-column flex-fill p-0 console-body">
-        <slot v-if="mode === 'custom'" />
-        <template v-else>
+        <!-- v-show, not v-if: a hosted terminal (xterm) must survive a switch to
+             the log view and back, or its DOM node and scrollback are lost. -->
+        <div
+          v-show="mode === 'custom'"
+          class="d-flex flex-column flex-fill console-custom"
+        >
+          <slot />
+        </div>
+        <template v-if="mode === 'log'">
           <!-- Empty state -->
           <div
             v-if="!command"
@@ -175,13 +185,15 @@
     v-show="!show"
     type="button"
     class="btn btn-primary console-fab"
+    :title="displayTitle"
+    :aria-label="displayTitle"
     @click="$emit('open')"
   >
     <IconChevronRight
       :size="24"
-      class="icon me-1"
+      class="icon console-fab-icon"
     />
-    {{ displayTitle }}
+    <span class="console-fab-label">{{ displayTitle }}</span>
   </button>
 </template>
 
@@ -228,6 +240,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   command: null,
   show: false,
+  title: undefined,
+  emptyText: undefined,
   wrapperClass: '',
   clearable: false,
   mode: 'log',
@@ -320,6 +334,10 @@ function download(): void {
   min-height: 0;
 }
 
+.console-custom {
+  min-height: 0;
+}
+
 .console-viewer {
   min-height: 0;
 }
@@ -380,5 +398,31 @@ function download(): void {
   bottom: 1.5rem;
   right: 1.5rem;
   z-index: 100;
+}
+
+.console-fab-icon + .console-fab-label {
+  margin-inline-start: 0.25rem;
+}
+
+/* On a phone the labelled pill covers a full table row; collapse it to a
+   round icon-only button (the label stays as title/aria-label). */
+@media (max-width: 767px) {
+  .console-fab {
+    width: 3rem;
+    height: 3rem;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+    bottom: 1rem;
+    right: 1rem;
+  }
+
+  .console-fab-label {
+    display: none;
+  }
+
+  .console-fab-icon {
+    margin: 0;
+  }
 }
 </style>

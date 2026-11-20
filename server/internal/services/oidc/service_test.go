@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -186,10 +187,10 @@ func setupMockOIDCServer(t *testing.T) (*httptest.Server, *rsa.PrivateKey, strin
 		case "/.well-known/openid-configuration":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"issuer":                 server.URL,
-				"authorization_endpoint": server.URL + "/auth",
-				"token_endpoint":         server.URL + "/token",
-				"jwks_uri":               server.URL + "/keys",
+				"issuer":                                server.URL,
+				"authorization_endpoint":                server.URL + "/auth",
+				"token_endpoint":                        server.URL + "/token",
+				"jwks_uri":                              server.URL + "/keys",
 				"id_token_signing_alg_values_supported": []string{"RS256"},
 				"response_types_supported":              []string{"code"},
 				"subject_types_supported":               []string{"public"},
@@ -608,8 +609,9 @@ func TestProvisionOrSyncUser(t *testing.T) {
 
 	// 3. User found by email linking
 	claimsEmail := models.OIDCTokenClaims{
-		Sub:   "sub-email-only",
-		Email: "alice@example.com",
+		Sub:           "sub-email-only",
+		Email:         "alice@example.com",
+		EmailVerified: true,
 	}
 	user3, err := svc.provisionOrSyncUser(ctx, claimsEmail, models.RoleAdmin)
 	if err != nil || user3.ID != user.ID {
@@ -643,5 +645,157 @@ func TestHelpers(t *testing.T) {
 
 	if min(3, 5) != 3 || min(10, 2) != 2 {
 		t.Fatal("min helper failure")
+	}
+}
+
+// seedLocalUser registers an unlinked local account (no OIDC sub) in the mock repo.
+func seedLocalUser(repo *mockRepo, id int64, username, email, role string) *models.User {
+	u := &models.User{ID: id, Username: username, Role: role, AuthProvider: "local"}
+	if email != "" {
+		e := email
+		u.Email = &e
+		repo.usersByEmail[email] = u
+	}
+	repo.usersByUsername[username] = u
+	return u
+}
+
+func TestProvisionOrSyncUser_UnverifiedEmailDoesNotLinkLocalAccount(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	victim := seedLocalUser(repo, 1, "admin", "admin@example.com", models.RoleAdmin)
+	svc := NewService(repo, &mockIssuer{}, &config.Config{OIDCAutoCreateUser: true})
+
+	user, err := svc.provisionOrSyncUser(ctx, models.OIDCTokenClaims{
+		Sub:               "attacker-sub",
+		Email:             "admin@example.com",
+		EmailVerified:     false,
+		PreferredUsername: "attacker",
+	}, models.RoleViewer)
+	if err != nil {
+		t.Fatalf("provisionOrSyncUser: %v", err)
+	}
+	if user.ID == victim.ID {
+		t.Fatal("unverified email must not link/hijack the existing local account")
+	}
+	if victim.OIDCSub != nil {
+		t.Fatalf("victim account was linked to sub %q", *victim.OIDCSub)
+	}
+	if victim.Role != models.RoleAdmin {
+		t.Fatalf("victim role mutated to %q", victim.Role)
+	}
+}
+
+func TestProvisionOrSyncUser_VerifiedEmailLinksLocalAccount(t *testing.T) {
+	repo := newMockRepo()
+	local := seedLocalUser(repo, 1, "bob", "bob@example.com", models.RoleViewer)
+	svc := NewService(repo, &mockIssuer{}, &config.Config{})
+
+	user, err := svc.provisionOrSyncUser(context.Background(), models.OIDCTokenClaims{
+		Sub: "bob-sub", Email: "bob@example.com", EmailVerified: true, PreferredUsername: "whatever",
+	}, models.RoleOperator)
+	if err != nil {
+		t.Fatalf("provisionOrSyncUser: %v", err)
+	}
+	if user.ID != local.ID || user.OIDCSub == nil || *user.OIDCSub != "bob-sub" || user.Role != models.RoleOperator {
+		t.Fatalf("expected verified email to link local account, got %+v", user)
+	}
+}
+
+func TestProvisionOrSyncUser_UsernameFallbackDoesNotHijack(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("unverified email, auto-create enabled: new suffixed account", func(t *testing.T) {
+		repo := newMockRepo()
+		victim := seedLocalUser(repo, 1, "admin", "", models.RoleAdmin)
+		svc := NewService(repo, &mockIssuer{}, &config.Config{OIDCAutoCreateUser: true})
+
+		user, err := svc.provisionOrSyncUser(ctx, models.OIDCTokenClaims{
+			Sub: "attacker-sub", PreferredUsername: "admin",
+		}, models.RoleViewer)
+		if err != nil {
+			t.Fatalf("provisionOrSyncUser: %v", err)
+		}
+		if user.ID == victim.ID || user.Username == "admin" || !strings.HasPrefix(user.Username, "admin_") {
+			t.Fatalf("expected a distinct suffixed account, got %+v", user)
+		}
+		if victim.OIDCSub != nil || victim.Role != models.RoleAdmin {
+			t.Fatalf("victim account was modified: %+v", victim)
+		}
+	})
+
+	t.Run("unverified email, auto-create disabled: rejected", func(t *testing.T) {
+		repo := newMockRepo()
+		victim := seedLocalUser(repo, 1, "admin", "admin@example.com", models.RoleAdmin)
+		svc := NewService(repo, &mockIssuer{}, &config.Config{OIDCAutoCreateUser: false})
+
+		_, err := svc.provisionOrSyncUser(ctx, models.OIDCTokenClaims{
+			Sub: "attacker-sub", PreferredUsername: "admin", Email: "admin@example.com",
+		}, models.RoleViewer)
+		if err == nil {
+			t.Fatal("expected rejection when auto-create is disabled")
+		}
+		if victim.OIDCSub != nil {
+			t.Fatal("victim account must stay unlinked")
+		}
+	})
+
+	t.Run("verified email unrelated to the account: no hijack", func(t *testing.T) {
+		repo := newMockRepo()
+		victim := seedLocalUser(repo, 1, "admin", "admin@example.com", models.RoleAdmin)
+		svc := NewService(repo, &mockIssuer{}, &config.Config{OIDCAutoCreateUser: false})
+
+		_, err := svc.provisionOrSyncUser(ctx, models.OIDCTokenClaims{
+			Sub: "attacker-sub", PreferredUsername: "admin", Email: "evil@example.com", EmailVerified: true,
+		}, models.RoleViewer)
+		if err == nil {
+			t.Fatal("expected rejection")
+		}
+		if victim.OIDCSub != nil {
+			t.Fatal("victim account must stay unlinked")
+		}
+	})
+
+	t.Run("account bound to another sub is never taken over by username", func(t *testing.T) {
+		repo := newMockRepo()
+		other := "someone-else"
+		victim := seedLocalUser(repo, 1, "carol", "carol@example.com", models.RoleViewer)
+		victim.OIDCSub = &other
+		svc := NewService(repo, &mockIssuer{}, &config.Config{OIDCAutoCreateUser: false})
+
+		_, err := svc.provisionOrSyncUser(ctx, models.OIDCTokenClaims{
+			Sub: "attacker-sub", PreferredUsername: "carol", Email: "carol@example.com",
+		}, models.RoleViewer)
+		if err == nil {
+			t.Fatal("expected rejection")
+		}
+		if *victim.OIDCSub != "someone-else" {
+			t.Fatal("victim sub was overwritten")
+		}
+	})
+}
+
+func TestProvisionOrSyncUser_LegitimateRelogins(t *testing.T) {
+	ctx := context.Background()
+	repo := newMockRepo()
+	svc := NewService(repo, &mockIssuer{}, &config.Config{})
+
+	// Re-login by sub match works even with an unverified email.
+	sub := "dave-sub"
+	dave := seedLocalUser(repo, 1, "dave", "dave@example.com", models.RoleViewer)
+	dave.OIDCSub = &sub
+	repo.usersBySub[sub] = dave
+	user, err := svc.provisionOrSyncUser(ctx, models.OIDCTokenClaims{Sub: sub, PreferredUsername: "dave"}, models.RoleOperator)
+	if err != nil || user.ID != dave.ID || user.Role != models.RoleOperator {
+		t.Fatalf("sub re-login failed: %+v, %v", user, err)
+	}
+
+	// Unlinked account whose own email is vouched for by the IdP links via username step too.
+	erin := seedLocalUser(repo, 2, "erin", "erin@example.com", models.RoleViewer)
+	if !svc.canLinkByUsername(erin, models.OIDCTokenClaims{Sub: "erin-sub", Email: "ERIN@example.com", EmailVerified: true}) {
+		t.Fatal("verified matching email should allow username linking")
+	}
+	if svc.canLinkByUsername(erin, models.OIDCTokenClaims{Sub: "erin-sub", Email: "erin@example.com"}) {
+		t.Fatal("unverified email must not allow username linking")
 	}
 }

@@ -816,7 +816,7 @@ func (db *DB) GetWebLogsTimeseries(ctx context.Context, since, until time.Time, 
 
 	where, args := buildWebLogsWhere(since, until, hostID, source)
 
-	query := fmt.Sprintf(`SELECT date_trunc('%s', captured_at) AS bucket_ts,
+	query := fmt.Sprintf(`SELECT date_trunc($%d, captured_at) AS bucket_ts,
 	COUNT(*) AS total,
 	SUM(CASE WHEN suspicious = TRUE THEN 1 ELSE 0 END) AS bot,
 	SUM(CASE WHEN suspicious = FALSE THEN 1 ELSE 0 END) AS human,
@@ -827,7 +827,8 @@ func (db *DB) GetWebLogsTimeseries(ctx context.Context, since, until time.Time, 
 	FROM web_log_requests
 	WHERE %s
 	GROUP BY bucket_ts
-	ORDER BY bucket_ts ASC`, bucket, where)
+	ORDER BY bucket_ts ASC`, len(args)+1, where)
+	args = append(args, bucket)
 
 	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {

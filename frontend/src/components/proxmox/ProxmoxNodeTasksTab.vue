@@ -100,6 +100,7 @@
               type="button"
               class="btn btn-icon btn-sm btn-ghost-secondary"
               :title="t('proxmox.viewLogsTooltip')"
+              :aria-label="t('proxmox.viewLogsTooltip')"
               @click="emit('view-logs', { upid: task.upid, action: task.task_type, label: task.object_id })"
             >
               <IconList
@@ -122,8 +123,9 @@ import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import type { ProxmoxTask } from '../../types/proxmox'
 import { compareValues } from '../../utils/sort'
+import { formatDateTime } from '../../utils/formatters'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const props = defineProps<{
   tasks: ProxmoxTask[]
@@ -173,8 +175,7 @@ const sortedTasks = computed(() => {
 })
 
 function formatDate(iso?: string): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '—')
 }
 
 function taskDuration(task: ProxmoxTask): string {

@@ -3,6 +3,7 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
@@ -22,7 +23,9 @@ func NewSettingsHandler(svc *settingssvc.Service) *SettingsHandler {
 }
 
 // GetSettings returns system configuration and database status. Admin-only:
-// the snapshot includes plaintext secrets (SMTP password, GitHub token).
+// the snapshot never includes plaintext secrets: smtpPass and githubToken are
+// always empty and smtpPassConfigured / githubTokenConfigured report whether a
+// value is stored.
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		respondError(c, apperr.Forbidden("insufficient permissions"))
@@ -80,7 +83,7 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
-	user := c.GetString("username")
+	user := strings.ReplaceAll(strings.ReplaceAll(c.GetString("username"), "\r", ""), "\n", "")
 	slog.InfoContext(c.Request.Context(), "manual metrics cleanup triggered", slog.String("user", user))
 	deletedDigests, message, err := h.svc.CleanupMetrics(c.Request.Context(), user, c.ClientIP())
 	if err != nil {
@@ -96,7 +99,7 @@ func (h *SettingsHandler) CleanupAuditLogs(c *gin.Context) {
 		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
-	user := c.GetString("username")
+	user := strings.ReplaceAll(strings.ReplaceAll(c.GetString("username"), "\r", ""), "\n", "")
 	slog.InfoContext(c.Request.Context(), "manual audit logs cleanup triggered", slog.String("user", user))
 	deleted, message, err := h.svc.CleanupAuditLogs(c.Request.Context(), user, c.ClientIP())
 	if err != nil {

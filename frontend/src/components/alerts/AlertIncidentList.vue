@@ -375,6 +375,7 @@
                     class="btn btn-icon btn-sm btn-ghost-success"
                     :disabled="resolvingId === row.item.id"
                     :title="t('alerts.warRoomCloseTooltip')"
+                    :aria-label="t('alerts.warRoomCloseTooltip')"
                     @click="$emit('resolve', row.item)"
                   >
                     <span
@@ -440,6 +441,7 @@ import {
   trackerStatusLabel,
 } from '../../utils/incidentFormat'
 import type { NotificationItem } from '../../types/generated'
+import { formatDateTimeSeconds } from '../../utils/formatters'
 
 type Incident = NotificationItem
 
@@ -506,7 +508,7 @@ defineEmits<{
   (e: 'acknowledge', item: Incident): void
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const filterType = ref('all')
 const filterStatus = ref('all')
@@ -689,8 +691,7 @@ function commandStatusLabel(status: string | undefined): string {
 }
 
 function formatDate(dateStr: string | undefined | null): string {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString(locale.value)
+  return formatDateTimeSeconds(dateStr, '')
 }
 </script>
 

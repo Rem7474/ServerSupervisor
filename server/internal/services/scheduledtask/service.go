@@ -15,6 +15,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -177,7 +178,7 @@ func (s *Service) Update(ctx context.Context, id string, req models.ScheduledTas
 		return nil, err
 	}
 	if err := s.sched.Update(updated); err != nil {
-		slog.WarnContext(ctx, "scheduler update failed", slog.String("task_id", id), slog.Any("err", err))
+		slog.WarnContext(ctx, "scheduler update failed", slog.String("task_id", logging.Sanitize(id)), slog.Any("err", err))
 	} else if req.Enabled {
 		if next := s.sched.NextRun(id); !next.IsZero() {
 			_ = s.repo.SetScheduledTaskNextRun(ctx, id, next)

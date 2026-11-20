@@ -95,6 +95,10 @@ export function useProxmoxConsole(): UseProxmoxConsoleApi {
     socket.onopen = (): void => {
       if (ws !== socket) return
       status.value = 'connected'
+      // The initial fit runs before the socket is open, so its resize was
+      // dropped: without this the remote PTY stays at its default size
+      // (80x24) until the next window resize.
+      socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
     }
 
     socket.onmessage = (event: MessageEvent): void => {

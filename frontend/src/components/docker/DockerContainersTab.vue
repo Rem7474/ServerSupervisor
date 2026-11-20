@@ -159,7 +159,7 @@
                 >
               </label>
             </td>
-            <td class="fw-semibold">
+            <td class="fw-semibold text-nowrap">
               {{ c.name }}
             </td>
             <td>
@@ -587,12 +587,10 @@
             style="min-height: 200px; max-height: 400px; overflow-y: auto;"
           >
             <div v-if="inspectTab === 'env'">
-              <div
+              <EmptyState
                 v-if="Object.keys(inspectTarget.env_vars || {}).length === 0"
-                class="text-secondary text-center py-3"
-              >
-                {{ t('docker.noEnvVars') }}
-              </div>
+                :title="t('docker.noEnvVars')"
+              />
               <table
                 v-else
                 class="table table-sm table-vcenter"
@@ -617,12 +615,10 @@
               </table>
             </div>
             <div v-if="inspectTab === 'volumes'">
-              <div
+              <EmptyState
                 v-if="!(inspectTarget.volumes || []).length"
-                class="text-secondary text-center py-3"
-              >
-                {{ t('docker.noVolumes') }}
-              </div>
+                :title="t('docker.noVolumes')"
+              />
               <ul
                 v-else
                 class="list-unstyled mb-0"
@@ -637,12 +633,10 @@
               </ul>
             </div>
             <div v-if="inspectTab === 'networks'">
-              <div
+              <EmptyState
                 v-if="!(inspectTarget.networks || []).length"
-                class="text-secondary text-center py-3"
-              >
-                {{ t('docker.noNetworks') }}
-              </div>
+                :title="t('docker.noNetworks')"
+              />
               <div
                 v-else
                 class="d-flex flex-wrap gap-2 pt-1"
@@ -723,6 +717,7 @@ import {
   getComposeInfo as getComposeInfoFromLabels,
   isComposeContainer as isComposeContainerFromLabels,
 } from '../../utils/dockerCompose'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 interface Container {
   id: string
@@ -902,11 +897,7 @@ function stateRank(state: string | undefined): number {
 }
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  return formatBytesShared(bytes || 0)
 }
 
 function openTracker(trackerId: string | undefined): void {

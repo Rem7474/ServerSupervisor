@@ -20,6 +20,7 @@ import (
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
@@ -289,10 +290,10 @@ func (s *Service) HandleCommandCompletion(commandID, status string) {
 	if existing, existErr := s.repo.GetBackupRunByCommandID(ctx, commandID); existErr == nil && existing != nil {
 		run.ID = existing.ID
 		if err := s.repo.UpdateBackupRun(ctx, run); err != nil {
-			slog.ErrorContext(ctx, "failed to update backup run", "command_id", commandID, "err", err)
+			slog.ErrorContext(ctx, "failed to update backup run", "command_id", logging.Sanitize(commandID), "err", err)
 		}
 	} else if _, err := s.repo.CreateBackupRun(ctx, run); err != nil {
-		slog.ErrorContext(ctx, "failed to create backup run", "command_id", commandID, "err", err)
+		slog.ErrorContext(ctx, "failed to create backup run", "command_id", logging.Sanitize(commandID), "err", err)
 	}
 
 	if run.Status != "error" {

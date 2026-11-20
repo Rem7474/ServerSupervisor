@@ -166,6 +166,7 @@
 import { useI18n } from 'vue-i18n'
 import AlertRuleCommandTrigger from './AlertRuleCommandTrigger.vue'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
+import { formatDateTimeSeconds } from '../../utils/formatters'
 
 interface TestResults {
   any_fires?: boolean
@@ -180,7 +181,7 @@ defineProps<{
   browserPermission?: string
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const channelSmtp = defineModel<boolean>('channelSmtp', { default: false })
 const channelNtfy = defineModel<boolean>('channelNtfy', { default: false })
@@ -188,7 +189,6 @@ const channelBrowser = defineModel<boolean>('channelBrowser', { default: false }
 const commandTriggerEnabled = defineModel<boolean>('commandTriggerEnabled', { default: false })
 
 function formatDate(dateStr?: string): string {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString(locale.value)
+  return formatDateTimeSeconds(dateStr, '')
 }
 </script>

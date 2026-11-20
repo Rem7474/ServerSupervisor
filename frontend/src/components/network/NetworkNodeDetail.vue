@@ -154,7 +154,7 @@
           <span class="detail-key">Internet</span>
           <span
             v-if="selectedNode?.isInternetExposed"
-            class="badge bg-orange-lt text-orange"
+            class="badge bg-warning-lt text-warning"
           >
             {{ selectedNode?.externalPort ? t('network.nodeExposedWithPort', { port: selectedNode.externalPort }) : t('network.nodeExposedLabel') }}
           </span>
@@ -192,7 +192,7 @@
             >auth</span>
             <span
               v-if="svc.exposedToInternet"
-              class="badge bg-orange-lt text-orange ms-1"
+              class="badge bg-warning-lt text-warning ms-1"
             >inet</span>
           </span>
           <span
@@ -221,7 +221,7 @@
               >auth</span>
               <span
                 v-if="p.isInternetExposed"
-                class="badge bg-orange-lt text-orange ms-1"
+                class="badge bg-warning-lt text-warning ms-1"
               >inet</span>
             </template>
           </span>
@@ -293,6 +293,8 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconHome } from '@tabler/icons-vue'
+import { hostStatusClass } from '../../utils/formatHostStatus'
+import { formatBytes as formatBytesShared } from '../../utils/formatters'
 
 interface SelectedNode {
   type?: string
@@ -453,22 +455,10 @@ const typeTagClass = computed(() => {
   return 'badge bg-secondary-lt text-secondary'
 })
 
-const statusBadgeClass = computed(() => {
-  const status = hostData.value?.status || props.selectedNode?.status
-  if (status === 'online') return 'status status-success'
-  if (status === 'warning') return 'status status-warning'
-  if (status === 'offline') return 'status status-danger'
-  return 'status status-secondary'
-})
+const statusBadgeClass = computed(() => hostStatusClass(hostData.value?.status || props.selectedNode?.status || ''))
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes && bytes !== 0) return '-'
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let value = bytes / 1024
-  let idx = 0
-  while (value >= 1024 && idx < units.length - 1) { value /= 1024; idx++ }
-  return `${value.toFixed(1)} ${units[idx]}`
+  return formatBytesShared(bytes)
 }
 
 function copyUrl(url: string): void {

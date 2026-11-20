@@ -3,8 +3,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { getApiErrorMessage } from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
-import { useCommandStream } from './useCommandStream'
+import { useCommandLogViewer } from './useCommandLogViewer'
 import { execBadgeColor } from '../utils/statusClasses'
+import { gitProviderBadgeClass } from '../utils/categoryBadges'
+import { formatDate, formatDateTimeSeconds } from '../utils/formatters'
+import { storeToRefs } from 'pinia'
+import { useHostsStore } from '../stores/hosts'
 
 interface TrackerCmd {
   id: string
@@ -144,7 +148,7 @@ interface UseGitWebhooksPageApi {
 }
 
 export function useGitWebhooksPage(): UseGitWebhooksPageApi {
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const dialog = useConfirmDialog()
   const route = useRoute()
   const router = useRouter()
@@ -154,7 +158,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   watch(activeTab, (tab) => {
     router.replace({ query: { ...route.query, tab } })
   })
-  const hosts: Ref<Host[]> = ref([])
+  // Shared, TTL-cached host list (stores/hosts) rather than a private copy.
+  const { hosts } = storeToRefs(useHostsStore())
   const error: Ref<string> = ref('')
   const saving: Ref<boolean> = ref(false)
   const modalError: Ref<string> = ref('')
@@ -217,10 +222,6 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     if (typeof response !== 'object' || response === null) return {}
     const data = (response as { data?: { webhook?: CreatedWebhook } }).data
     return data?.webhook ?? {}
-  }
-
-  function readError(err: unknown, fallback: string): string {
-    return getApiErrorMessage(err, fallback)
   }
 
   onMounted(async () => {
@@ -286,7 +287,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       const response = await api.getGitWebhooks()
       webhooks.value = response.data.webhooks || []
     } catch (err: unknown) {
-      error.value = readError(err, t('webhooks.loadWebhooksError'))
+      error.value = getApiErrorMessage(err, t('webhooks.loadWebhooksError'))
     } finally {
       loadingWebhooks.value = false
     }
@@ -300,19 +301,14 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       trackers.value = response.data.trackers || []
       ensureRunningRefresh()
     } catch (err: unknown) {
-      error.value = readError(err, t('webhooks.loadTrackersError'))
+      error.value = getApiErrorMessage(err, t('webhooks.loadTrackersError'))
     } finally {
       loadingTrackers.value = false
     }
   }
 
   async function loadHosts(): Promise<void> {
-    try {
-      const response = await api.getHosts()
-      hosts.value = response.data || []
-    } catch {
-      hosts.value = []
-    }
+    await useHostsStore().fetchHosts()
   }
 
   function openCreateWebhook(): void {
@@ -350,7 +346,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       closeWebhookModal()
       await loadWebhooks()
     } catch (err: unknown) {
-      modalError.value = readError(err, t('common.error'))
+      modalError.value = getApiErrorMessage(err, t('common.error'))
     } finally {
       saving.value = false
     }
@@ -361,7 +357,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.updateGitWebhook(webhook.id, { ...webhook, enabled: !webhook.enabled })
       await loadWebhooks()
     } catch (err: unknown) {
-      error.value = readError(err, t('common.error'))
+      error.value = getApiErrorMessage(err, t('common.error'))
     }
   }
 
@@ -376,7 +372,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.deleteGitWebhook(webhook.id)
       await loadWebhooks()
     } catch (err: unknown) {
-      error.value = readError(err, t('webhooks.deleteError'))
+      error.value = getApiErrorMessage(err, t('webhooks.deleteError'))
     }
   }
 
@@ -421,7 +417,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       closeTrackerModal()
       await loadTrackers()
     } catch (err: unknown) {
-      modalError.value = readError(err, t('common.error'))
+      modalError.value = getApiErrorMessage(err, t('common.error'))
     } finally {
       saving.value = false
     }
@@ -432,7 +428,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.updateReleaseTracker(tracker.id, { ...tracker, enabled: !tracker.enabled })
       await loadTrackers()
     } catch (err: unknown) {
-      error.value = readError(err, t('common.error'))
+      error.value = getApiErrorMessage(err, t('common.error'))
     }
   }
 
@@ -441,7 +437,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.checkReleaseTrackerNow(tracker.id)
       setTimeout(() => loadTrackers(), 2000)
     } catch (err: unknown) {
-      error.value = readError(err, t('common.error'))
+      error.value = getApiErrorMessage(err, t('common.error'))
     }
   }
 
@@ -456,7 +452,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       await api.deleteReleaseTracker(tracker.id)
       await loadTrackers()
     } catch (err: unknown) {
-      error.value = readError(err, t('webhooks.deleteError'))
+      error.value = getApiErrorMessage(err, t('webhooks.deleteError'))
     }
   }
 
@@ -472,14 +468,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   }
 
   function providerBadge(provider: string): string {
-    const map: Record<string, string> = {
-      github: 'bg-blue-lt text-blue',
-      gitlab: 'bg-orange-lt text-orange',
-      gitea: 'bg-teal-lt text-teal',
-      forgejo: 'bg-purple-lt text-purple',
-      custom: 'bg-secondary-lt text-secondary',
-    }
-    return map[provider] || 'bg-secondary-lt text-secondary'
+    return gitProviderBadgeClass(provider)
   }
 
   function execStatusBadge(status: string): string {
@@ -487,13 +476,11 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   }
 
   function formatRelative(dateStr: string): string {
-    if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleString(locale.value)
+    return formatDateTimeSeconds(dateStr)
   }
 
   function formatDateOnly(dateStr?: string): string {
-    if (!dateStr) return '-'
-    return new Date(dateStr).toLocaleDateString(locale.value)
+    return formatDate(dateStr)
   }
 
   function cooldownRemainingMs(tracker: ReleaseTracker): number {
@@ -534,60 +521,22 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     const detectedAt = new Date(tracker.last_release_detected_at).getTime()
     if (!Number.isFinite(detectedAt)) return '-'
     const eta = new Date(detectedAt + (hours * 60 * 60 * 1000))
-    return eta.toLocaleString(locale.value)
+    return formatDateTimeSeconds(eta)
   }
 
   // ── Tracker "live console" (command output streaming) ──────────────────────
-  const { openCommandStream, closeStream } = useCommandStream()
-  const selectedTrackerCmd: Ref<TrackerCmd | null> = ref(null)
-  const showTrackerConsole: Ref<boolean> = ref(false)
+  const {
+    selected: selectedTrackerCmd,
+    visible: showTrackerConsole,
+    showById: showTrackerCommand,
+    close: closeTrackerLogs,
+  } = useCommandLogViewer<TrackerCmd>()
 
-  function closeTrackerLogs(): void {
-    closeStream()
-    selectedTrackerCmd.value = null
-    showTrackerConsole.value = false
-  }
 
-  function connectTrackerStream(commandId: string): void {
-    openCommandStream(commandId, {
-      onInit(payload) {
-        if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
-        selectedTrackerCmd.value = {
-          ...selectedTrackerCmd.value,
-          status: payload.status || selectedTrackerCmd.value.status,
-          output: payload.output ?? selectedTrackerCmd.value.output,
-        }
-      },
-      onChunk(payload) {
-        if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
-        selectedTrackerCmd.value = {
-          ...selectedTrackerCmd.value,
-          output: (selectedTrackerCmd.value.output || '') + (payload.chunk || ''),
-        }
-      },
-      onStatus(payload) {
-        if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
-        selectedTrackerCmd.value = {
-          ...selectedTrackerCmd.value,
-          status: payload.status || selectedTrackerCmd.value.status,
-          output: payload.output ?? selectedTrackerCmd.value.output,
-        }
-      },
-    })
-  }
 
+  // A vanished command history entry leaves the page as it is.
   async function openTrackerLogs(commandId: string): Promise<void> {
-    closeStream()
-    try {
-      const res = await api.getCommandStatus(commandId)
-      selectedTrackerCmd.value = res.data as unknown as TrackerCmd
-      showTrackerConsole.value = true
-      if (res.data?.status === 'pending' || res.data?.status === 'running') {
-        connectTrackerStream(commandId)
-      }
-    } catch {
-      // Keep page usable even if command history entry vanished.
-    }
+    await showTrackerCommand(commandId)
   }
 
   return {

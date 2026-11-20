@@ -56,10 +56,11 @@ func NormalizeVersion(v string) string {
 }
 
 // ResolveContainerVersion picks the best human-readable version for a running
-// container. A non-"latest" tag wins; otherwise we fall back to OCI/label
-// hints which can reveal the real release behind a moving "latest" tag.
+// container. A tag that names a version (v1.2, 14-alpine, 9) wins; a moving
+// channel tag (latest, release, stable, ...) falls back to OCI/label hints,
+// which can reveal the real release behind it.
 func ResolveContainerVersion(imageTag string, labels map[string]string) string {
-	if imageTag != "latest" {
+	if looksLikeVersionTag(imageTag) {
 		return imageTag
 	}
 	for _, key := range []string{
@@ -72,4 +73,11 @@ func ResolveContainerVersion(imageTag string, labels map[string]string) string {
 		}
 	}
 	return imageTag
+}
+
+// looksLikeVersionTag reports whether a tag starts like a version number,
+// optionally prefixed with "v".
+func looksLikeVersionTag(tag string) bool {
+	tag = strings.TrimPrefix(tag, "v")
+	return tag != "" && tag[0] >= '0' && tag[0] <= '9'
 }

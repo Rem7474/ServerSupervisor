@@ -37,7 +37,9 @@ import { useProxmoxConsole } from '../../composables/useProxmoxConsole'
 
 const { status: statusRef, errorMessage: errorRef } = useProxmoxConsole()
 
-const { termOpenMock, termDisposeMock, termFocusMock, fitMock } = vi.hoisted(() => ({
+const { termOpenMock, termDisposeMock, termFocusMock, fitMock, keyHandlerMock, hasSelectionMock } = vi.hoisted(() => ({
+  keyHandlerMock: vi.fn(),
+  hasSelectionMock: vi.fn(() => false),
   termOpenMock: vi.fn(),
   termDisposeMock: vi.fn(),
   termFocusMock: vi.fn(),
@@ -51,6 +53,8 @@ vi.mock('@xterm/xterm', () => ({
       dispose: termDisposeMock,
       focus: termFocusMock,
       loadAddon: vi.fn(),
+      attachCustomKeyEventHandler: keyHandlerMock,
+      hasSelection: hasSelectionMock,
       cols: 80,
       rows: 24,
     }
@@ -110,6 +114,29 @@ describe('ProxmoxConsole', () => {
     wrapper.unmount()
   })
 
+  it('shows a command log without starting the terminal when terminal is false, and closing it leaves the PVE session alone', async () => {
+    const wrapper = mount(ProxmoxConsole, {
+      props: {
+        guestId: 'g1',
+        show: true,
+        terminal: false,
+        logTitle: 'Console Live',
+        command: { host_name: 'web1', module: 'apt', action: 'update', status: 'completed', output: 'done' },
+      },
+    })
+    await flushPromises()
+
+    expect(openMock).not.toHaveBeenCalled()
+    expect(termOpenMock).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Console Live')
+    expect(wrapper.text()).toContain('done')
+
+    await wrapper.find('button[title="Fermer"]').trigger('click')
+    expect(closeMock).not.toHaveBeenCalled()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
   it('a plain show-prop toggle (not the close button) does not close the socket', async () => {
     statusRef.value = 'connected'
     const wrapper = mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
@@ -147,6 +174,25 @@ describe('ProxmoxConsole', () => {
     await flushPromises()
 
     expect(openMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('hands Ctrl+V and a selected Ctrl+C back to the browser, keeps the rest for the shell', async () => {
+    mount(ProxmoxConsole, { props: { guestId: 'g1', guestName: 'web1', show: true } })
+    await flushPromises()
+    const handler = keyHandlerMock.mock.calls[0][0] as (e: KeyboardEvent) => boolean
+    const key = (init: KeyboardEventInit) => new KeyboardEvent('keydown', init)
+
+    expect(handler(key({ key: 'v', ctrlKey: true }))).toBe(false)
+    expect(handler(key({ key: 'V', ctrlKey: true, shiftKey: true }))).toBe(false)
+
+    hasSelectionMock.mockReturnValue(false)
+    expect(handler(key({ key: 'c', ctrlKey: true }))).toBe(true) // ^C interrupts
+    hasSelectionMock.mockReturnValue(true)
+    expect(handler(key({ key: 'c', ctrlKey: true }))).toBe(false) // copies
+
+    expect(handler(key({ key: 'a', ctrlKey: true }))).toBe(true)
+    expect(handler(new KeyboardEvent('keyup', { key: 'v', ctrlKey: true }))).toBe(true)
+    hasSelectionMock.mockReturnValue(false)
   })
 
   it('disposes the terminal and closes the socket on unmount', async () => {

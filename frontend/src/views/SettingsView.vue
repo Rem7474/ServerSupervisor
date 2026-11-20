@@ -6,7 +6,7 @@
           to="/"
           class="text-decoration-none"
         >
-          Dashboard
+          {{ t('nav.sections.control.items.dashboard') }}
         </router-link>
         <span class="text-muted mx-1">/</span>
         <span>{{ t('settings.pageTitle') }}</span>
@@ -82,6 +82,7 @@
             :form="form"
             :auth-is-admin="auth.isAdmin"
             :show-smtp-pass="showSmtpPass"
+            :smtp-pass-configured="settings.smtpPassConfigured"
             :saving-smtp="savingSmtp"
             :smtp-save-msg="smtpSaveMsg"
             :smtp-save-ok="smtpSaveOk"
@@ -97,6 +98,7 @@
               :form="form"
               :auth-is-admin="auth.isAdmin"
               :show-git-hub-token="showGitHubToken"
+              :github-token-configured="settings.githubTokenConfigured"
               :saving-notif="savingNotif"
               :notif-save-msg="notifSaveMsg"
               :notif-save-ok="notifSaveOk"

@@ -161,6 +161,7 @@ import { useMonitoringHostDetail } from '../composables/useMonitoringHostDetail'
 import { PROBE_REFRESH_SEC } from '../composables/useUptimeProbeDetail'
 import type { UptimeProbe } from '../types/uptime'
 import type { SSLCertificate } from '../types/ssl'
+import { probeStatusClass, sslDaysClass } from '../utils/statusClasses'
 
 const { t } = useI18n()
 const { host, loading, error } = useMonitoringHostDetail()
@@ -195,12 +196,7 @@ const probeStatusLabel = computed(() => {
   if (status === 'down') return 'DOWN'
   return t('host.unknownStatus')
 })
-const probeStatusColor = computed(() => {
-  const status = probeLoaded.value?.last_status
-  if (status === 'up') return 'text-success'
-  if (status === 'down') return 'text-danger'
-  return 'text-secondary'
-})
+const probeStatusColor = computed(() => probeStatusClass(probeLoaded.value?.last_status, 'text'))
 
 const certDaysLabel = computed(() => {
   const d = certLoaded.value?.days_remaining
@@ -208,11 +204,5 @@ const certDaysLabel = computed(() => {
   if (d < 0) return t('host.expiredDays', { days: Math.abs(d) })
   return t('host.daysRemaining', { count: d }, d)
 })
-const certDaysColor = computed(() => {
-  const d = certLoaded.value?.days_remaining
-  if (d == null) return 'text-secondary'
-  if (d < 0 || d <= 7) return 'text-danger'
-  if (d <= 30) return 'text-warning'
-  return 'text-success'
-})
+const certDaysColor = computed(() => sslDaysClass(certLoaded.value?.days_remaining, 'text'))
 </script>

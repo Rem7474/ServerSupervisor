@@ -86,9 +86,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/account/security',
-    name: 'AccountSecurity',
-    component: () => import('../views/AccountSecurityView.vue'),
-    meta: { requiresAuth: true },
+    redirect: { path: '/account', query: { tab: 'connexions' } },
   },
   {
     path: '/users',
@@ -100,7 +98,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settings',
     name: 'Settings',
     component: () => import('../views/SettingsView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     // The Docker/system env var catalog used to be its own page; it's now

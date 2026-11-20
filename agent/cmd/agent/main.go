@@ -87,7 +87,10 @@ func main() {
 		content := config.DefaultConfigFileWithOverrides(*initServerURL, *initAPIKey)
 
 		if *configPath == "-" {
-			fmt.Print(content)
+			if _, err := os.Stdout.WriteString(content); err != nil {
+				slog.Error("failed to write config to stdout", "err", err)
+				os.Exit(1)
+			}
 			return
 		}
 

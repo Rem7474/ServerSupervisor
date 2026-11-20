@@ -2,7 +2,7 @@ name: CI Server
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, dev]
     paths:
       - 'server/**'
       - '!server/**/*.md'

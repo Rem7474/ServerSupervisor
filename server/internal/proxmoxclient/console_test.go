@@ -508,3 +508,34 @@ func TestOpenLXCConsoleBadHandshake(t *testing.T) {
 		t.Errorf("error should surface PVE's actual status/body, got: %v", err)
 	}
 }
+
+// The handshake write deadline must not outlive the handshake: a session that
+// stays open past handshakeTimeout has to keep accepting keystrokes.
+func TestTermSession_WriteWorksAfterHandshakeTimeout(t *testing.T) {
+	old := handshakeTimeout
+	handshakeTimeout = 300 * time.Millisecond
+	defer func() { handshakeTimeout = old }()
+
+	srv := fakeTermproxyServer(t)
+	defer srv.Close()
+
+	c := New(srv.URL, "user@pve!token", "secret-token", false)
+	session, err := c.OpenLXCConsole(context.Background(), "pve1", 101, "root@pam", "hunter2")
+	if err != nil {
+		t.Fatalf("OpenLXCConsole: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	time.Sleep(2 * handshakeTimeout)
+
+	if err := session.Write([]byte("ls\n")); err != nil {
+		t.Fatalf("Write after handshake timeout elapsed: %v", err)
+	}
+	out, err := session.ReadMessage()
+	if err != nil {
+		t.Fatalf("ReadMessage: %v", err)
+	}
+	if string(out) != "ls\n" {
+		t.Errorf("echoed output = %q, want %q", out, "ls\n")
+	}
+}

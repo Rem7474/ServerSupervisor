@@ -27,7 +27,7 @@
         v-else
         class="table-responsive"
       >
-        <table class="table table-vcenter card-table mb-0">
+        <table class="table table-vcenter card-table">
           <thead>
             <tr>
               <th>{{ t('host.nameColumn') }}</th>
@@ -85,6 +85,7 @@
           </div>
           <button
             type="button"
+            :aria-label="t('common.close')"
             class="btn-close me-2 m-auto"
             @click="taskRunResult = null"
           />

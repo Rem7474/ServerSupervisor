@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 6 * * 1'    # chaque lundi à 6h UTC
   push:
-    branches: [main]
+    branches: [main, dev]
     paths:
       - 'server/go.mod'
       - 'server/go.sum'
@@ -180,7 +180,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=server-trivy
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: serversupervisor-server:scan
           format: sarif

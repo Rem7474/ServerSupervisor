@@ -163,7 +163,7 @@
                 v-for="channel in rule.actions?.channels"
                 :key="channel"
                 class="badge me-1"
-                :class="channelBadgeClass(channel)"
+                :class="notificationChannelBadgeClass(channel)"
               >
                 {{ channelLabel(channel) }}
               </span>
@@ -222,6 +222,8 @@ import SortableHeader from '../common/SortableHeader.vue'
 import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import { formatDurationSecs } from '../../utils/formatters'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
+import { notificationChannelBadgeClass } from '../../utils/categoryBadges'
+import type { AlertRule } from '../../types/alert'
 
 const { t } = useI18n()
 
@@ -230,70 +232,12 @@ interface Host {
   name?: string
 }
 
-interface ProxmoxScope {
-  scope_mode?: string
-  connection_id?: string | number
-  node_id?: string | number
-  guest_id?: string | number
-  storage_id?: string | number
-  disk_id?: string | number
-}
-
-interface CommandTrigger {
-  module: string
-  action: string
-  target?: string
-}
-
-interface AlertActions {
-  channels?: string[]
-  command_trigger?: CommandTrigger | null
-}
-
-interface DockerScope {
-  scope_mode?: string
-  host_id?: string
-  container_id?: string
-  project_name?: string
-}
-
-interface AlertRule {
-  id: string | number
-  name?: string
-  enabled?: boolean
-  host_id?: string
-  source_type?: string
-  metric: string
-  operator: string
-  threshold_warn?: number
-  threshold_crit?: number
-  threshold_clear_warn?: number | null
-  threshold_clear_crit?: number | null
-  duration_seconds?: number
-  active_incident_count?: number
-  last_fired?: string
-  actions?: AlertActions
-  proxmox_scope?: ProxmoxScope
-  docker_scope?: DockerScope
-}
-
-const CHANNEL_BADGE_CLASSES: Record<string, string> = {
-  browser: 'bg-green-lt text-green',
-  smtp: 'bg-azure-lt text-azure',
-  ntfy: 'bg-azure-lt text-azure',
-  notify: 'bg-purple-lt text-purple',
-}
-
 function channelLabel(channel: string): string {
   if (channel === 'browser') return t('alerts.channelBrowserLabel')
   if (channel === 'smtp') return t('alerts.channelEmail')
   if (channel === 'ntfy') return t('alerts.channelNtfyShort')
   if (channel === 'notify') return t('alerts.channelNotify')
   return channel
-}
-
-function channelBadgeClass(channel: string): string {
-  return CHANNEL_BADGE_CLASSES[channel] || 'bg-azure-lt text-azure'
 }
 
 const props = withDefaults(defineProps<{

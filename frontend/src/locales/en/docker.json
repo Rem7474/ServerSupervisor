@@ -23,7 +23,7 @@
   "servicesColumn": "Services",
   "configFileColumn": "Config file",
   "updateAvailableTooltipItem": "{image}: {version} available",
-  "updatesCountBadge": "{count} updates",
+  "updatesCountBadge": "{count} update | {count} updates",
   "viewTracking": "View tracking",
   "triggerTracker": "Trigger the tracker",
   "startProjectAriaLabel": "Start the project",

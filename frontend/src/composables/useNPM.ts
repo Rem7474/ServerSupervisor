@@ -1,10 +1,11 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { npmApi } from '../api/npm'
 import type { NPMProxyHostEnriched } from '../types/npm'
 import { getApiErrorMessage } from '../api/client'
 import { useConfirmDialog } from './useConfirmDialog'
 import { compareStrings } from '../utils/formatters'
+import { useAutoRefresh } from './useAutoRefresh'
 
 export type NPMSortKey = 'connection_name' | 'domain' | 'forward' | 'npm_enabled' | 'uptime_status' | 'ssl_days_remaining'
 
@@ -19,9 +20,8 @@ export function useNPM() {
   const actionError = ref('')
   const toggling = ref<Record<string, boolean>>({})
   const togglingNPM = ref<Record<string, boolean>>({})
-  const autoRefresh = ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
-  let refreshTimer: ReturnType<typeof setInterval> | null = null
+  // A tick is skipped while a monitoring toggle is in flight (it reloads on its own).
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => load(), { intervalSec: NPM_REFRESH_SEC, skip: () => hasPendingToggle.value })
   const hasPendingToggle = computed(() =>
     Object.values(toggling.value).some(Boolean) || Object.values(togglingNPM.value).some(Boolean)
   )
@@ -82,17 +82,6 @@ export function useNPM() {
     } finally {
       loading.value = false
     }
-  }
-
-  function startRefreshTimer(): void {
-    stopRefreshTimer()
-    refreshTimer = setInterval(() => {
-      if (autoRefresh.value && !hasPendingToggle.value) load()
-    }, NPM_REFRESH_SEC * 1000)
-  }
-
-  function stopRefreshTimer(): void {
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }
 
   // toggleNPM appelle NPM pour activer/désactiver le proxy host dans NPM lui-même.
@@ -170,11 +159,7 @@ export function useNPM() {
     }
   }
 
-  onMounted(() => {
-    load()
-    startRefreshTimer()
-  })
-  onUnmounted(stopRefreshTimer)
+  onMounted(() => { void load() })
 
   return {
     hosts,

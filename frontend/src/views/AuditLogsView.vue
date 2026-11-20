@@ -202,7 +202,7 @@
                   :key="cmd.id"
                   :class="{ 'table-active': selectedCmd?.id === cmd.id }"
                 >
-                  <td class="text-secondary small">
+                  <td class="text-secondary small text-nowrap">
                     {{ formatDate(cmd.created_at) }}
                   </td>
                   <td>
@@ -234,6 +234,7 @@
                       class="btn btn-icon btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
                       :title="t('account.viewLogsTooltip')"
+                      :aria-label="t('account.viewLogsTooltip')"
                       @click="openLogViewer(cmd)"
                     >
                       <IconList
@@ -290,7 +291,10 @@
     </div>
 
     <!-- ── Connexions tab (admin only) ────────────────────────────────────── -->
-    <div v-show="activeTab === 'connexions'">
+    <div
+      v-if="auth.role === 'admin'"
+      v-show="activeTab === 'connexions'"
+    >
       <AuditSecurityPanel
         :security="security"
         :period="securityPeriod"
@@ -327,7 +331,10 @@
     </div>
 
     <!-- ── Journal tab (raw audit_logs, admin only) ───────────────────────── -->
-    <div v-show="activeTab === 'journal'">
+    <div
+      v-if="auth.role === 'admin'"
+      v-show="activeTab === 'journal'"
+    >
       <div class="card">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
           <h3 class="card-title mb-0">
@@ -418,7 +425,7 @@
                 v-for="log in journalLogs"
                 :key="log.id"
               >
-                <td class="text-secondary small">
+                <td class="text-secondary small text-nowrap">
                   {{ formatDate(log.created_at) }}
                 </td>
                 <td>

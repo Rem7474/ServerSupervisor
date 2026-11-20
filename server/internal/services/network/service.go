@@ -19,6 +19,7 @@ import (
 type Repository interface {
 	GetNetworkTopologyConfig(ctx context.Context) (*models.NetworkTopologyConfig, error)
 	SaveNetworkTopologyConfig(ctx context.Context, cfg *models.NetworkTopologyConfig) error
+	CreateAuditLog(ctx context.Context, username, action, hostID, ipAddress, details, status string) (int64, error)
 }
 
 // SnapshotBuilder builds the live network snapshot (wired to networkview.BuildSnapshot).
@@ -66,12 +67,15 @@ func (s *Service) TopologyConfig(ctx context.Context) (*models.NetworkTopologyCo
 	return s.repo.GetNetworkTopologyConfig(ctx)
 }
 
-// SaveTopologyConfig persists the topology configuration then wakes the network
-// view subscribers (nil-safe when no bus is wired).
-func (s *Service) SaveTopologyConfig(ctx context.Context, cfg *models.NetworkTopologyConfig) error {
+// SaveTopologyConfig persists the topology configuration, records an audit
+// log entry for the acting user, then wakes the network view subscribers
+// (nil-safe when no bus is wired).
+func (s *Service) SaveTopologyConfig(ctx context.Context, cfg *models.NetworkTopologyConfig, username, clientIP string) error {
 	if err := s.repo.SaveNetworkTopologyConfig(ctx, cfg); err != nil {
+		_, _ = s.repo.CreateAuditLog(ctx, username, "update_network_config", "", clientIP, "Network topology config update failed", "failed")
 		return err
 	}
+	_, _ = s.repo.CreateAuditLog(ctx, username, "update_network_config", "", clientIP, "Network topology config updated", "success")
 	s.bus.Publish(events.TopicNetwork)
 	return nil
 }

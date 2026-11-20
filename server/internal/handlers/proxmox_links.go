@@ -27,7 +27,7 @@ func (h *ProxmoxHandler) CreateLink(c *gin.Context) {
 		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	link, err := h.svc.CreateLink(c.Request.Context(), req)
+	link, err := h.svc.CreateLink(c.Request.Context(), req, proxmoxActor(c))
 	if err != nil {
 		respondError(c, err)
 		return
@@ -52,7 +52,7 @@ func (h *ProxmoxHandler) UpdateLink(c *gin.Context) {
 		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	link, err := h.svc.UpdateLink(c.Request.Context(), c.Param("id"), req)
+	link, err := h.svc.UpdateLink(c.Request.Context(), c.Param("id"), req, proxmoxActor(c))
 	if err != nil {
 		respondError(c, err)
 		return
@@ -62,7 +62,7 @@ func (h *ProxmoxHandler) UpdateLink(c *gin.Context) {
 
 // DeleteLink removes a guest-host link.
 func (h *ProxmoxHandler) DeleteLink(c *gin.Context) {
-	if err := h.svc.DeleteLink(c.Request.Context(), c.Param("id")); err != nil {
+	if err := h.svc.DeleteLink(c.Request.Context(), c.Param("id"), proxmoxActor(c)); err != nil {
 		respondError(c, err)
 		return
 	}

@@ -18,7 +18,7 @@
         <div class="text-secondary small">
           {{ t('settings.auditLogs') }}
         </div>
-        <div>{{ t('settings.entriesCount', { count: formatNumber(dbStatus.auditLogCount) }) }}</div>
+        <div>{{ t('settings.entriesCount', { count: formatNumber(dbStatus.auditLogCount) }, dbStatus.auditLogCount) }}</div>
       </div>
       <div class="mb-3 pb-3 border-bottom">
         <div class="text-secondary small">

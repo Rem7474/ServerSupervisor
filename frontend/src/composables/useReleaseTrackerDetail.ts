@@ -3,13 +3,15 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
-import { useCommandStream } from './useCommandStream'
+import { useCommandLogViewer, patchRow } from './useCommandLogViewer'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { ReleaseTracker, ReleaseTrackerExecution, ReleaseTrackerRequest, ReleaseVersionHistoryItem } from '../types/tracker'
 import type { ComposeProject } from '../types/docker'
-import type { Host } from '../types/host'
 import type { WebhookFormData } from './useWebhookForm'
+import { gitProviderBadgeClass } from '../utils/categoryBadges'
+import { storeToRefs } from 'pinia'
+import { useHostsStore } from '../stores/hosts'
 
 interface CmdRow { id: string; status?: string; output?: string; [key: string]: unknown }
 // The API enriches the tracker with the resolved release URL (not in the Go model).
@@ -24,14 +26,13 @@ export function useReleaseTrackerDetail() {
   const tracker = ref<TrackerView | null>(null)
   const executions = ref<ReleaseTrackerExecution[]>([])
   const versionHistory = ref<ReleaseVersionHistoryItem[]>([])
-  const hosts = ref<Host[]>([])
+  // Shared, TTL-cached host list (stores/hosts) rather than a private copy.
+  const { hosts } = storeToRefs(useHostsStore())
   const loading = ref(false)
   const error = ref('')
   const historyLoading = ref(false)
   const checking = ref(false)
   const running = ref(false)
-  const selectedCmd = ref<CmdRow | null>(null)
-  const showConsole = ref(false)
   const nowTick = ref(Date.now())
   let cooldownTimer: number | null = null
 
@@ -43,7 +44,11 @@ export function useReleaseTrackerDetail() {
   const saving = ref(false)
   const modalError = ref('')
 
-  const { openCommandStream, closeStream } = useCommandStream()
+  // Console for one execution's command; keeps the executions list's status
+  // badge in step with what the console shows.
+  const { selected: selectedCmd, visible: showConsole, showById, close: clearExecutionLogs } = useCommandLogViewer<CmdRow>({
+    onStatus: (commandId, status) => patchRow(executions, (e) => e.command_id === commandId, { status }),
+  })
 
   const canRunManually = computed(() => {
     if (!tracker.value) return false
@@ -110,10 +115,9 @@ export function useReleaseTrackerDetail() {
     loading.value = true
     error.value = ''
     try {
-      const [res, hostsRes] = await Promise.all([api.getReleaseTracker(id, signal), api.getHosts(signal)])
+      const [res] = await Promise.all([api.getReleaseTracker(id, signal), useHostsStore().fetchHosts()])
       tracker.value = res.data.tracker
       executions.value = res.data.executions || []
-      hosts.value = hostsRes.data || []
     } catch (e: unknown) {
       if (isApiAbort(e)) return
       error.value = getApiErrorMessage(e, t('webhooks.loadErrorGeneric'))
@@ -161,60 +165,10 @@ export function useReleaseTrackerDetail() {
     } catch { /* ignore */ }
   }
 
-  function clearExecutionLogs(): void {
-    closeStream()
-    selectedCmd.value = null
-    showConsole.value = false
-  }
 
-  function connectExecutionStream(commandId: string): void {
-    openCommandStream(commandId, {
-      onInit(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          status: payload.status || selectedCmd.value.status,
-          output: payload.output ?? selectedCmd.value.output,
-        }
-      },
-      onChunk(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          output: (selectedCmd.value.output || '') + (payload.chunk || ''),
-        }
-      },
-      onStatus(payload) {
-        if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
-        selectedCmd.value = {
-          ...selectedCmd.value,
-          status: payload.status || selectedCmd.value.status,
-          output: payload.output ?? selectedCmd.value.output,
-        }
-
-        const idx = executions.value.findIndex((e: ReleaseTrackerExecution) => e.command_id === commandId)
-        if (idx !== -1) {
-          const next = [...executions.value]
-          next[idx] = { ...next[idx], status: payload.status || next[idx].status }
-          executions.value = next
-        }
-      },
-    })
-  }
 
   async function openExecutionLogs(commandId: string): Promise<void> {
-    closeStream()
-    try {
-      const res = await api.getCommandStatus(commandId)
-      const cmd = res.data
-      selectedCmd.value = cmd as unknown as CmdRow
-      showConsole.value = true
-      if (cmd?.status === 'pending' || cmd?.status === 'running') {
-        connectExecutionStream(commandId)
-      }
-    } catch {
-      error.value = t('webhooks.couldNotLoadCommandLogsError')
-    }
+    if (!(await showById(commandId))) error.value = t('webhooks.couldNotLoadCommandLogsError')
   }
 
   async function runManually(): Promise<void> {
@@ -274,14 +228,7 @@ export function useReleaseTrackerDetail() {
   }
 
   function providerBadge(provider: string): string {
-    const map: Record<string, string> = {
-      github: 'bg-blue-lt text-blue',
-      gitlab: 'bg-orange-lt text-orange',
-      gitea: 'bg-teal-lt text-teal',
-      forgejo: 'bg-purple-lt text-purple',
-      custom: 'bg-secondary-lt text-secondary',
-    }
-    return map[provider] || 'bg-secondary-lt text-secondary'
+    return gitProviderBadgeClass(provider)
   }
 
   onMounted(() => {
@@ -295,7 +242,6 @@ export function useReleaseTrackerDetail() {
       window.clearInterval(cooldownTimer)
       cooldownTimer = null
     }
-    closeStream()
   })
 
   return {

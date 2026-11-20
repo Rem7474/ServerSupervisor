@@ -144,6 +144,25 @@ describe('TrafficOverviewPanel (characterization)', () => {
     expect(text).toContain('Aucune requête récente.')
   })
 
+  // A request with no vhost (direct IP access) used to show a hardcoded
+  // English "(unknown)" in both domain tables.
+  it.each([
+    ['fr', '(inconnu)'],
+    ['en', '(unknown)'],
+  ])('labels requests without a domain in the UI language (%s)', async (locale, label) => {
+    setLocale(locale as 'fr' | 'en')
+    vi.mocked(apiClient.getWebLogsSummary).mockResolvedValue({
+      data: { ...summaryData.data, traffic: { ...summaryData.data.traffic, top_domains: [{ domain: '', hits: 7 }] } },
+    } as never)
+    const wrapper = mount(TrafficOverviewPanel, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    const occurrences = wrapper.text().split(label).length - 1
+    expect(occurrences).toBe(2)
+    if (locale === 'fr') expect(wrapper.text()).not.toContain('(unknown)')
+  })
+
   it('translates to English when the locale is switched', async () => {
     setLocale('en')
     const wrapper = mount(TrafficOverviewPanel, mountOpts)

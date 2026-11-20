@@ -19,7 +19,7 @@
   "logsColumn": "Logs",
   "repoBranchColumn": "Repo / Branche",
   "commitColumn": "Commit",
-  "alertsTriggeredTooltip": "{n} alerte(s) déclenchée(s) sur l'hôte dans les 15 min suivant ce déploiement",
+  "alertsTriggeredTooltip": "{n} alerte déclenchée sur l'hôte dans les 15 min suivant ce déploiement | {n} alertes déclenchées sur l'hôte dans les 15 min suivant ce déploiement",
   "viewReceivedPayloadTooltip": "Voir le payload reçu",
   "paginationRangeLabel": "{from}–{to} sur {total}",
   "availableVarsInScriptTitle": "Variables disponibles dans le script",

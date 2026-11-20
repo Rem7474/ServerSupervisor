@@ -30,6 +30,11 @@ export type { NotificationItem }
 const notifications = ref<NotificationItem[]>([])
 const loading = ref(false)
 const readAtRef = ref<string | null>(null)
+// Browser notification permission, tracked so the bell can offer to enable
+// notifications instead of prompting on page load.
+const browserPermission = ref<NotificationPermission | 'unsupported'>(
+  typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
+)
 let seenIdSet: Set<string | number> | null = null
 let wsReady = false
 let lifecycleReady = false
@@ -143,10 +148,20 @@ export function useNotifications() {
     }
   }
 
+  // Asked from a user action (the bell's "enable" button, or saving an alert
+  // rule with the browser channel): browsers ignore or silence a permission
+  // prompt that no user gesture triggered.
+  async function enableBrowserNotifications(): Promise<void> {
+    if (typeof Notification === 'undefined') return
+    browserPermission.value = await Notification.requestPermission()
+    if (browserPermission.value === 'granted') await setupPushNotifications()
+  }
+
   function watchPermissionChange(): void {
     if (!navigator.permissions) return
     navigator.permissions.query({ name: 'notifications' as PermissionName }).then((status) => {
       status.onchange = () => {
+        if (typeof Notification !== 'undefined') browserPermission.value = Notification.permission
         if (status.state === 'denied') {
           cleanupPushSubscription()
         } else if (status.state === 'granted') {
@@ -217,12 +232,7 @@ export function useNotifications() {
   onMounted(async () => {
     if (lifecycleReady) return
     lifecycleReady = true
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      const perm = await Notification.requestPermission()
-      if (perm === 'granted') {
-        await setupPushNotifications()
-      }
-    } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       await setupPushNotifications()
     }
     watchPermissionChange()
@@ -243,6 +253,8 @@ export function useNotifications() {
   return {
     notifications,
     loading,
+    browserPermission,
+    enableBrowserNotifications,
     readAtRef,
     unreadCount,
     resolvingId,

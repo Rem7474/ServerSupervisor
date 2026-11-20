@@ -31,7 +31,7 @@
             class="mt-2 pt-2 border-top d-flex align-items-center gap-2"
           >
             <span class="text-muted small">Temp:</span>
-            <span :class="['text-sm fw-semibold', tempColor(metrics.cpu_temperature)]">
+            <span :class="['text-sm fw-semibold', getTemperatureColorClass(metrics.cpu_temperature)]">
               {{ `${(metrics.cpu_temperature ?? 0).toFixed(1)}°C` }}
             </span>
           </div>
@@ -175,7 +175,9 @@ import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import { fetchMetricsHistory, type MetricsHistoryPoint } from '../../composables/useHostMetricsHistory'
 import dayjs from '../../utils/dayjs'
 import { getApexChartPalette, AsyncApexChart as ApexChart, type ApexChartInstance } from '../../utils/apexChartTheme'
-import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../../utils/chartTimeAxis'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, formatChartTimestamp, chartTimeDetail } from '../../utils/chartTimeAxis'
+import { getMetricColorClass, getTemperatureColorClass } from '../../utils/metricColor'
+import { formatUptime, formatBytes as formatBytesShared } from '../../utils/formatters'
 
 interface MetricsData {
   cpu_cores?: number
@@ -313,50 +315,19 @@ function buildMemChartOptions(): ApexOptions {
 }
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-}
-
-function formatUptime(seconds: number | undefined): string {
-  if (!seconds) return 'N/A'
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  if (days > 0) return t('host.metricsUptimeDaysHours', { days, hours })
-  const mins = Math.floor((seconds % 3600) / 60)
-  return `${hours}h ${mins}m`
+  return formatBytesShared(bytes || 0)
 }
 
 function cpuColor(pct: number | undefined): string {
-  if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-danger'
-  if (pct > 70) return 'text-warning'
-  return 'text-success'
+  return pct ? getMetricColorClass(pct) : 'text-secondary'
 }
 
 function memColor(pct: number | undefined): string {
-  if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-danger'
-  if (pct > 75) return 'text-warning'
-  return 'text-success'
-}
-
-function tempColor(temp: number | undefined): string {
-  if (!temp) return 'text-secondary'
-  if (temp >= 85) return 'text-danger'
-  if (temp >= 70) return 'text-warning'
-  return 'text-success'
+  return pct ? getMetricColorClass(pct) : 'text-secondary'
 }
 
 function formatChartTime(timestamp: number | string | undefined): string {
-  if (!timestamp) return ''
-  const date = dayjs(timestamp)
-  if (!date.isValid()) return ''
-  if (chartHours.value <= 24) return date.format('HH:mm')
-  if (chartHours.value <= 720) return date.format('DD/MM HH:mm')
-  return date.format('DD/MM')
+  return formatChartTimestamp(timestamp, chartTimeDetail(chartHours.value))
 }
 
 function toChartPoint(metric: HistoryPoint, field: keyof HistoryPoint): { x: number; y: number } | null {

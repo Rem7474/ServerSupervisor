@@ -77,6 +77,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { formatNumber, formatBytes as formatBytesShared } from '../../utils/formatters'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model); typed in the Phase 7 split
 type AnyRecord = Record<string, any>
@@ -87,23 +88,14 @@ const props = defineProps<{
   compare: AnyRecord
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 function numberFormat(v: number): string {
-  return new Intl.NumberFormat(locale.value).format(Number(v) || 0)
+  return formatNumber(v)
 }
 
 function formatBytes(bytes: number): string {
-  const value = Number(bytes) || 0
-  if (value < 1024) return `${value} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let size = value / 1024
-  let unit = 0
-  while (size >= 1024 && unit < units.length - 1) {
-    size /= 1024
-    unit++
-  }
-  return `${size.toFixed(1)} ${units[unit]}`
+  return formatBytesShared(Number(bytes) || 0)
 }
 
 function percent(v: number): string {

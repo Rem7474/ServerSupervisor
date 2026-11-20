@@ -64,6 +64,24 @@ type Repository interface {
 	ListProxmoxBackupRuns(ctx context.Context, connectionID string) ([]models.ProxmoxBackupRun, error)
 
 	GetExposureByIPs(ctx context.Context, ips []string, since time.Time) (map[string]*models.HostExposure, error)
+
+	CreateAuditLog(ctx context.Context, username, action, hostID, ipAddress, details, status string) (int64, error)
+}
+
+// Actor identifies who triggered a mutating use-case, for the audit trail.
+type Actor struct {
+	Username string
+	ClientIP string
+}
+
+// audit records a Proxmox mutation in audit_logs. Best-effort, like every
+// other service's audit write: a failed audit insert never fails the action.
+func (s *Service) audit(ctx context.Context, actor Actor, action, details string, err error) {
+	status := "success"
+	if err != nil {
+		status = "failed"
+	}
+	_, _ = s.repo.CreateAuditLog(ctx, actor.Username, action, "", actor.ClientIP, details, status)
 }
 
 // Service holds the Proxmox HTTP use-cases + owns the background poller.
@@ -222,7 +240,7 @@ func (s *Service) ListLinks(ctx context.Context, status string) ([]models.Proxmo
 	return s.repo.ListProxmoxGuestLinks(ctx, status)
 }
 
-func (s *Service) CreateLink(ctx context.Context, req models.ProxmoxGuestLinkRequest) (*models.ProxmoxGuestLink, error) {
+func (s *Service) CreateLink(ctx context.Context, req models.ProxmoxGuestLinkRequest, actor Actor) (*models.ProxmoxGuestLink, error) {
 	if req.Status == "" {
 		req.Status = "confirmed"
 	}
@@ -233,6 +251,7 @@ func (s *Service) CreateLink(ctx context.Context, req models.ProxmoxGuestLinkReq
 	if err == nil {
 		s.publishLink(req.HostID)
 	}
+	s.audit(ctx, actor, "proxmox_link_create", fmt.Sprintf("guest=%s host=%s status=%s", req.GuestID, req.HostID, req.Status), err)
 	return link, err
 }
 
@@ -256,7 +275,7 @@ func (s *Service) GetLink(ctx context.Context, id string) (*models.ProxmoxGuestL
 	return link, nil
 }
 
-func (s *Service) UpdateLink(ctx context.Context, id string, req models.ProxmoxGuestLinkUpdate) (*models.ProxmoxGuestLink, error) {
+func (s *Service) UpdateLink(ctx context.Context, id string, req models.ProxmoxGuestLinkUpdate, actor Actor) (*models.ProxmoxGuestLink, error) {
 	if _, err := s.GetLink(ctx, id); err != nil {
 		return nil, err
 	}
@@ -272,17 +291,20 @@ func (s *Service) UpdateLink(ctx context.Context, id string, req models.ProxmoxG
 	if err == nil && link != nil {
 		s.publishLink(link.HostID)
 	}
+	s.audit(ctx, actor, "proxmox_link_update", "link="+id, err)
 	return link, err
 }
 
-func (s *Service) DeleteLink(ctx context.Context, id string) error {
+func (s *Service) DeleteLink(ctx context.Context, id string, actor Actor) error {
 	link, err := s.GetLink(ctx, id)
 	if err != nil {
 		return err
 	}
 	if err := s.repo.DeleteProxmoxGuestLink(ctx, id); err != nil {
+		s.audit(ctx, actor, "proxmox_link_delete", "link="+id, err)
 		return err
 	}
+	s.audit(ctx, actor, "proxmox_link_delete", fmt.Sprintf("link=%s host=%s", id, link.HostID), nil)
 	s.publishLink(link.HostID)
 	return nil
 }
@@ -547,15 +569,18 @@ func (s *Service) NodeSyslog(ctx context.Context, nodeID string, limit int, serv
 	return lines, nil
 }
 
-func (s *Service) RefreshNodeApt(ctx context.Context, nodeID string) (string, error) {
+func (s *Service) RefreshNodeApt(ctx context.Context, nodeID string, actor Actor) (string, error) {
 	node, client, err := s.nodeClient(ctx, nodeID)
 	if err != nil {
 		return "", err
 	}
 	upid, err := client.TriggerNodeAptUpdate(node.NodeName)
 	if err != nil {
-		return "", apperr.BadGateway(err.Error())
+		err = apperr.BadGateway(err.Error())
+		s.audit(ctx, actor, "proxmox_node_apt_refresh", "node="+node.NodeName, err)
+		return "", err
 	}
+	s.audit(ctx, actor, "proxmox_node_apt_refresh", "node="+node.NodeName+" upid="+upid, nil)
 	return upid, nil
 }
 
@@ -802,7 +827,7 @@ var validGuestAction = map[string]bool{"start": true, "shutdown": true, "reboot"
 
 // GuestAction issues a start/shutdown/reboot power action on a VM or LXC
 // container, resolving its connection/node from the stored guest record.
-func (s *Service) GuestAction(ctx context.Context, guestID, action string) (string, error) {
+func (s *Service) GuestAction(ctx context.Context, guestID, action string, actor Actor) (string, error) {
 	if !validGuestAction[action] {
 		return "", apperr.Validation("invalid guest action")
 	}
@@ -815,10 +840,14 @@ func (s *Service) GuestAction(ctx context.Context, guestID, action string) (stri
 		return "", err
 	}
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	details := fmt.Sprintf("action=%s node=%s vmid=%d type=%s", action, guest.NodeName, guest.VMID, guest.GuestType)
 	upid, err := client.GuestAction(guest.NodeName, guest.VMID, guest.GuestType, action)
 	if err != nil {
-		return "", apperr.BadGateway(err.Error())
+		err = apperr.BadGateway(err.Error())
+		s.audit(ctx, actor, "proxmox_guest_action", details, err)
+		return "", err
 	}
+	s.audit(ctx, actor, "proxmox_guest_action", details+" upid="+upid, nil)
 	return upid, nil
 }
 
@@ -860,7 +889,7 @@ func (s *Service) OpenGuestConsole(ctx context.Context, guestID string) (*models
 }
 
 // MigrateGuest migrates a guest to target; guestType defaults to "vm".
-func (s *Service) MigrateGuest(ctx context.Context, nodeID string, vmid int, guestType, target string, online bool) (string, error) {
+func (s *Service) MigrateGuest(ctx context.Context, nodeID string, vmid int, guestType, target string, online bool, actor Actor) (string, error) {
 	if guestType == "" {
 		guestType = "vm"
 	}
@@ -868,16 +897,20 @@ func (s *Service) MigrateGuest(ctx context.Context, nodeID string, vmid int, gue
 	if err != nil {
 		return "", err
 	}
+	details := fmt.Sprintf("node=%s vmid=%d type=%s target=%s online=%t", node.NodeName, vmid, guestType, target, online)
 	upid, err := client.MigrateGuest(node.NodeName, vmid, guestType, target, online)
 	if err != nil {
-		return "", apperr.BadGateway(err.Error())
+		err = apperr.BadGateway(err.Error())
+		s.audit(ctx, actor, "proxmox_guest_migrate", details, err)
+		return "", err
 	}
+	s.audit(ctx, actor, "proxmox_guest_migrate", details+" upid="+upid, nil)
 	return upid, nil
 }
 
 var validServiceAction = map[string]bool{"start": true, "stop": true, "restart": true, "reload": true}
 
-func (s *Service) NodeServiceAction(ctx context.Context, nodeID, service, action string) (string, error) {
+func (s *Service) NodeServiceAction(ctx context.Context, nodeID, service, action string, actor Actor) (string, error) {
 	if !validServiceAction[action] {
 		return "", apperr.Validation(fmt.Sprintf("invalid action %q; allowed: start stop restart reload", action))
 	}
@@ -885,10 +918,14 @@ func (s *Service) NodeServiceAction(ctx context.Context, nodeID, service, action
 	if err != nil {
 		return "", err
 	}
+	details := fmt.Sprintf("node=%s service=%s action=%s", node.NodeName, service, action)
 	upid, err := client.NodeServiceAction(node.NodeName, service, action)
 	if err != nil {
-		return "", apperr.BadGateway(err.Error())
+		err = apperr.BadGateway(err.Error())
+		s.audit(ctx, actor, "proxmox_node_service_action", details, err)
+		return "", err
 	}
+	s.audit(ctx, actor, "proxmox_node_service_action", details+" upid="+upid, nil)
 	return upid, nil
 }
 

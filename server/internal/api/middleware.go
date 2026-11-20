@@ -227,12 +227,12 @@ func RequestLogger() gin.HandlerFunc {
 		attrs := []any{
 			slog.Int("status", status),
 			slog.String("method", c.Request.Method),
-			slog.String("path", path),
+			slog.String("path", strings.ReplaceAll(strings.ReplaceAll(path, "\n", ""), "\r", "")),
 			slog.Duration("latency", time.Since(start)),
-			slog.String("client_ip", clientIP),
+			slog.String("client_ip", strings.ReplaceAll(strings.ReplaceAll(clientIP, "\n", ""), "\r", "")),
 		}
 		if query != "" {
-			attrs = append(attrs, slog.String("query", query))
+			attrs = append(attrs, slog.String("query", strings.ReplaceAll(strings.ReplaceAll(query, "\n", ""), "\r", "")))
 		}
 		// respondError (internal/handlers/httperr.go) records the underlying
 		// error detail via c.Error — for an apperr.Internal that's the real
@@ -446,12 +446,20 @@ func AdminOnlyMiddleware() gin.HandlerFunc {
 	}
 }
 
+// HostAccessReader is the slice of *database.DB that HostPermissionMiddleware
+// needs; an interface so the middleware can be unit-tested without a database.
+type HostAccessReader interface {
+	GetHostAccess(ctx context.Context, username, hostID string) (restricted bool, level string, err error)
+}
+
 // HostPermissionMiddleware enforces per-host access control.
 // Admins always pass. Non-admins with NO host_permissions entries use their
-// global role (backward-compatible). Non-admins WITH entries are restricted
-// to the listed hosts; if the requested host is not in their list, 403 is returned.
+// global role (backward-compatible): operator-level routes then require the
+// global operator role, viewer-level routes any authenticated role. Non-admins
+// WITH entries are restricted to the listed hosts; if the requested host is
+// not in their list, 403 is returned.
 // requiredLevel: "viewer" (any entry) or "operator" (must have operator entry).
-func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.HandlerFunc {
+func HostPermissionMiddleware(db HostAccessReader, requiredLevel string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get("role")
 		if role == "admin" {
@@ -475,7 +483,15 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 		}
 
 		if !restricted {
-			// No host-specific restrictions — global role applies.
+			// No host-specific restrictions — global role applies. A viewer
+			// (or any non-operator role) must not reach operator-level
+			// routes just because it has no host_permissions rows.
+			if requiredLevel == "operator" && role != "operator" {
+				lang := apperr.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+				c.JSON(http.StatusForbidden, gin.H{"error": apperr.GetMessage(apperr.CodeOperatorRequired, lang, nil)})
+				c.Abort()
+				return
+			}
 			c.Next()
 			return
 		}

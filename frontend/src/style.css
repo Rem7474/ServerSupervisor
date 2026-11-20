@@ -102,8 +102,15 @@ html {
    job. */
 @media (min-width: 992px) {
   .side-panel.side-panel-terminal {
-    height: calc(var(--console-vh, 100vh) - 2rem);
+    height: min(calc(var(--console-vh, 100vh) - 2rem), 45rem);
   }
+}
+
+/* The reopen button of a console panel (CommandLogPanel.vue) is fixed to the
+   viewport corner; leave room under the footer so the last row and the
+   footer line can scroll clear of it. */
+body:has(.console-fab:not([style*="display: none"])) .page-wrapper {
+  padding-bottom: 4rem;
 }
 
 body {
@@ -111,6 +118,27 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+}
+
+/* Tabler 1.6 ships a neutral (chroma-0) gray scale; the app's dark theme is
+   built on the blue-tinted scale of earlier Tabler releases. */
+:root {
+  --tblr-gray-50: #f9fafb;
+  --tblr-gray-100: #f3f4f6;
+  --tblr-gray-200: #e5e7eb;
+  --tblr-gray-300: #d1d5db;
+  --tblr-gray-400: #9ca3af;
+  --tblr-gray-500: #6b7280;
+  --tblr-gray-600: #4b5563;
+  --tblr-gray-700: #374151;
+  --tblr-gray-800: #1f2937;
+  --tblr-gray-900: #111827;
+  --tblr-gray-950: #030712;
+}
+
+[data-bs-theme="dark"] {
+  --tblr-border-color: #2e3c51;
+  --tblr-border-color-translucent: rgba(72, 110, 149, 0.14);
 }
 
 :root {
@@ -468,6 +496,19 @@ select:-webkit-autofill:focus {
    it, so scrolling a long list doesn't scroll the column headers out of
    view. Apply alongside .table-responsive (which only handles horizontal
    overflow on its own). */
+/* On a phone a wide table scrolls sideways with nothing to say so: paint a
+   soft edge on the side that still has content. `local` attachments move
+   with the scroll, so each fade disappears once that end is reached. */
+@media (max-width: 767px) {
+  .table-responsive {
+    background:
+      linear-gradient(to right, var(--tblr-bg-surface) 30%, transparent) left center / 2rem 100% no-repeat local,
+      linear-gradient(to left, var(--tblr-bg-surface) 30%, transparent) right center / 2rem 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 45%), transparent) left center / 0.75rem 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 45%), transparent) right center / 0.75rem 100% no-repeat scroll;
+  }
+}
+
 .scroll-table {
   max-height: 70vh;
   overflow-y: auto;
@@ -609,4 +650,74 @@ code {
 [data-bs-theme="dark"] .apt-package-item code {
   background: rgba(255,255,255,0.04);
   color: #94a3b8;
+}
+
+/* Radio-button cards (webhook update action, release-tracker type). */
+.tracker-type-card {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--tblr-border-color);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.tracker-type-card--active {
+  border-color: var(--tblr-primary);
+  background: var(--tblr-primary-lt);
+}
+
+.tracker-type-card--idle {
+  border-color: var(--tblr-border-color);
+  background: transparent;
+}
+
+.tracker-type-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Newly registered host(s) with their API key — AddHostView and the
+   network-discovery panel it renders. */
+.host-success {
+  background: var(--ss-panel-medium);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 14px;
+  padding: 20px;
+  color: var(--ss-text-on-dark);
+}
+
+.host-success-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.host-success-card {
+  background: var(--ss-panel-strong);
+  border: 1px solid var(--ss-border-default);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.host-success-key {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.host-success-key code {
+  display: block;
+  background: rgba(2, 6, 23, 0.6);
+  color: var(--ss-text-strong);
+  padding: 8px 10px;
+  border-radius: 8px;
+  flex: 1;
+  word-break: break-all;
 }

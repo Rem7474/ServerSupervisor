@@ -134,3 +134,45 @@ func isValidation(err error) bool {
 	var ae *apperr.Error
 	return errors.As(err, &ae) && ae.HTTPStatus == 400
 }
+
+func TestSnapshot_NeverReturnsSecrets(t *testing.T) {
+	cfg := &config.Config{SMTPPass: "hunter2", GitHubToken: "ghp_secret"}
+	settings := newSvc(&fakeRepo{}, cfg).Snapshot(context.Background())["settings"].(map[string]any)
+
+	if settings["smtpPass"] != "" || settings["githubToken"] != "" {
+		t.Errorf("secrets leaked: smtpPass=%v githubToken=%v", settings["smtpPass"], settings["githubToken"])
+	}
+	if settings["smtpPassConfigured"] != true || settings["githubTokenConfigured"] != true {
+		t.Errorf("configured flags = %v/%v, want true/true", settings["smtpPassConfigured"], settings["githubTokenConfigured"])
+	}
+
+	empty := newSvc(&fakeRepo{}, &config.Config{}).Snapshot(context.Background())["settings"].(map[string]any)
+	if empty["smtpPassConfigured"] != false || empty["githubTokenConfigured"] != false {
+		t.Errorf("configured flags = %v/%v, want false/false", empty["smtpPassConfigured"], empty["githubTokenConfigured"])
+	}
+}
+
+func TestUpdate_MaskedSentinelDoesNotOverwriteSecrets(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := newSvc(repo, &config.Config{})
+
+	svc.Update(context.Background(), models.SettingsUpdateRequest{
+		SMTPPass:    config.MaskedSecretSentinel,
+		GitHubToken: config.MaskedSecretSentinel,
+		SMTPHost:    "smtp.example.com",
+	}, "alice", "1.2.3.4")
+
+	for _, key := range []string{"smtp_pass", "github_token"} {
+		if _, ok := repo.setCalls[key]; ok {
+			t.Errorf("Update persisted %q from the masked sentinel", key)
+		}
+	}
+	if repo.setCalls["smtp_host"] != "smtp.example.com" {
+		t.Errorf("non-secret field should still be saved, got %q", repo.setCalls["smtp_host"])
+	}
+
+	svc.Update(context.Background(), models.SettingsUpdateRequest{GitHubToken: "ghp_new"}, "alice", "1.2.3.4")
+	if repo.setCalls["github_token"] != "ghp_new" {
+		t.Errorf("github_token = %q, want ghp_new", repo.setCalls["github_token"])
+	}
+}

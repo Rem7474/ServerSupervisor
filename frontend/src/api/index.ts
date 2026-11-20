@@ -25,7 +25,7 @@ import { maintenanceApi } from './maintenance'
 
 // Re-export shared helpers/types so `import api, { getApiErrorMessage } from '../api'`
 // and type imports keep resolving.
-export { getApiErrorMessage, isApiAbort } from './client'
+export { getApiErrorMessage } from './client'
 export type { JsonObject } from './client'
 export type { AlertRule } from './alerts'
 export type { ProxmoxConnection } from './proxmox'

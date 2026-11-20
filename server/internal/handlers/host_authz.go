@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -9,9 +10,16 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 )
 
+// hostAccessReader is the slice of *database.DB requireHostAccess needs. It is
+// an interface so the authorization decision can be unit-tested without a
+// database.
+type hostAccessReader interface {
+	GetHostAccess(ctx context.Context, username, hostID string) (restricted bool, level string, err error)
+}
+
 // requireHostAccess enforces host-level authorization for handlers that accept
 // host_id in request payloads (not path params covered by middleware).
-func requireHostAccess(c *gin.Context, db *database.DB, hostID string, requiredLevel string) bool {
+func requireHostAccess(c *gin.Context, db hostAccessReader, hostID string, requiredLevel string) bool {
 	role := c.GetString("role")
 	if role == models.RoleAdmin {
 		return true
@@ -29,8 +37,15 @@ func requireHostAccess(c *gin.Context, db *database.DB, hostID string, requiredL
 		return false
 	}
 
-	// Backward compatibility: users without explicit per-host entries keep role-based access.
+	// Backward compatibility: users without explicit per-host entries keep
+	// role-based access. That fallback must still honour the global role: a
+	// viewer with no host_permissions rows must not reach operator-level
+	// mutations (issue #485).
 	if !restricted {
+		if requiredLevel == "operator" && role != models.RoleOperator {
+			respondError(c, apperr.Forbidden("operator role required"))
+			return false
+		}
 		return true
 	}
 
