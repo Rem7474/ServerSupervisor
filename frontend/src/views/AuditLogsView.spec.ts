@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
+import { reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../i18n'
 import { useAuthStore } from '../stores/auth'
@@ -17,9 +18,13 @@ vi.mock('../api', () => ({
     (e as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback || String(e),
 }))
 
+const route = reactive({ query: {} as Record<string, string> })
+const routerReplace = vi.fn((loc: { query?: Record<string, string> }) => {
+  if (loc?.query) route.query = { ...loc.query }
+})
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
-  useRouter: () => ({ replace: vi.fn() }),
+  useRoute: () => route,
+  useRouter: () => ({ replace: routerReplace }),
 }))
 
 import AuditLogsView from './AuditLogsView.vue'
@@ -30,10 +35,22 @@ const mountOpts = {
   },
 }
 
+const wrappers: VueWrapper[] = []
+function mountAuditView() {
+  const wrapper = mount(AuditLogsView, mountOpts)
+  wrappers.push(wrapper)
+  return wrapper
+}
+
 describe('AuditLogsView', () => {
+  afterEach(() => {
+    while (wrappers.length) wrappers.pop()?.unmount()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     setLocale('fr')
+    route.query = {}
     setActivePinia(createPinia())
     useAuthStore().setAuth({ role: 'admin', username: 'admin' } as never, 'admin')
     getCommandsHistory.mockResolvedValue({ data: { commands: [], total: 0 } })
@@ -43,7 +60,7 @@ describe('AuditLogsView', () => {
   })
 
   it('renders the translated header, tabs and commands table', async () => {
-    const wrapper = mount(AuditLogsView, mountOpts)
+    const wrapper = mountAuditView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('Audit')
@@ -60,13 +77,13 @@ describe('AuditLogsView', () => {
 
   it('pluralizes the commands-count footer label for 2+ results', async () => {
     getCommandsHistory.mockResolvedValue({ data: { commands: [], total: 2 } })
-    const wrapper = mount(AuditLogsView, mountOpts)
+    const wrapper = mountAuditView()
     await flushPromises()
     expect(wrapper.text()).toContain('2 commandes — page 1 / 1')
   })
 
   it('shows the translated status/module filter options', async () => {
-    const wrapper = mount(AuditLogsView, mountOpts)
+    const wrapper = mountAuditView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('Tous les états')
@@ -77,7 +94,7 @@ describe('AuditLogsView', () => {
   })
 
   it('renders the translated connexions tab', async () => {
-    const wrapper = mount(AuditLogsView, mountOpts)
+    const wrapper = mountAuditView()
     await flushPromises()
     await wrapper.findAll('a.nav-link')[1].trigger('click')
     await flushPromises()
@@ -87,7 +104,7 @@ describe('AuditLogsView', () => {
   })
 
   it('renders the translated journal tab with category filter options', async () => {
-    const wrapper = mount(AuditLogsView, mountOpts)
+    const wrapper = mountAuditView()
     await flushPromises()
     await wrapper.findAll('a.nav-link')[2].trigger('click')
     await flushPromises()
@@ -102,11 +119,54 @@ describe('AuditLogsView', () => {
 
   it('translates to English when the locale is switched', async () => {
     setLocale('en')
-    const wrapper = mount(AuditLogsView, mountOpts)
+    const wrapper = mountAuditView()
     await flushPromises()
 
     expect(wrapper.text()).toContain('History of actions, connections and commands')
     expect(wrapper.text()).toContain('Commands')
     expect(wrapper.text()).toContain('No command recorded')
+  })
+
+  it('loads the journal tab immediately on mount when ?tab=journal', async () => {
+    route.query = { tab: 'journal' }
+    const wrapper = mountAuditView()
+    await flushPromises()
+
+    expect(getAuditLogs).toHaveBeenCalled()
+    expect(getCommandsHistory).not.toHaveBeenCalled()
+    expect(wrapper.find('a.nav-link.active').text()).toBe('Journal')
+  })
+
+  it('switches tabs reactively when route.query.tab changes while already on /audit', async () => {
+    route.query = { tab: 'commandes' }
+    const wrapper = mountAuditView()
+    await flushPromises()
+    expect(wrapper.find('a.nav-link.active').text()).toBe('Commandes')
+
+    route.query.tab = 'journal'
+    await flushPromises()
+    expect(getAuditLogs).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('a.nav-link.active').text()).toBe('Journal')
+
+    route.query.tab = 'connexions'
+    await flushPromises()
+    expect(getLoginEventsAdmin).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('a.nav-link.active').text()).toBe('Connexions')
+
+    route.query.tab = 'commandes'
+    await flushPromises()
+    expect(wrapper.find('a.nav-link.active').text()).toBe('Commandes')
+  })
+
+  it('restricts operators to the commandes tab even if ?tab=journal is requested', async () => {
+    useAuthStore().setAuth({ role: 'operator', username: 'op' } as never, 'op')
+    route.query = { tab: 'journal' }
+    const wrapper = mountAuditView()
+    await flushPromises()
+
+    expect(wrapper.findAll('a.nav-link').map((a) => a.text())).toEqual(['Commandes'])
+    expect(wrapper.find('a.nav-link.active').text()).toBe('Commandes')
+    expect(getCommandsHistory).toHaveBeenCalledTimes(1)
+    expect(getAuditLogs).not.toHaveBeenCalled()
   })
 })

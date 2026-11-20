@@ -174,22 +174,29 @@
                   <router-link
                     v-for="item in section.items"
                     :key="item.to"
+                    v-slot="{ href, navigate }"
+                    custom
                     :to="item.to"
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="openSectionKey = null"
                   >
-                    <component
-                      :is="item.icon"
-                      :size="16"
-                      class="icon icon-sm me-2"
-                    />
-                    {{ item.label }}
-                    <span
-                      v-if="item.to === '/proxmox' && suggestedProxmoxLinksCount > 0"
-                      class="badge bg-azure-lt text-azure ms-1"
-                      :title="t('common.proxmoxSuggestedLinks', { count: suggestedProxmoxLinksCount }, suggestedProxmoxLinksCount)"
-                    >{{ suggestedProxmoxLinksCount }}</span>
+                    <a
+                      :href="href"
+                      class="dropdown-item"
+                      :class="{ active: isItemActive(item.to) }"
+                      role="menuitem"
+                      @click="navigate($event); openSectionKey = null"
+                    >
+                      <component
+                        :is="item.icon"
+                        :size="16"
+                        class="icon icon-sm me-2"
+                      />
+                      {{ item.label }}
+                      <span
+                        v-if="item.to === '/proxmox' && suggestedProxmoxLinksCount > 0"
+                        class="badge bg-azure-lt text-azure ms-1"
+                        :title="t('common.proxmoxSuggestedLinks', { count: suggestedProxmoxLinksCount }, suggestedProxmoxLinksCount)"
+                      >{{ suggestedProxmoxLinksCount }}</span>
+                    </a>
                   </router-link>
                 </div>
               </li>
@@ -345,7 +352,24 @@ function handlePageShow(event: PageTransitionEvent): void {
 const visibleSections = computed(() => visibleNavSections(auth, t))
 
 function isItemActive(to: string): boolean {
-  return to === '/' ? route.path === '/' : route.path.startsWith(to)
+  if (to === '/') return route.path === '/'
+  const qIndex = to.indexOf('?')
+  if (qIndex === -1) return route.path.startsWith(to)
+
+  const targetPath = to.slice(0, qIndex)
+  if (route.path !== targetPath) return false
+
+  const targetParams = new URLSearchParams(to.slice(qIndex + 1))
+  if (targetPath === '/audit') {
+    const targetTab = targetParams.get('tab')
+    const currentTab = Array.isArray(route.query.tab) ? route.query.tab[0] : route.query.tab
+    if (targetTab === 'commandes') return !currentTab || currentTab === 'commandes'
+    if (targetTab === 'journal') return currentTab === 'journal' || currentTab === 'connexions'
+  }
+  for (const [key, val] of targetParams.entries()) {
+    if (route.query[key] !== val) return false
+  }
+  return true
 }
 
 function isSectionActive(section: NavSection): boolean {

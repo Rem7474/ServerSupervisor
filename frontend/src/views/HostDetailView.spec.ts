@@ -312,6 +312,17 @@ describe('HostDetailView — tabs', () => {
     expect(wrapper.find('.nav-tabs').text()).not.toContain('Système')
   })
 
+  it('shows the Permissions tab only for admins', () => {
+    const nonAdmin = mount(HostDetailView, { global: { stubs } })
+    expect(nonAdmin.find('.nav-tabs').text()).not.toContain('Permissions')
+
+    const api = baseUseHostDetail()
+    api.auth = reactive({ isAdmin: true, username: 'alice' })
+    useHostDetailMock.mockReturnValue(api)
+    const admin = mount(HostDetailView, { global: { stubs } })
+    expect(admin.find('.nav-tabs').text()).toContain('Permissions')
+  })
+
   it('shows the Console tab only for an admin on a host confirmed-linked to an LXC guest', () => {
     const linked = { status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', guest_name: 'ct-web', node_name: 'pve1', vmid: 101 }
     const tabsFor = (isAdmin: boolean, link: AnyRecord | null) => {

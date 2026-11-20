@@ -1100,7 +1100,9 @@ const hostTabs = computed<EntityTab[]>(() => {
   // Labeled "Permissions" (not "Security") to avoid colliding with
   // ProxmoxNodeView's "Security logs" tab — same word, unrelated content
   // (per-host RBAC here vs. PVE syslog auth-failure search there).
-  tabs.push({ key: 'securite', label: t('host.permissionsTabLabel') })
+  if (auth.isAdmin) {
+    tabs.push({ key: 'securite', label: t('host.permissionsTabLabel') })
+  }
   tabs.push({
     key: 'taches-personnalisees',
     label: t('host.customTasksTabLabel'),

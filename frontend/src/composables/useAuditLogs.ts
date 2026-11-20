@@ -49,11 +49,31 @@ export function useAuditLogs() {
   const moduleFilterOptions = computed(() => remoteCommandModuleOptions())
   const journalCategoryFilterOptions = computed(() => journalCategoryOptions())
 
-  const activeTab = ref((route.query.tab as string) || 'commandes')
+  function resolveTab(raw: unknown): 'commandes' | 'connexions' | 'journal' {
+    const val = Array.isArray(raw) ? raw[0] : raw
+    if (val === 'connexions' && auth.role === 'admin') return 'connexions'
+    if (val === 'journal' && auth.role === 'admin') return 'journal'
+    return 'commandes'
+  }
+
+  const activeTab = ref<string>(resolveTab(route.query.tab))
 
   watch(activeTab, (tab) => {
-    router.replace({ query: { ...route.query, tab } })
+    if (route.query.tab !== tab) {
+      router.replace({ query: { ...route.query, tab } })
+    }
   })
+
+  watch(
+    () => route.query.tab,
+    (nextTab) => {
+      const target = resolveTab(nextTab)
+      if (target === activeTab.value) return
+      if (target === 'connexions') void switchToConnexions()
+      else if (target === 'journal') void switchToJournal()
+      else void switchToCommandes()
+    }
+  )
 
   // ── Commands history ─────────────────────────────────────────────────────────
   const cmds = ref<RemoteCommandWithHost[]>([])
@@ -293,6 +313,10 @@ export function useAuditLogs() {
   }
 
   async function switchToConnexions(): Promise<void> {
+    if (auth.role !== 'admin') {
+      await switchToCommandes()
+      return
+    }
     activeTab.value = 'connexions'
     if (!connexionsLoaded.value) await fetchConnexions()
   }
@@ -331,6 +355,10 @@ export function useAuditLogs() {
   }
 
   async function switchToJournal(): Promise<void> {
+    if (auth.role !== 'admin') {
+      await switchToCommandes()
+      return
+    }
     activeTab.value = 'journal'
     if (!journalLoaded.value) await fetchJournal()
   }
@@ -422,7 +450,10 @@ export function useAuditLogs() {
 
   onMounted(async () => {
     if (route.query.module) cmdModuleFilter.value = String(route.query.module)
-    await fetchCmds()
+    const initialTab = resolveTab(route.query.tab)
+    if (initialTab === 'connexions') await switchToConnexions()
+    else if (initialTab === 'journal') await switchToJournal()
+    else await switchToCommandes()
     const cmdId = route.query.command
     if (cmdId) {
       try {
@@ -439,7 +470,7 @@ export function useAuditLogs() {
         if (now - lastCmdFetchAt.value >= refreshMs) {
           fetchCmds()
         }
-      } else if (auth.role === 'admin') {
+      } else if (activeTab.value === 'connexions' && auth.role === 'admin') {
         const now = Date.now()
         if (now - lastConnFetchAt.value >= 30000) {
           fetchConnexions()

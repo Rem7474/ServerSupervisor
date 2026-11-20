@@ -291,7 +291,10 @@
     </div>
 
     <!-- ── Connexions tab (admin only) ────────────────────────────────────── -->
-    <div v-show="activeTab === 'connexions'">
+    <div
+      v-if="auth.role === 'admin'"
+      v-show="activeTab === 'connexions'"
+    >
       <AuditSecurityPanel
         :security="security"
         :period="securityPeriod"
@@ -328,7 +331,10 @@
     </div>
 
     <!-- ── Journal tab (raw audit_logs, admin only) ───────────────────────── -->
-    <div v-show="activeTab === 'journal'">
+    <div
+      v-if="auth.role === 'admin'"
+      v-show="activeTab === 'journal'"
+    >
       <div class="card">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
           <h3 class="card-title mb-0">

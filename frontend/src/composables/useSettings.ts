@@ -6,6 +6,7 @@ import { isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import { i18n } from '../i18n'
 import { formatNumber } from '../utils/formatters'
+import type { SettingsUpdateRequest } from '../types/settings'
 
 export function useSettings() {
   const route = useRoute()
@@ -31,6 +32,8 @@ export function useSettings() {
     // a category added server-side just shows up here on next load.
     auditCategories: [] as { key: string; label: string }[],
     smtpConfigured: false,
+    smtpPassConfigured: false,
+    githubTokenConfigured: false,
     smtpHost: '',
     smtpPort: 587,
     ntfyUrl: '',
@@ -120,21 +123,26 @@ export function useSettings() {
     try {
       const res = await apiClient.getSettings(signal)
       if (res.data) {
-        settings.value = res.data.settings || {}
-        dbStatus.value = res.data.dbStatus || {}
         const s = res.data.settings || {}
+        settings.value = {
+          ...settings.value,
+          ...s,
+          smtpPassConfigured: Boolean(s.smtpPassConfigured),
+          githubTokenConfigured: Boolean(s.githubTokenConfigured),
+          auditCategories: s.auditCategories || [],
+        }
+        dbStatus.value = res.data.dbStatus || {}
         form.value.smtpHost = s.smtpHost || ''
         form.value.smtpPort = s.smtpPort || 587
         form.value.smtpUser = s.smtpUser || ''
-        form.value.smtpPass = s.smtpPass || ''
+        form.value.smtpPass = ''
         form.value.smtpFrom = s.smtpFrom || ''
         form.value.smtpTo = s.smtpTo || ''
         form.value.smtpTls = s.smtpTls !== undefined ? s.smtpTls : true
         form.value.ntfyUrl = s.ntfyUrl || ''
-        form.value.githubToken = s.githubToken || ''
+        form.value.githubToken = ''
         form.value.metricsRetentionDays = s.metricsRetentionDays || 30
         form.value.auditRetentionDays = s.auditRetentionDays || 90
-        settings.value.auditCategories = s.auditCategories || []
         form.value.auditRetentionDaysByCategory = { ...(s.auditRetentionDaysByCategory || {}) }
         form.value.threatWeightWordpress = s.threatWeightWordPress ?? 2
         form.value.threatWeightAdminpanel = s.threatWeightAdminPanel ?? 3
@@ -162,15 +170,18 @@ export function useSettings() {
     savingSmtp.value = true
     smtpSaveMsg.value = ''
     try {
-      await apiClient.updateSettings({
+      const payload: Partial<SettingsUpdateRequest> = {
         smtp_host: form.value.smtpHost,
         smtp_port: form.value.smtpPort,
         smtp_user: form.value.smtpUser,
-        smtp_pass: form.value.smtpPass,
         smtp_from: form.value.smtpFrom,
         smtp_to: form.value.smtpTo,
         smtp_tls: form.value.smtpTls,
-      })
+      }
+      if (form.value.smtpPass && form.value.smtpPass !== '••••••••') {
+        payload.smtp_pass = form.value.smtpPass
+      }
+      await apiClient.updateSettings(payload)
       smtpSaveOk.value = true
       smtpSaveMsg.value = i18n.global.t('settings.smtpSavedMsg')
       await fetchSettings()
@@ -188,10 +199,13 @@ export function useSettings() {
     savingNotif.value = true
     notifSaveMsg.value = ''
     try {
-      await apiClient.updateSettings({
+      const payload: Partial<SettingsUpdateRequest> = {
         ntfy_url: form.value.ntfyUrl,
-        github_token: form.value.githubToken,
-      })
+      }
+      if (form.value.githubToken && form.value.githubToken !== '••••••••') {
+        payload.github_token = form.value.githubToken
+      }
+      await apiClient.updateSettings(payload)
       notifSaveOk.value = true
       notifSaveMsg.value = i18n.global.t('settings.notificationsSavedMsg')
       await fetchSettings()
@@ -332,7 +346,7 @@ export function useSettings() {
   }
 
   onMounted(() => {
-    fetchSettings()
+    if (auth.isAdmin) fetchSettings()
   })
 
   return {

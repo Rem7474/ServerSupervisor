@@ -421,6 +421,8 @@ onMounted(async () => {
     await switchToIncidents()
   } else if (route.query.tab === 'templates') {
     await switchToTemplates()
+  } else if (route.query.tab === 'maintenance') {
+    alertsTab.value = 'maintenance'
   } else {
     await switchToWarRoom()
   }
