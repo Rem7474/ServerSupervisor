@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/notify"
 	"github.com/serversupervisor/server/internal/safego"
 	"github.com/serversupervisor/server/internal/services/push"
@@ -76,20 +77,20 @@ func (d *Dispatcher) Send(ctx context.Context, ev Event) {
 		switch ch {
 		case "smtp":
 			if ev.SMTPTo == "" || d.cfg.SMTPFrom == "" {
-				slog.WarnContext(ctx, "notifychannels: SMTP to/from not configured", slog.String("source", ev.LogID))
+				slog.WarnContext(ctx, "notifychannels: SMTP to/from not configured", slog.String("source", logging.Sanitize(ev.LogID)))
 				continue
 			}
 			if err := d.notifier.SendSMTP(d.cfg, d.cfg.SMTPFrom, ev.SMTPTo, ev.SMTPSubject, ev.SMTPBody); err != nil {
-				slog.ErrorContext(ctx, "notifychannels: SMTP send failed", slog.String("source", ev.LogID), slog.Any("err", err))
+				slog.ErrorContext(ctx, "notifychannels: SMTP send failed", slog.String("source", logging.Sanitize(ev.LogID)), slog.Any("err", err))
 			}
 
 		case "ntfy":
 			if ev.NtfyURL == "" {
-				slog.WarnContext(ctx, "notifychannels: ntfy URL not configured", slog.String("source", ev.LogID))
+				slog.WarnContext(ctx, "notifychannels: ntfy URL not configured", slog.String("source", logging.Sanitize(ev.LogID)))
 				continue
 			}
 			if err := d.notifier.SendNtfy(d.cfg, ev.NtfyURL, ev.NtfyTitle, ev.NtfyBody); err != nil {
-				slog.ErrorContext(ctx, "notifychannels: ntfy send failed", slog.String("source", ev.LogID), slog.Any("err", err))
+				slog.ErrorContext(ctx, "notifychannels: ntfy send failed", slog.String("source", logging.Sanitize(ev.LogID)), slog.Any("err", err))
 			}
 
 		case "notify":
@@ -124,7 +125,7 @@ func (d *Dispatcher) Send(ctx context.Context, ev Event) {
 			}
 
 		default:
-			slog.WarnContext(ctx, "notifychannels: unknown channel", slog.String("channel", ch), slog.String("source", ev.LogID))
+			slog.WarnContext(ctx, "notifychannels: unknown channel", slog.String("channel", logging.Sanitize(ch)), slog.String("source", logging.Sanitize(ev.LogID)))
 		}
 	}
 }

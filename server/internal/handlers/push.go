@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
+	"github.com/serversupervisor/server/internal/logging"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 )
 
@@ -50,7 +51,7 @@ func (h *PushHandler) Subscribe(c *gin.Context) {
 		userAgent = userAgent[:500]
 	}
 	if err := h.svc.Subscribe(c.Request.Context(), username, req.Endpoint, req.Keys.P256DH, req.Keys.Auth, userAgent); err != nil {
-		slog.ErrorContext(c.Request.Context(), "Push: failed to save subscription", slog.String("user", username), slog.Any("err", err))
+		slog.ErrorContext(c.Request.Context(), "Push: failed to save subscription", slog.String("user", logging.Sanitize(username)), slog.Any("err", err))
 		respondError(c, err)
 		return
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
@@ -200,7 +201,7 @@ func (s *Service) Receive(ctx context.Context, id string, body []byte, headers h
 	}
 
 	if !verifyWebhookSignature(wh.Provider, wh.Secret, body, headers) {
-		slog.ErrorContext(ctx, "webhook signature verification failed", slog.String("id", id), slog.String("ip", clientIP))
+		slog.ErrorContext(ctx, "webhook signature verification failed", slog.String("id", logging.Sanitize(id)), slog.String("ip", logging.Sanitize(clientIP)))
 		return nil, apperr.Unauthorized("invalid signature")
 	}
 
@@ -213,7 +214,7 @@ func (s *Service) Receive(ctx context.Context, id string, body []byte, headers h
 	)
 	parsed, err := parseGitPayload(wh.Provider, body, eventHeader)
 	if err != nil {
-		slog.ErrorContext(ctx, "webhook payload parse failed", slog.String("id", id), slog.Any("err", err))
+		slog.ErrorContext(ctx, "webhook payload parse failed", slog.String("id", logging.Sanitize(id)), slog.Any("err", err))
 		return nil, apperr.Validation("failed to parse git payload")
 	}
 	parsed.EventType = normalizeEvent(eventHeader)
@@ -239,7 +240,7 @@ func (s *Service) Receive(ctx context.Context, id string, body []byte, headers h
 
 	createdExec, err := s.repo.CreateWebhookExecution(ctx, newExecution(id, wh.Provider, parsed, "pending", body))
 	if err != nil {
-		slog.ErrorContext(ctx, "webhook execution record failed", slog.String("id", id), slog.Any("err", err))
+		slog.ErrorContext(ctx, "webhook execution record failed", slog.String("id", logging.Sanitize(id)), slog.Any("err", err))
 		return nil, apperr.Internal(err)
 	}
 
@@ -270,7 +271,7 @@ func (s *Service) Receive(ctx context.Context, id string, body []byte, headers h
 		},
 	})
 	if err != nil {
-		slog.ErrorContext(ctx, "webhook command dispatch failed", slog.String("id", id), slog.Any("err", err))
+		slog.ErrorContext(ctx, "webhook command dispatch failed", slog.String("id", logging.Sanitize(id)), slog.Any("err", err))
 		now := time.Now()
 		_ = s.repo.UpdateWebhookExecutionStatus(ctx, createdExec.ID, "failed", &now)
 		return nil, apperr.Internal(err)
@@ -279,8 +280,8 @@ func (s *Service) Receive(ctx context.Context, id string, body []byte, headers h
 	_ = s.repo.UpdateWebhookExecutionCommandID(ctx, createdExec.ID, result.Command.ID)
 	_ = s.repo.UpdateGitWebhookLastTriggered(ctx, id)
 	slog.InfoContext(ctx, "webhook dispatched",
-		slog.String("id", id), slog.String("command", result.Command.ID),
-		slog.String("host", wh.HostID), slog.String("repo", parsed.RepoName), slog.String("branch", parsed.Branch))
+		slog.String("id", logging.Sanitize(id)), slog.String("command", logging.Sanitize(result.Command.ID)),
+		slog.String("host", logging.Sanitize(wh.HostID)), slog.String("repo", logging.Sanitize(parsed.RepoName)), slog.String("branch", logging.Sanitize(parsed.Branch)))
 
 	return &ReceiveResult{Status: "dispatched", ExecutionID: createdExec.ID, CommandID: result.Command.ID}, nil
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/events"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
 )
@@ -188,7 +189,7 @@ func (s *Service) ReportCommandResult(ctx context.Context, hostID string, result
 			details = truncateOutput(result.Output, 2000)
 		}
 		if err := s.repo.UpdateAuditLogStatus(ctx, *cmd.AuditLogID, result.Status, details); err != nil {
-			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update audit log %d for command %s: %v", *cmd.AuditLogID, result.CommandID, err))
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update audit log %d for command %s: %v", *cmd.AuditLogID, logging.Sanitize(result.CommandID), err))
 		}
 	}
 
@@ -421,7 +422,7 @@ func (s *Service) storeMetrics(ctx context.Context, hostID string, report *model
 		}
 		if update.Hostname != nil || update.OS != nil || update.AgentVersion != nil {
 			if err := s.repo.UpdateHost(ctx, hostID, &update); err != nil {
-				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update host %s: %v", hostID, err))
+				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update host %s: %v", logging.Sanitize(hostID), err))
 			}
 		}
 		if proxmoxIsMetricsSource {
@@ -440,7 +441,7 @@ func (s *Service) storeMetrics(ctx context.Context, hostID string, report *model
 	if report.AgentVersion != "" {
 		update := models.HostUpdate{AgentVersion: stringPtrIfNotEmpty(report.AgentVersion)}
 		if err := s.repo.UpdateHost(ctx, hostID, &update); err != nil {
-			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update host %s: %v", hostID, err))
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update host %s: %v", logging.Sanitize(hostID), err))
 		}
 	}
 	return nil
@@ -665,7 +666,7 @@ func (s *Service) pushUUNotification(hostname, hostID string, run models.UURun) 
 	if s.cfg.NotifyURL != "" {
 		n := notify.New()
 		if err := n.SendNtfy(s.cfg, s.cfg.NotifyURL, title, msg); err != nil {
-			slog.Error("UU ntfy notification failed", slog.String("host_id", hostID), slog.Any("err", err))
+			slog.Error("UU ntfy notification failed", slog.String("host_id", logging.Sanitize(hostID)), slog.Any("err", err))
 		}
 	}
 }

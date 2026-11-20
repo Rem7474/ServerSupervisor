@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -76,7 +77,7 @@ func (d *Dispatcher) Create(ctx context.Context, req Request) (*Result, error) {
 			"pending",
 		)
 		if err != nil {
-			slog.WarnContext(ctx, "failed to create audit log for command", slog.String("module", req.Module), slog.String("action", req.Action), slog.Any("err", err))
+			slog.WarnContext(ctx, "failed to create audit log for command", slog.String("module", logging.Sanitize(req.Module)), slog.String("action", logging.Sanitize(req.Action)), slog.Any("err", err))
 		} else {
 			auditLogIDPtr = &auditLogID
 		}
