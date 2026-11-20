@@ -46,30 +46,35 @@ func NewService(repo Repository, cfg *config.Config, latestVersion func() string
 	return &Service{repo: repo, cfg: cfg, latestVersion: latestVersion}
 }
 
-// Snapshot returns the current configuration and database status.
+// Snapshot returns the current configuration and database status. Secrets
+// (SMTP password, GitHub token) are never returned: the corresponding
+// smtpPass/githubToken fields are always "" and the *Configured booleans tell
+// the UI whether a value is stored.
 func (s *Service) Snapshot(ctx context.Context) map[string]any {
 	c := s.cfg
 	return map[string]any{
 		"settings": map[string]any{
-			"baseUrl":              c.BaseURL,
-			"dbHost":               c.DBHost,
-			"dbPort":               c.DBPort,
-			"tlsEnabled":           c.TLSEnabled,
+			"baseUrl":                      c.BaseURL,
+			"dbHost":                       c.DBHost,
+			"dbPort":                       c.DBPort,
+			"tlsEnabled":                   c.TLSEnabled,
 			"metricsRetentionDays":         c.MetricsRetentionDays,
 			"auditRetentionDays":           c.AuditRetentionDays,
 			"auditRetentionDaysByCategory": c.AuditRetentionDaysByCategory,
 			"auditCategories":              models.AuditCategories(),
-			"smtpConfigured":       c.SMTPHost != "",
-			"smtpHost":             c.SMTPHost,
-			"smtpPort":             c.SMTPPort,
-			"smtpUser":             c.SMTPUser,
-			"smtpPass":             c.SMTPPass,
-			"smtpFrom":             c.SMTPFrom,
-			"smtpTo":               c.SMTPTo,
-			"smtpTls":              c.SMTPTLS,
-			"ntfyUrl":              c.NotifyURL,
-			"githubToken":          c.GitHubToken,
-			"latestAgentVersion":   s.latestVersion(),
+			"smtpConfigured":               c.SMTPHost != "",
+			"smtpHost":                     c.SMTPHost,
+			"smtpPort":                     c.SMTPPort,
+			"smtpUser":                     c.SMTPUser,
+			"smtpPass":                     "",
+			"smtpPassConfigured":           c.SMTPPass != "",
+			"smtpFrom":                     c.SMTPFrom,
+			"smtpTo":                       c.SMTPTo,
+			"smtpTls":                      c.SMTPTLS,
+			"ntfyUrl":                      c.NotifyURL,
+			"githubToken":                  "",
+			"githubTokenConfigured":        c.GitHubToken != "",
+			"latestAgentVersion":           s.latestVersion(),
 
 			"threatWeightWordPress":        c.ThreatWeightWordPress,
 			"threatWeightAdminPanel":       c.ThreatWeightAdminPanel,
@@ -107,6 +112,14 @@ func (s *Service) databaseStatus(ctx context.Context) map[string]any {
 	}
 }
 
+// isUpdatableSecret reports whether a secret field of an update request carries
+// a real new value. Empty means "unchanged", and the masked sentinel is what a
+// client echoes back when the user did not retype the secret — neither may
+// overwrite the stored value.
+func isUpdatableSecret(v string) bool {
+	return v != "" && v != config.MaskedSecretSentinel
+}
+
 // Update persists configuration changes and applies them to the in-memory config.
 func (s *Service) Update(ctx context.Context, req models.SettingsUpdateRequest, username, clientIP string) {
 	save := func(key, value string) {
@@ -125,7 +138,7 @@ func (s *Service) Update(ctx context.Context, req models.SettingsUpdateRequest, 
 	if req.SMTPUser != "" {
 		save("smtp_user", req.SMTPUser)
 	}
-	if req.SMTPPass != "" {
+	if isUpdatableSecret(req.SMTPPass) {
 		save("smtp_pass", req.SMTPPass)
 	}
 	if req.SMTPFrom != "" {
@@ -137,7 +150,7 @@ func (s *Service) Update(ctx context.Context, req models.SettingsUpdateRequest, 
 	if req.NtfyURL != "" {
 		save("ntfy_url", req.NtfyURL)
 	}
-	if req.GitHubToken != "" {
+	if isUpdatableSecret(req.GitHubToken) {
 		save("github_token", req.GitHubToken)
 	}
 

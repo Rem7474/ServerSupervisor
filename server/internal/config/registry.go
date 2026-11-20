@@ -148,7 +148,7 @@ var AllParams = []ConfigParamDef{
 	selectParam("OIDC_DEFAULT_ROLE", "oidc_default_role", "oidc", "viewer", "Rôle OIDC par défaut", "Rôle attribué à un utilisateur sans correspondance de groupe spécifique.", false, "viewer", "operator", "admin"),
 	boolParam("OIDC_AUTO_CREATE_USER", "oidc_auto_create_user", "oidc", "true", "Création automatique des comptes", "Créer automatiquement un compte local lors de la première connexion OIDC réussie.", false),
 	boolParam("OIDC_ALLOW_LOCAL_LOGIN", "oidc_allow_local_login", "oidc", "true", "Autoriser l'authentification locale", "Garde actif le formulaire login/mot de passe classique même si OIDC est activé.", false),
-	boolParam("OIDC_INSECURE_SKIP_VERIFY", "oidc_insecure_skip_verify", "oidc", "false", "Ignorer la vérification SSL OIDC", "Désactive la vérification des certificats TLS de l'émetteur OIDC (déconseillé en production).", false),
+	boolParam("OIDC_INSECURE_SKIP_VERIFY", "oidc_insecure_skip_verify", "oidc", "false", "Ignorer la vérification SSL OIDC", "Désactive la vérification des certificats TLS de l'émetteur OIDC (déconseillé en production). Lu une seule fois au démarrage (transport HTTP du service OIDC) : un redémarrage est requis.", true),
 
 	// ==================== Notifications / Alerts ====================
 	strParam("NOTIFY_URL", "ntfy_url", "notifications", "", "URL du topic ntfy.sh", "URL complète du topic ntfy pour les alertes push instantanées (ex: https://ntfy.sh/mon-serveur).", false, false),

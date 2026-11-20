@@ -2,7 +2,7 @@ name: CI Agent
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, dev]
     paths:
       - 'agent/**'
       - '!agent/**/*.md'
