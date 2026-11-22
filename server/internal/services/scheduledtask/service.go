@@ -69,17 +69,17 @@ var validModules = map[string]bool{
 // on a bad module or cron expression.
 func validate(req *models.ScheduledTaskRequest) error {
 	if !validModules[req.Module] {
-		return apperr.Validation("invalid module: " + req.Module)
+		return apperr.Validation("invalid module: "+req.Module).I18n(apperr.CodeScheduledTaskModuleInvalid, map[string]string{"module": req.Module})
 	}
 	// "custom" ignores Action entirely (the agent only looks up Target in
 	// tasks.yaml, see agent/internal/dispatcher/handler_custom.go) — every
 	// other module needs it to know what to do.
 	if req.Module != "custom" && req.Action == "" {
-		return apperr.Validation("action requise")
+		return apperr.Validation("action is required").I18n(apperr.CodeScheduledTaskActionRequired, nil)
 	}
 	if req.CronExpression != "" {
 		if _, err := cron.ParseStandard(req.CronExpression); err != nil {
-			return apperr.Validation("expression cron invalide : " + err.Error())
+			return apperr.Validation("invalid cron expression: "+err.Error()).I18n(apperr.CodeScheduledTaskCronInvalid, map[string]string{"reason": err.Error()})
 		}
 	}
 	if req.Payload == "" {
