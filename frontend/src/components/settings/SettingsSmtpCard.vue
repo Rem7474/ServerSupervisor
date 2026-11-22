@@ -42,6 +42,7 @@
               v-model="form.smtpPass"
               :type="showSmtpPass ? 'text' : 'password'"
               class="form-control"
+              :placeholder="smtpPassConfigured ? '••••••••' : undefined"
               autocomplete="new-password"
             >
             <button
@@ -141,6 +142,7 @@ withDefaults(defineProps<{
   form: SmtpForm
   authIsAdmin?: boolean
   showSmtpPass?: boolean
+  smtpPassConfigured?: boolean
   savingSmtp?: boolean
   smtpSaveMsg?: string
   smtpSaveOk?: boolean
@@ -150,6 +152,7 @@ withDefaults(defineProps<{
 }>(), {
   authIsAdmin: false,
   showSmtpPass: false,
+  smtpPassConfigured: false,
   savingSmtp: false,
   smtpSaveMsg: '',
   smtpSaveOk: false,

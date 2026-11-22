@@ -18,7 +18,7 @@
         {{ tooltip.country }}
       </div>
       <div class="text-secondary small">
-        {{ numberFormat(tooltip.hits) }} hits
+        {{ t('security.worldMapHitsCount', { count: numberFormat(tooltip.hits) }, tooltip.hits) }}
       </div>
     </div>
   </div>
@@ -122,33 +122,32 @@ async function renderWorldMap() {
     .join('path')
     .attr('class', 'country')
     .attr('d', path as any)
-    .attr('fill', (d: AnyRecord) => {
+    .style('fill', (d: AnyRecord) => {
       const key = mapCountryKey(String(d?.properties?.name || ''))
       const hits = countryHits.get(key) || 0
-      return hits > 0 ? color(hits) : '#e9edf2'
+      return hits > 0 ? color(hits) : null
     })
-    .attr('stroke', '#ffffff')
     .attr('stroke-width', 0.6)
 
   // aria-label (not a <title>) so screen readers still get per-country
   // context without also triggering the browser's native hover tooltip —
   // that stacked visually with the custom one below.
   countries.attr('aria-label', (d: AnyRecord) => {
-    const country = String(d?.properties?.name || 'Unknown')
+    const country = String(d?.properties?.name || t('security.unknownCountryLabel'))
     const key = mapCountryKey(country)
     const hits = countryHits.get(key) || 0
-    return `${country}: ${numberFormat(hits)} hits`
+    return `${country}: ${t('security.worldMapHitsCount', { count: numberFormat(hits) }, hits)}`
   })
 
   countries
     .on('mouseenter', function (this: SVGPathElement, event: MouseEvent, d: AnyRecord) {
       select(this).raise().classed('country-hover', true)
-      const country = String(d?.properties?.name || 'Unknown')
+      const country = String(d?.properties?.name || t('security.unknownCountryLabel'))
       const key = mapCountryKey(country)
       updateTooltip(event, country, countryHits.get(key) || 0)
     })
     .on('mousemove', function (event: MouseEvent, d: AnyRecord) {
-      const country = String(d?.properties?.name || 'Unknown')
+      const country = String(d?.properties?.name || t('security.unknownCountryLabel'))
       const key = mapCountryKey(country)
       updateTooltip(event, country, countryHits.get(key) || 0)
     })
@@ -191,6 +190,8 @@ watch(
 }
 
 .world-map :deep(.country) {
+  fill: var(--ss-panel-solid);
+  stroke: var(--ss-border-default);
   transition: filter 0.1s ease-in-out, stroke-width 0.1s ease-in-out;
 }
 

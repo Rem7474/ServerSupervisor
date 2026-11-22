@@ -1,7 +1,7 @@
 <template>
   <div
     ref="bellRef"
-    class="dropdown"
+    class="dropdown notification-bell"
   >
     <!-- Bell button -->
     <button
@@ -41,6 +41,19 @@
           @click.stop="markAllRead"
         >
           {{ t('alerts.notificationBellMarkAllRead') }}
+        </button>
+      </div>
+      <div
+        v-if="browserPermission === 'default'"
+        class="d-flex align-items-center justify-content-between gap-2 px-3 py-2 border-bottom small"
+      >
+        <span class="text-secondary">{{ t('alerts.notificationBellEnableHint') }}</span>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          @click.stop="enableBrowserNotifications"
+        >
+          {{ t('alerts.notificationBellEnableButton') }}
         </button>
       </div>
 
@@ -104,6 +117,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-success py-0 px-1 notification-resolve-btn"
                   :title="t('alerts.notificationBellResolveAction')"
+                  :aria-label="t('alerts.notificationBellResolveAction')"
                   :disabled="resolvingId === item.id"
                   @click.stop="resolveIncident(item)"
                 >
@@ -201,11 +215,13 @@ const {
   notificationResolved,
   notificationTitle,
   notificationRoute,
+  browserPermission,
+  enableBrowserNotifications,
 } = useNotifications()
 
 function toggleOpen(): void {
   isOpen.value = !isOpen.value
-  if (isOpen.value) fetchNotifications()
+  if (isOpen.value) void fetchNotifications()
 }
 
 function onClickOutside(e: MouseEvent): void {
@@ -233,9 +249,30 @@ onUnmounted(() => {
  */
 .notification-dropdown {
   top: calc(100% + 8px);
+  /* .dropdown-menu ships `left: 0`; with `right: 0` also set and a fixed
+     width the over-constrained box resolves on `left`, so the panel opened
+     rightward from the bell and ran off-screen on a phone. */
+  left: auto;
   right: 0;
   width: 380px;
   max-width: calc(100vw - 1rem);
+}
+
+/* Below the sm breakpoint the bell sits mid-header, so anchoring to it can't
+   fit a 380px panel. Releasing the wrapper's `position: relative` makes the
+   panel resolve against the full-width navbar instead, and the two side
+   offsets then stretch it across the viewport. */
+@media (max-width: 575px) {
+  .notification-bell {
+    position: static;
+  }
+
+  .notification-dropdown {
+    left: 0.5rem;
+    right: 0.5rem;
+    width: auto;
+    max-width: none;
+  }
 }
 
 .notification-bell-btn {

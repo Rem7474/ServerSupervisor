@@ -1,12 +1,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
 import { useDomainDetails } from './useDomainDetails'
 import type { WebLogIPTimelineRow } from '../types/security'
-import type { TimeRangeModel } from '../types/timeRange'
+import { httpStatusClass } from '../utils/statusClasses'
+import { formatNumber, formatDateTimeSeconds, formatBytes as formatBytesShared } from '../utils/formatters'
+import { useWebLogsFilters } from './useWebLogsFilters'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
@@ -19,17 +19,8 @@ interface TimeseriesPoint {
 }
 
 export function useTraffic() {
-  const { locale } = useI18n()
   const hostsStore = useHostsStore()
-  const route = useRoute()
-  const router = useRouter()
 
-  const periodOptions = [
-    { value: '1h', label: '1h' },
-    { value: '24h', label: '24h' },
-    { value: '168h', label: '7j' },
-    { value: '720h', label: '30j' },
-  ]
 
   // The summary+timeseries call is an expensive multi-query aggregate over
   // the whole table (see GetWebLogsSummary server-side); polling it every few
@@ -39,25 +30,9 @@ export function useTraffic() {
   const REFRESH_INTERVAL_MS = 30000
   const LIVE_REFRESH_INTERVAL_MS = 8000
 
-  const period = ref(typeof route.query.period === 'string' ? route.query.period : '24h')
-  const source = ref(typeof route.query.source === 'string' ? route.query.source : '')
-  const hostId = ref(typeof route.query.host_id === 'string' ? route.query.host_id : '')
-  const from = ref<string | null>(typeof route.query.from === 'string' ? route.query.from : null)
-  const to = ref<string | null>(typeof route.query.to === 'string' ? route.query.to : null)
-  const timeRange = ref<TimeRangeModel>({
-    mode: from.value && to.value ? 'custom' : 'preset',
-    period: period.value,
-    from: from.value,
-    to: to.value,
-  })
+  const { period, source, hostId, from, to, timeRange, periodOptions, applyTimeRange, detailFilters } = useWebLogsFilters()
   const autoRefresh = ref(true)
 
-  // Unlike useBot.ts (Menaces), this page never had URL sync before — added
-  // alongside the custom range so a from/to (or a preset/host/source) picked
-  // here survives a refresh or a shared link, same as Menaces already does.
-  watch([period, source, hostId, from, to], ([p, s, h, f, toVal]) => {
-    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined, from: f || undefined, to: toVal || undefined } })
-  })
 
   const loading = ref(false)
   const summary = ref<AnyRecord>({ traffic: {}, threats: {} })
@@ -87,7 +62,7 @@ export function useTraffic() {
     const fromApi = traffic.value.top_proxy_hosts || []
     if (fromApi.length) return fromApi
     return topDomains.value.map((d: AnyRecord) => ({
-      vhost: d.domain || '(unknown)',
+      vhost: d.domain || '',
       hits: d.hits || 0,
     }))
   })
@@ -107,33 +82,15 @@ export function useTraffic() {
   })
 
   function numberFormat(v: number): string {
-    return new Intl.NumberFormat(locale.value).format(Number(v) || 0)
+    return formatNumber(v)
   }
 
   function formatBytes(bytes: number): string {
-    const value = Number(bytes) || 0
-    if (value < 1024) return `${value} B`
-    const units = ['KB', 'MB', 'GB', 'TB']
-    let size = value / 1024
-    let unit = 0
-    while (size >= 1024 && unit < units.length - 1) {
-      size /= 1024
-      unit++
-    }
-    return `${size.toFixed(1)} ${units[unit]}`
+    return formatBytesShared(Number(bytes) || 0)
   }
 
   function formatDate(v: string): string {
-    const d = new Date(v)
-    if (Number.isNaN(d.getTime())) return v || '-'
-    return d.toLocaleString()
-  }
-
-  function statusClass(status: number): string {
-    if (status >= 200 && status < 300) return 'bg-success-lt text-success'
-    if (status >= 300 && status < 400) return 'bg-warning-lt text-warning'
-    if (status >= 400) return 'bg-danger-lt text-danger'
-    return 'bg-secondary-lt text-secondary'
+    return formatDateTimeSeconds(v)
   }
 
 
@@ -143,14 +100,7 @@ export function useTraffic() {
   }
 
   function onRangeChange(): void {
-    if (timeRange.value.mode === 'custom' && timeRange.value.from && timeRange.value.to) {
-      from.value = timeRange.value.from
-      to.value = timeRange.value.to
-    } else {
-      period.value = timeRange.value.period
-      from.value = null
-      to.value = null
-    }
+    applyTimeRange()
     void loadAll(true)
   }
 
@@ -214,13 +164,7 @@ export function useTraffic() {
 
   function openDomain(domain: string) {
     if (!domain) return
-    domainModal.open(domain, {
-      period: period.value,
-      hostId: hostId.value || undefined,
-      source: source.value || undefined,
-      from: from.value || undefined,
-      to: to.value || undefined,
-    })
+    domainModal.open(domain, detailFilters())
   }
 
   async function openIP(ip: string) {
@@ -309,7 +253,7 @@ export function useTraffic() {
     numberFormat,
     formatBytes,
     formatDate,
-    statusClass,
+    statusClass: httpStatusClass,
     hostWidth,
     onRangeChange,
     loadAll,

@@ -81,6 +81,24 @@ describe('DomainDetailsModal', () => {
     expect(wrapper.find('[title="Suspecte"]').exists()).toBe(true)
   })
 
+  it.each([
+    ['', {}, 'Hôte introuvable'],
+    ['h1', { '5.6.7.8': 'error' }, 'Erreur — Réessayer'],
+    ['h1', {}, 'Bloquer 5.6.7.8 (CrowdSec, 4h)'],
+  ])('names the block button for host "%s" and state %o', (hostId, blockState, label) => {
+    const wrapper = mountModal({
+      blockState,
+      details: {
+        hits: 1, bytes: 0, status_4xx: 0, status_5xx: 0, top_paths: [], total: 0,
+        top_clients: [{ ip: '5.6.7.8', hits: 3, blocked: false, host_id: hostId }],
+        requests: [],
+      },
+    })
+    const button = wrapper.find(`button[aria-label="${label}"]`)
+    expect(button.exists()).toBe(true)
+    expect(button.attributes('title')).toBe(label)
+  })
+
   it('translates to English when the locale is switched', () => {
     setLocale('en')
     const wrapper = mountModal()

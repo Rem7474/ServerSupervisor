@@ -78,12 +78,10 @@
           v-if="loading"
           variant="list"
         />
-        <div
+        <EmptyState
           v-else-if="!timeline.length"
-          class="text-center py-4 text-secondary"
-        >
-          {{ t('security.noRequestsTitle') }}
-        </div>
+          :title="t('security.noRequestsTitle')"
+        />
         <template v-else>
           <div class="timeline-frieze border-bottom px-3 py-3">
             <div class="timeline-controls d-flex align-items-center justify-content-between mb-2 gap-2">
@@ -107,7 +105,7 @@
                 </div>
               </div>
               <div class="small text-secondary">
-                {{ t('security.groupingSummary', { label: timelineBucketLabel, count: timelineBuckets.length }) }}
+                {{ t('security.groupingSummary', { label: timelineBucketLabel, count: timelineBuckets.length }, timelineBuckets.length) }}
                 <span
                   v-if="selectedInterval === 'auto'"
                   class="badge bg-azure-lt text-azure ms-1"
@@ -243,7 +241,7 @@
                         <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
                       </div>
                       <div class="timeline-event-path font-monospace small">
-                        {{ r.domain || '(unknown)' }} {{ r.path }}
+                        {{ r.domain || t('security.unknownDomainLabel') }} {{ r.path }}
                       </div>
                       <div class="timeline-event-meta small text-secondary">
                         <span><strong>{{ t('security.domainLabel') }}:</strong> {{ r.domain || '-' }}</span>
@@ -293,6 +291,7 @@ import { useIpTimeline } from '../../composables/useIpTimeline'
 import { useModalChrome } from '../../composables/useModalChrome'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import type { WebLogIPTimelineRow } from '../../types/security'
+import EmptyState from '../EmptyState.vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },

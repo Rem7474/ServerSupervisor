@@ -1,16 +1,18 @@
-import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
-import dayjs from '../utils/dayjs'
 import type { UptimeProbe, UptimeStats, UptimeHistoryBucket } from '../types/generated'
+import { probeStatusClass } from '../utils/statusClasses'
+import { formatChartTimestamp } from '../utils/chartTimeAxis'
+import { useAutoRefresh } from './useAutoRefresh'
 
 // 1h/24h windows are dense enough that only the time-of-day matters; wider
 // windows (7j/30j) need the date too or every bucket label looks identical.
 function formatBucketLabel(bucketStart: string, windowHours: number): string {
-  return dayjs(bucketStart).format(windowHours > 24 ? 'DD/MM HH:mm' : 'HH:mm:ss')
+  return formatChartTimestamp(bucketStart, windowHours > 24 ? 'dayTime' : 'timeSeconds')
 }
 
 interface ProbeResult {
@@ -130,13 +132,10 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
 
   const statusColor = computed(() => {
     if (!probe.value) return ''
-    if (probe.value.last_status === 'up') return 'text-success'
-    if (probe.value.last_status === 'down') return 'text-danger'
-    return 'text-secondary'
+    return probeStatusClass(probe.value.last_status, 'text')
   })
 
-  const autoRefresh = autoRefreshOverride ?? ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => fetchAll(), { intervalSec: PROBE_REFRESH_SEC, enabled: autoRefreshOverride })
 
   // Bucket-based availability bar, oldest-first (reading left-to-right ends on
   // "now") — scales with statsWindow instead of always showing the last few
@@ -187,13 +186,8 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
     }
   }
 
-  let refresh: ReturnType<typeof setInterval> | undefined
   onMounted(() => {
-    fetchAll()
-    refresh = setInterval(() => { if (autoRefresh.value) fetchAll() }, PROBE_REFRESH_SEC * 1000)
-  })
-  onUnmounted(() => {
-    if (refresh) clearInterval(refresh)
+    void fetchAll()
   })
 
   return {

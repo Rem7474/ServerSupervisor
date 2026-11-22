@@ -537,17 +537,23 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	proxmoxAdmin.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
 	proxmoxAdmin.POST("/proxmox/instances/:id/poll-now", h.PollNow)
 	proxmoxAdmin.PUT("/proxmox/nodes/:id/sensor-source", h.UpdateNodeSensorSource)
-	// Guest power actions (start/shutdown/reboot) — admin only: unlike the
-	// migrate/service-action routes above (open to any authenticated user,
-	// gated only by the PVE token's own Sys.Modify scope), this can power off
-	// a running VM/CT directly, so it's gated at the app layer too.
+	// Guest power actions (start/shutdown/reboot) — admin only: this can power
+	// off a running VM/CT directly, so it's gated at the app layer too, not
+	// just by the PVE token's own Sys.Modify scope.
 	proxmoxAdmin.POST("/proxmox/guests/:id/action", h.GuestAction)
-	// Guest ↔ host link management
+	// Every other Proxmox mutation (link management, node service actions,
+	// apt refresh, guest migration) is admin-only for the same reason; reads
+	// below stay open to any authenticated user. All of them write an
+	// audit_logs entry (see proxmoxsvc.Service.audit).
+	proxmoxAdmin.POST("/proxmox/links", h.CreateLink)
+	proxmoxAdmin.PUT("/proxmox/links/:id", h.UpdateLink)
+	proxmoxAdmin.DELETE("/proxmox/links/:id", h.DeleteLink)
+	proxmoxAdmin.POST("/proxmox/nodes/:id/services/:service/:action", h.NodeServiceAction)
+	proxmoxAdmin.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)
+	proxmoxAdmin.POST("/proxmox/nodes/:id/guests/:vmid/migrate", h.MigrateGuest)
+	// Guest ↔ host link reads
 	g.GET("/proxmox/links", h.ListLinks)
-	g.POST("/proxmox/links", h.CreateLink)
 	g.GET("/proxmox/links/:id", h.GetLink)
-	g.PUT("/proxmox/links/:id", h.UpdateLink)
-	g.DELETE("/proxmox/links/:id", h.DeleteLink)
 	// Per-host Proxmox link lookup + candidate guests for manual linking
 	g.GET("/hosts/:id/proxmox-link", h.GetLinkByHost)
 	g.GET("/hosts/:id/proxmox-candidates", h.ListLinkCandidates)
@@ -566,18 +572,13 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/nodes/:id/tasks/:upid/log", h.GetTaskLog)
 	g.GET("/proxmox/nodes/:id/rrd", h.GetNodeRRD)
 
-	// Node services (list requires Sys.Audit; actions require Sys.Modify)
+	// Node services (list requires Sys.Audit; actions are admin-only, registered above)
 	g.GET("/proxmox/nodes/:id/services", h.ListNodeServices)
-	g.POST("/proxmox/nodes/:id/services/:service/:action", h.NodeServiceAction)
 
 	// Guest network interfaces (live — VM via QEMU agent, LXC native)
 	g.GET("/proxmox/nodes/:id/guest-networks", h.GetNodeGuestNetworks)
 	// Guest ↔ NPM domain correlation (live IP matched against npm_proxy_hosts.forward_host)
 	g.GET("/proxmox/nodes/:id/guest-exposure", h.GetNodeGuestExposure)
-
-	// Node actions (write — require Sys.Modify on the Proxmox token)
-	g.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)
-	g.POST("/proxmox/nodes/:id/guests/:vmid/migrate", h.MigrateGuest)
 }
 
 func registerUptimeRoutes(g *gin.RouterGroup, h *handlers.UptimeHandler) {

@@ -108,6 +108,7 @@ export default [
     rules: {
       'local/no-forbidden-tabler-class': 'error',
       'local/no-native-confirm': 'error',
+      'local/icon-button-needs-label': 'error',
     },
   },
   {
@@ -117,7 +118,6 @@ export default [
     // rather than typing the monolith and re-touching every line during the
     // split. Remove these entries (and the residual any) as each file is split.
     files: [
-      '**/views/GlobalScheduledTasksView.vue',
       '**/components/docker/DockerContainersTab.vue',
       // Child of the ProxmoxNodeView monolith; guest/link/network rows carry
       // runtime fields beyond the generated ProxmoxGuest model. Typed when the
@@ -133,6 +133,13 @@ export default [
     ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    // Specs mount small inline host components next to the one under test.
+    files: ['**/*.spec.ts', '**/*.browser.test.ts'],
+    rules: {
+      'vue/one-component-per-file': 'off',
     },
   },
   {

@@ -1,7 +1,8 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { emitHttpError, emitNetworkOk } from '../utils/httpErrorBus'
-import { i18n } from '../i18n'
+import { i18n, localeTag } from '../i18n'
+import { keyedErrorMessage } from '../utils/translateError'
 
 export type JsonObject = Record<string, unknown>
 
@@ -28,10 +29,13 @@ type ApiErrorLike = {
     data?: {
       error?: unknown
       message?: unknown
+      i18nKey?: unknown
+      params?: Record<string, string>
     }
   }
   message?: unknown
   name?: unknown
+  isAxiosError?: unknown
 }
 
 function asApiErrorLike(error: unknown): ApiErrorLike {
@@ -91,15 +95,24 @@ function hardRedirectToLogin(): void {
 }
 
 /**
- * Normalize API/Network error objects into a user-facing message.
+ * Normalize API/Network error objects into a user-facing message, in the
+ * active UI language: a catalogued `i18nKey` wins, then the server's own
+ * message (rendered for the Accept-Language sent below), then `fallback`.
+ * Axios's own `message` ("Network Error", "Request failed with status code
+ * 500") is English transport jargon, so it is never shown; a plain `Error`'s
+ * message still is.
  */
 export function getApiErrorMessage(
   error: unknown,
   fallback: string = i18n.global.t('common.genericError')
 ): string {
   const parsed = asApiErrorLike(error)
-  const message = parsed.response?.data?.error || parsed.response?.data?.message || parsed.message
+  const data = parsed.response?.data
+  const keyed = keyedErrorMessage(data)
+  if (keyed) return keyed
 
+  const ownMessage = parsed.isAxiosError === true ? undefined : parsed.message
+  const message = data?.error || data?.message || ownMessage
   return message ? String(message) : fallback
 }
 
@@ -107,9 +120,14 @@ export function getApiErrorMessage(
  * The CSRF token is mirrored in a readable cookie (ss_csrf) and must be echoed
  * in the X-CSRF-Token header on every state-changing request (double-submit
  * pattern). X-Requested-With remains as defense-in-depth.
+ *
+ * Accept-Language carries the UI language rather than the browser's, so the
+ * server's catalogued error messages (apperr.Error.I18n) match what the user
+ * reads everywhere else, including after a manual language switch.
  */
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const headers = config.headers as Record<string, string>
+  headers['Accept-Language'] = localeTag()
   if (isStateChangingMethod(config.method)) {
     const csrf = readCSRFFromCookie()
     if (csrf) headers['X-CSRF-Token'] = csrf

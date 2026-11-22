@@ -86,7 +86,7 @@
                 class="badge bg-warning-lt text-warning ms-1"
                 :title="getComposeUpdates(p).map(v => t('docker.updateAvailableTooltipItem', { image: v.docker_image, version: v.latest_version })).join('\n')"
               >
-                {{ t('docker.updatesCountBadge', { count: getComposeUpdates(p).length }) }}
+                {{ t('docker.updatesCountBadge', { count: getComposeUpdates(p).length }, getComposeUpdates(p).length) }}
               </span>
               <div
                 v-if="getComposeUpdates(p).length > 0"
@@ -225,6 +225,7 @@
                   type="button"
                   class="btn btn-icon btn-sm btn-ghost-secondary"
                   :title="t('docker.configTooltip')"
+                  :aria-label="t('docker.configTooltip')"
                   @click="selectedProject = p"
                 >
                   <IconFile
@@ -337,12 +338,10 @@
                 class="m-0 p-3 small"
                 style="max-height: 60vh; overflow-y: auto; background: var(--ss-panel-solid-darker); color: var(--ss-text-on-dark); border-radius: 0 0 4px 0;"
               >{{ selectedProject.raw_config }}</pre>
-              <div
+              <EmptyState
                 v-else
-                class="p-4 text-secondary text-center"
-              >
-                {{ t('docker.configNotAvailable') }}
-              </div>
+                :title="t('docker.configNotAvailable')"
+              />
             </div>
           </div>
         </div>

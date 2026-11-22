@@ -122,7 +122,7 @@
       v-else-if="form.host_id && hostMetrics?.metrics && hostMetrics.metrics.length < (capabilities?.metrics?.length || 0)"
       class="alert alert-info py-2 small mb-2"
     >
-      {{ t('alerts.sourceHostMetricsCountInfo', { n: hostMetrics?.metrics?.length ?? 0 }) }}
+      {{ t('alerts.sourceHostMetricsCountInfo', { n: hostMetrics?.metrics?.length ?? 0 }, hostMetrics?.metrics?.length ?? 0) }}
     </div>
     <div class="metric-grid">
       <button
@@ -484,30 +484,19 @@ import { useI18n } from 'vue-i18n'
 import type { AlertRuleFormData, DockerScope } from '../../composables/useAlertRuleForm'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 import { getEntityStateLabel } from '../../utils/statusClasses'
+import type { AlertRuleCapabilities, AlertHostCapabilities, AlertScopeOption, AlertDockerHostScope } from '../../types/alert'
 
-interface ScopeOption { id: string; label: string }
 interface MetricCard { value: string; label: string; icon: string }
 interface HostOption { id: string; name: string }
-interface HostMetrics { metrics?: Array<{ metric: string; label: string; icon?: string }> }
-interface Capabilities { metrics?: Array<{ metric: string }> }
-
-interface DockerContainer { id: string; name: string; image: string; state: string }
-interface DockerProject { name: string; services: string[] }
-interface DockerHostOption {
-  host_id: string
-  host_name: string
-  containers: DockerContainer[]
-  projects: DockerProject[]
-}
 
 const props = defineProps<{
   form: AlertRuleFormData
   rule?: { id?: number | string } | null
   hosts: HostOption[]
-  capabilities?: Capabilities | null
+  capabilities?: Pick<AlertRuleCapabilities, 'metrics'> | null
   capabilitiesLoading?: boolean
   capabilitiesError?: string
-  hostMetrics?: HostMetrics | null
+  hostMetrics?: Pick<AlertHostCapabilities, 'metrics'> | null
   hostMetricsLoading?: boolean
   hostMetricsError?: string
   metricCards: MetricCard[]
@@ -515,12 +504,12 @@ const props = defineProps<{
   metricAllowsGuestScope: boolean
   metricAllowsStorageScope: boolean
   metricAllowsDiskScope: boolean
-  proxmoxConnections: ScopeOption[]
-  proxmoxNodes: ScopeOption[]
-  proxmoxStorages: ScopeOption[]
-  proxmoxGuests: ScopeOption[]
-  proxmoxDisks: ScopeOption[]
-  dockerHosts: DockerHostOption[]
+  proxmoxConnections: AlertScopeOption[]
+  proxmoxNodes: AlertScopeOption[]
+  proxmoxStorages: AlertScopeOption[]
+  proxmoxGuests: AlertScopeOption[]
+  proxmoxDisks: AlertScopeOption[]
+  dockerHosts: AlertDockerHostScope[]
   dockerCapabilitiesLoading?: boolean
 }>()
 

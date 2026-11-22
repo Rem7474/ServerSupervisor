@@ -1,6 +1,8 @@
 import { ref, computed, watch, toValue, type MaybeRefOrGetter } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { WebLogIPTimelineRow } from '../types/security'
+import { httpStatusClass } from '../utils/statusClasses'
+import { formatTime, formatDateTimeSeconds } from '../utils/formatters'
 
 export interface TimelineBucket {
   key: string
@@ -66,24 +68,11 @@ function statusFamilyBadgeClass(family: string): string {
 }
 
 function formatBucketLabel(startMs: number, bucketMs: number): string {
-  const d = new Date(startMs)
-  if (bucketMs < 60 * 1000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-/** Tailwind/Tabler badge class for an individual HTTP status code. */
-export function statusClass(status: number): string {
-  if (status >= 500 && status < 600) return 'bg-danger-lt text-danger'
-  if (status >= 400 && status < 500) return 'bg-warning-lt text-warning'
-  if (status >= 200 && status < 300) return 'bg-success-lt text-success'
-  if (status >= 300 && status < 400) return 'bg-primary-lt text-primary'
-  return 'bg-secondary-lt text-secondary'
+  return formatTime(startMs, bucketMs < 60 * 1000)
 }
 
 export function formatDate(v: string): string {
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return v || '-'
-  return d.toLocaleString()
+  return formatDateTimeSeconds(v)
 }
 
 export function truncate(s: string, max: number): string {
@@ -170,7 +159,8 @@ export function useIpTimeline(
     const ms = timelineBucketMs.value
     if (ms < 60 * 1000) return t('security.bucketLabelSeconds', { n: Math.round(ms / 1000) })
     if (ms < 60 * 60 * 1000) return t('security.bucketLabelMinutes', { n: Math.round(ms / (60 * 1000)) })
-    return t('security.bucketLabelHours', { n: Math.round(ms / (60 * 60 * 1000)) })
+    const hours = Math.round(ms / (60 * 60 * 1000))
+    return t('security.bucketLabelHours', { n: hours }, hours)
   })
 
   const timelineBuckets = computed<TimelineBucket[]>(() => {
@@ -193,8 +183,8 @@ export function useIpTimeline(
       .map((b): TimelineBucket => ({
         ...b,
         label: formatBucketLabel(b.startMs, timelineBucketMs.value),
-        rangeLabel: `${new Date(b.startMs).toLocaleString()} → ${new Date(b.endMs).toLocaleString()}`,
-        title: `${new Date(b.startMs).toLocaleString()} (${b.count} req)`,
+        rangeLabel: `${formatDateTimeSeconds(b.startMs)} → ${formatDateTimeSeconds(b.endMs)}`,
+        title: `${formatDateTimeSeconds(b.startMs)} (${b.count} req)`,
       }))
   })
 
@@ -273,7 +263,7 @@ export function useIpTimeline(
         return {
           key,
           label: bucket?.label || formatBucketLabel(start, timelineBucketMs.value),
-          rangeLabel: bucket?.rangeLabel || `${new Date(start).toLocaleString()} → ${new Date(end).toLocaleString()}`,
+          rangeLabel: bucket?.rangeLabel || `${formatDateTimeSeconds(start)} → ${formatDateTimeSeconds(end)}`,
           count: groupRows.length,
           errorCount,
           uniquePaths,
@@ -340,7 +330,7 @@ export function useIpTimeline(
     toggleBucketFilter,
     // display helpers
     bucketToneClass,
-    statusClass,
+    statusClass: httpStatusClass,
     formatDate,
     truncate,
   }

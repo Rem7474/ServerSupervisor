@@ -163,6 +163,43 @@ func TestHostPermission_ViewerCannotPerformOperatorAction(t *testing.T) {
 	}
 }
 
+// Issue #485: a viewer with NO host_permissions rows used to fall through the
+// "backward-compatible" branch and reach operator-level routes.
+func TestHostPermission_ViewerWithoutEntriesCannotPerformOperatorAction(t *testing.T) {
+	db, cfg := testutil.NewPostgresDBWithConfig(t)
+
+	if err := db.CreateUser(context.Background(), "erin", mustHash(t, "x"), "viewer"); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	if err := db.RegisterHost(context.Background(), &models.Host{ID: "host-1", Name: "h1", Hostname: "h1.local", Status: "online"}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+
+	r := gin.New()
+	g := r.Group("/api/v1")
+	g.Use(api.JWTMiddleware(cfg))
+	g.GET("/hosts/:id", api.HostPermissionMiddleware(db, "operator"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token := issueJWT(t, cfg.JWTSecret, "erin", "viewer")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, authedRequest(t, "/api/v1/hosts/host-1", token))
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("viewer with 0 host_permissions rows must be denied operator action, got %d", w.Code)
+	}
+
+	// An explicit per-host operator grant still lets that viewer through.
+	if err := db.SetHostPermission(context.Background(), "erin", "host-1", "operator"); err != nil {
+		t.Fatalf("set perm: %v", err)
+	}
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, authedRequest(t, "/api/v1/hosts/host-1", token))
+	if w.Code != http.StatusOK {
+		t.Fatalf("explicit operator grant must pass, got %d", w.Code)
+	}
+}
+
 func mustHash(t *testing.T, p string) string {
 	t.Helper()
 	h, err := handlers.HashPassword(p)

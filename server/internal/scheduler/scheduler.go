@@ -11,6 +11,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -133,20 +134,20 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 			TriggeredBy: "scheduler",
 		})
 		if err != nil {
-			slog.ErrorContext(s.ctx, "scheduler: failed to create command", slog.String("task_id", t.ID), slog.String("task_name", t.Name), slog.Any("err", err))
+			slog.ErrorContext(s.ctx, "scheduler: failed to create command", slog.String("task_id", logging.Sanitize(t.ID)), slog.String("task_name", logging.Sanitize(t.Name)), slog.Any("err", err))
 			now := time.Now()
 			next := s.NextRun(t.ID)
 			_ = s.db.UpdateScheduledTaskRun(s.ctx, t.ID, "failed", now, next)
 			return
 		}
 		if err := s.db.LinkCommandToScheduledTask(s.ctx, result.Command.ID, t.ID); err != nil {
-			slog.ErrorContext(s.ctx, "scheduler: failed to link command", slog.String("task_id", t.ID), slog.Any("err", err))
+			slog.ErrorContext(s.ctx, "scheduler: failed to link command", slog.String("task_id", logging.Sanitize(t.ID)), slog.Any("err", err))
 		}
 		now := time.Now()
 		next := s.NextRun(t.ID)
 		if err := s.db.UpdateScheduledTaskRun(s.ctx, t.ID, "pending", now, next); err != nil {
-			slog.ErrorContext(s.ctx, "scheduler: failed to update run metadata", slog.String("task_id", t.ID), slog.Any("err", err))
+			slog.ErrorContext(s.ctx, "scheduler: failed to update run metadata", slog.String("task_id", logging.Sanitize(t.ID)), slog.Any("err", err))
 		}
-		slog.InfoContext(s.ctx, "scheduler queued command", slog.String("task_id", t.ID), slog.String("task_name", t.Name), slog.String("command_id", result.Command.ID), slog.String("host_id", t.HostID))
+		slog.InfoContext(s.ctx, "scheduler queued command", slog.String("task_id", logging.Sanitize(t.ID)), slog.String("task_name", logging.Sanitize(t.Name)), slog.String("command_id", logging.Sanitize(result.Command.ID)), slog.String("host_id", logging.Sanitize(t.HostID)))
 	}
 }

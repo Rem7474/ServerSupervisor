@@ -19,11 +19,6 @@ interface PaginationApi<T> {
   setPage: (page: number) => void
 }
 
-interface RemotePaginationApi {
-  nextPage: () => void
-  prevPage: () => void
-}
-
 export function usePagination<T>({ items, pageSize = 10, initialPage = 1 }: PaginationOptions<T> = {}): PaginationApi<T> {
   const currentPage: Ref<number> = ref(initialPage)
   const safePageSize = Math.max(1, pageSize)
@@ -73,24 +68,4 @@ export function usePagination<T>({ items, pageSize = 10, initialPage = 1 }: Pagi
     resetPage,
     setPage,
   }
-}
-
-interface RemotePaginationOptions {
-  currentPage: RefLike<number>
-  totalPages: RefLike<number>
-}
-
-export function useRemotePagination({ currentPage, totalPages }: RemotePaginationOptions): RemotePaginationApi {
-  const safeCurrentPage = currentPage
-  const safeTotalPages = totalPages
-
-  function nextPage(): void {
-    if (safeCurrentPage.value < safeTotalPages.value) safeCurrentPage.value += 1
-  }
-
-  function prevPage(): void {
-    if (safeCurrentPage.value > 1) safeCurrentPage.value -= 1
-  }
-
-  return { nextPage, prevPage }
 }

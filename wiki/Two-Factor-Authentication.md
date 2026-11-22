@@ -1,13 +1,13 @@
 # Authentification à deux facteurs (TOTP & clés de sécurité/passkeys)
 
-Second facteur optionnel, par compte, géré depuis `/account/security`. Deux méthodes
+Second facteur optionnel, par compte, géré depuis l'onglet Connexions de `/account`. Deux méthodes
 indépendantes, cumulables : un compte peut avoir l'une, l'autre, les deux, ou aucune.
 `Authenticate()` considère l'une ou l'autre comme suffisante — il n'exige pas les deux à la
 fois même si les deux sont enregistrées.
 
 ## 1. TOTP (application d'authentification)
 
-1. Depuis `/account/security`, lancer l'activation TOTP : le serveur génère un secret + un QR
+1. Depuis l'onglet Connexions de `/account`, lancer l'activation TOTP : le serveur génère un secret + un QR
    code (`data:image/png` encodé côté serveur, rien à installer) + **10 codes de secours** à usage
    unique (chaînes de 10 caractères).
 2. Scanner le QR code avec une app TOTP standard (Google Authenticator, Aegis, 1Password…).

@@ -28,7 +28,17 @@ type fakeRepo struct {
 	connByID     map[string]*models.ProxmoxConnection
 	guestsByNode map[string][]models.ProxmoxGuest
 	guestByID    map[string]*models.ProxmoxGuest
+	nodeByID     map[string]*models.ProxmoxNode
 	consoleCreds map[string][2]string // connID -> [username, password]
+
+	audits []auditEntry
+}
+
+type auditEntry struct{ username, action, ip, details, status string }
+
+func (f *fakeRepo) CreateAuditLog(_ context.Context, username, action, _, ip, details, status string) (int64, error) {
+	f.audits = append(f.audits, auditEntry{username, action, ip, details, status})
+	return 1, nil
 }
 
 func (f *fakeRepo) ListProxmoxConnections(context.Context) ([]models.ProxmoxConnection, error) {
@@ -107,7 +117,12 @@ func (f *fakeRepo) ListProxmoxNodes(context.Context) ([]models.ProxmoxNode, erro
 func (f *fakeRepo) ListProxmoxNodesByConnection(context.Context, string) ([]models.ProxmoxNode, error) {
 	return nil, nil
 }
-func (f *fakeRepo) GetProxmoxNode(context.Context, string) (*models.ProxmoxNode, error) {
+func (f *fakeRepo) GetProxmoxNode(_ context.Context, id string) (*models.ProxmoxNode, error) {
+	if f.nodeByID != nil {
+		if n, ok := f.nodeByID[id]; ok {
+			return n, nil
+		}
+	}
 	return nil, nil
 }
 func (f *fakeRepo) GetProxmoxNodeMetricsSummary(context.Context, int, int) ([]models.ProxmoxNodeMetricsSummary, error) {
@@ -189,7 +204,7 @@ func TestGetConnection_NotFound(t *testing.T) {
 func TestUpdateLink_InvalidStatus(t *testing.T) {
 	repo := &fakeRepo{link: &models.ProxmoxGuestLink{}}
 	bad := "bogus"
-	_, err := newSvc(repo).UpdateLink(context.Background(), "id", models.ProxmoxGuestLinkUpdate{Status: &bad})
+	_, err := newSvc(repo).UpdateLink(context.Background(), "id", models.ProxmoxGuestLinkUpdate{Status: &bad}, Actor{})
 	if status(err) != 400 {
 		t.Fatalf("invalid status should be 400, got %v", err)
 	}
@@ -197,20 +212,20 @@ func TestUpdateLink_InvalidStatus(t *testing.T) {
 
 func TestUpdateLink_NotFound(t *testing.T) {
 	// GetProxmoxGuestLink returns nil -> not found.
-	if status(mustLinkErr(newSvc(&fakeRepo{}).UpdateLink(context.Background(), "id", models.ProxmoxGuestLinkUpdate{}))) != 404 {
+	if status(mustLinkErr(newSvc(&fakeRepo{}).UpdateLink(context.Background(), "id", models.ProxmoxGuestLinkUpdate{}, Actor{}))) != 404 {
 		t.Error("missing link should be 404")
 	}
 }
 
 func TestNodeServiceAction_InvalidAction(t *testing.T) {
-	_, err := newSvc(&fakeRepo{}).NodeServiceAction(context.Background(), "node", "pveproxy", "frobnicate")
+	_, err := newSvc(&fakeRepo{}).NodeServiceAction(context.Background(), "node", "pveproxy", "frobnicate", Actor{})
 	if status(err) != 400 {
 		t.Fatalf("invalid action should be 400, got %v", err)
 	}
 }
 
 func TestGuestAction_InvalidAction(t *testing.T) {
-	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "guest-1", "frobnicate")
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "guest-1", "frobnicate", Actor{})
 	if status(err) != 400 {
 		t.Fatalf("invalid action should be 400, got %v", err)
 	}
@@ -219,7 +234,7 @@ func TestGuestAction_InvalidAction(t *testing.T) {
 // stop (hard power-off, no ACPI shutdown) is deliberately excluded from the
 // whitelist — see the "Proxmox integration" note in the root CLAUDE.md.
 func TestGuestAction_ExcludesHardStop(t *testing.T) {
-	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "guest-1", "stop")
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "guest-1", "stop", Actor{})
 	if status(err) != 400 {
 		t.Fatalf("hard stop must not be whitelisted, got %v", err)
 	}
@@ -227,7 +242,7 @@ func TestGuestAction_ExcludesHardStop(t *testing.T) {
 
 func TestGuestAction_GuestNotFound(t *testing.T) {
 	// GetProxmoxGuestByID's fakeRepo stub always errors -> not found.
-	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "missing", "start")
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "missing", "start", Actor{})
 	if status(err) != 404 {
 		t.Fatalf("missing guest should be 404, got %v", err)
 	}

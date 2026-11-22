@@ -50,7 +50,7 @@
     >
       <template #warroom>
         <WarRoomPanel
-          :incidents="(incidents as any)"
+          :incidents="incidents"
           :loading="incidentsLoading"
           :error="incidentsError"
           :is-admin="auth.isAdmin"
@@ -63,23 +63,23 @@
 
       <template #rules>
         <AlertRuleList
-          :rules="(rules as any)"
-          :hosts="(hosts as any)"
+          :rules="rules"
+          :hosts="hosts"
           :loading="loading"
           :fetched="fetched"
           :error="saveError"
           :is-admin="auth.isAdmin"
-          :format-date="(formatDate as any)"
+          :format-date="formatDate"
           @add="startAddAlert"
-          @edit="(startEditAlert as any)"
-          @toggle="(onToggleEnabled as any)"
-          @delete="(deleteAlert as any)"
+          @edit="startEditAlert"
+          @toggle="onToggleEnabled"
+          @delete="deleteAlert"
         />
       </template>
 
       <template #releases>
         <AlertReleaseSummary
-          :trackers="(trackers as any)"
+          :trackers="trackers"
           :loading="trackersLoading"
           :error="trackersError"
         />
@@ -87,7 +87,7 @@
 
       <template #incidents>
         <AlertIncidentList
-          :incidents="(incidents as any)"
+          :incidents="incidents"
           :loading="incidentsLoading"
           :error="incidentsError"
           :active-incident-count="activeIncidentCount"
@@ -123,7 +123,7 @@
     <AlertRuleTemplateModal
       :visible="showTemplateModal"
       :template="editingTemplate"
-      :agent-metrics="(capabilities?.agent_metrics as any) || []"
+      :agent-metrics="capabilities?.agent_metrics || []"
       :saving="templateSaving"
       :error="templateSaveError"
       @close="closeTemplateModal"
@@ -132,7 +132,7 @@
     <AlertRuleTemplateApplyModal
       :visible="showApplyModal"
       :template="applyingTemplate"
-      :hosts="(hosts as any)"
+      :hosts="hosts"
       :applying="applying"
       :error="applyError"
       :result="applyResult"
@@ -143,15 +143,15 @@
     <ErrorBoundary :title="t('alerts.ruleFormLoadErrorTitle')">
       <AlertRuleModal
         :visible="showModal"
-        :rule="(editingRule as any)"
-        :hosts="(hosts as any)"
-        :capabilities="(capabilities as any)"
+        :rule="editingRule"
+        :hosts="hosts"
+        :capabilities="capabilities"
         :capabilities-loading="capabilitiesLoading"
         :capabilities-error="capabilitiesError"
         :saving="saving"
         :error="saveError"
         @close="closeModal"
-        @submit="(saveAlert as any)"
+        @submit="saveAlert"
       />
     </ErrorBoundary>
   </div>
@@ -391,10 +391,10 @@ const alertsTabs = computed<EntityTab[]>(() => [
 // (alertsTab.value=...) as part of their lazy-load-on-first-visit logic;
 // 'rules' has no such loader, so it's a plain assignment.
 function onTabClick(key: string): void {
-  if (key === 'releases') { switchToTrackers(); return }
-  if (key === 'incidents') { switchToIncidents(); return }
-  if (key === 'warroom') { switchToWarRoom(); return }
-  if (key === 'templates') { switchToTemplates(); return }
+  if (key === 'releases') { void switchToTrackers(); return }
+  if (key === 'incidents') { void switchToIncidents(); return }
+  if (key === 'warroom') { void switchToWarRoom(); return }
+  if (key === 'templates') { void switchToTemplates(); return }
   alertsTab.value = key
 }
 
@@ -421,6 +421,8 @@ onMounted(async () => {
     await switchToIncidents()
   } else if (route.query.tab === 'templates') {
     await switchToTemplates()
+  } else if (route.query.tab === 'maintenance') {
+    alertsTab.value = 'maintenance'
   } else {
     await switchToWarRoom()
   }

@@ -14,8 +14,7 @@ import type { ScheduledTaskWithHost, ScheduledTaskExecution } from '../types/tas
 import { getApiErrorMessage } from '../api/client'
 import { getExecutionStateClass } from '../utils/statusClasses'
 import { commandStatusLabel } from '../utils/commandStatus'
-import { i18n } from '../i18n'
-import { compareStrings } from '../utils/formatters'
+import { compareStrings, formatDateTime } from '../utils/formatters'
 
 const DEFAULT_CRON = '0 3 * * *'
 const TASKS_REFRESH_SEC = 30
@@ -25,8 +24,7 @@ function emptyCreateForm() {
 }
 
 function formatDate(iso: string | undefined): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleString(i18n.global.locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '')
 }
 
 function statusBadge(status: string | undefined): string {
@@ -345,7 +343,7 @@ export function useGlobalScheduledTasks() {
     refreshTimer = setInterval(() => {
       // Skip while a task is manually being run — avoids the row's
       // "running" state flickering under a refetch mid-execution.
-      if (autoRefresh.value && runningId.value === null) loadTasks()
+      if (autoRefresh.value && runningId.value === null) void loadTasks()
     }, TASKS_REFRESH_SEC * 1000)
   }
 
@@ -433,7 +431,7 @@ export function useGlobalScheduledTasks() {
 
   onMounted(() => {
     hostsStore.fetchHosts()
-    loadTasks()
+    void loadTasks()
     startRefreshTimer()
   })
   onUnmounted(stopRefreshTimer)

@@ -26,6 +26,7 @@ import (
 	"github.com/serversupervisor/server/internal/auth"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -102,7 +103,7 @@ func (s *Service) ipBlocked(ctx context.Context, ip string) bool {
 	since := time.Now().Add(-bruteForceWindow)
 	count, err := s.repo.CountRecentFailedLoginsAfterUnblock(ctx, ip, since)
 	if err != nil {
-		slog.ErrorContext(ctx, "isIPBlocked DB query failed — using in-memory fallback", slog.String("ip", ip), slog.Any("err", err))
+		slog.ErrorContext(ctx, "isIPBlocked DB query failed — using in-memory fallback", slog.String("ip", logging.Sanitize(ip)), slog.Any("err", err))
 		return s.memIsBlocked(ip)
 	}
 	return count >= bruteForceMaxFails

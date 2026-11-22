@@ -37,14 +37,20 @@ func (h *NetworkHandler) GetTopologyConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, cfg)
 }
 
-// SaveTopologyConfig persists network configuration.
+// SaveTopologyConfig persists network configuration. Operator+ only: the
+// route sits in the shared authenticated group (viewers read the same
+// config), so the role is enforced here.
 func (h *NetworkHandler) SaveTopologyConfig(c *gin.Context) {
+	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
+		respondError(c, apperr.Forbidden("operator role required"))
+		return
+	}
 	var cfg models.NetworkTopologyConfig
 	if err := c.ShouldBindJSON(&cfg); err != nil {
 		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	if err := h.svc.SaveTopologyConfig(c.Request.Context(), &cfg); err != nil {
+	if err := h.svc.SaveTopologyConfig(c.Request.Context(), &cfg, c.GetString("username"), c.ClientIP()); err != nil {
 		respondError(c, err)
 		return
 	}

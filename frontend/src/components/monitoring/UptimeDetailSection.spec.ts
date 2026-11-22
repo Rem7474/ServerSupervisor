@@ -160,3 +160,34 @@ describe('UptimeDetailSection — error state', () => {
     vi.clearAllMocks()
   })
 })
+
+describe('UptimeDetailSection — background refresh', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    setLocale('fr')
+    getUptimeProbe.mockResolvedValue({ data: { id: 'probe-1', last_status: 'up', consecutive_failures: 0 } })
+    getUptimeHistory.mockResolvedValue({ data: { results: [] } })
+    getUptimeStats.mockResolvedValue({ data: { uptime_percent: 100, successful_checks: 1, total_checks: 1, avg_latency_ms: 10, p95_latency_ms: 10 } })
+    getUptimeHistoryBuckets.mockResolvedValue({ data: { buckets: [] } })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.clearAllMocks()
+  })
+
+  it('keeps the KPIs on screen instead of flashing the skeleton on each auto-refresh', async () => {
+    const wrapper = mount(UptimeDetailSection, { props: { probeId: 'probe-1' } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('UP')
+
+    getUptimeProbe.mockReturnValue(new Promise(() => {}))
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    expect(getUptimeProbe).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).toContain('UP')
+    const kpiSkeletons = wrapper.findAllComponents({ name: 'LoadingSkeleton' }).filter((c) => c.props('variant') === 'kpi')
+    expect(kpiSkeletons).toHaveLength(0)
+    wrapper.unmount()
+  })
+})

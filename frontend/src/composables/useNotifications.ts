@@ -30,6 +30,11 @@ export type { NotificationItem }
 const notifications = ref<NotificationItem[]>([])
 const loading = ref(false)
 const readAtRef = ref<string | null>(null)
+// Browser notification permission, tracked so the bell can offer to enable
+// notifications instead of prompting on page load.
+const browserPermission = ref<NotificationPermission | 'unsupported'>(
+  typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
+)
 let seenIdSet: Set<string | number> | null = null
 let wsReady = false
 let lifecycleReady = false
@@ -143,14 +148,24 @@ export function useNotifications() {
     }
   }
 
+  // Asked from a user action (the bell's "enable" button, or saving an alert
+  // rule with the browser channel): browsers ignore or silence a permission
+  // prompt that no user gesture triggered.
+  async function enableBrowserNotifications(): Promise<void> {
+    if (typeof Notification === 'undefined') return
+    browserPermission.value = await Notification.requestPermission()
+    if (browserPermission.value === 'granted') await setupPushNotifications()
+  }
+
   function watchPermissionChange(): void {
     if (!navigator.permissions) return
     navigator.permissions.query({ name: 'notifications' as PermissionName }).then((status) => {
       status.onchange = () => {
+        if (typeof Notification !== 'undefined') browserPermission.value = Notification.permission
         if (status.state === 'denied') {
-          cleanupPushSubscription()
+          void cleanupPushSubscription()
         } else if (status.state === 'granted') {
-          setupPushNotifications()
+          void setupPushNotifications()
         }
       }
     }).catch(() => {})
@@ -202,7 +217,7 @@ export function useNotifications() {
         payload.type === 'release_tracker_execution' ||
         payload.type === 'webhook_execution'
       ) {
-        fetchNotifications()
+        void fetchNotifications()
       }
 
       for (const listener of rawListeners) listener(payload)
@@ -211,22 +226,17 @@ export function useNotifications() {
 
   function syncNotificationsIfVisible(): void {
     if (document.visibilityState !== 'visible') return
-    fetchNotifications()
+    void fetchNotifications()
   }
 
   onMounted(async () => {
     if (lifecycleReady) return
     lifecycleReady = true
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      const perm = await Notification.requestPermission()
-      if (perm === 'granted') {
-        await setupPushNotifications()
-      }
-    } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       await setupPushNotifications()
     }
     watchPermissionChange()
-    fetchNotifications()
+    void fetchNotifications()
     setInterval(fetchNotifications, 30_000)
     window.addEventListener('ss:app-resume', syncNotificationsIfVisible)
   })
@@ -243,6 +253,8 @@ export function useNotifications() {
   return {
     notifications,
     loading,
+    browserPermission,
+    enableBrowserNotifications,
     readAtRef,
     unreadCount,
     resolvingId,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../i18n'
@@ -101,5 +101,20 @@ describe('NotificationBell', () => {
     const wrapper = await mountBell()
     await wrapper.get('.notification-bell-btn').trigger('click')
     expect(wrapper.text()).toContain('No notifications')
+  })
+
+  it('offers to enable browser notifications while permission is undecided', async () => {
+    vi.mocked(Notification.requestPermission).mockResolvedValueOnce('denied')
+    const wrapper = await mountBell()
+    await wrapper.get('.notification-bell-btn').trigger('click')
+    const enable = wrapper.findAll('button').find((b) => b.text() === 'Activer')
+    expect(enable).toBeDefined()
+    expect(wrapper.text()).toContain('Recevoir les alertes même quand l’onglet est fermé')
+
+    await enable!.trigger('click')
+    await flushPromises()
+
+    expect(Notification.requestPermission).toHaveBeenCalledTimes(1)
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Activer')).toBe(false)
   })
 })

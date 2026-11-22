@@ -371,8 +371,10 @@ func (s *Service) provisionOrSyncUser(ctx context.Context, claims models.OIDCTok
 		return user, nil
 	}
 
-	// 2. Check if user exists by email
-	if claims.Email != "" {
+	// 2. Link an existing local user by email — only when the IdP asserts the
+	// address is verified. Otherwise anyone able to register an unverified
+	// email at the IdP could take over the matching local account.
+	if claims.Email != "" && claims.EmailVerified {
 		user, err = s.repo.GetUserByEmail(ctx, claims.Email)
 		if err == nil && user != nil {
 			_ = s.repo.LinkOIDCUser(ctx, user.ID, claims.Sub, claims.Email)
@@ -386,10 +388,15 @@ func (s *Service) provisionOrSyncUser(ctx context.Context, claims models.OIDCTok
 		}
 	}
 
-	// 3. Check if user exists by username
+	// 3. Username fallback. A bare username match must never hijack an
+	// existing local account: an unlinked account is only linked when the IdP
+	// vouches for a verified email equal to the account's own email. An
+	// account already bound to the same sub is a legitimate re-login; one
+	// bound to another sub is never taken over. Anything else falls through
+	// to step 4 (auto-create with a unique suffix, or rejection).
 	if claims.PreferredUsername != "" {
 		user, err = s.repo.GetUserByUsername(ctx, claims.PreferredUsername)
-		if err == nil && user != nil {
+		if err == nil && user != nil && s.canLinkByUsername(user, claims) {
 			_ = s.repo.LinkOIDCUser(ctx, user.ID, claims.Sub, claims.Email)
 			user.OIDCSub = &claims.Sub
 			if user.Role != role {
@@ -400,7 +407,6 @@ func (s *Service) provisionOrSyncUser(ctx context.Context, claims models.OIDCTok
 			return user, nil
 		}
 	}
-
 	// 4. If user not found, create new if auto-provisioning is enabled
 	if !s.cfg.OIDCAutoCreateUser {
 		return nil, apperr.Forbidden("user account not found and auto-provisioning is disabled")
@@ -425,6 +431,18 @@ func (s *Service) provisionOrSyncUser(ctx context.Context, claims models.OIDCTok
 	}
 
 	return newUser, nil
+}
+
+// canLinkByUsername reports whether an OIDC login may adopt the local account
+// matched by username. See step 3 of provisionOrSyncUser.
+func (s *Service) canLinkByUsername(user *models.User, claims models.OIDCTokenClaims) bool {
+	if user.OIDCSub != nil {
+		return *user.OIDCSub == claims.Sub
+	}
+	if !claims.EmailVerified || claims.Email == "" || user.Email == nil {
+		return false
+	}
+	return strings.EqualFold(*user.Email, claims.Email)
 }
 
 func extractStringSlice(claims map[string]interface{}, key string) []string {

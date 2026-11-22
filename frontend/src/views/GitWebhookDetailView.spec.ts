@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../i18n'
 
 const { getGitWebhook, getHosts, getWebhookExecutions, getCommandStatus } = vi.hoisted(() => ({
@@ -47,6 +48,7 @@ function baseWebhook(overrides: Record<string, unknown> = {}) {
 
 describe('GitWebhookDetailView', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     setLocale('fr')
     getGitWebhook.mockResolvedValue({ data: { webhook: baseWebhook(), executions: [] } })

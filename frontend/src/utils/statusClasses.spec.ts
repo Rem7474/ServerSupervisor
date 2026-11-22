@@ -3,6 +3,9 @@ import { setLocale } from '../i18n'
 import {
   getEntityStateClass, getEntityStateLabel, getExecutionStateClass, getExecutionStateLabel,
   knownEntityStates, knownExecutionStates,
+  httpStatusClass,
+  probeStatusClass,
+  sslDaysClass,
 } from './statusClasses'
 
 beforeEach(() => {
@@ -81,5 +84,44 @@ describe('locale reactivity', () => {
     setLocale('en')
     expect(getEntityStateLabel('running')).toBe('Running')
     expect(getExecutionStateLabel('completed')).toBe('Completed')
+  })
+})
+
+describe('httpStatusClass', () => {
+  it.each([
+    [200, 'success'],
+    [204, 'success'],
+    [301, 'primary'],
+    [404, 'warning'],
+    [499, 'warning'],
+    [500, 'danger'],
+    [503, 'danger'],
+    [101, 'secondary'],
+    [null, 'secondary'],
+  ])('%s → %s (same hue as the traffic status donut)', (code, tone) => {
+    expect(httpStatusClass(code)).toBe(`bg-${tone}-lt text-${tone}`)
+  })
+})
+
+describe('probeStatusClass', () => {
+  it('maps up/down and falls back to neutral', () => {
+    expect(probeStatusClass('up')).toBe('bg-success-lt text-success')
+    expect(probeStatusClass('down', 'text')).toBe('text-danger')
+    expect(probeStatusClass(undefined)).toBe('bg-secondary-lt text-secondary')
+  })
+})
+
+describe('sslDaysClass', () => {
+  it.each([
+    [null, 'bg-secondary-lt text-secondary', 'text-secondary'],
+    [-1, 'bg-danger text-white', 'text-danger'],
+    [0, 'bg-danger-lt text-danger', 'text-danger'],
+    [7, 'bg-danger-lt text-danger', 'text-danger'],
+    [8, 'bg-warning-lt text-warning', 'text-warning'],
+    [30, 'bg-warning-lt text-warning', 'text-warning'],
+    [31, 'bg-success-lt text-success', 'text-success'],
+  ])('%s days → %s / %s', (days, badge, text) => {
+    expect(sslDaysClass(days)).toBe(badge)
+    expect(sslDaysClass(days, 'text')).toBe(text)
   })
 })

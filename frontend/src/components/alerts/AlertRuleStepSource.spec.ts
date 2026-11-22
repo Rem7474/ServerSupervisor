@@ -130,6 +130,27 @@ describe('AlertRuleStepSource (characterization, per source-type branches)', () 
   })
 })
 
+describe('AlertRuleStepSource — partial host metrics notice', () => {
+  const capabilities = { metrics: [{ metric: 'cpu' }, { metric: 'memory' }, { metric: 'disk' }] }
+
+  it.each([
+    [1, 'fr', 'Cet hôte dispose de 1 métrique —'],
+    [2, 'fr', 'Cet hôte dispose de 2 métriques —'],
+    [1, 'en', 'This host has 1 metric —'],
+    [2, 'en', 'This host has 2 metrics —'],
+  ])('%i reported metric(s) in %s', (count, locale, expected) => {
+    setLocale(locale as 'fr' | 'en')
+    const wrapper = mount(AlertRuleStepSource, {
+      props: baseProps({
+        form: formFor('cpu', { host_id: 'host-1' }),
+        capabilities,
+        hostMetrics: { metrics: capabilities.metrics.slice(0, count) },
+      }),
+    })
+    expect(wrapper.text()).toContain(expected)
+  })
+})
+
 describe('AlertRuleStepSource — field writes emit a whole-object update:form, never mutate the prop', () => {
   it('hostIdModel (plain fieldModel) emits the merged form without touching sibling fields', async () => {
     const form = formFor('cpu', { host_id: '' })

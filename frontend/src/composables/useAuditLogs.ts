@@ -9,9 +9,8 @@ import { getApiErrorMessage } from '../api/client'
 import { useStatusBadge } from './useStatusBadge'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { moduleLabel, moduleClass, remoteCommandModuleOptions } from '../utils/moduleMeta'
-import { useCommandStream } from './useCommandStream'
+import { useCommandLogViewer, patchRow } from './useCommandLogViewer'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
-import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
 import type { AuditLog, LoginEvent } from '../types/generated'
 import { AuditCategoryAlert, AuditCategoryAuth, AuditCategoryCommand, AuditCategorySettings } from '../types/generated'
 import type { SecurityData } from '../components/security/AuditSecurityPanel.vue'
@@ -50,11 +49,31 @@ export function useAuditLogs() {
   const moduleFilterOptions = computed(() => remoteCommandModuleOptions())
   const journalCategoryFilterOptions = computed(() => journalCategoryOptions())
 
-  const activeTab = ref((route.query.tab as string) || 'commandes')
+  function resolveTab(raw: unknown): 'commandes' | 'connexions' | 'journal' {
+    const val = Array.isArray(raw) ? raw[0] : raw
+    if (val === 'connexions' && auth.role === 'admin') return 'connexions'
+    if (val === 'journal' && auth.role === 'admin') return 'journal'
+    return 'commandes'
+  }
+
+  const activeTab = ref<string>(resolveTab(route.query.tab))
 
   watch(activeTab, (tab) => {
-    router.replace({ query: { ...route.query, tab } })
+    if (route.query.tab !== tab) {
+      router.replace({ query: { ...route.query, tab } })
+    }
   })
+
+  watch(
+    () => route.query.tab,
+    (nextTab) => {
+      const target = resolveTab(nextTab)
+      if (target === activeTab.value) return
+      if (target === 'connexions') void switchToConnexions()
+      else if (target === 'journal') void switchToJournal()
+      else void switchToCommandes()
+    }
+  )
 
   // ── Commands history ─────────────────────────────────────────────────────────
   const cmds = ref<RemoteCommandWithHost[]>([])
@@ -108,21 +127,29 @@ export function useAuditLogs() {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
     searchDebounceTimer = setTimeout(() => {
       cmdsPage.value = 1
-      fetchCmds()
+      void fetchCmds()
     }, 350)
   }
 
   function onFilterChange(): void {
     cmdsPage.value = 1
-    fetchCmds()
+    void fetchCmds()
   }
 
-  const selectedCmd = ref<RemoteCommand | null>(null)
-  const showLogViewer = ref(false)
   const cancellingId = ref<string | null>(null)
   let auditPollTimer: ReturnType<typeof setInterval> | null = null
 
-  const { openCommandStream, closeStream } = useCommandStream()
+  // Keeps the command list row in step with the console while it streams.
+  function syncCmdInList(commandId: string, status: string, output?: string): void {
+    patchRow(cmds, (c) => c.id === commandId, { status, ...(output ? { output } : {}) })
+  }
+
+  const {
+    selected: selectedCmd,
+    visible: showLogViewer,
+    show: showCommand,
+    close: closeLogViewer,
+  } = useCommandLogViewer<RemoteCommand>({ onStatus: syncCmdInList })
 
   // ── Connexions (admin) ───────────────────────────────────────────────────────
   const connexions = ref<LoginEvent[]>([])
@@ -171,48 +198,14 @@ export function useAuditLogs() {
     return getStatusBadgeClass(status, 'badge bg-warning-lt text-warning')
   }
 
+  // Re-opening the selected row only brings the console back; it keeps
+  // following the stream it already has.
   function openLogViewer(cmd: RemoteCommand): void {
     if (selectedCmd.value?.id === cmd.id) {
       showLogViewer.value = true
       return
     }
-    closeLogViewer()
-    selectedCmd.value = { ...cmd }
-    showLogViewer.value = true
-
-    if (cmd.status === 'running' || cmd.status === 'pending') {
-      connectStream(cmd.id)
-    }
-  }
-
-  function closeLogViewer(): void {
-    closeStream()
-    selectedCmd.value = null
-    showLogViewer.value = false
-  }
-
-  function connectStream(commandId: string): void {
-    const syncCmdInList = (patch: Partial<RemoteCommand>): void => {
-      const idx = cmds.value.findIndex((c) => c.id === commandId)
-      if (idx === -1) return
-      const next = [...cmds.value]
-      next[idx] = { ...next[idx], ...patch }
-      cmds.value = next
-    }
-
-    openCommandStream(commandId, {
-      onInit(p: CommandStreamInitMsg) {
-        if (selectedCmd.value) { selectedCmd.value.status = p.status; selectedCmd.value.output = p.output || '' }
-        syncCmdInList({ status: p.status, output: p.output || '' })
-      },
-      onChunk(p: CommandStreamChunkMsg) {
-        if (selectedCmd.value) selectedCmd.value.output = (selectedCmd.value.output || '') + p.chunk
-      },
-      onStatus(p: CommandStatusUpdateMsg) {
-        if (selectedCmd.value) { selectedCmd.value.status = p.status; if (p.output) selectedCmd.value.output = p.output }
-        syncCmdInList({ status: p.status, ...(p.output ? { output: p.output } : {}) })
-      },
-    })
+    showCommand(cmd)
   }
 
   // ── Data fetching ─────────────────────────────────────────────────────────────
@@ -320,6 +313,10 @@ export function useAuditLogs() {
   }
 
   async function switchToConnexions(): Promise<void> {
+    if (auth.role !== 'admin') {
+      await switchToCommandes()
+      return
+    }
     activeTab.value = 'connexions'
     if (!connexionsLoaded.value) await fetchConnexions()
   }
@@ -358,6 +355,10 @@ export function useAuditLogs() {
   }
 
   async function switchToJournal(): Promise<void> {
+    if (auth.role !== 'admin') {
+      await switchToCommandes()
+      return
+    }
     activeTab.value = 'journal'
     if (!journalLoaded.value) await fetchJournal()
   }
@@ -365,12 +366,12 @@ export function useAuditLogs() {
   function selectJournalPage(page: number): void {
     if (page < 1 || page === journalPage.value) return
     journalPage.value = page
-    fetchJournal()
+    void fetchJournal()
   }
 
   watch([journalCategoryFilter, journalFrom, journalTo], () => {
     journalPage.value = 1
-    fetchJournal()
+    void fetchJournal()
   })
 
   async function exportJournal(): Promise<void> {
@@ -400,13 +401,13 @@ export function useAuditLogs() {
     if (page === cmdsPage.value) return
     cmdsPage.value = page
     closeLogViewer()
-    fetchCmds()
+    void fetchCmds()
   }
 
   function selectConnexionsPage(page: number): void {
     if (page === connexionsPage.value) return
     connexionsPage.value = page
-    fetchConnexions()
+    void fetchConnexions()
   }
 
   async function setSecurityPeriod(hours: number): Promise<void> {
@@ -449,7 +450,10 @@ export function useAuditLogs() {
 
   onMounted(async () => {
     if (route.query.module) cmdModuleFilter.value = String(route.query.module)
-    await fetchCmds()
+    const initialTab = resolveTab(route.query.tab)
+    if (initialTab === 'connexions') await switchToConnexions()
+    else if (initialTab === 'journal') await switchToJournal()
+    else await switchToCommandes()
     const cmdId = route.query.command
     if (cmdId) {
       try {
@@ -464,12 +468,12 @@ export function useAuditLogs() {
         const now = Date.now()
         const refreshMs = hasActiveCommands.value ? 5000 : 30000
         if (now - lastCmdFetchAt.value >= refreshMs) {
-          fetchCmds()
+          void fetchCmds()
         }
-      } else if (auth.role === 'admin') {
+      } else if (activeTab.value === 'connexions' && auth.role === 'admin') {
         const now = Date.now()
         if (now - lastConnFetchAt.value >= 30000) {
-          fetchConnexions()
+          void fetchConnexions()
         }
       }
     }, 5000)

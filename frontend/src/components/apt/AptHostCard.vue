@@ -81,6 +81,7 @@
           type="button"
           class="btn btn-icon btn-sm btn-ghost-secondary flex-shrink-0"
           :title="t('apt.viewLiveLogs')"
+          :aria-label="t('apt.viewLiveLogs')"
           @click="$emit('watch-command', activeCommand)"
         >
           <IconList
@@ -137,6 +138,7 @@
             type="button"
             class="btn btn-icon btn-sm btn-outline-secondary"
             :title="t('apt.scheduleModalTitle')"
+            :aria-label="t('apt.scheduleModalTitle')"
             @click="$emit('schedule')"
           >
             <IconCalendar
@@ -153,6 +155,7 @@
           type="button"
           class="btn btn-icon btn-sm btn-ghost-secondary flex-shrink-0"
           :title="expanded ? t('apt.collapse') : t('apt.expandTooltip')"
+          :aria-label="expanded ? t('apt.collapse') : t('apt.expandTooltip')"
           @click="$emit('update:expanded', !expanded)"
         >
           <IconChevronDown :size="16" />
@@ -314,6 +317,7 @@
                 type="button"
                 class="btn btn-icon btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
                 :title="t('apt.viewLogs')"
+                :aria-label="t('apt.viewLogs')"
                 @click="$emit('watch-command', cmd)"
               >
                 <IconList

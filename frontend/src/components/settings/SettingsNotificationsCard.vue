@@ -30,7 +30,7 @@
             v-model="form.githubToken"
             :type="showGitHubToken ? 'text' : 'password'"
             class="form-control"
-            placeholder="ghp_..."
+            :placeholder="githubTokenConfigured ? '••••••••' : 'ghp_...'"
             autocomplete="new-password"
             aria-describedby="github-token-hint"
           >
@@ -98,6 +98,7 @@ withDefaults(defineProps<{
   form: NotifForm
   authIsAdmin?: boolean
   showGitHubToken?: boolean
+  githubTokenConfigured?: boolean
   savingNotif?: boolean
   notifSaveMsg?: string
   notifSaveOk?: boolean
@@ -107,6 +108,7 @@ withDefaults(defineProps<{
 }>(), {
   authIsAdmin: false,
   showGitHubToken: false,
+  githubTokenConfigured: false,
   savingNotif: false,
   notifSaveMsg: '',
   notifSaveOk: false,

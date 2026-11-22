@@ -143,7 +143,7 @@
               </div>
               <div
                 class="h3 mb-1"
-                :class="tempColor(nodeCpuTempCurrent)"
+                :class="getTemperatureColorClass(nodeCpuTempCurrent)"
               >
                 {{ nodeCpuTempCurrent > 0 ? `${nodeCpuTempCurrent.toFixed(1)}°C` : '—' }}
               </div>
@@ -191,7 +191,7 @@
                 {{ t('proxmox.uptimeLabel') }}
               </div>
               <div class="h3 mb-0">
-                {{ formatUptime(node.uptime) }}
+                {{ formatUptime(node.uptime, '—') }}
               </div>
             </div>
 
@@ -487,6 +487,7 @@
               </h5>
               <button
                 type="button"
+                :aria-label="t('common.close')"
                 class="btn-close"
                 @click="migrateModal.open = false"
               />
@@ -574,10 +575,11 @@ import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
 import { useProxmoxNode } from '../composables/useProxmoxNode'
 import { useModalChrome } from '../composables/useModalChrome'
-import { getMetricColorClass } from '../utils/metricColor'
+import { getMetricColorClass, getTemperatureColorClass } from '../utils/metricColor'
+import { formatDateTime, formatUptime, formatBytes as formatBytesShared } from '../utils/formatters'
 
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const {
   node,
@@ -707,9 +709,9 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
 // avoids re-triggering on every tab.value change load() itself makes.
 function onTabClick(key: string): void {
   tab.value = key
-  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackups() }
-  if (key === 'services') loadServices()
-  if (key === 'backups') loadBackups()
+  if (key === 'vms' || key === 'lxc') { void loadGuestNetworks(); void loadGuestExposure(); void loadBackups() }
+  if (key === 'services') void loadServices()
+  if (key === 'backups') void loadBackups()
 }
 
 function memPct(n: { mem_used?: number; mem_total?: number }): string | number {
@@ -719,13 +721,6 @@ function memPct(n: { mem_used?: number; mem_total?: number }): string | number {
 
 function cpuColor(usage: number): string {
   return getMetricColorClass(usage * 100, 'bg')
-}
-
-function tempColor(temp: number | undefined): string {
-  if (!temp) return 'text-secondary'
-  if (temp >= 85) return 'text-danger'
-  if (temp >= 70) return 'text-warning'
-  return 'text-success'
 }
 
 function ramColor(used: number, total: number): string {
@@ -739,27 +734,11 @@ function storageColor(used: number, total: number): string {
 }
 
 function formatBytes(bytes: number | undefined): string {
-  if (!bytes) return '0 B'
-  const unitKeys = ['proxmox.byteUnitKilo', 'proxmox.byteUnitMega', 'proxmox.byteUnitGiga', 'proxmox.byteUnitTera']
-  let i = 0, v = bytes
-  while (v >= 1024 && i < unitKeys.length) { v /= 1024; i++ }
-  const unit = i === 0 ? 'B' : t(unitKeys[i - 1])
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${unit}`
-}
-
-function formatUptime(seconds: number | undefined): string {
-  if (!seconds) return '—'
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  if (d > 0) return `${d}${t('proxmox.daySuffix')} ${h}h`
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
+  return formatBytesShared(bytes || 0)
 }
 
 function formatDate(iso: string | undefined): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
+  return formatDateTime(iso, '—')
 }
 </script>
 

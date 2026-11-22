@@ -97,7 +97,7 @@
           v-else
           class="table-responsive"
         >
-          <table class="table table-vcenter card-table mb-0">
+          <table class="table table-vcenter card-table">
             <thead>
               <tr>
                 <th>
@@ -416,7 +416,7 @@ watch(() => props.refreshTick, () => {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
     refreshTimer = null
-    load()
+    void load()
   }, 400)
 })
 
@@ -424,7 +424,7 @@ watch(() => props.refreshTick, () => {
 // stays mounted (EntityTabShell keeps lazy tabs alive via v-show), so data
 // can otherwise go stale while the user was looking at another tab.
 watch(() => props.active, (isActive) => {
-  if (isActive && props.collectorAvailable !== false) load()
+  if (isActive && props.collectorAvailable !== false) void load()
 })
 </script>
 

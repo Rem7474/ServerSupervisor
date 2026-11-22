@@ -12,7 +12,7 @@ import (
 
 // RefreshNodeApt triggers `apt-get update` on a Proxmox node via the PVE API.
 func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
-	upid, err := h.svc.RefreshNodeApt(c.Request.Context(), c.Param("id"))
+	upid, err := h.svc.RefreshNodeApt(c.Request.Context(), c.Param("id"), proxmoxActor(c))
 	if err != nil {
 		respondError(c, err)
 		return
@@ -65,7 +65,7 @@ func (h *ProxmoxHandler) MigrateGuest(c *gin.Context) {
 		respondError(c, apperr.Validation("vmid invalide"))
 		return
 	}
-	upid, err := h.svc.MigrateGuest(c.Request.Context(), c.Param("id"), vmid, body.GuestType, body.Target, body.Online)
+	upid, err := h.svc.MigrateGuest(c.Request.Context(), c.Param("id"), vmid, body.GuestType, body.Target, body.Online, proxmoxActor(c))
 	if err != nil {
 		respondError(c, err)
 		return
@@ -84,7 +84,7 @@ func (h *ProxmoxHandler) GuestAction(c *gin.Context) {
 		respondError(c, apperr.Validation("action requise"))
 		return
 	}
-	upid, err := h.svc.GuestAction(c.Request.Context(), c.Param("id"), body.Action)
+	upid, err := h.svc.GuestAction(c.Request.Context(), c.Param("id"), body.Action, proxmoxActor(c))
 	if err != nil {
 		respondError(c, err)
 		return
@@ -94,7 +94,7 @@ func (h *ProxmoxHandler) GuestAction(c *gin.Context) {
 
 // NodeServiceAction proxies a systemd service action to PVE (start/stop/restart/reload).
 func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
-	upid, err := h.svc.NodeServiceAction(c.Request.Context(), c.Param("id"), c.Param("service"), c.Param("action"))
+	upid, err := h.svc.NodeServiceAction(c.Request.Context(), c.Param("id"), c.Param("service"), c.Param("action"), proxmoxActor(c))
 	if err != nil {
 		respondError(c, err)
 		return

@@ -1,9 +1,10 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
-import { isApiAbort } from '../api/client'
+import { isApiAbort, getApiErrorMessage } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { ProxmoxSummary, ProxmoxNode, ProxmoxConnection } from '../types/proxmox'
+import { useAutoRefresh } from './useAutoRefresh'
 
 const PROXMOX_REFRESH_SEC = 30
 
@@ -16,9 +17,7 @@ export function useProxmox() {
   const filterConnection = ref('')
   const loading = ref(true)
   const error = ref('')
-  const autoRefresh = ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
-  let refreshTimer: ReturnType<typeof setInterval> | null = null
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => load(), { intervalSec: PROXMOX_REFRESH_SEC })
   const nodeSortKey = ref<string>('node_name')
   const nodeSortDir = ref<'asc' | 'desc'>('asc')
 
@@ -129,13 +128,13 @@ export function useProxmox() {
       if (instRes.status === 'fulfilled') {
         instances.value = instRes.value.data
       } else if (instRes.reason?.response?.status !== 403) {
-        error.value = instRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
+        error.value = getApiErrorMessage(instRes.reason, t('proxmox.genericLoadError'))
       }
       if (sumRes.status === 'rejected' && sumRes.reason?.response?.status !== 403) {
-        error.value = sumRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
+        error.value = getApiErrorMessage(sumRes.reason, t('proxmox.genericLoadError'))
       }
       if (nodesRes.status === 'rejected' && nodesRes.reason?.response?.status !== 403) {
-        error.value = nodesRes.reason?.response?.data?.error || t('proxmox.genericLoadError')
+        error.value = getApiErrorMessage(nodesRes.reason, t('proxmox.genericLoadError'))
       }
     } finally {
       loading.value = false
@@ -143,19 +142,7 @@ export function useProxmox() {
     }
   }
 
-  function startRefreshTimer(): void {
-    stopRefreshTimer()
-    refreshTimer = setInterval(() => {
-      if (autoRefresh.value) load()
-    }, PROXMOX_REFRESH_SEC * 1000)
-  }
-
-  function stopRefreshTimer(): void {
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
-  }
-
-  onMounted(() => { load(); startRefreshTimer() })
-  onUnmounted(stopRefreshTimer)
+  onMounted(() => { void load() })
 
   return {
     summary,

@@ -40,5 +40,6 @@ withDefaults(defineProps<{
 }>(), {
   series: null,
   options: () => ({}),
+  emptyText: undefined,
 })
 </script>

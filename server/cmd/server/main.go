@@ -177,6 +177,15 @@ func main() {
 		poller.Every(rootCtx, handlers.NPMPollInterval, false, "npm-sync", npmH.PollOnce)
 	}
 
+	// Purge expired OIDC authorization states (single-use rows normally deleted
+	// on consumption; abandoned ceremonies would otherwise accumulate forever).
+	// Local-only DB housekeeping, so it also runs in demo mode.
+	poller.Every(rootCtx, time.Hour, false, "oidc-state-cleanup", func(ctx context.Context) {
+		if err := db.CleanExpiredOIDCStates(ctx); err != nil {
+			slog.WarnContext(ctx, "failed to clean expired OIDC states", slog.Any("err", err))
+		}
+	})
+
 	// Start server
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

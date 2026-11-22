@@ -3,7 +3,7 @@
     v-if="visible"
     ref="modalRef"
     class="modal modal-blur show d-block"
-    style="background:rgba(0,0,0,.5)"
+    style="background: var(--ss-panel-medium)"
     role="dialog"
     aria-modal="true"
   >
@@ -15,6 +15,7 @@
           </h5>
           <button
             type="button"
+            :aria-label="t('common.close')"
             class="btn-close"
             @click="close"
           />

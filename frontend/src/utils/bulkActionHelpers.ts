@@ -18,17 +18,3 @@ export async function confirmBulkAction(
     cancelLabel: t('common.cancel'),
   })
 }
-
-export async function confirmDestructiveAction(
-  title: string,
-  description: string
-): Promise<boolean> {
-  const { confirm } = useConfirmDialog()
-
-  return await confirm({
-    title,
-    message: description,
-    destructive: true,
-    variant: 'danger',
-  })
-}

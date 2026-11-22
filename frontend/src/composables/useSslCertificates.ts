@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { npmApi } from '../api/npm'
@@ -6,6 +6,9 @@ import type { SSLCertificate } from '../types/ssl'
 import { useConfirmDialog } from './useConfirmDialog'
 import dayjs from '../utils/dayjs'
 import { usePagination } from './usePagination'
+import { getApiErrorMessage } from '../api/client'
+import { sslDaysClass } from '../utils/statusClasses'
+import { useAutoRefresh } from './useAutoRefresh'
 
 type SSLCert = SSLCertificate
 
@@ -25,8 +28,7 @@ export function useSslCertificates() {
   const { t } = useI18n()
   const dialog = useConfirmDialog()
 
-  const autoRefresh = ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => fetchCerts(), { intervalSec: REFRESH_SEC })
   const error = ref('')
 
   const certs = ref<SSLCert[]>([])
@@ -90,15 +92,11 @@ export function useSslCertificates() {
   function daysLabel(d: number | null | undefined): string {
     if (d == null) return t('monitoring.sslCertStatusUnknown')
     if (d < 0) return t('monitoring.sslDaysExpiredWithCount', { days: Math.abs(d) })
-    return `${d}j`
+    return `${d}${t('common.dayUnitShort')}`
   }
 
   function daysBadge(d: number | null | undefined): string {
-    if (d == null) return 'bg-secondary-lt text-secondary'
-    if (d < 0) return 'bg-danger text-white'
-    if (d <= 7) return 'bg-danger-lt text-danger'
-    if (d <= 30) return 'bg-warning-lt text-warning'
-    return 'bg-success-lt text-success'
+    return sslDaysClass(d)
   }
 
   async function fetchCerts(): Promise<void> {
@@ -109,7 +107,7 @@ export function useSslCertificates() {
       lastUpdatedAt.value = new Date()
       error.value = ''
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.sslLoadCertsError')
+      error.value = getApiErrorMessage(e, t('monitoring.sslLoadCertsError'))
     } finally {
       loadingCerts.value = false
     }
@@ -121,7 +119,7 @@ export function useSslCertificates() {
       await api.checkSSLCertificateNow(c.id)
       await fetchCerts()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.checkFailedError')
+      error.value = getApiErrorMessage(e, t('monitoring.checkFailedError'))
     } finally {
       checkingCertId.value = ''
     }
@@ -168,7 +166,7 @@ export function useSslCertificates() {
       closeCertModal()
       await fetchCerts()
     } catch (e: unknown) {
-      certFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.saveErrorGeneric')
+      certFormError.value = getApiErrorMessage(e, t('monitoring.saveErrorGeneric'))
     } finally {
       savingCert.value = false
     }
@@ -195,7 +193,7 @@ export function useSslCertificates() {
       await api.deleteSSLCertificate(c.id)
       await fetchCerts()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.deleteFailedError')
+      error.value = getApiErrorMessage(e, t('monitoring.deleteFailedError'))
     }
   }
 
@@ -209,14 +207,7 @@ export function useSslCertificates() {
 
   watch(certSort, resetCertPage, { deep: true })
 
-  let refreshTimer: ReturnType<typeof setInterval> | undefined
-  onMounted(() => {
-    fetchCerts()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) fetchCerts() }, REFRESH_SEC * 1000)
-  })
-  onUnmounted(() => {
-    if (refreshTimer) clearInterval(refreshTimer)
-  })
+  onMounted(() => { void fetchCerts() })
 
   return {
     REFRESH_SEC,

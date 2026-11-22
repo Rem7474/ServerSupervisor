@@ -19,6 +19,7 @@ import (
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/events"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/safego"
 	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
@@ -185,7 +186,7 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 
 	parsedOrigin, err := url.Parse(origin)
 	if err != nil {
-		slog.Warn("[WS] rejected origin (parse error)", slog.String("origin", origin))
+		slog.Warn("[WS] rejected origin (parse error)", slog.String("origin", logging.Sanitize(origin)))
 		return false
 	}
 
@@ -200,7 +201,7 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 			return true
 		}
 		if parsedOrigin.Host == parsedBase.Host {
-			slog.Warn("[WS] allowed origin with scheme mismatch (update BASE_URL scheme if needed)", slog.String("origin", origin), slog.String("base_url", baseURL))
+			slog.Warn("[WS] allowed origin with scheme mismatch (update BASE_URL scheme if needed)", slog.String("origin", logging.Sanitize(origin)), slog.String("base_url", logging.Sanitize(baseURL)))
 			return true
 		}
 	}
@@ -218,12 +219,12 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 			return true
 		}
 		if parsedOrigin.Host == parsedAllowed.Host {
-			slog.Warn("[WS] allowed origin with scheme mismatch", slog.String("origin", origin), slog.String("allowed", allowed))
+			slog.Warn("[WS] allowed origin with scheme mismatch", slog.String("origin", logging.Sanitize(origin)), slog.String("allowed", logging.Sanitize(allowed)))
 			return true
 		}
 	}
 
-	slog.Warn("[WS] rejected origin (set BASE_URL or ALLOWED_ORIGINS correctly)", slog.String("origin", origin), slog.String("base_url", baseURL))
+	slog.Warn("[WS] rejected origin (set BASE_URL or ALLOWED_ORIGINS correctly)", slog.String("origin", logging.Sanitize(origin)), slog.String("base_url", logging.Sanitize(baseURL)))
 	return false
 }
 

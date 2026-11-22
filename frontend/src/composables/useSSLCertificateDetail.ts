@@ -1,11 +1,13 @@
-import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
-import { isApiAbort } from '../api/client'
+import { isApiAbort, getApiErrorMessage } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 import type { SSLCertificate, SSLCertificateEvent } from '../types/ssl'
 import dayjs from '../utils/dayjs'
+import { sslDaysClass } from '../utils/statusClasses'
+import { useAutoRefresh } from './useAutoRefresh'
 
 type SSLCert = SSLCertificate
 
@@ -26,9 +28,8 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
   const loading = ref(false)
   const loadingEvents = ref(false)
   const error = ref('')
-  const autoRefresh = autoRefreshOverride ?? ref(true)
-  const lastUpdatedAt = ref<Date | null>(null)
   const REFRESH_SEC = 60
+  const { autoRefresh, lastUpdatedAt } = useAutoRefresh(() => fetchAll(), { intervalSec: REFRESH_SEC, enabled: autoRefreshOverride })
 
   function formatDate(ts: string | undefined | null): string {
     return ts ? dayjs(ts).format('YYYY-MM-DD') : '—'
@@ -59,12 +60,7 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
 
   const statusColor = computed(() => {
     if (!cert.value) return ''
-    const d = cert.value.days_remaining
-    if (d == null) return 'text-secondary'
-    if (d < 0) return 'text-danger'
-    if (d <= 7) return 'text-danger'
-    if (d <= 30) return 'text-warning'
-    return 'text-success'
+    return sslDaysClass(cert.value.days_remaining, 'text')
   })
 
   const daysColor = computed(() => statusColor.value)
@@ -86,7 +82,7 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
       lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       if (isApiAbort(e)) return
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || t('monitoring.sslLoadCertError')
+      error.value = getApiErrorMessage(e, t('monitoring.sslLoadCertError'))
     } finally {
       loading.value = false
     }
@@ -108,14 +104,7 @@ export function useSSLCertificateDetail(certIdOverride?: string, autoRefreshOver
     await Promise.all([fetchCert(), fetchEvents()])
   }
 
-  let refreshTimer: ReturnType<typeof setInterval> | undefined
-  onMounted(() => {
-    fetchAll()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) fetchAll() }, REFRESH_SEC * 1000)
-  })
-  onUnmounted(() => {
-    if (refreshTimer) clearInterval(refreshTimer)
-  })
+  onMounted(() => { void fetchAll() })
 
   return {
     cert,

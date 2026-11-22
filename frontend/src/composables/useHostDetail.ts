@@ -10,6 +10,7 @@ import type { WSHostSnapshot } from '../types/ws'
 import { useAuthStore } from '../stores/auth'
 import { confirmAptCommand } from '../utils/aptConfirm'
 import { i18n } from '../i18n'
+import { formatBytes } from '../utils/formatters'
 
 // AnyRecord is the raw shape of an untyped JSON payload received over WebSocket
 // or HTTP. The composable keeps it loose because the consuming components
@@ -214,11 +215,11 @@ export function useHostDetail() {
         const nextStatus = asString(p.status, current.status)
         updateCommand({ ...current, status: nextStatus })
         if (nextStatus === 'completed' || nextStatus === 'failed') {
-          loadCmdHistoryRefresh()
+          void loadCmdHistoryRefresh()
           if (current.module === 'apt') {
             const action = asString(current.action)
             if (['install_uu', 'configure_uu', 'toggle_uu', 'run_uu'].includes(action)) {
-              loadUUData()
+              void loadUUData()
             }
           }
         }
@@ -597,15 +598,7 @@ export function useHostDetail() {
   }
 
   function formatBytesLink(bytes: number) {
-    if (!bytes) return '0 B'
-    const units = ['B', 'Ko', 'Mo', 'Go', 'To']
-    let i = 0
-    let v = bytes
-    while (v >= 1024 && i < units.length - 1) {
-      v /= 1024
-      i++
-    }
-    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+    return formatBytes(bytes || 0)
   }
 
   const hostPerms = ref<AnyRecord[]>([])
@@ -671,11 +664,11 @@ export function useHostDetail() {
   }
 
   onMounted(() => {
-    loadComplete()
-    loadProxmoxLink()
-    loadHostPerms()
-    loadUUData()
-    loadHostIncidents()
+    void loadComplete()
+    void loadProxmoxLink()
+    void loadHostPerms()
+    void loadUUData()
+    void loadHostIncidents()
   })
 
   return {

@@ -1,33 +1,5 @@
 <template>
   <div>
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-      <div>
-        <div class="page-pretitle">
-          <router-link
-            to="/"
-            class="text-decoration-none"
-          >
-            {{ t('account.dashboardBreadcrumb') }}
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <router-link
-            to="/account"
-            class="text-decoration-none"
-          >
-            {{ t('common.myAccount') }}
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <span>{{ t('account.accountSecurityBreadcrumb') }}</span>
-        </div>
-        <h2 class="page-title">
-          {{ t('account.mfaAuthTitle') }}
-        </h2>
-        <div class="text-secondary">
-          {{ t('account.securityConfigSubtitle') }}
-        </div>
-      </div>
-    </div>
-
     <!-- MFA card -->
     <div
       class="card mb-4"
@@ -131,8 +103,12 @@
                   </button>
                 </div>
                 <div class="mb-3">
-                  <label class="form-label">{{ t('account.totpCodeLabel') }}</label>
+                  <label
+                    class="form-label"
+                    for="mfa-verify-code"
+                  >{{ t('account.totpCodeLabel') }}</label>
                   <input
+                    id="mfa-verify-code"
                     v-model="verifyCode"
                     type="text"
                     class="form-control"
@@ -182,8 +158,12 @@
               {{ t('account.disableMfaButton') }}
             </div>
             <div class="mb-3">
-              <label class="form-label">{{ t('account.passwordLabel') }}</label>
+              <label
+                class="form-label"
+                for="mfa-disable-password"
+              >{{ t('account.passwordLabel') }}</label>
               <input
+                id="mfa-disable-password"
                 v-model="disablePassword"
                 type="password"
                 class="form-control"
@@ -263,6 +243,13 @@
           v-else-if="webauthnCredentials.length"
           class="table table-vcenter mb-3"
         >
+          <thead class="visually-hidden">
+            <tr>
+              <th>{{ t('account.passkeyColumnName') }}</th>
+              <th>{{ t('account.passkeyColumnDetails') }}</th>
+              <th>{{ t('account.passkeyColumnActions') }}</th>
+            </tr>
+          </thead>
           <tbody>
             <tr
               v-for="cred in webauthnCredentials"
@@ -303,8 +290,12 @@
           v-if="addingPasskey"
           class="border rounded p-3"
         >
-          <label class="form-label">{{ t('account.keyNameLabel') }}</label>
+          <label
+            class="form-label"
+            for="passkey-name"
+          >{{ t('account.keyNameLabel') }}</label>
           <input
+            id="passkey-name"
             v-model="newPasskeyName"
             type="text"
             class="form-control mb-3"
@@ -413,10 +404,10 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { IconClock, IconCopy, IconDeviceDesktop, IconKey, IconX } from '@tabler/icons-vue'
-import ConnectionsTable from '../components/common/ConnectionsTable.vue'
-import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import { useAccountSecurity } from '../composables/useAccountSecurity'
-import { useDateFormatter } from '../composables/useDateFormatter'
+import ConnectionsTable from '../common/ConnectionsTable.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
+import { useAccountSecurity } from '../../composables/useAccountSecurity'
+import { useDateFormatter } from '../../composables/useDateFormatter'
 
 const { t } = useI18n()
 const { formatExactDate, formatRelativeTime } = useDateFormatter()

@@ -1,21 +1,26 @@
 <template>
   <CommandLogPanel
-    mode="custom"
+    :mode="terminal ? 'custom' : 'log'"
     :show="show"
-    :title="t('proxmox.consoleTitle', { name: guestName || guestId })"
+    :command="command"
+    :empty-text="emptyText"
+    :clearable="clearable"
+    :title="terminal ? t('proxmox.consoleTitle', { name: guestName || guestId }) : logTitle"
     wrapper-class="side-panel side-panel-terminal"
     @close="handleClose"
     @open="$emit('open')"
+    @clear="$emit('clear')"
   >
     <template #title-suffix>
       <span
+        v-if="terminal"
         :class="statusBadgeClass"
         class="ms-2"
       >{{ statusLabel }}</span>
     </template>
     <template #header-actions>
       <button
-        v-if="status !== 'connecting' && status !== 'connected'"
+        v-if="terminal && status !== 'connecting' && status !== 'connected'"
         type="button"
         class="btn btn-sm btn-ghost-secondary"
         @click="connect"
@@ -84,6 +89,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           :title="t('proxmox.upArrowTooltip')"
+          :aria-label="t('proxmox.upArrowTooltip')"
           @click="sendArrow('\u001b[A')"
         >
           <IconArrowUp
@@ -96,6 +102,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           :title="t('proxmox.downArrowTooltip')"
+          :aria-label="t('proxmox.downArrowTooltip')"
           @click="sendArrow('\u001b[B')"
         >
           <IconArrowDown
@@ -108,6 +115,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           :title="t('proxmox.leftArrowTooltip')"
+          :aria-label="t('proxmox.leftArrowTooltip')"
           @click="sendArrow('\u001b[D')"
         >
           <IconArrowLeft
@@ -120,6 +128,7 @@
           class="btn btn-icon btn-sm btn-ghost-secondary"
           :disabled="!inputEnabled"
           :title="t('proxmox.rightArrowTooltip')"
+          :aria-label="t('proxmox.rightArrowTooltip')"
           @click="sendArrow('\u001b[C')"
         >
           <IconArrowRight
@@ -144,18 +153,33 @@ import { useProxmoxConsole } from '../../composables/useProxmoxConsole'
 import { useStatusBadge } from '../../composables/useStatusBadge'
 import { useModalChrome } from '../../composables/useModalChrome'
 
+// One side panel hosts either this guest's terminal (`terminal`, the default)
+// or a command-output log (`terminal` false, fed by `command`), so a page that
+// offers both keeps a single panel and a single reopen button. `show` is the
+// panel's visibility whichever content it holds.
 const props = withDefaults(defineProps<{
   guestId: string
   guestName?: string
   show?: boolean
+  terminal?: boolean
+  command?: Record<string, unknown> | null
+  logTitle?: string
+  emptyText?: string
+  clearable?: boolean
 }>(), {
   guestName: '',
   show: false,
+  terminal: true,
+  command: null,
+  logTitle: '',
+  emptyText: '',
+  clearable: false,
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'open'): void
+  (e: 'clear'): void
 }>()
 
 const { t } = useI18n()
@@ -283,6 +307,18 @@ function sendArrow(sequence: string): void {
   ctrlArmed.value = false
 }
 
+// xterm.js turns Ctrl+V into a literal ^V for the shell and Ctrl+C into ^C,
+// so neither pastes nor copies. Returning false hands the key back to the
+// browser: Ctrl+V then fires a native paste event, and Ctrl+C with a
+// selection copies it. Without a selection Ctrl+C stays the interrupt key.
+function handleKeyEvent(e: KeyboardEvent): boolean {
+  if (e.type !== 'keydown' || !e.ctrlKey || e.altKey || e.metaKey) return true
+  const key = e.key.toLowerCase()
+  if (key === 'v') return false
+  if (key === 'c' && term?.hasSelection()) return false
+  return true
+}
+
 function connect(): void {
   if (!term) return
   ctrlArmed.value = false
@@ -295,7 +331,7 @@ function connect(): void {
 // hides a static log). Reopening (the "Rouvrir" button, or the parent
 // re-showing the panel) starts a fresh session via connect().
 function handleClose(): void {
-  closeSocket()
+  if (props.terminal) closeSocket()
   emit('close')
 }
 
@@ -337,6 +373,7 @@ async function mountTerminal(): Promise<void> {
   fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
   term.open(containerEl.value)
+  term.attachCustomKeyEventHandler(handleKeyEvent)
   scheduleFit()
 
   connect()
@@ -354,7 +391,9 @@ function teardownTerminal(): void {
   fitAddon = null
 }
 
-watch(() => props.show, (visible) => {
+const terminalVisible = computed(() => props.show && props.terminal)
+
+watch(terminalVisible, (visible) => {
   if (!visible) return
   if (!term) {
     void mountTerminal()

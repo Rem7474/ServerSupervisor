@@ -16,7 +16,9 @@ import { translateError } from '../utils/translateError'
 import { formatRelativeTime } from './useDateFormatter'
 import dayjs from '../utils/dayjs'
 import { useReactiveApexChartPalette } from '../utils/apexChartTheme'
-import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp } from '../utils/chartTimeAxis'
+import { clampTimestamp, getMinPointTimestamp, getMaxPointTimestamp, formatChartTimestamp, chartTimeDetail } from '../utils/chartTimeAxis'
+import { getMetricColorClass } from '../utils/metricColor'
+import { formatUptime } from '../utils/formatters'
 
 interface DashboardCveSummary {
   critical_count?: number
@@ -307,7 +309,7 @@ export function useDashboard() {
     if (!proxmoxAutoSwitched.value && proxmoxNodes.value.length > 0) {
       proxmoxAutoSwitched.value = true
       chartSource.value = 'proxmox'
-      fetchSummary()
+      void fetchSummary()
     }
   }
 
@@ -330,7 +332,7 @@ export function useDashboard() {
     summaryRefreshTimer = setInterval(() => {
       if (document.visibilityState !== 'visible') return
       if (summaryLoading.value) return
-      fetchSummary()
+      void fetchSummary()
     }, summaryRefreshIntervalMs())
   }
 
@@ -360,12 +362,7 @@ export function useDashboard() {
   }
 
   function formatSummaryChartTime(timestamp?: number) {
-    if (!timestamp) return ''
-    const date = dayjs(timestamp)
-    if (!date.isValid()) return ''
-    if (summaryHours.value < 24) return date.format('HH:mm')
-    if (summaryHours.value < 720) return date.format('DD/MM HH:mm')
-    return date.format('DD/MM')
+    return formatChartTimestamp(timestamp, chartTimeDetail(summaryHours.value))
   }
 
   function toSummaryPoint(point: DashboardMetricPoint, key: 'cpu_avg' | 'memory_avg'): ChartPoint | null {
@@ -412,7 +409,7 @@ export function useDashboard() {
 
   function changeSummaryRange(hours: number) {
     summaryHours.value = hours
-    fetchSummary()
+    void fetchSummary()
     startSummaryRefreshTimer()
   }
 
@@ -448,33 +445,18 @@ export function useDashboard() {
     }
   }
 
-  function formatUptime(seconds: number | null | undefined) {
-    if (seconds == null) return 'N/A'
-    const days = Math.floor(seconds / 86400)
-    const hours = Math.floor((seconds % 86400) / 3600)
-    if (days > 0) return `${days}j ${hours}h`
-    return `${hours}h ${Math.floor((seconds % 3600) / 60)}m`
-  }
-
+  // A 0 CPU/RAM reading means "no metrics yet" (the agent never reports a
+  // true 0), so it stays neutral; a 0 % disk is a real value.
   function cpuColor(pct: number | null | undefined) {
-    if (!pct) return 'text-secondary'
-    if (pct > 90) return 'text-danger'
-    if (pct > 70) return 'text-warning'
-    return 'text-success'
+    return pct ? getMetricColorClass(pct) : 'text-secondary'
   }
 
   function memColor(pct: number | null | undefined) {
-    if (!pct) return 'text-secondary'
-    if (pct > 90) return 'text-danger'
-    if (pct > 75) return 'text-warning'
-    return 'text-success'
+    return pct ? getMetricColorClass(pct) : 'text-secondary'
   }
 
   function diskColor(pct: number | null | undefined) {
-    if (pct == null) return 'text-secondary'
-    if (pct > 90) return 'text-danger'
-    if (pct > 75) return 'text-warning'
-    return 'text-success'
+    return getMetricColorClass(pct)
   }
 
   function isAgentUpToDate(version: string) {
@@ -503,8 +485,8 @@ export function useDashboard() {
       })
       .catch(() => {}) // WS is the nominal path — REST is best-effort
 
-    fetchSummary()
-    fetchProxmoxSummary()
+    void fetchSummary()
+    void fetchProxmoxSummary()
     apiClient
       .getSettings()
       .then((r) => {
@@ -512,7 +494,7 @@ export function useDashboard() {
       })
       .catch(() => {})
 
-    refreshCveSummary()
+    void refreshCveSummary()
     cveRefreshTimer = setInterval(refreshCveSummary, 5 * 60 * 1000)
     startSummaryRefreshTimer()
     wsEvents.on('reconnected', refreshDashboardOnReconnect)

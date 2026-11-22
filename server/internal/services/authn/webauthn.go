@@ -17,6 +17,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -346,7 +347,7 @@ func (s *Service) FinishWebAuthnLogin(ctx context.Context, username, sessionToke
 		return nil, apperr.Unauthorized("security key verification failed")
 	}
 	if err := s.repo.UpdateWebAuthnCredentialUsage(ctx, updatedCred.ID, *updatedCred); err != nil {
-		slog.ErrorContext(ctx, "failed to persist webauthn sign-count update", slog.String("user", username), slog.Any("err", err))
+		slog.ErrorContext(ctx, "failed to persist webauthn sign-count update", slog.String("user", logging.Sanitize(username)), slog.Any("err", err))
 	}
 
 	_ = s.repo.CreateLoginEvent(ctx, username, ip, userAgent, true)

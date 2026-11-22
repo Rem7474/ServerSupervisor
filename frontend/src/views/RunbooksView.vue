@@ -106,6 +106,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-success"
                     :title="t('runbooks.runButton')"
+                    :aria-label="t('runbooks.runButton')"
                     :disabled="runningIds.has(rb.id)"
                     @click="handleRun(rb)"
                   >
@@ -123,6 +124,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
                     :title="t('runbooks.historyButton')"
+                    :aria-label="t('runbooks.historyButton')"
                     @click="openHistory(rb)"
                   >
                     <IconHistory
@@ -134,6 +136,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-secondary"
                     :title="t('runbooks.editButton')"
+                    :aria-label="t('runbooks.editButton')"
                     @click="startEdit(rb)"
                   >
                     <IconPencil
@@ -145,6 +148,7 @@
                     type="button"
                     class="btn btn-icon btn-sm btn-ghost-danger"
                     :title="t('runbooks.deleteButton')"
+                    :aria-label="t('runbooks.deleteButton')"
                     @click="handleDelete(rb)"
                   >
                     <IconTrash
@@ -175,6 +179,7 @@
             </h5>
             <button
               type="button"
+              :aria-label="t('common.close')"
               class="btn-close"
               @click="closeModal"
             />
@@ -208,7 +213,7 @@
             <label class="form-label">{{ t('runbooks.stepsOrderedLabel') }}</label>
             <div
               v-for="(step, index) in form.steps"
-              :key="index"
+              :key="stepKey(step)"
               class="border rounded p-2 mb-2"
             >
               <div class="row g-2 align-items-end">
@@ -228,8 +233,9 @@
                 <div class="col-auto">
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-danger"
+                    class="btn btn-icon btn-sm btn-ghost-danger"
                     :title="t('runbooks.removeStepTooltip')"
+                    :aria-label="t('runbooks.removeStepTooltip')"
                     @click="form.steps.splice(index, 1)"
                   >
                     <IconTrash
@@ -301,6 +307,7 @@
             </h5>
             <button
               type="button"
+              :aria-label="t('common.close')"
               class="btn-close"
               @click="closeHistory"
             />
@@ -342,7 +349,7 @@
                       <td>
                         <span
                           class="badge"
-                          :class="executionBadgeClass(exec.status)"
+                          :class="execBadgeColor(exec.status)"
                         >{{ executionStatusLabel(exec.status) }}</span>
                       </td>
                       <td>{{ exec.triggered_by }}</td>
@@ -358,7 +365,7 @@
                         colspan="4"
                         class="bg-dark-subtle"
                       >
-                        <table class="table table-sm mb-0">
+                        <table class="table table-vcenter table-sm mb-0">
                           <thead>
                             <tr>
                               <th>#</th>
@@ -380,7 +387,7 @@
                                 <span
                                   v-if="s.status"
                                   class="badge"
-                                  :class="executionBadgeClass(s.status)"
+                                  :class="execBadgeColor(s.status)"
                                 >{{ executionStatusLabel(s.status) }}
                                   <span
                                     v-if="s.status === 'running' || s.status === 'pending'"
@@ -460,6 +467,8 @@ import {
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useModalChrome } from '../composables/useModalChrome'
 import type { Runbook, RunbookStepCreate } from '../types/generated'
+import { execBadgeColor } from '../utils/statusClasses'
+import { formatDateTimeSeconds } from '../utils/formatters'
 
 const {
   hostsStore, runbooks, loading, fetched, error,
@@ -470,7 +479,7 @@ const {
   selectedStepCommand, showStepLogPanel, openStepLogs, closeStepLogs,
 } = useRunbooks()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const editModalRef = ref<HTMLElement | null>(null)
 const historyModalRef = ref<HTMLElement | null>(null)
@@ -552,19 +561,26 @@ function executionStatusLabel(status: string): string {
   return status || t('common.statusUnknown')
 }
 
-function executionBadgeClass(status: string): string {
-  if (status === 'completed') return 'bg-success-lt text-success'
-  if (status === 'failed') return 'bg-danger-lt text-danger'
-  if (status === 'running' || status === 'pending') return 'bg-primary-lt text-primary'
-  return 'bg-secondary-lt text-secondary'
-}
 
 function formatDate(dateStr: string | undefined | null): string {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString(locale.value)
+  return formatDateTimeSeconds(dateStr, '')
 }
 
 onMounted(async () => {
   await Promise.all([loadRunbooks(), hostsStore.fetchHosts()])
 })
+
+// Stable per-step key, so removing a step doesn't hand the next step's row
+// (and its DispatchStepEditor state) to a different step. Kept outside the
+// step objects so the saved payload is unchanged.
+const stepKeys = new WeakMap<object, number>()
+let nextStepKey = 0
+function stepKey(step: object): number {
+  let key = stepKeys.get(step)
+  if (key === undefined) {
+    key = ++nextStepKey
+    stepKeys.set(step, key)
+  }
+  return key
+}
 </script>

@@ -27,8 +27,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatTime } from '../utils/formatters'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: boolean
@@ -43,7 +44,7 @@ defineEmits<{
 
 const lastUpdatedLabel = computed(() => {
   if (!props.lastUpdatedAt) return t('common.never')
-  return props.lastUpdatedAt.toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  return formatTime(props.lastUpdatedAt, true)
 })
 </script>
 

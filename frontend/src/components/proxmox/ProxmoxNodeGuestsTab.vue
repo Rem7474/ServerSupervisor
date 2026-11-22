@@ -163,6 +163,7 @@
                   type="button"
                   class="btn btn-sm btn-icon btn-ghost-success"
                   :title="t('proxmox.startTooltip')"
+                  :aria-label="t('proxmox.startTooltip')"
                   :disabled="actionLoadingFor(g) !== null"
                   @click="emit('guest-action', g, 'start')"
                 >
@@ -180,6 +181,7 @@
                     type="button"
                     class="btn btn-sm btn-icon btn-ghost-warning"
                     :title="t('proxmox.restartTooltip')"
+                    :aria-label="t('proxmox.restartTooltip')"
                     :disabled="actionLoadingFor(g) !== null"
                     @click="emit('guest-action', g, 'reboot')"
                   >
@@ -196,6 +198,7 @@
                     type="button"
                     class="btn btn-sm btn-icon btn-ghost-danger"
                     :title="t('proxmox.stopTooltip')"
+                    :aria-label="t('proxmox.stopTooltip')"
                     :disabled="actionLoadingFor(g) !== null"
                     @click="emit('guest-action', g, 'shutdown')"
                   >
