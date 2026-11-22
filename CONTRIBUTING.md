@@ -2,7 +2,7 @@
 
 ## Prérequis
 
-- Go 1.25+ (version exacte dans `server/go.mod` / `agent/go.mod`)
+- Go 1.26+ (version exacte dans `server/go.mod` / `agent/go.mod`)
 - Node.js 22+
 - TimescaleDB 2.27.2 (PostgreSQL 16) — prérequis obligatoire (hypertables, `time_bucket`, retention policies)
 
