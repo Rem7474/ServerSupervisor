@@ -232,7 +232,7 @@ export function useReleaseTrackerDetail() {
   }
 
   onMounted(() => {
-    load()
+    void load()
     cooldownTimer = window.setInterval(() => {
       nowTick.value = Date.now()
     }, 60000)

@@ -346,7 +346,7 @@ export function useSettings() {
   }
 
   onMounted(() => {
-    if (auth.isAdmin) fetchSettings()
+    if (auth.isAdmin) void fetchSettings()
   })
 
   return {

@@ -221,7 +221,7 @@ const {
 
 function toggleOpen(): void {
   isOpen.value = !isOpen.value
-  if (isOpen.value) fetchNotifications()
+  if (isOpen.value) void fetchNotifications()
 }
 
 function onClickOutside(e: MouseEvent): void {

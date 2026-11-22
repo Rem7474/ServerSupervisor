@@ -187,7 +187,7 @@ export function useUptimeProbeDetail(probeIdOverride?: string, autoRefreshOverri
   }
 
   onMounted(() => {
-    fetchAll()
+    void fetchAll()
   })
 
   return {

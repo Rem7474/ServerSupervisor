@@ -709,9 +709,9 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
 // avoids re-triggering on every tab.value change load() itself makes.
 function onTabClick(key: string): void {
   tab.value = key
-  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure(); loadBackups() }
-  if (key === 'services') loadServices()
-  if (key === 'backups') loadBackups()
+  if (key === 'vms' || key === 'lxc') { void loadGuestNetworks(); void loadGuestExposure(); void loadBackups() }
+  if (key === 'services') void loadServices()
+  if (key === 'backups') void loadBackups()
 }
 
 function memPct(n: { mem_used?: number; mem_total?: number }): string | number {

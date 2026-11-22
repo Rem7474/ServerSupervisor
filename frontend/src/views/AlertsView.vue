@@ -391,10 +391,10 @@ const alertsTabs = computed<EntityTab[]>(() => [
 // (alertsTab.value=...) as part of their lazy-load-on-first-visit logic;
 // 'rules' has no such loader, so it's a plain assignment.
 function onTabClick(key: string): void {
-  if (key === 'releases') { switchToTrackers(); return }
-  if (key === 'incidents') { switchToIncidents(); return }
-  if (key === 'warroom') { switchToWarRoom(); return }
-  if (key === 'templates') { switchToTemplates(); return }
+  if (key === 'releases') { void switchToTrackers(); return }
+  if (key === 'incidents') { void switchToIncidents(); return }
+  if (key === 'warroom') { void switchToWarRoom(); return }
+  if (key === 'templates') { void switchToTemplates(); return }
   alertsTab.value = key
 }
 

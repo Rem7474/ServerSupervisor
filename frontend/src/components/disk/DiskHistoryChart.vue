@@ -257,7 +257,7 @@ async function loadHistory(hours: number): Promise<void> {
 watch(() => props.mounts, (v) => {
   if (v.length && !selectedMount.value) {
     selectedMount.value = v[0]
-    loadHistory(chartHours.value)
+    void loadHistory(chartHours.value)
   }
 }, { immediate: false })
 
@@ -266,14 +266,14 @@ watch(() => props.refreshTick, () => {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
     refreshTimer = null
-    loadHistory(chartHours.value)
+    void loadHistory(chartHours.value)
   }, 400)
 })
 
 onMounted(() => {
   if (props.mounts.length) {
     selectedMount.value = props.mounts[0]
-    loadHistory(24)
+    void loadHistory(24)
   }
 })
 </script>

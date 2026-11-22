@@ -342,7 +342,7 @@ watch(() => props.refreshTick, () => {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
     refreshTimer = null
-    loadHistory(chartHours.value)
+    void loadHistory(chartHours.value)
   }, 400)
 })
 

@@ -195,11 +195,11 @@ watch(() => props.refreshTick, () => {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
     refreshTimer = null
-    loadHistory()
+    void loadHistory()
   }, 400)
 })
 
 onMounted(() => {
-  loadHistory()
+  void loadHistory()
 })
 </script>

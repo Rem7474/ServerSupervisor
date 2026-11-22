@@ -343,7 +343,7 @@ export function useGlobalScheduledTasks() {
     refreshTimer = setInterval(() => {
       // Skip while a task is manually being run — avoids the row's
       // "running" state flickering under a refetch mid-execution.
-      if (autoRefresh.value && runningId.value === null) loadTasks()
+      if (autoRefresh.value && runningId.value === null) void loadTasks()
     }, TASKS_REFRESH_SEC * 1000)
   }
 
@@ -431,7 +431,7 @@ export function useGlobalScheduledTasks() {
 
   onMounted(() => {
     hostsStore.fetchHosts()
-    loadTasks()
+    void loadTasks()
     startRefreshTimer()
   })
   onUnmounted(stopRefreshTimer)

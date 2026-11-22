@@ -659,7 +659,7 @@ function populateForm(entries: ConfigEntry[]) {
 
 function toggleRevealSecrets() {
   revealSecrets.value = !revealSecrets.value
-  loadConfig()
+  void loadConfig()
 }
 
 function toggleLocalPassword(key: string) {
@@ -808,7 +808,7 @@ async function saveCategory(category: string) {
 }
 
 onMounted(() => {
-  loadConfig()
+  void loadConfig()
 })
 </script>
 

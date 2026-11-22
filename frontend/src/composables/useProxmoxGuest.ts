@@ -285,7 +285,7 @@ export function useProxmoxGuest() {
 
   function changeRange(value: number): void {
     hours.value = value
-    loadGuestSummary()
+    void loadGuestSummary()
   }
 
   async function performGuestAction(action: GuestPowerAction): Promise<void> {
@@ -319,7 +319,7 @@ export function useProxmoxGuest() {
     await loadGuestSummary()
     await loadGuestNetworks()
     refreshTimer = setInterval(() => {
-      if (autoRefresh.value) loadGuest()
+      if (autoRefresh.value) void loadGuest()
     }, GUEST_REFRESH_SEC * 1000)
   })
   onUnmounted(() => {

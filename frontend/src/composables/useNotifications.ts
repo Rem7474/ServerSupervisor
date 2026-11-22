@@ -163,9 +163,9 @@ export function useNotifications() {
       status.onchange = () => {
         if (typeof Notification !== 'undefined') browserPermission.value = Notification.permission
         if (status.state === 'denied') {
-          cleanupPushSubscription()
+          void cleanupPushSubscription()
         } else if (status.state === 'granted') {
-          setupPushNotifications()
+          void setupPushNotifications()
         }
       }
     }).catch(() => {})
@@ -217,7 +217,7 @@ export function useNotifications() {
         payload.type === 'release_tracker_execution' ||
         payload.type === 'webhook_execution'
       ) {
-        fetchNotifications()
+        void fetchNotifications()
       }
 
       for (const listener of rawListeners) listener(payload)
@@ -226,7 +226,7 @@ export function useNotifications() {
 
   function syncNotificationsIfVisible(): void {
     if (document.visibilityState !== 'visible') return
-    fetchNotifications()
+    void fetchNotifications()
   }
 
   onMounted(async () => {
@@ -236,7 +236,7 @@ export function useNotifications() {
       await setupPushNotifications()
     }
     watchPermissionChange()
-    fetchNotifications()
+    void fetchNotifications()
     setInterval(fetchNotifications, 30_000)
     window.addEventListener('ss:app-resume', syncNotificationsIfVisible)
   })

@@ -127,13 +127,13 @@ export function useAuditLogs() {
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
     searchDebounceTimer = setTimeout(() => {
       cmdsPage.value = 1
-      fetchCmds()
+      void fetchCmds()
     }, 350)
   }
 
   function onFilterChange(): void {
     cmdsPage.value = 1
-    fetchCmds()
+    void fetchCmds()
   }
 
   const cancellingId = ref<string | null>(null)
@@ -366,12 +366,12 @@ export function useAuditLogs() {
   function selectJournalPage(page: number): void {
     if (page < 1 || page === journalPage.value) return
     journalPage.value = page
-    fetchJournal()
+    void fetchJournal()
   }
 
   watch([journalCategoryFilter, journalFrom, journalTo], () => {
     journalPage.value = 1
-    fetchJournal()
+    void fetchJournal()
   })
 
   async function exportJournal(): Promise<void> {
@@ -401,13 +401,13 @@ export function useAuditLogs() {
     if (page === cmdsPage.value) return
     cmdsPage.value = page
     closeLogViewer()
-    fetchCmds()
+    void fetchCmds()
   }
 
   function selectConnexionsPage(page: number): void {
     if (page === connexionsPage.value) return
     connexionsPage.value = page
-    fetchConnexions()
+    void fetchConnexions()
   }
 
   async function setSecurityPeriod(hours: number): Promise<void> {
@@ -468,12 +468,12 @@ export function useAuditLogs() {
         const now = Date.now()
         const refreshMs = hasActiveCommands.value ? 5000 : 30000
         if (now - lastCmdFetchAt.value >= refreshMs) {
-          fetchCmds()
+          void fetchCmds()
         }
       } else if (activeTab.value === 'connexions' && auth.role === 'admin') {
         const now = Date.now()
         if (now - lastConnFetchAt.value >= 30000) {
-          fetchConnexions()
+          void fetchConnexions()
         }
       }
     }, 5000)

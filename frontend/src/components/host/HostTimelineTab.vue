@@ -210,7 +210,7 @@ async function load(): Promise<void> {
 function startRefreshTimer(): void {
   stopRefreshTimer()
   refreshTimer = setInterval(() => {
-    if (autoRefresh.value) load()
+    if (autoRefresh.value) void load()
   }, TIMELINE_REFRESH_SEC * 1000)
 }
 
@@ -249,7 +249,7 @@ function statusLabel(status: string): string {
 }
 
 onMounted(() => {
-  load()
+  void load()
   startRefreshTimer()
 })
 onUnmounted(stopRefreshTimer)

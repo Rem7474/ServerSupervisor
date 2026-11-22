@@ -466,7 +466,7 @@ watch(
   () => props.active,
   (active) => {
     if (active && !tasks.value.length && !tasksLoading.value) {
-      loadTasks()
+      void loadTasks()
     }
   },
   { immediate: true }

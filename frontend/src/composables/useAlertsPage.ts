@@ -217,7 +217,7 @@ export function useAlertsPage(): UseAlertsPageApi {
       (payload.type === 'release_tracker_detected' || payload.type === 'release_tracker_execution') &&
       trackersLoaded.value
     ) {
-      loadTrackers()
+      void loadTrackers()
     }
   }
 

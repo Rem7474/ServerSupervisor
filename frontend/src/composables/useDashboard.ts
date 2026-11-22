@@ -309,7 +309,7 @@ export function useDashboard() {
     if (!proxmoxAutoSwitched.value && proxmoxNodes.value.length > 0) {
       proxmoxAutoSwitched.value = true
       chartSource.value = 'proxmox'
-      fetchSummary()
+      void fetchSummary()
     }
   }
 
@@ -332,7 +332,7 @@ export function useDashboard() {
     summaryRefreshTimer = setInterval(() => {
       if (document.visibilityState !== 'visible') return
       if (summaryLoading.value) return
-      fetchSummary()
+      void fetchSummary()
     }, summaryRefreshIntervalMs())
   }
 
@@ -409,7 +409,7 @@ export function useDashboard() {
 
   function changeSummaryRange(hours: number) {
     summaryHours.value = hours
-    fetchSummary()
+    void fetchSummary()
     startSummaryRefreshTimer()
   }
 
@@ -485,8 +485,8 @@ export function useDashboard() {
       })
       .catch(() => {}) // WS is the nominal path — REST is best-effort
 
-    fetchSummary()
-    fetchProxmoxSummary()
+    void fetchSummary()
+    void fetchProxmoxSummary()
     apiClient
       .getSettings()
       .then((r) => {
@@ -494,7 +494,7 @@ export function useDashboard() {
       })
       .catch(() => {})
 
-    refreshCveSummary()
+    void refreshCveSummary()
     cveRefreshTimer = setInterval(refreshCveSummary, 5 * 60 * 1000)
     startSummaryRefreshTimer()
     wsEvents.on('reconnected', refreshDashboardOnReconnect)

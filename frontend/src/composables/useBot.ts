@@ -311,8 +311,8 @@ export function useBot() {
 
   onMounted(() => {
     hostsStore.fetchHosts()
-    loadThreats()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) loadThreats() }, BOT_REFRESH_SEC * 1000)
+    void loadThreats()
+    refreshTimer = setInterval(() => { if (autoRefresh.value) void loadThreats() }, BOT_REFRESH_SEC * 1000)
   })
   onUnmounted(() => {
     if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
