@@ -3,9 +3,13 @@
     <div class="card-body">
       <!-- Webhook URL -->
       <div class="mb-3">
-        <label class="form-label fw-medium">{{ t('webhooks.webhookUrlLabel') }}</label>
+        <label
+          :for="`${uid}-1`"
+          class="form-label fw-medium"
+        >{{ t('webhooks.webhookUrlLabel') }}</label>
         <div class="input-group">
           <input
+            :id="`${uid}-1`"
             type="text"
             class="form-control font-monospace small"
             readonly
@@ -32,9 +36,13 @@
 
       <!-- Secret -->
       <div class="mb-3">
-        <label class="form-label fw-medium">{{ t('webhooks.hmacSecretLabel') }}</label>
+        <label
+          :for="`${uid}-2`"
+          class="form-label fw-medium"
+        >{{ t('webhooks.hmacSecretLabel') }}</label>
         <div class="input-group">
           <input
+            :id="`${uid}-2`"
             :type="showSecret ? 'text' : 'password'"
             class="form-control font-monospace small"
             readonly
@@ -44,6 +52,7 @@
             v-if="currentSecret"
             class="btn btn-outline-secondary"
             type="button"
+            :aria-label="t('webhooks.toggleSecretVisibility')"
             @click="showSecret = !showSecret"
           >
             <IconEye
@@ -116,12 +125,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconCheck, IconCopy, IconEye, IconEyeOff, IconRefresh } from '@tabler/icons-vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import api from '../../api'
 import { getApiErrorMessage } from '../../api/client'
+
+const uid = useId()
 
 const { t } = useI18n()
 

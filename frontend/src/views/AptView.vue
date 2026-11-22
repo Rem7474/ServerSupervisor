@@ -12,9 +12,9 @@
         <span>APT</span>
       </div>
       <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <h2 class="page-title">
+        <h1 class="page-title">
           {{ t('apt.pageTitle') }}
-        </h2>
+        </h1>
         <router-link
           to="/audit?module=apt"
           class="btn btn-sm btn-outline-secondary"

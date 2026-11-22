@@ -13,9 +13,9 @@
             <span class="text-muted mx-1">/</span>
             <span>Runbooks</span>
           </div>
-          <h2 class="page-title">
+          <h1 class="page-title">
             Runbooks
-          </h2>
+          </h1>
           <div class="text-muted small mt-1">
             {{ t('runbooks.pageSubtitle') }}
           </div>
@@ -170,6 +170,8 @@
       ref="editModalRef"
       class="modal modal-blur fade show d-block"
       tabindex="-1"
+      role="dialog"
+      aria-modal="true"
     >
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -192,8 +194,12 @@
               {{ saveError }}
             </div>
             <div class="mb-3">
-              <label class="form-label">{{ t('runbooks.nameColumn') }}</label>
+              <label
+                :for="`${uid}-1`"
+                class="form-label"
+              >{{ t('runbooks.nameColumn') }}</label>
               <input
+                :id="`${uid}-1`"
                 v-model="form.name"
                 type="text"
                 class="form-control"
@@ -201,8 +207,12 @@
               >
             </div>
             <div class="mb-3">
-              <label class="form-label">Description</label>
+              <label
+                :for="`${uid}-2`"
+                class="form-label"
+              >Description</label>
               <textarea
+                :id="`${uid}-2`"
                 v-model="form.description"
                 class="form-control"
                 rows="2"
@@ -210,7 +220,10 @@
               />
             </div>
 
-            <label class="form-label">{{ t('runbooks.stepsOrderedLabel') }}</label>
+            <label
+              :for="`${uid}-3`"
+              class="form-label"
+            >{{ t('runbooks.stepsOrderedLabel') }}</label>
             <div
               v-for="(step, index) in form.steps"
               :key="stepKey(step)"
@@ -247,6 +260,7 @@
               </div>
               <label class="form-check mt-2 mb-0">
                 <input
+                  :id="`${uid}-3`"
                   v-model="step.continue_on_failure"
                   class="form-check-input"
                   type="checkbox"
@@ -298,6 +312,8 @@
       ref="historyModalRef"
       class="modal modal-blur fade show d-block"
       tabindex="-1"
+      role="dialog"
+      aria-modal="true"
     >
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -454,7 +470,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconFileText, IconHistory, IconPencil, IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -469,6 +485,8 @@ import { useModalChrome } from '../composables/useModalChrome'
 import type { Runbook, RunbookStepCreate } from '../types/generated'
 import { execBadgeColor } from '../utils/statusClasses'
 import { formatDateTimeSeconds } from '../utils/formatters'
+
+const uid = useId()
 
 const {
   hostsStore, runbooks, loading, fetched, error,

@@ -18,9 +18,9 @@
           <span class="text-muted mx-1">/</span>
           <span>{{ t('account.usersPageLabel') }}</span>
         </div>
-        <h2 class="page-title">
+        <h1 class="page-title">
           {{ t('account.usersPageLabel') }}
-        </h2>
+        </h1>
         <div class="text-secondary">
           {{ t('account.rolesManagementSubtitle') }}
         </div>
@@ -41,8 +41,12 @@
         >
           <div class="row g-3">
             <div class="col-md-4">
-              <label class="form-label">{{ t('account.usernameLabel') }}</label>
+              <label
+                :for="`${uid}-1`"
+                class="form-label"
+              >{{ t('account.usernameLabel') }}</label>
               <input
+                :id="`${uid}-1`"
                 v-model="newUserForm.username"
                 name="username"
                 type="text"
@@ -56,8 +60,12 @@
               >
             </div>
             <div class="col-md-4">
-              <label class="form-label">{{ t('account.passwordLabel') }}</label>
+              <label
+                :for="`${uid}-2`"
+                class="form-label"
+              >{{ t('account.passwordLabel') }}</label>
               <input
+                :id="`${uid}-2`"
                 v-model="newUserForm.password"
                 name="new-password"
                 type="password"
@@ -69,8 +77,12 @@
               >
             </div>
             <div class="col-md-3">
-              <label class="form-label">{{ t('account.roleLabel') }}</label>
+              <label
+                :for="`${uid}-3`"
+                class="form-label"
+              >{{ t('account.roleLabel') }}</label>
               <select
+                :id="`${uid}-3`"
                 v-model="newUserForm.role"
                 class="form-select"
                 :disabled="creatingUser"
@@ -219,12 +231,15 @@
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconTrash } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { useUsers } from '../composables/useUsers'
+
+const uid = useId()
 
 const { t } = useI18n()
 

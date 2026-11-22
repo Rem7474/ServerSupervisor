@@ -27,8 +27,12 @@
     >
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.name') }} *</label>
+          <label
+            :for="`${uid}-1`"
+            class="form-label"
+          >{{ t('settings.name') }} *</label>
           <input
+            :id="`${uid}-1`"
             v-model="form.name"
             type="text"
             class="form-control"
@@ -36,8 +40,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.registryHostLabel') }} *</label>
+          <label
+            :for="`${uid}-2`"
+            class="form-label"
+          >{{ t('settings.registryHostLabel') }} *</label>
           <input
+            :id="`${uid}-2`"
             v-model="form.registry_host"
             type="text"
             class="form-control"
@@ -45,8 +53,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('common.user') }} *</label>
+          <label
+            :for="`${uid}-3`"
+            class="form-label"
+          >{{ t('common.user') }} *</label>
           <input
+            :id="`${uid}-3`"
             v-model="form.username"
             type="text"
             class="form-control"
@@ -54,8 +66,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.passwordToken') }} {{ editingId ? t('settings.unchangedIfEmpty') : '*' }}</label>
+          <label
+            :for="`${uid}-4`"
+            class="form-label"
+          >{{ t('settings.passwordToken') }} {{ editingId ? t('settings.unchangedIfEmpty') : '*' }}</label>
           <input
+            :id="`${uid}-4`"
             v-model="form.password"
             type="password"
             class="form-control"
@@ -167,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
@@ -174,6 +191,8 @@ import type { RegistryCredential } from '../../types/tracker'
 import { useConnectionCrud } from '../../composables/useConnectionCrud'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+
+const uid = useId()
 
 const { t } = useI18n()
 

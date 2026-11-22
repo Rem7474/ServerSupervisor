@@ -3,6 +3,8 @@
     v-if="show"
     ref="modalRef"
     class="traffic-modal-backdrop"
+    role="dialog"
+    aria-modal="true"
     @click.self="$emit('close')"
   >
     <div class="traffic-modal card shadow-lg">

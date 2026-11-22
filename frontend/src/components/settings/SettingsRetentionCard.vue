@@ -7,8 +7,12 @@
     </div>
     <div class="card-body">
       <div class="mb-3">
-        <label class="form-label">{{ t('settings.metricsLabel') }}</label>
+        <label
+          :for="`${uid}-1`"
+          class="form-label"
+        >{{ t('settings.metricsLabel') }}</label>
         <input
+          :id="`${uid}-1`"
           v-model.number="form.metricsRetentionDays"
           type="number"
           class="form-control"
@@ -24,8 +28,12 @@
         </div>
       </div>
       <div class="mb-3">
-        <label class="form-label">{{ t('settings.auditDefaultLabel') }}</label>
+        <label
+          :for="`${uid}-2`"
+          class="form-label"
+        >{{ t('settings.auditDefaultLabel') }}</label>
         <input
+          :id="`${uid}-2`"
           v-model.number="form.auditRetentionDays"
           type="number"
           class="form-control"
@@ -44,7 +52,10 @@
         v-if="auditCategories.length > 0"
         class="mb-0"
       >
-        <label class="form-label">{{ t('settings.auditByCategoryLabel') }}</label>
+        <label
+          :for="`${uid}-3`"
+          class="form-label"
+        >{{ t('settings.auditByCategoryLabel') }}</label>
         <div class="row g-2">
           <div
             v-for="cat in auditCategories"
@@ -54,6 +65,7 @@
             <div class="input-group input-group-flat">
               <span class="input-group-text">{{ cat.label }}</span>
               <input
+                :id="`${uid}-3`"
                 type="number"
                 class="form-control"
                 min="1"
@@ -91,7 +103,10 @@
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+
+const uid = useId()
 
 const { t } = useI18n()
 

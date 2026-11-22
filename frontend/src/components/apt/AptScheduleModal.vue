@@ -4,6 +4,8 @@
       ref="modalRef"
       class="modal modal-blur fade show d-block"
       tabindex="-1"
+      role="dialog"
+      aria-modal="true"
       @click.self="$emit('close')"
     >
       <div class="modal-dialog modal-dialog-centered">
@@ -26,8 +28,12 @@
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label class="form-label">{{ t('apt.taskName') }}</label>
+              <label
+                :for="`${uid}-1`"
+                class="form-label"
+              >{{ t('apt.taskName') }}</label>
               <input
+                :id="`${uid}-1`"
                 v-model="form.name"
                 type="text"
                 class="form-control"
@@ -35,8 +41,12 @@
               >
             </div>
             <div class="mb-3">
-              <label class="form-label">{{ t('apt.command') }}</label>
+              <label
+                :for="`${uid}-2`"
+                class="form-label"
+              >{{ t('apt.command') }}</label>
               <select
+                :id="`${uid}-2`"
                 v-model="form.action"
                 class="form-select"
               >
@@ -118,13 +128,15 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, ref, watch } from 'vue'
+import { reactive, computed, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import apiClient from '../../api'
 import CronBuilder from '../CronBuilder.vue'
 import { MANUAL_SENTINEL } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
 import { useModalChrome } from '../../composables/useModalChrome'
+
+const uid = useId()
 
 const { t } = useI18n()
 
