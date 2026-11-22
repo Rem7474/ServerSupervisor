@@ -257,7 +257,7 @@
               </th>
               <th>
                 <SortableHeader
-                  label="Uptime"
+                  :label="t('common.uptime')"
                   :active="sortKey === 'uptime'"
                   :direction="sortDir"
                   @toggle="toggleSort('uptime')"

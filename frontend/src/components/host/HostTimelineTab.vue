@@ -2,7 +2,7 @@
   <div>
     <PageRefreshBar
       v-model="autoRefresh"
-      label="Timeline"
+      :label="t('common.timeline')"
       :interval-sec="TIMELINE_REFRESH_SEC"
       :last-updated-at="lastUpdatedAt"
     />

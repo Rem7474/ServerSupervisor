@@ -611,7 +611,7 @@
                   />
                   {{ t('host.perHostPermissionsTitle') }}
                 </h3>
-                <span class="badge badge-sm bg-danger text-white">Admin only</span>
+                <span class="badge badge-sm bg-danger text-white">{{ t('common.adminOnly') }}</span>
               </div>
               <div class="card-body p-0">
                 <div v-if="permLoading">

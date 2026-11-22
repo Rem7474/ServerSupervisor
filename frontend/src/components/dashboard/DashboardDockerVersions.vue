@@ -46,7 +46,7 @@
             <th>{{ t('dashboard.runningColumn') }}</th>
             <th>{{ t('dashboard.latestVersionColumn') }}</th>
             <th>{{ t('common.status') }}</th>
-            <th>Task</th>
+            <th>{{ t('common.task') }}</th>
             <th class="text-end">
               Actions
             </th>

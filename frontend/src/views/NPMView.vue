@@ -130,7 +130,7 @@
               >
                 <div class="d-flex justify-content-center gap-3">
                   <SortableHeader
-                    label="Uptime"
+                    :label="t('common.uptime')"
                     :active="sortKey === 'uptime_status'"
                     :direction="sortDir"
                     @toggle="toggleSort('uptime_status')"

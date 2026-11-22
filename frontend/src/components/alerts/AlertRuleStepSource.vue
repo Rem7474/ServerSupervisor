@@ -21,7 +21,7 @@
       <div
         class="btn-group w-100"
         role="group"
-        aria-label="Source type"
+        :aria-label="t('common.sourceType')"
       >
         <button
           type="button"
