@@ -165,7 +165,7 @@ describe('useDocker — handleBulkContainerAction', () => {
     dialog.onConfirm()
     await promise
 
-    expect(addToast).toHaveBeenCalledWith('1 envoyée(s), 1 échec(s)', 'warning', 6000)
+    expect(addToast).toHaveBeenCalledWith('1 envoyée, 1 échec', 'warning', 6000)
   })
 })
 

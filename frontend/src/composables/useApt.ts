@@ -452,7 +452,10 @@ export function useApt() {
         addToast(t('apt.agentUpdateLaunchedOn', { count: succeeded }, succeeded), 'success', 7000)
       } else {
         addToast(
-          t('apt.agentUpdateSummary', { succeeded, failed }),
+          t('apt.agentUpdateSummary', {
+            launched: t('apt.agentUpdateLaunchedCount', { count: succeeded }, succeeded),
+            failed: t('apt.agentUpdateFailedCount', { count: failed }, failed),
+          }),
           failed === results.length ? 'error' : 'warning',
           7000
         )

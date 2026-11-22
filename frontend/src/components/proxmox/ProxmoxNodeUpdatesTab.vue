@@ -34,7 +34,7 @@
         </div>
         <div>
           <div class="fw-medium">
-            {{ t('proxmox.pendingPackagesLabel') }}
+            {{ t('proxmox.pendingPackagesLabel', pendingUpdates ?? 0) }}
           </div>
           <div
             v-if="lastUpdateCheckAt"

@@ -315,6 +315,7 @@
         <EntityTabShell
           v-model="activeTab"
           :tabs="hostTabs"
+          nav-class="host-detail-tabs"
         >
           <template #overview>
             <div class="row row-cards mb-3">
@@ -1123,6 +1124,19 @@ const hostTabs = computed<EntityTab[]>(() => {
 </script>
 
 <style scoped>
+/* Same horizontal-scroll behaviour as the Proxmox node tabs: with 15+ tabs the
+   bar must scroll on narrow screens instead of wrapping onto several rows. */
+:deep(.host-detail-tabs) {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+:deep(.host-detail-tabs .nav-item) {
+  flex: 0 0 auto;
+}
+
 :deep(.side-panel) {
   transition: width 0.3s ease-in-out;
   overflow: hidden;

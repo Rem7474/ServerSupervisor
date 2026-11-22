@@ -28,16 +28,6 @@
                 v{{ appVersion }}
               </a>
             </li>
-            <li
-              v-if="wsStatus"
-              class="list-inline-item"
-            >
-              <span
-                class="status-dot me-1"
-                :class="wsDotClass"
-              />
-              <span class="text-secondary">{{ wsStatusLabel }}</span>
-            </li>
           </ul>
         </div>
         <div class="col-12 col-lg-auto mt-0">
@@ -60,41 +50,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconBrandGithub } from '@tabler/icons-vue'
 
 const { t } = useI18n()
 
-const props = withDefaults(defineProps<{
-  wsStatus?: string | null
-}>(), {
-  wsStatus: null,
-})
-
 declare const __APP_VERSION__: string
 const appVersion = __APP_VERSION__
 const year = new Date().getFullYear()
-
-const wsDotClass = computed(() => {
-  switch (props.wsStatus) {
-    case 'connected':    return 'status-dot-animated bg-success'
-    case 'connecting':   return 'status-dot-animated bg-warning'
-    case 'reconnecting': return 'status-dot-animated bg-warning'
-    case 'error':        return 'bg-danger'
-    case 'disconnected': return 'bg-secondary'
-    default:             return 'bg-secondary'
-  }
-})
-
-const wsStatusLabel = computed(() => {
-  switch (props.wsStatus) {
-    case 'connected':    return t('common.footerWsConnectedLabel')
-    case 'connecting':   return t('common.footerWsConnectingLabel')
-    case 'reconnecting': return t('common.footerWsReconnectingLabel')
-    case 'error':        return t('common.footerWsErrorLabel')
-    case 'disconnected': return t('common.footerWsDisconnectedLabel')
-    default:             return ''
-  }
-})
 </script>

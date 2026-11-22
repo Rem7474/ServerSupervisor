@@ -64,7 +64,7 @@ describe('NetworkDiscoveryPanel', () => {
     expect(wrapper.text()).toContain('Répond (4 ms)')
     expect(wrapper.text()).toContain('Déjà enregistré — web')
     expect(wrapper.text()).toContain('Ne répond pas')
-    expect(wrapper.text()).toContain('3 adresse(s) scannée(s), 1 nouvelle(s) disponible(s)')
+    expect(wrapper.text()).toContain('3 adresses scannées, 1 nouvelle disponible')
   })
 
   it('selects all candidates, deselects one, and submits the bulk add with edited names', async () => {

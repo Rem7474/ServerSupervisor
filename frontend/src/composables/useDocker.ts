@@ -119,7 +119,10 @@ export function useDocker() {
         addToast(t('docker.commandsSentSuccess', { count: succeeded }, succeeded), 'success')
       } else {
         addToast(
-          t('docker.bulkSummary', { succeeded, failed }),
+          t('docker.bulkSummary', {
+            sent: t('docker.bulkSentCount', { count: succeeded }, succeeded),
+            failed: t('docker.bulkFailedCount', { count: failed }, failed),
+          }),
           failed === results.length ? 'error' : 'warning',
           6000
         )

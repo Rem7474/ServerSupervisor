@@ -277,7 +277,10 @@ async function submit(): Promise<void> {
     const failed = ((response.data?.results || []) as BulkResult[]).filter((r) => !r.created)
     emit('created')
     if (failed.length) {
-      resultSummary.value = t('webhooks.trackersCreatedSummary', { created, failed: failed.length, names: failed.map((r) => r.name || '?').join(', ') })
+      resultSummary.value = t('webhooks.trackersCreatedSummary', {
+        created: t('webhooks.trackersCreatedCount', { count: created }, created),
+        failed: t('webhooks.trackersFailedCount', { count: failed.length }, failed.length),
+        names: failed.map((r) => r.name || '?').join(', ') })
       await loadContainers()
     } else {
       close()

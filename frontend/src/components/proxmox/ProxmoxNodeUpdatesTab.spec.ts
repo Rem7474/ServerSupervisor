@@ -26,7 +26,7 @@ describe('ProxmoxNodeUpdatesTab', () => {
       props: { pendingUpdates: 5, lastUpdateCheckAt: '2026-01-15T10:00:00Z' },
     })
     expect(wrapper.text()).toContain('5')
-    expect(wrapper.text()).toContain('paquet(s) en attente de mise à jour')
+    expect(wrapper.text()).toContain('paquets en attente de mise à jour')
     expect(wrapper.text()).toContain('Détecté le')
     expect(wrapper.text()).toContain('cache apt du nœud Proxmox')
     expect(wrapper.text()).toContain('connectez-vous directement au nœud')
