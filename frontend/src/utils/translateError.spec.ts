@@ -29,7 +29,7 @@ describe('translateError', () => {
   it('interpolates params for a keyed message', () => {
     setLocale('en')
     const error = {
-      response: { data: { error: 'ignored', i18nKey: 'GIT_PROVIDER_ERROR', params: { status: '503' } } },
+      response: { data: { error: 'ignored', i18nKey: 'GIT_PROVIDER_ERROR', params: { provider: 'GitHub', status: '503' } } },
     }
     expect(translateError(error)).toBe('GitHub API error (503)')
   })

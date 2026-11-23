@@ -61,7 +61,7 @@
           GitLab
         </option>
         <option value="gitea">
-          Gitea (Codeberg)
+          Gitea / Forgejo
         </option>
       </select>
     </div>
@@ -91,6 +91,10 @@
         placeholder="ex: core"
       >
     </div>
+    <WebhookGitInstanceFields
+      :form="form"
+      @update:form="emit('update:form', $event)"
+    />
   </template>
 
   <!-- Docker-specific fields: the image reference comes from a running
@@ -218,7 +222,7 @@
                 GitLab
               </option>
               <option value="gitea">
-                Gitea (Codeberg)
+                Gitea / Forgejo
               </option>
             </select>
           </div>
@@ -248,6 +252,10 @@
               placeholder="ex: core"
             >
           </div>
+          <WebhookGitInstanceFields
+            :form="form"
+            @update:form="emit('update:form', $event)"
+          />
         </div>
       </div>
     </div>
@@ -257,6 +265,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import WebhookGitInstanceFields from './WebhookGitInstanceFields.vue'
 import type { WebhookFormData, RegistryCredential, PickableContainer } from '../../composables/useWebhookForm'
 
 const { t } = useI18n()

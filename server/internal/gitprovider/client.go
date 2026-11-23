@@ -34,13 +34,16 @@ type Release struct {
 }
 
 // NewClient creates a new Git provider client.
-// Supported providers: "github", "gitlab", "gitea"
-func NewClient(provider, authToken string) Client {
+// Supported providers: "github", "gitlab", "gitea". baseURL only applies to
+// gitlab/gitea (self-hosted instances; empty selects the public instance) and
+// must already have been through NormalizeBaseURL. authToken is the token for
+// the selected provider.
+func NewClient(provider, authToken, baseURL string) Client {
 	switch provider {
 	case "gitlab":
-		return newGitLabClient(authToken)
+		return newGitLabClient(baseURL, authToken, newGuardedHTTPClient())
 	case "gitea":
-		return newGiteaClient(authToken)
+		return newGiteaClient(baseURL, authToken, newGuardedHTTPClient())
 	default:
 		return newGitHubClient(authToken)
 	}

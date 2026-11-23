@@ -248,5 +248,13 @@
   "createTaskButton": "Créer une tâche",
   "monitorOnlyModeHint": "Mode surveillance seule: configurez une VM cible et une tâche pour autoriser l'exécution manuelle.",
   "manualRunUnavailableError": "Exécution manuelle non disponible dans ce mode.",
-  "triggerError": "Erreur lors du déclenchement"
+  "triggerError": "Erreur lors du déclenchement",
+  "gitBaseUrlLabel": "URL de l'instance",
+  "gitBaseUrlPlaceholder": "ex : https://git.example.lan",
+  "gitBaseUrlHint": "Laissez vide pour l'instance publique (gitlab.com / codeberg.org). Les instances auto-hébergées sur un réseau privé sont acceptées ; les adresses loopback et lien-local sont refusées.",
+  "gitTokenLabel": "Token d'accès",
+  "gitTokenHint": "Nécessaire pour les dépôts privés. Stocké sur le serveur, jamais réaffiché.",
+  "gitTokenStoredPlaceholder": "•••••••• (token enregistré, laissez vide pour le conserver)",
+  "gitTokenClearLabel": "Supprimer le token enregistré",
+  "gitBaseUrlInvalidError": "L'URL de l'instance doit être une URL http(s) valide, sans identifiants, paramètres ni fragment."
 }

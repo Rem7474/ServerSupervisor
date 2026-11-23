@@ -2,6 +2,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import type { CustomTaskSummary } from '../types/task'
+import { isSelfHostable, isValidGitBaseUrl } from '../utils/gitRepoLinks'
 
 export interface Host {
   id: string
@@ -63,6 +64,8 @@ export interface WebhookItem {
   rollback_on_failure?: boolean
   registry_credentials_id?: string
   reconcile_drift?: boolean
+  git_base_url?: string
+  has_git_token?: boolean
 }
 
 export interface WebhookFormData {
@@ -95,6 +98,10 @@ export interface WebhookFormData {
   rollback_on_failure?: boolean
   registry_credentials_id?: string
   reconcile_drift?: boolean
+  git_base_url?: string
+  git_token?: string
+  clear_git_token?: boolean
+  has_git_token?: boolean
 }
 
 const gitEnvVarKeys = [
@@ -177,6 +184,10 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
     rollback_on_failure: false,
     registry_credentials_id: '',
     reconcile_drift: false,
+    git_base_url: '',
+    git_token: '',
+    clear_git_token: false,
+    has_git_token: false,
   })
 
   const form: Ref<WebhookFormData> = ref(defaultWebhookForm())
@@ -231,6 +242,10 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
             rollback_on_failure: !!props.item.rollback_on_failure,
             registry_credentials_id: props.item.registry_credentials_id || '',
             reconcile_drift: !!props.item.reconcile_drift,
+            git_base_url: props.item.git_base_url || '',
+            git_token: '',
+            clear_git_token: false,
+            has_git_token: !!props.item.has_git_token,
           }
         : defaultTrackerForm()
       return
@@ -350,6 +365,9 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
       if ((form.value.cooldown_hours ?? 0) < 0 || (form.value.cooldown_hours ?? 0) > 168) {
         return t('webhooks.cooldownRangeError')
       }
+      if (isSelfHostable(form.value.provider) && !isValidGitBaseUrl(form.value.git_base_url ?? '')) {
+        return t('webhooks.gitBaseUrlInvalidError')
+      }
       if (form.value.tracker_type === 'git') {
         if (!form.value.repo_owner || !form.value.repo_name) {
           return t('webhooks.gitOwnerRepoRequiredError')
@@ -410,6 +428,14 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
         payload.post_update_task_id = ''
         payload.reconcile_drift = false
       }
+      // Instance URL and token only exist for self-hostable providers; the
+      // server wipes them for GitHub, so don't send stale values either.
+      if (!isSelfHostable(payload.provider)) {
+        payload.git_base_url = ''
+        payload.git_token = ''
+        payload.clear_git_token = false
+      }
+      delete payload.has_git_token
       // Git trackers never use the compose path or registry credentials.
       if (payload.tracker_type !== 'docker') {
         payload.update_action = 'custom'

@@ -13,6 +13,8 @@ import (
 
 type fakeRepo struct {
 	created     bool
+	lastCreated models.ReleaseTracker
+	lastUpdated models.ReleaseTracker
 	getErr      error
 	getResult   *models.ReleaseTracker
 	listResult  []models.ReleaseTracker
@@ -36,12 +38,14 @@ func (f *fakeRepo) ListReleaseTrackers(context.Context) ([]models.ReleaseTracker
 }
 func (f *fakeRepo) CreateReleaseTracker(_ context.Context, t models.ReleaseTracker) (*models.ReleaseTracker, error) {
 	f.created = true
+	f.lastCreated = t
 	return &t, nil
 }
 func (f *fakeRepo) GetReleaseTrackerByID(context.Context, string) (*models.ReleaseTracker, error) {
 	return f.getResult, f.getErr
 }
-func (f *fakeRepo) UpdateReleaseTracker(context.Context, string, models.ReleaseTracker) error {
+func (f *fakeRepo) UpdateReleaseTracker(_ context.Context, _ string, t models.ReleaseTracker) error {
+	f.lastUpdated = t
 	return nil
 }
 func (f *fakeRepo) DeleteReleaseTracker(context.Context, string) error { return nil }

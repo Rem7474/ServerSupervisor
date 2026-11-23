@@ -61,8 +61,9 @@ func (db *DB) CreateReleaseTracker(ctx context.Context, t models.ReleaseTracker)
 		 (name, tracker_type, provider, repo_owner, repo_name, docker_image, docker_tag, host_id, custom_task_id,
 		  notify_channels, notify_on_release, enabled, cooldown_hours,
 		  update_action, compose_project, compose_service, pre_update_task_id, post_update_task_id,
-		  cleanup_after_update, healthcheck_timeout_sec, rollback_on_failure, registry_credentials_id, reconcile_drift)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+		  cleanup_after_update, healthcheck_timeout_sec, rollback_on_failure, registry_credentials_id, reconcile_drift,
+		  git_base_url, git_token)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
 		 RETURNING id, name, tracker_type, provider, repo_owner, repo_name, docker_image, docker_tag,
 		           host_id, custom_task_id, last_release_tag, cooldown_hours, last_release_detected_at, last_checked_at, last_triggered_at,
 		           notify_channels, notify_on_release, enabled, created_at`,
@@ -71,6 +72,7 @@ func (db *DB) CreateReleaseTracker(ctx context.Context, t models.ReleaseTracker)
 		t.UpdateAction, nullStrTracker(t.ComposeProject), nullStrTracker(t.ComposeService),
 		nullStrTracker(t.PreUpdateTaskID), nullStrTracker(t.PostUpdateTaskID),
 		t.CleanupAfterUpdate, t.HealthcheckTimeoutSec, t.RollbackOnFailure, nullStrTracker(t.RegistryCredentialsID), t.ReconcileDrift,
+		t.GitBaseURL, t.GitToken,
 	).Scan(
 		&result.ID, &result.Name, &result.TrackerType, &result.Provider, &result.RepoOwner, &result.RepoName,
 		&result.DockerImage, &result.DockerTag, &scannedHostID, &result.CustomTaskID, &result.LastReleaseTag,
@@ -97,6 +99,8 @@ func (db *DB) CreateReleaseTracker(ctx context.Context, t models.ReleaseTracker)
 	result.RollbackOnFailure = t.RollbackOnFailure
 	result.RegistryCredentialsID = t.RegistryCredentialsID
 	result.ReconcileDrift = t.ReconcileDrift
+	result.GitBaseURL = t.GitBaseURL
+	result.HasGitToken = t.GitToken != ""
 	return &result, nil
 }
 
@@ -110,6 +114,7 @@ func (db *DB) ListReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker,
 		        COALESCE(h.name, '') AS host_name,
 		        t.update_action, t.compose_project, t.compose_service, t.pre_update_task_id, t.post_update_task_id,
 		        t.cleanup_after_update, t.healthcheck_timeout_sec, t.rollback_on_failure, t.registry_credentials_id, t.reconcile_drift,
+		        t.git_base_url, (t.git_token <> ''),
 		        le.id, le.command_id, le.tag_name, le.release_url, le.release_name,
 		        le.status, le.triggered_at, le.completed_at
 		 FROM release_trackers t
@@ -147,6 +152,7 @@ func (db *DB) ListReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker,
 			&t.HostName,
 			&updateAction, &composeProject, &composeService, &preTask, &postTask,
 			&cleanup, &healthTimeout, &rollback, &regCredID, &reconcileDrift,
+			&t.GitBaseURL, &t.HasGitToken,
 			&leID, &leCommandID, &leTag, &leURL, &leName, &leStatus, &leTriggered, &leCompleted,
 		); err != nil {
 			return nil, err
@@ -194,7 +200,8 @@ func (db *DB) GetReleaseTrackerByID(ctx context.Context, id string) (*models.Rel
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name,
 		        t.update_action, t.compose_project, t.compose_service, t.pre_update_task_id, t.post_update_task_id,
-		        t.cleanup_after_update, t.healthcheck_timeout_sec, t.rollback_on_failure, t.registry_credentials_id, t.reconcile_drift
+		        t.cleanup_after_update, t.healthcheck_timeout_sec, t.rollback_on_failure, t.registry_credentials_id, t.reconcile_drift,
+		        t.git_base_url, t.git_token
 		 FROM release_trackers t
 		 LEFT JOIN hosts h ON h.id = t.host_id
 		 WHERE t.id = $1`, id,
@@ -207,7 +214,9 @@ func (db *DB) GetReleaseTrackerByID(ctx context.Context, id string) (*models.Rel
 		&t.HostName,
 		&updateAction, &composeProject, &composeService, &preTask, &postTask,
 		&cleanup, &healthTimeout, &rollback, &regCredID, &reconcileDrift,
+		&t.GitBaseURL, &t.GitToken,
 	)
+	t.HasGitToken = t.GitToken != ""
 	t.HostID = hostID.String
 	if err != nil {
 		return nil, err
@@ -243,7 +252,9 @@ func (db *DB) UpdateReleaseTracker(ctx context.Context, id string, t models.Rele
 		   update_action=$15, compose_project=$16, compose_service=$17,
 		   pre_update_task_id=$18, post_update_task_id=$19,
 		   cleanup_after_update=$20, healthcheck_timeout_sec=$21, rollback_on_failure=$22,
-		   registry_credentials_id=$23, reconcile_drift=$24
+		   registry_credentials_id=$23, reconcile_drift=$24,
+		   git_base_url=$25,
+		   git_token=CASE WHEN $27 THEN '' WHEN $26 <> '' THEN $26 ELSE git_token END
 		 WHERE id=$14`,
 		t.Name, t.TrackerType, t.Provider, t.RepoOwner, t.RepoName,
 		t.DockerImage, t.DockerTag,
@@ -253,6 +264,7 @@ func (db *DB) UpdateReleaseTracker(ctx context.Context, id string, t models.Rele
 		t.UpdateAction, nullStrTracker(t.ComposeProject), nullStrTracker(t.ComposeService),
 		nullStrTracker(t.PreUpdateTaskID), nullStrTracker(t.PostUpdateTaskID),
 		t.CleanupAfterUpdate, t.HealthcheckTimeoutSec, t.RollbackOnFailure, nullStrTracker(t.RegistryCredentialsID), t.ReconcileDrift,
+		t.GitBaseURL, t.GitToken, t.ClearGitToken,
 	)
 	return err
 }
@@ -389,7 +401,8 @@ func (db *DB) GetEnabledReleaseTrackers(ctx context.Context) ([]models.ReleaseTr
 		        docker_image, docker_tag, host_id, custom_task_id,
 		        last_release_tag, latest_image_digest, cooldown_hours, last_release_detected_at, last_triggered_at, notify_channels, notify_on_release,
 		        update_action, compose_project, compose_service, pre_update_task_id, post_update_task_id,
-		        cleanup_after_update, healthcheck_timeout_sec, rollback_on_failure, registry_credentials_id, reconcile_drift
+		        cleanup_after_update, healthcheck_timeout_sec, rollback_on_failure, registry_credentials_id, reconcile_drift,
+		        git_base_url, git_token
 		 FROM release_trackers WHERE enabled = TRUE ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -411,6 +424,7 @@ func (db *DB) GetEnabledReleaseTrackers(ctx context.Context) ([]models.ReleaseTr
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease,
 			&updateAction, &composeProject, &composeService, &preTask, &postTask,
 			&cleanup, &healthTimeout, &rollback, &regCredID, &reconcileDrift,
+			&t.GitBaseURL, &t.GitToken,
 		); err != nil {
 			return nil, err
 		}

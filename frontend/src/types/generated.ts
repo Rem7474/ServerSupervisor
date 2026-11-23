@@ -2230,6 +2230,12 @@ export interface ReleaseTracker {
    * false for non-compose trackers or ones with no digest recorded yet.
    */
   drift_detected?: boolean;
+  /**
+   * GitBaseURL is the self-hosted instance root for gitlab/gitea trackers
+   * (empty = the public instance). Always empty for github.
+   */
+  git_base_url: string;
+  has_git_token: boolean;
 }
 /**
  * ReleaseTrackerRequest is the create/update body for a release tracker — the
@@ -2262,6 +2268,13 @@ export interface ReleaseTrackerRequest {
   rollback_on_failure: boolean;
   registry_credentials_id: string;
   reconcile_drift: boolean;
+  /**
+   * Self-hosted GitLab/Gitea instance. git_token is write-only; an empty
+   * value keeps the stored token on update, clear_git_token erases it.
+   */
+  git_base_url: string;
+  git_token: string;
+  clear_git_token: boolean;
 }
 export interface ReleaseTrackerExecution {
   id: string;
