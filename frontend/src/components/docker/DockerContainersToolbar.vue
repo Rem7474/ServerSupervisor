@@ -11,6 +11,7 @@
           <select
             v-model="hostFilter"
             class="form-select"
+            :aria-label="t('docker.allHosts')"
           >
             <option value="">
               {{ t('docker.allHosts') }}
@@ -28,6 +29,7 @@
           <select
             v-model="stateFilter"
             class="form-select"
+            :aria-label="t('docker.allStates')"
           >
             <option value="">
               {{ t('docker.allStates') }}
@@ -56,6 +58,7 @@
           <select
             v-model="composeFilter"
             class="form-select"
+            :aria-label="t('docker.allContainers')"
           >
             <option value="">
               {{ t('docker.allContainers') }}
