@@ -54,7 +54,7 @@ func (s *Service) ListForUser(ctx context.Context, username string) ([]models.Ho
 // "viewer" or "operator".
 func (s *Service) Set(ctx context.Context, username, hostID, level string) error {
 	if !validLevel(level) {
-		return apperr.Validation("level doit être 'viewer' ou 'operator'")
+		return apperr.Validation("level must be 'viewer' or 'operator'").I18n(apperr.CodeHostPermLevelInvalid, nil)
 	}
 	return s.repo.SetHostPermission(ctx, username, hostID, level)
 }
