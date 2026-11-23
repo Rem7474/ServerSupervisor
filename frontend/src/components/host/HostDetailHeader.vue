@@ -12,9 +12,9 @@
           <span class="text-muted mx-1">/</span>
           <span>{{ t('host.hostBreadcrumb') }}</span>
         </div>
-        <h2 class="page-title">
+        <h1 class="page-title">
           {{ host?.name || host?.hostname || t('host.loadingLabel') }}
-        </h2>
+        </h1>
         <div class="text-secondary">
           {{ host?.hostname || t('host.notConnected') }} - {{ host?.os || t('host.unknownOs') }} - {{ host?.ip_address }}
           <span v-if="host?.last_seen">- {{ t('host.lastActivityLabel') }} <RelativeTime :date="host.last_seen" /></span>

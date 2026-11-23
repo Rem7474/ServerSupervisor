@@ -55,11 +55,11 @@ func (s *Service) GetEffectiveConfig(ctx context.Context, revealSecrets bool) (c
 func (s *Service) UpdateParam(ctx context.Context, key, value, username, clientIP string) (*config.ConfigEntry, string, error) {
 	param, ok := config.FindParam(key)
 	if !ok {
-		return nil, "", apperr.NotFound(fmt.Sprintf("paramètre de configuration inconnu : %s", key))
+		return nil, "", apperr.NotFound(fmt.Sprintf("unknown configuration parameter: %s", key)).I18n(apperr.CodeConfigParamUnknown, map[string]string{"key": key})
 	}
 
 	if !param.IsEditable {
-		return nil, "", apperr.Validation(fmt.Sprintf("le paramètre %s est géré uniquement via l'environnement Docker", param.Key))
+		return nil, "", apperr.Validation(fmt.Sprintf("parameter %s is managed through the Docker environment only", param.Key)).I18n(apperr.CodeConfigParamEnvOnly, map[string]string{"key": param.Key})
 	}
 
 	trimmedVal := strings.TrimSpace(value)
@@ -76,13 +76,13 @@ func (s *Service) UpdateParam(ctx context.Context, key, value, username, clientI
 
 	if param.Validate != nil && trimmedVal != "" {
 		if err := param.Validate(trimmedVal); err != nil {
-			return nil, "", apperr.Validation(fmt.Sprintf("valeur invalide pour %s : %v", param.Key, err))
+			return nil, "", apperr.Validation(fmt.Sprintf("invalid value for %s: %v", param.Key, err)).I18n(apperr.CodeConfigValueInvalid, map[string]string{"key": param.Key, "reason": err.Error()})
 		}
 	}
 
 	// Persist to database
 	if err := s.repo.SetSetting(ctx, param.SettingKey, trimmedVal); err != nil {
-		return nil, "", apperr.Failed(fmt.Sprintf("erreur lors de l'enregistrement de %s : %v", param.Key, err))
+		return nil, "", apperr.Failed(fmt.Sprintf("could not save %s: %v", param.Key, err)).I18n(apperr.CodeConfigSaveFailed, map[string]string{"key": param.Key, "reason": err.Error()})
 	}
 
 	// Reload config in memory
@@ -145,17 +145,17 @@ func configConflictWarning(e config.ConfigEntry) string {
 func (s *Service) ResetParam(ctx context.Context, key, username, clientIP string) (*config.ConfigEntry, string, error) {
 	param, ok := config.FindParam(key)
 	if !ok {
-		return nil, "", apperr.NotFound(fmt.Sprintf("paramètre inconnu : %s", key))
+		return nil, "", apperr.NotFound(fmt.Sprintf("unknown configuration parameter: %s", key)).I18n(apperr.CodeConfigParamUnknown, map[string]string{"key": key})
 	}
 
 	if !param.IsEditable {
-		return nil, "", apperr.Validation(fmt.Sprintf("le paramètre %s n'est pas modifiable", param.Key))
+		return nil, "", apperr.Validation(fmt.Sprintf("parameter %s is not editable", param.Key)).I18n(apperr.CodeConfigParamNotEditable, map[string]string{"key": param.Key})
 	}
 
 	wasLiveViaDB := s.cfg.OverrideFromDB(s.repo)[param.SettingKey]
 
 	if err := s.repo.DeleteSetting(ctx, param.SettingKey); err != nil {
-		return nil, "", apperr.Failed(fmt.Sprintf("erreur lors de la réinitialisation de %s : %v", param.Key, err))
+		return nil, "", apperr.Failed(fmt.Sprintf("could not reset %s: %v", param.Key, err)).I18n(apperr.CodeConfigResetFailed, map[string]string{"key": param.Key, "reason": err.Error()})
 	}
 
 	// Reload config in memory

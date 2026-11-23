@@ -43,6 +43,7 @@ import (
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
+	systemsvc "github.com/serversupervisor/server/internal/services/system"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
 	weblogssvc "github.com/serversupervisor/server/internal/services/weblogs"
@@ -98,7 +99,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub, bus)
 	aptH := handlers.NewAptHandler(aptsvc.NewService(db, dispatcher), db)
 	dockerH := handlers.NewDockerHandler(dockersvc.NewService(db, dispatcher), db)
-	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
+	systemH := handlers.NewSystemHandler(db, systemsvc.NewService(dispatcher))
 	networkSvc := networksvc.NewService(db, func(ctx context.Context) (*models.NetworkSnapshot, error) {
 		return networkview.BuildSnapshot(ctx, db)
 	}, bus)

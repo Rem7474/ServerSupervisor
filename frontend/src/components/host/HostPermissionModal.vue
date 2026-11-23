@@ -4,6 +4,8 @@
     ref="permModalRef"
     class="modal modal-blur fade show d-block modal-permissions-overlay"
     tabindex="-1"
+    role="dialog"
+    aria-modal="true"
     @click.self="open = false"
   >
     <div
@@ -23,8 +25,12 @@
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">{{ t('host.userColumn') }}</label>
+            <label
+              :for="`${uid}-2`"
+              class="form-label"
+            >{{ t('host.userColumn') }}</label>
             <select
+              :id="`${uid}-2`"
               v-model="username"
               class="form-select"
             >
@@ -41,8 +47,12 @@
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">{{ t('host.levelColumn') }}</label>
+            <label
+              :for="`${uid}-3`"
+              class="form-label"
+            >{{ t('host.levelColumn') }}</label>
             <select
+              :id="`${uid}-3`"
               v-model="level"
               class="form-select"
             >
@@ -88,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { HostRecord } from '../../types/hostDetail'
@@ -106,6 +116,7 @@ const level = defineModel<string>('level', { required: true })
 defineEmits<{ save: [] }>()
 
 const { t } = useI18n()
+const uid = useId()
 
 const permModalRef = ref<HTMLElement | null>(null)
 useModalChrome(permModalRef, () => open.value, { onClose: () => { open.value = false } })

@@ -102,7 +102,7 @@ var AllParams = []ConfigParamDef{
 	// ==================== Server ====================
 	intParam("SERVER_PORT", "server_port", "server", "8080", "Port d'écoute du serveur", "Port TCP sur lequel le serveur écoute les requêtes HTTP.", true, validatePort),
 	strParam("BASE_URL", "base_url", "server", "http://localhost:8080", "URL de base publique", "URL racine utilisée pour générer les liens absolus et redirections d'authentification.", false, false, validateURL),
-	boolParam("TLS_ENABLED", "tls_enabled", "server", "false", "HTTPS / TLS activé", "Indique si l'application est servie directement derrière une terminaison TLS.", false),
+	boolParam("TLS_ENABLED", "tls_enabled", "server", "false", "HTTPS / TLS activé", "Force le flag Secure sur les cookies de session. Le serveur n'écoute qu'en HTTP : à activer quand l'application est exposée en HTTPS derrière un reverse proxy.", false),
 	boolParam("DEMO_MODE", "demo_mode", "server", "false", "Mode démonstration", "Désactive tout appel réseau sortant (probes, git, proxmox). Modifiable uniquement via ENV.", true, false),
 	strParam("TZ", "tz", "server", "UTC", "Fuseau horaire (Timezone)", "Fuseau horaire utilisé pour les plannings cron et l'affichage des dates.", false, true),
 
@@ -137,7 +137,7 @@ var AllParams = []ConfigParamDef{
 	strParam("OIDC_ISSUER_URL", "oidc_issuer_url", "oidc", "", "URL de l'émetteur OIDC (Issuer URL)", "URL racine du fournisseur d'identité OIDC (ex: https://auth.example.com).", false, false),
 	strParam("OIDC_CLIENT_ID", "oidc_client_id", "oidc", "", "Identifiant client OIDC (Client ID)", "Client ID fourni par votre serveur d'identité OIDC.", false, false),
 	strParam("OIDC_CLIENT_SECRET", "oidc_client_secret", "oidc", "", "Secret client OIDC (Client Secret)", "Secret partagé du client OIDC.", true, false),
-	strParam("OIDC_REDIRECT_URL", "oidc_redirect_url", "oidc", "", "URL de redirection OIDC (Callback)", "URL de retour après authentification (ex: https://supervisor.example.com/api/v1/auth/oidc/callback).", false, false),
+	strParam("OIDC_REDIRECT_URL", "oidc_redirect_url", "oidc", "", "URL de redirection OIDC (Callback)", "URL de retour après authentification (ex: https://supervisor.example.com/api/auth/oidc/callback).", false, false),
 	csvParam("OIDC_SCOPES", "oidc_scopes", "oidc", "openid, profile, email, groups", "Portées OIDC (Scopes)", "Scopes demandés au fournisseur (séparés par des virgules).", false),
 	strParam("OIDC_USERNAME_CLAIM", "oidc_username_claim", "oidc", "preferred_username", "Revendication du nom d'utilisateur (Username Claim)", "Champ du token ID à utiliser comme nom d'utilisateur.", false, false),
 	strParam("OIDC_EMAIL_CLAIM", "oidc_email_claim", "oidc", "email", "Revendication de l'email (Email Claim)", "Champ du token ID contenant l'adresse email.", false, false),

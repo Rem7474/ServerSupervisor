@@ -5,6 +5,9 @@ api_key: "your-api-key-here"
 # Report interval in seconds
 report_interval: 30
 
+# Max size (bytes) of the JSON report sent to the server (default 3 MiB)
+max_report_body_bytes: 3145728
+
 # Enable Docker container monitoring
 collect_docker: true
 
@@ -22,10 +25,10 @@ collect_web_logs: false
 
 # Glob paths to parse (supports wildcards)
 web_logs_log_paths:
-	- "/var/log/nginx/access.log"
-	- "/var/log/apache2/access.log"
-	- "/var/log/httpd/access_log"
-	- "/data/logs/proxy-host-*_access.log"
+  - "/var/log/nginx/access.log"
+  - "/var/log/apache2/access.log"
+  - "/var/log/httpd/access_log"
+  - "/data/logs/proxy-host-*_access.log"
 
 # Number of latest log lines to inspect per file
 web_logs_tail_lines: 5000
@@ -57,6 +60,22 @@ crowdsec_alerts_password: ""
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false
+
+# Network flows (per-host bandwidth by remote peer, from conntrack accounting)
+collect_network_flows: false
+network_flows_top_n: 50
+# Read the TLS SNI of outbound handshakes to label talkers by domain
+# (needs CAP_NET_RAW)
+network_flows_l7_capture: false
+
+# Disable the WebSocket push channel; commands are then only picked up on the
+# regular report_interval poll
+disable_ws_push: false
+
+# Logging: log_level debug|info|warn|error (--verbose forces debug),
+# log_format text|json
+log_level: info
+log_format: text
 
 # Restic backup supervision. Only paths and feature flags — never put
 # restic/Swift/SMTP credentials here; they stay in resticconf on disk

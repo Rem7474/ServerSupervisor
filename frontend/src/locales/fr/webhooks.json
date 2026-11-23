@@ -48,6 +48,7 @@
   "exampleAppPlaceholder": "mon-app",
   "webhookUrlLabel": "URL du Webhook",
   "hmacSecretLabel": "Secret HMAC",
+  "toggleSecretVisibility": "Afficher ou masquer le secret",
   "regenerateButton": "Régénérer",
   "providerConfigPrefix": "Configuration {provider}:",
   "gitlabHeaderLabel": "Header:",

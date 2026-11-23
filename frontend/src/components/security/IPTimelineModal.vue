@@ -3,6 +3,8 @@
     v-if="show"
     ref="modalRef"
     class="timeline-drawer-backdrop"
+    role="dialog"
+    aria-modal="true"
     @click.self="$emit('close')"
   >
     <div class="timeline-modal card shadow-lg">

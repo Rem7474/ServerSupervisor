@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
@@ -108,7 +109,14 @@ func (h *RunbooksHandler) GetRunbookExecution(c *gin.Context) {
 	c.JSON(http.StatusOK, exec)
 }
 
+// runbookCompletionTimeout bounds the DB work done when a runbook step's
+// command completes. The call runs detached from any request, so without a
+// deadline a stuck query would pin its goroutine forever.
+const runbookCompletionTimeout = 30 * time.Second
+
 // HandleCommandCompletion implements agentsvc.CommandCompletionListener.
 func (h *RunbooksHandler) HandleCommandCompletion(commandID, status string) {
-	h.svc.NotifyComplete(context.Background(), commandID, status)
+	ctx, cancel := context.WithTimeout(context.Background(), runbookCompletionTimeout)
+	defer cancel()
+	h.svc.NotifyComplete(ctx, commandID, status)
 }

@@ -12,7 +12,7 @@
           <span class="text-muted mx-1">/</span>
           <span>{{ tracker?.name || id }}</span>
         </div>
-        <h2 class="page-title d-flex align-items-center gap-2">
+        <h1 class="page-title d-flex align-items-center gap-2">
           {{ tracker?.name }}
           <template v-if="tracker">
             <span
@@ -34,7 +34,7 @@
             class="badge bg-warning-lt text-warning"
             :title="t('webhooks.plannedDeploymentTooltip', { eta: cooldownEtaText })"
           >{{ t('webhooks.cooldownActiveLabel', { remaining: cooldownRemainingText }) }}</span>
-        </h2>
+        </h1>
       </div>
     </div>
 

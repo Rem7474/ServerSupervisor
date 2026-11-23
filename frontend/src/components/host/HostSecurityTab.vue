@@ -21,45 +21,49 @@
         :title="t('host.noRestrictionsTitle')"
         :subtitle="t('host.noRestrictionsSubtitle')"
       />
-      <table
+      <div
         v-else
-        class="table table-vcenter mb-0"
+        class="table-responsive"
       >
-        <thead>
-          <tr>
-            <th>{{ t('host.userColumn') }}</th>
-            <th>{{ t('host.levelColumn') }}</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="p in hostPerms"
-            :key="p.username"
-          >
-            <td>{{ p.username }}</td>
-            <td>
-              <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
-                {{ p.level }}
-              </span>
-            </td>
-            <td class="text-end">
-              <button
-                type="button"
-                class="btn btn-icon btn-sm btn-ghost-danger"
-                :title="t('host.revokeTooltip')"
-                :aria-label="t('host.revokeTooltip')"
-                @click="$emit('revoke', p.username)"
-              >
-                <IconX
-                  :size="16"
-                  class="icon icon-sm"
-                />
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <table
+          class="table table-vcenter mb-0"
+        >
+          <thead>
+            <tr>
+              <th>{{ t('host.userColumn') }}</th>
+              <th>{{ t('host.levelColumn') }}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="p in hostPerms"
+              :key="p.username"
+            >
+              <td>{{ p.username }}</td>
+              <td>
+                <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
+                  {{ p.level }}
+                </span>
+              </td>
+              <td class="text-end">
+                <button
+                  type="button"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
+                  :title="t('host.revokeTooltip')"
+                  :aria-label="t('host.revokeTooltip')"
+                  @click="$emit('revoke', p.username)"
+                >
+                  <IconX
+                    :size="16"
+                    class="icon icon-sm"
+                  />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     <div class="card-footer d-flex justify-content-end">
       <button

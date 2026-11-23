@@ -11,9 +11,9 @@
         <span class="text-muted mx-1">/</span>
         <span>{{ host?.domain_names?.[0] || t('host.monitoringFallback') }}</span>
       </div>
-      <h2 class="page-title">
+      <h1 class="page-title">
         {{ host?.domain_names?.[0] || '...' }}
-      </h2>
+      </h1>
       <div
         v-if="host"
         class="text-secondary"

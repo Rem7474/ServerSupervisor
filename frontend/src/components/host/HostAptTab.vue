@@ -244,8 +244,12 @@
             v-if="uuForm.config.auto_reboot"
             class="col-md-6"
           >
-            <label class="form-label small mb-1">{{ t('host.uuRebootTimeLabel') }}</label>
+            <label
+              :for="`${uid}-1`"
+              class="form-label small mb-1"
+            >{{ t('host.uuRebootTimeLabel') }}</label>
             <input
+              :id="`${uid}-1`"
               v-model="uuForm.config.auto_reboot_time"
               type="time"
               class="form-control form-control-sm"
@@ -376,12 +380,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconList } from '@tabler/icons-vue'
 import dayjs from '../../utils/dayjs'
 import CVEList from '../apt/CVEList.vue'
 import AptPendingPackagesList from '../apt/AptPendingPackagesList.vue'
+
+const uid = useId()
 
 interface AptStatus {
   last_upgrade?: string

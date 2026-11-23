@@ -260,6 +260,8 @@
     v-if="selectedProject"
     ref="modalRef"
     class="modal modal-blur fade show d-block"
+    role="dialog"
+    aria-modal="true"
     @click.self="selectedProject = null"
   >
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">

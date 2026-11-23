@@ -26,12 +26,16 @@
               v-if="!result"
             >
               <div class="mb-3">
-                <label class="form-label">{{ t('alerts.hostsLabel') }}</label>
+                <label
+                  :for="`${uid}-1`"
+                  class="form-label"
+                >{{ t('alerts.hostsLabel') }}</label>
                 <div class="input-icon mb-2">
                   <span class="input-icon-addon">
                     <IconSearch :size="16" />
                   </span>
                   <input
+                    :id="`${uid}-1`"
                     v-model="search"
                     type="text"
                     class="form-control"
@@ -142,11 +146,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconSearch } from '@tabler/icons-vue'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { AlertRuleTemplate, ApplyAlertRuleTemplateResult, Host } from '../../types/generated'
+
+const uid = useId()
 
 const props = withDefaults(defineProps<{
   visible?: boolean

@@ -68,8 +68,12 @@
         v-if="proxmoxLink.status === 'confirmed'"
         class="d-flex align-items-center gap-2 ms-auto"
       >
-        <label class="form-label mb-0 text-muted small">{{ t('host.metricsSourceLabel') }}</label>
+        <label
+          :for="`${uid}-1`"
+          class="form-label mb-0 text-muted small"
+        >{{ t('host.metricsSourceLabel') }}</label>
         <select
+          :id="`${uid}-1`"
           class="form-select form-select-sm"
           style="width:auto"
           :value="proxmoxLink.metrics_source"
@@ -203,12 +207,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import { IconExternalLink, IconLink, IconTrash } from '@tabler/icons-vue'
 import { useI18n } from 'vue-i18n'
 import BadgePill from '../common/BadgePill.vue'
 import { getMetricColorClass } from '../../utils/metricColor'
 import type { HostRecord } from '../../types/hostDetail'
+
+const uid = useId()
 
 const props = defineProps<{
   proxmoxLink: HostRecord | null
