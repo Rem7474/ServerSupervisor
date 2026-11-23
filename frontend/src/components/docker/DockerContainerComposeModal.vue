@@ -79,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useModalChrome } from '../../composables/useModalChrome'
 import { getComposeInfo } from '../../utils/dockerCompose'
@@ -96,7 +96,12 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const modalRef = ref<HTMLElement | null>(null)
-useModalChrome(modalRef, () => true, { onClose: () => emit('close') })
+// The modal is created already open, so the chrome (focus trap, autofocus)
+// must be armed once the element exists: with an always-true getter its
+// immediate watcher would run in setup(), while modalRef is still null.
+const mounted = ref(false)
+onMounted(() => { mounted.value = true })
+useModalChrome(modalRef, () => mounted.value, { onClose: () => emit('close') })
 
 const composeInfo = computed(() => getComposeInfo(props.container.labels))
 </script>

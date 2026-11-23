@@ -176,7 +176,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import EmptyState from '../EmptyState.vue'
 import { useModalChrome } from '../../composables/useModalChrome'
@@ -200,7 +200,12 @@ const { t } = useI18n()
 const tab = ref('env')
 
 const modalRef = ref<HTMLElement | null>(null)
-useModalChrome(modalRef, () => true, { onClose: () => emit('close') })
+// The modal is created already open, so the chrome (focus trap, autofocus)
+// must be armed once the element exists: with an always-true getter its
+// immediate watcher would run in setup(), while modalRef is still null.
+const mounted = ref(false)
+onMounted(() => { mounted.value = true })
+useModalChrome(modalRef, () => mounted.value, { onClose: () => emit('close') })
 
 function formatBytes(bytes: number | undefined): string {
   return formatBytesShared(bytes || 0)
