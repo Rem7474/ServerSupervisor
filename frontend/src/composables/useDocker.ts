@@ -97,7 +97,7 @@ export function useDocker() {
   // console per item (that doesn't scale past a couple of containers), just
   // a summary toast. The WS docker snapshot picks up the resulting state
   // changes on its own, same as it already does for every other command.
-  async function handleBulkContainerAction(containers: DockerContainer[], action: string): Promise<void> {
+  async function handleBulkContainerAction(containers: Pick<DockerContainer, 'host_id' | 'name'>[], action: string): Promise<void> {
     if (!containers.length || bulkActionLoading.value) return
     const verb = action === 'start' ? t('docker.verbStart') : action === 'stop' ? t('docker.verbStop') : t('docker.verbRestart')
     const names = containers.map((c) => c.name).join(', ')

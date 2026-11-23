@@ -62,22 +62,22 @@
       <div class="side-main">
         <DockerContainersTab
           v-if="activeTab === 'containers'"
-          :containers="(containers as any)"
-          :version-comparisons="(versionComparisons as any)"
+          :containers="containers"
+          :version-comparisons="versionComparisons"
           :can-run-docker="canRunDocker"
-          :action-loading="(dockerActionLoading as any)"
+          :action-loading="dockerActionLoading"
           :bulk-action-loading="bulkActionLoading"
-          @container-action="(handleContainerAction as any)"
-          @bulk-container-action="(handleBulkContainerAction as any)"
+          @container-action="handleContainerAction"
+          @bulk-container-action="handleBulkContainerAction"
         />
         <ComposeProjectsTab
           v-if="activeTab === 'compose'"
-          :compose-projects="(composeProjects as any)"
-          :containers="(containers as any)"
-          :version-comparisons="(versionComparisons as any)"
+          :compose-projects="composeProjects"
+          :containers="containers"
+          :version-comparisons="versionComparisons"
           :can-run-docker="canRunDocker"
-          :action-loading="(composeActionLoading as any)"
-          @compose-action="(handleComposeAction as any)"
+          :action-loading="composeActionLoading"
+          @compose-action="handleComposeAction"
         />
       </div>
 

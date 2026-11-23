@@ -70,11 +70,11 @@
               <AlertRuleStepSource
                 v-model:form="form"
                 :rule="rule"
-                :hosts="(hosts as any)"
-                :capabilities="(capabilities as any)"
+                :hosts="hosts"
+                :capabilities="capabilities"
                 :capabilities-loading="capabilitiesLoading"
                 :capabilities-error="capabilitiesError"
-                :host-metrics="(hostMetrics as any)"
+                :host-metrics="hostMetrics"
                 :host-metrics-loading="hostMetricsLoading"
                 :host-metrics-error="hostMetricsError"
                 :metric-cards="metricCards"
@@ -82,12 +82,12 @@
                 :metric-allows-guest-scope="metricAllowsGuestScope"
                 :metric-allows-storage-scope="metricAllowsStorageScope"
                 :metric-allows-disk-scope="metricAllowsDiskScope"
-                :proxmox-connections="(proxmoxConnections as any)"
-                :proxmox-nodes="(proxmoxNodes as any)"
-                :proxmox-storages="(proxmoxStorages as any)"
-                :proxmox-guests="(proxmoxGuests as any)"
-                :proxmox-disks="(proxmoxDisks as any)"
-                :docker-hosts="(dockerHosts as any)"
+                :proxmox-connections="proxmoxConnections"
+                :proxmox-nodes="proxmoxNodes"
+                :proxmox-storages="proxmoxStorages"
+                :proxmox-guests="proxmoxGuests"
+                :proxmox-disks="proxmoxDisks"
+                :docker-hosts="dockerHosts"
                 :docker-capabilities-loading="dockerCapabilitiesLoading"
                 @select-metric="selectMetric"
                 @set-source-type="setSourceType"
@@ -97,8 +97,8 @@
             <div v-if="step === 2">
               <AlertRuleStepConditions
                 v-model:form="form"
-                :rule="(rule as any)"
-                :test-results="(testResults as any)"
+                :rule="rule"
+                :test-results="testResults"
                 :has-no-data-results="hasNoDataResults"
                 :can-download-test-logs="canDownloadTestLogs"
                 :downloading-logs="downloadingLogs"
@@ -114,8 +114,8 @@
                 v-model:channel-browser="channelBrowser"
                 v-model:command-trigger-enabled="commandTriggerEnabled"
                 :form="form"
-                :rule="(rule as any)"
-                :test-results="(testResults as any)"
+                :rule="rule"
+                :test-results="testResults"
                 :test-error="testError"
                 :browser-permission="browserPermission"
               />
@@ -216,17 +216,21 @@ import { getApiErrorMessage } from '../../api/client'
 
 interface Host {
   id: string
-  name?: string
+  name: string
 }
 
 interface TestResult {
-  has_data?: boolean
-  [key: string]: unknown
+  host_id: string
+  host_name: string
+  has_data: boolean
+  current_value: number
+  would_fire: boolean
 }
 
 interface TestResults {
+  any_fires?: boolean
+  evaluated_at?: string
   results?: TestResult[]
-  [key: string]: unknown
 }
 
 const props = withDefaults(defineProps<{

@@ -699,7 +699,7 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
   {
     key: 'updates',
     label: t('proxmox.updatesTabLabel'),
-    badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-warning-lt text-warning' }] : [],
+    badges: (node.value?.pending_updates ?? 0) > 0 ? [{ value: node.value?.pending_updates ?? 0, badgeClass: 'badge ms-1 bg-warning-lt text-warning' }] : [],
     lazy: true,
   },
   { key: 'services', label: t('proxmox.servicesTabLabel'), lazy: true },

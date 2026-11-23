@@ -516,26 +516,26 @@
     <WebhookModal
       :visible="showWebhookModal"
       mode="webhook"
-      :item="(editingWebhook as any)"
-      :hosts="(hosts as any)"
+      :item="editingWebhook"
+      :hosts="hosts"
       :saving="saving"
       :error="modalError"
       @close="closeWebhookModal"
-      @submit="(saveWebhook as any)"
+      @submit="saveWebhook"
     />
 
     <WebhookModal
       :visible="showTrackerModal"
       mode="tracker"
-      :item="(editingTracker as any)"
-      :hosts="(hosts as any)"
+      :item="editingTracker"
+      :hosts="hosts"
       :saving="saving"
       :error="modalError"
       :prefill-docker-image="prefillDockerImage"
       :prefill-docker-tag="prefillDockerTag"
       :prefill-compose-project="prefillComposeProject"
       @close="closeTrackerModal"
-      @submit="(saveTracker as any)"
+      @submit="saveTracker"
     />
 
     <TrackableContainersModal

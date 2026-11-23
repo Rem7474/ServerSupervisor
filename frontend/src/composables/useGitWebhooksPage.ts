@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api, { getApiErrorMessage } from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
+import type { WebhookFormData } from './useWebhookForm'
 import { useCommandLogViewer } from './useCommandLogViewer'
 import { execBadgeColor } from '../utils/statusClasses'
 import { gitProviderBadgeClass } from '../utils/categoryBadges'
@@ -95,7 +96,7 @@ interface CreatedWebhook {
   secret?: string
 }
 
-type FormPayload = Record<string, unknown>
+type FormPayload = WebhookFormData
 
 interface UseGitWebhooksPageApi {
   activeTab: Ref<string>

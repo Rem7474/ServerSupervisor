@@ -246,7 +246,10 @@ function buildElements() {
   })
 }
 
-function getLayoutOptions(): Record<string, unknown> {
+// fcose options aren't part of cytoscape's typed LayoutOptions union.
+type FcoseLayoutOptions = cytoscape.BaseLayoutOptions & Record<string, unknown>
+
+function getLayoutOptions(): FcoseLayoutOptions {
   return {
     name: 'fcose',
     animate: true,
@@ -266,7 +269,7 @@ function getLayoutOptions(): Record<string, unknown> {
   }
 }
 
-function showTooltip(event: any, lines: string[]): void {
+function showTooltip(event: cytoscape.EventObject, lines: string[]): void {
   if (!tooltipRef.value) return
   tooltipRef.value.innerHTML = lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')
   tooltipRef.value.style.display = 'block'
@@ -278,7 +281,7 @@ function hideTooltip(): void {
   if (tooltipRef.value) tooltipRef.value.style.display = 'none'
 }
 
-function moveTooltip(event: any): void {
+function moveTooltip(event: cytoscape.EventObject): void {
   if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
   tooltipRef.value.style.left = `${event.originalEvent.pageX + 12}px`
   tooltipRef.value.style.top = `${event.originalEvent.pageY + 12}px`
@@ -291,7 +294,7 @@ function emitPositions(): void {
   positionSaveTimeout = setTimeout(() => {
     if (!cy) return
     const positions: Record<string, { x: number; y: number }> = {}
-    cy.nodes().forEach((n: any) => {
+    cy.nodes().forEach((n: cytoscape.NodeSingular) => {
       const pos = n.position()
       positions[n.id()] = { x: Math.round(pos.x), y: Math.round(pos.y) }
     })
@@ -310,7 +313,7 @@ function initCytoscape(): void {
     container: cyContainer.value,
     elements: buildElements(),
     style: getNetworkGraphStyle(),
-    layout: hasPositions ? { name: 'preset', fit: true, padding: 48 } : (getLayoutOptions() as any),
+    layout: hasPositions ? { name: 'preset', fit: true, padding: 48 } : (getLayoutOptions()),
     minZoom: 0.2,
     maxZoom: 3,
     wheelSensitivity: 0.3,
@@ -318,7 +321,7 @@ function initCytoscape(): void {
   })
 
   if (hasPositions) {
-    cy.nodes().forEach((n: any) => {
+    cy.nodes().forEach((n: cytoscape.NodeSingular) => {
       const pos = savedPositions[n.id()]
       if (pos) n.position(pos)
     })
@@ -327,18 +330,18 @@ function initCytoscape(): void {
 
   cy.on('dragfree', 'node', emitPositions)
 
-  cy.on('tap', 'node', (event: any) => {
+  cy.on('tap', 'node', (event: cytoscape.EventObject) => {
     emit('node-select', { ...event.target.data() })
   })
 
   // Click on host → emit event
-  cy.on('tap', 'node[type="host"]', (event: any) => {
+  cy.on('tap', 'node[type="host"]', (event: cytoscape.EventObject) => {
     const hostId = event.target.data('hostId')
     if (hostId) emit('host-click', hostId)
   })
 
   // Hover tooltips
-  cy.on('mouseover', 'node', (event: any) => {
+  cy.on('mouseover', 'node', (event: cytoscape.EventObject) => {
     const d = event.target.data()
     const lines: string[] = []
     if (d.type === 'host') {
@@ -372,7 +375,7 @@ function initCytoscape(): void {
   cy.on('mousemove', 'node', moveTooltip)
   cy.on('mouseout', 'node', hideTooltip)
 
-  cy.on('mouseover', 'edge', (event: any) => {
+  cy.on('mouseover', 'edge', (event: cytoscape.EventObject) => {
     const d = event.target.data()
     const lines: string[] = []
     if (d.edgeType === 'internet-proxy') {
@@ -396,8 +399,7 @@ function initCytoscape(): void {
 
 function resetLayout() {
   if (!cy) return
-  // fcose options aren't part of cytoscape's typed LayoutOptions union.
-  cy.layout(getLayoutOptions() as any).run()
+  cy.layout(getLayoutOptions()).run()
 }
 
 function fitView() {
@@ -463,13 +465,13 @@ watch(
       const newElements = buildElements()
       cy.elements().remove()
       cy.add(newElements)
-      cy.layout(getLayoutOptions() as any).run()
+      cy.layout(getLayoutOptions()).run()
       return
     }
 
     // Snapshot current in-memory positions before rebuild
     const currentPositions: Record<string, { x: number; y: number }> = {}
-    cy.nodes().forEach((n: any) => {
+    cy.nodes().forEach((n: cytoscape.NodeSingular) => {
       currentPositions[n.id()] = { x: n.position('x'), y: n.position('y') }
     })
 
@@ -479,7 +481,7 @@ watch(
 
     // Restore positions: use in-memory first, fallback to prop (DB-loaded)
     let hasNewNodes = false
-    cy.nodes().forEach((n: any) => {
+    cy.nodes().forEach((n: cytoscape.NodeSingular) => {
       const pos = currentPositions[n.id()] || (props.nodePositions || {})[n.id()]
       if (pos) {
         n.position(pos)
@@ -489,7 +491,7 @@ watch(
     })
 
     if (hasNewNodes) {
-      cy.layout({ ...getLayoutOptions(), randomize: false, fit: false } as any).run()
+      cy.layout({ ...getLayoutOptions(), randomize: false, fit: false } as FcoseLayoutOptions).run()
     }
   },
   { deep: true }
