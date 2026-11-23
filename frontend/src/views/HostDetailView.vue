@@ -1,84 +1,15 @@
 <template>
   <div class="host-detail-page">
-    <div class="page-header mb-3">
-      <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3">
-        <div>
-          <div class="page-pretitle">
-            <router-link
-              to="/"
-              class="text-decoration-none"
-            >
-              {{ t('nav.sections.control.items.dashboard') }}
-            </router-link>
-            <span class="text-muted mx-1">/</span>
-            <span>{{ t('host.hostBreadcrumb') }}</span>
-          </div>
-          <h2 class="page-title">
-            {{ host?.name || host?.hostname || t('host.loadingLabel') }}
-          </h2>
-          <div class="text-secondary">
-            {{ host?.hostname || t('host.notConnected') }} - {{ host?.os || t('host.unknownOs') }} - {{ host?.ip_address }}
-            <span v-if="host?.last_seen">- {{ t('host.lastActivityLabel') }} <RelativeTime :date="host.last_seen" /></span>
-          </div>
-          <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-            <span
-              v-if="host"
-              :class="hostStatusClass(host.status)"
-              :aria-label="t('host.hostStatusAriaLabel', { status: formatHostStatus(host.status) })"
-            >
-              <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
-              {{ formatHostStatus(host.status) }}
-            </span>
-            <BadgePill
-              v-if="host?.agent_version"
-              :tone="isAgentUpToDate(host.agent_version) ? 'success' : 'warning'"
-              :text="t('host.agentVersionBadge', { version: host.agent_version })"
-              :aria-label="isAgentUpToDate(host.agent_version) ? t('host.agentUpToDateAriaSuffix', { version: host.agent_version }) : t('host.agentUpdateAvailableAriaSuffix', { version: host.agent_version })"
-              :title="isAgentUpToDate(host.agent_version) ? t('host.agentUpToDateTitle') : t('host.agentUpdateAvailableTitle')"
-              compact
-            />
-          </div>
-        </div>
-        <div class="d-flex flex-wrap align-items-center justify-content-lg-end gap-2">
-          <button
-            type="button"
-            class="btn btn-outline-secondary"
-            @click="isEditing = true"
-          >
-            <IconPencil
-              :size="16"
-              class="icon me-1"
-            />
-            {{ t('host.editLabel') }}
-          </button>
-          <button
-            v-if="canUpdateAgent"
-            type="button"
-            class="btn btn-outline-primary"
-            :disabled="agentUpdateLoading"
-            @click="sendAgentUpdate"
-          >
-            <IconRefresh
-              :size="16"
-              class="icon me-1"
-            />
-            {{ t('host.updateAgentLabel') }}
-          </button>
-          <button
-            v-if="auth.isAdmin"
-            type="button"
-            class="btn btn-outline-danger"
-            @click="deleteHost"
-          >
-            <IconTrash
-              :size="16"
-              class="icon me-1"
-            />
-            {{ t('host.deleteLabel') }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <HostDetailHeader
+      :host="host"
+      :is-admin="auth.isAdmin"
+      :can-update-agent="canUpdateAgent"
+      :agent-update-loading="agentUpdateLoading"
+      :is-agent-up-to-date="isAgentUpToDate"
+      @edit="isEditing = true"
+      @update-agent="sendAgentUpdate"
+      @delete="deleteHost"
+    />
 
     <WsStatusBar
       :status="wsStatus"
@@ -100,207 +31,22 @@
       class="mb-3"
     />
 
-    <!-- Proxmox link panel -->
-    <div
-      v-if="proxmoxLink && proxmoxLink.status !== 'ignored'"
-      class="card mb-3 border-0 shadow-sm"
-    >
-      <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-3">
-        <!-- Guest info -->
-        <div class="d-flex align-items-center gap-2">
-          <BadgePill
-            text="Proxmox"
-            tone="orange"
-            compact
-          />
-          <span class="fw-medium">{{ proxmoxLink.guest_name || `VMID ${proxmoxLink.vmid}` }}</span>
-          <span class="text-muted small">({{ proxmoxLink.guest_type?.toUpperCase() }} · {{ proxmoxLink.node_name }})</span>
-          <!-- This panel only has the link's own metadata (status, metrics
-               source) — no running/stopped state, so power actions can't
-               live here without a second API call. Send to the guest's own
-               page instead, which already has them (start/shutdown/reboot,
-               auto-refresh, full metrics). -->
-          <router-link
-            :to="`/proxmox/guests/${proxmoxLink.guest_id}`"
-            class="text-decoration-none small d-inline-flex align-items-center gap-1"
-            :title="t('host.viewGuestTooltip')"
-          >
-            {{ t('host.viewGuestLabel') }}
-            <IconExternalLink :size="14" />
-          </router-link>
-        </div>
-
-        <!-- Status badge + suggestion actions -->
-        <div class="d-flex align-items-center gap-2">
-          <BadgePill
-            v-if="proxmoxLink.status === 'suggested'"
-            :text="t('host.suggestionBadge')"
-            tone="warning"
-            compact
-          />
-          <BadgePill
-            v-else
-            :text="t('host.linkedBadge')"
-            tone="success"
-            compact
-          />
-          <template v-if="proxmoxLink.status === 'suggested'">
-            <button
-              type="button"
-              class="btn btn-sm btn-success"
-              :disabled="linkSaving"
-              @click="confirmLink"
-            >
-              {{ t('host.confirmLabel') }}
-            </button>
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              :disabled="linkSaving"
-              @click="ignoreLink"
-            >
-              {{ t('host.ignoreLabel') }}
-            </button>
-          </template>
-        </div>
-
-        <!-- Metrics source selector (shown only when confirmed) -->
-        <div
-          v-if="proxmoxLink.status === 'confirmed'"
-          class="d-flex align-items-center gap-2 ms-auto"
-        >
-          <label class="form-label mb-0 text-muted small">{{ t('host.metricsSourceLabel') }}</label>
-          <select
-            class="form-select form-select-sm"
-            style="width:auto"
-            :value="proxmoxLink.metrics_source"
-            @change="changeMetricsSource(($event.target as HTMLSelectElement).value as 'agent' | 'proxmox' | 'auto')"
-          >
-            <option value="auto">
-              {{ t('host.automaticOption') }}
-            </option>
-            <option value="agent">
-              Agent
-            </option>
-            <option value="proxmox">
-              Proxmox
-            </option>
-          </select>
-          <button
-            type="button"
-            class="btn btn-icon btn-sm btn-outline-danger"
-            :disabled="linkSaving"
-            :title="t('host.deleteLinkTooltip')"
-            :aria-label="t('host.deleteLinkTooltip')"
-            @click="deleteLink"
-          >
-            <IconTrash
-              :size="16"
-              class="icon icon-sm"
-            />
-          </button>
-        </div>
-
-        <!-- Guest live metrics (source = proxmox) -->
-        <template v-if="proxmoxLink.status === 'confirmed' && proxmoxLink.metrics_source !== 'agent'">
-          <div class="d-flex align-items-center gap-3 ms-2 border-start ps-3">
-            <div class="text-muted small">
-              CPU <strong :class="getMetricColorClass((proxmoxLink.cpu_usage ?? 0) * 100)">{{ ((proxmoxLink.cpu_usage ?? 0) * 100).toFixed(1) }}%</strong>
-            </div>
-            <div class="text-muted small">
-              RAM
-              <strong
-                v-if="linkRamPct != null"
-                :class="getMetricColorClass(linkRamPct)"
-              >{{ linkRamPct.toFixed(1) }}%</strong> <span class="text-body">({{ formatBytesLink(proxmoxLink.mem_usage) }} / {{ formatBytesLink(proxmoxLink.mem_alloc) }})</span>
-            </div>
-            <div
-              v-if="linkDiskPct != null"
-              class="text-muted small"
-            >
-              {{ t('host.diskLabel') }} <strong :class="getMetricColorClass(linkDiskPct)">{{ linkDiskPct.toFixed(1) }}%</strong>
-            </div>
-          </div>
-        </template>
-      </div>
-    </div>
-
-    <!-- No link banner + manual link button -->
-    <div
-      v-else-if="!proxmoxLink && showLinkButton"
-      class="d-flex align-items-center gap-2 mb-3"
-    >
-      <button
-        type="button"
-        class="btn btn-sm btn-outline-warning"
-        @click="openLinkForm"
-      >
-        <IconLink
-          :size="16"
-          class="icon icon-sm me-1"
-        />
-        {{ t('host.linkToProxmoxLabel') }}
-      </button>
-    </div>
-
-    <!-- Manual link form -->
-    <div
-      v-if="showLinkForm"
-      class="card mb-3"
-    >
-      <div class="card-body">
-        <div class="fw-medium mb-2">
-          {{ t('host.linkHostToGuestLabel') }}
-        </div>
-        <div
-          v-if="linkCandidatesLoading"
-          class="text-muted small"
-        >
-          {{ t('host.loadingLabel') }}
-        </div>
-        <div
-          v-else-if="linkCandidates.length === 0"
-          class="text-muted small"
-        >
-          {{ t('host.noGuestAvailable') }}
-        </div>
-        <div
-          v-else
-          class="d-flex align-items-center gap-2"
-        >
-          <select
-            v-model="selectedCandidate"
-            class="form-select form-select-sm candidate-select"
-          >
-            <option value="">
-              {{ t('host.chooseGuestOption') }}
-            </option>
-            <option
-              v-for="g in linkCandidates"
-              :key="g.id"
-              :value="g.id"
-            >
-              {{ g.name || `VMID ${g.vmid}` }} ({{ g.guest_type?.toUpperCase() }} · {{ g.node_name }})
-            </option>
-          </select>
-          <button
-            type="button"
-            class="btn btn-sm btn-primary"
-            :disabled="!selectedCandidate || linkSaving"
-            @click="createManualLink"
-          >
-            {{ t('host.linkButtonLabel') }}
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm btn-outline-secondary"
-            @click="showLinkForm = false; selectedCandidate = ''"
-          >
-            {{ t('host.cancel') }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <HostProxmoxLinkPanel
+      v-model:show-link-form="showLinkForm"
+      v-model:selected-candidate="selectedCandidate"
+      :proxmox-link="proxmoxLink"
+      :link-saving="linkSaving"
+      :show-link-button="showLinkButton"
+      :link-candidates="linkCandidates"
+      :link-candidates-loading="linkCandidatesLoading"
+      :format-bytes-link="formatBytesLink"
+      @confirm="confirmLink"
+      @ignore="ignoreLink"
+      @change-metrics-source="changeMetricsSource"
+      @delete="deleteLink"
+      @open-form="openLinkForm"
+      @create-link="createManualLink"
+    />
 
     <div class="side-layout">
       <div class="side-main">
@@ -318,179 +64,32 @@
           nav-class="host-detail-tabs"
         >
           <template #overview>
-            <div class="row row-cards mb-3">
-              <div class="col-6 col-lg-3">
-                <div class="card card-sm h-100">
-                  <div class="card-body">
-                    <div class="subheader">
-                      APT
-                    </div>
-                    <div
-                      class="h2 mb-0 mt-1"
-                      :class="(aptStatus?.security_updates || 0) > 0 ? 'text-danger' : (aptStatus?.pending_packages || 0) > 0 ? 'text-warning' : 'text-success'"
-                    >
-                      {{ aptStatus?.pending_packages || 0 }}
-                    </div>
-                    <div class="text-secondary small">
-                      {{ aptStatus?.security_updates || 0 }} {{ t('host.securityUpdatesSuffix') }}
-                      <a
-                        href="#"
-                        class="ms-1 text-decoration-none"
-                        @click.prevent="activeTab = 'apt'"
-                      >{{ t('host.seeLabel') }}</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-6 col-lg-3">
-                <div class="card card-sm h-100">
-                  <div class="card-body">
-                    <div class="subheader">
-                      {{ t('host.dockerContainersLabel') }}
-                    </div>
-                    <div class="h2 mb-0 mt-1">
-                      {{ dockerRunningCount }} / {{ containers.length }}
-                    </div>
-                    <div class="text-secondary small">
-                      {{ t('host.runningLabel') }}
-                      <a
-                        href="#"
-                        class="ms-1 text-decoration-none"
-                        @click.prevent="activeTab = 'docker'"
-                      >{{ t('host.seeLabel') }}</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-6 col-lg-3">
-                <div class="card card-sm h-100">
-                  <div class="card-body">
-                    <div class="subheader">
-                      {{ t('host.scheduledTasksTabLabel') }}
-                    </div>
-                    <div class="h2 mb-0 mt-1">
-                      {{ tasksCount }}
-                    </div>
-                    <div class="text-secondary small">
-                      <a
-                        href="#"
-                        class="text-decoration-none"
-                        @click.prevent="activeTab = 'planifiees'"
-                      >{{ t('host.seeLabel') }}</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-6 col-lg-3">
-                <div class="card card-sm h-100">
-                  <div class="card-body">
-                    <div class="subheader">
-                      {{ t('host.recentCommandsLabel') }}
-                    </div>
-                    <div class="h2 mb-0 mt-1">
-                      {{ cmdHistory.length }}
-                    </div>
-                    <div class="text-secondary small">
-                      <a
-                        href="#"
-                        class="text-decoration-none"
-                        @click.prevent="goToTimelineCommands"
-                      >{{ t('host.seeLabel') }}</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card mb-3">
-              <div class="card-header d-flex align-items-center justify-content-between">
-                <h3 class="card-title mb-0">
-                  <IconAlertTriangle
-                    :size="24"
-                    class="icon me-1"
-                  />
-                  {{ t('host.activeAlertsTitle') }}
-                </h3>
-                <router-link
-                  to="/alerts?tab=incidents"
-                  class="btn btn-sm btn-outline-secondary"
-                >
-                  {{ t('host.allAlertsLabel') }}
-                </router-link>
-              </div>
-              <div
-                v-if="incidentsLoading"
-                class="card-body"
-              >
-                <LoadingSkeleton variant="list" />
-              </div>
-              <div
-                v-else-if="!hostActiveIncidents.length"
-                class="card-body"
-              >
-                <EmptyState :title="t('host.noActiveAlerts')" />
-              </div>
-              <div
-                v-else
-                class="list-group list-group-flush"
-              >
-                <router-link
-                  v-for="item in hostActiveIncidents"
-                  :key="item.id"
-                  :to="hostAlertsLink"
-                  class="list-group-item list-group-item-action d-flex align-items-center gap-2"
-                >
-                  <span
-                    class="badge"
-                    :class="item.severity === 'crit' ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'"
-                  >{{ item.severity }}</span>
-                  <span class="flex-grow-1">{{ item.rule_name || item.metric }}</span>
-                  <RelativeTime :date="item.triggered_at || ''" />
-                </router-link>
-              </div>
-            </div>
+            <HostOverviewTab
+              :apt-status="aptStatus"
+              :docker-running-count="dockerRunningCount"
+              :containers-count="containers.length"
+              :tasks-count="tasksCount"
+              :commands-count="cmdHistory.length"
+              :incidents="hostActiveIncidents"
+              :incidents-loading="incidentsLoading"
+              :alerts-link="hostAlertsLink"
+              @go-tab="activeTab = $event"
+              @go-commands="goToTimelineCommands"
+            />
           </template>
 
           <template #metrics>
-            <div
-              v-if="host && host.status !== 'online'"
-              class="alert alert-warning mb-3"
-            >
-              <IconAlertCircle
-                :size="16"
-                class="icon me-2"
-              />
-              {{ t('host.agentOfflineWarning') }}
-            </div>
-            <HostMetricsPanel
+            <HostMetricsTab
               :host-id="hostId"
-              :metrics="effectiveMetrics"
-              :metrics-source="effectiveMetricsSource"
-              :proxmox-guest-id="proxmoxLink?.guest_id ?? null"
-              :refresh-tick="metricsUpdatedAt"
-            />
-            <DiskMetricsCard
-              :host-id="hostId"
-              :initial-metrics="(diskMetrics as any)"
-              class="mb-4"
-            />
-            <DiskHistoryChart
-              :host-id="hostId"
-              :mounts="(diskMetrics?.map((d: any) => d.mount_point) ?? [])"
-              :refresh-tick="metricsUpdatedAt"
-              class="mb-4"
-            />
-            <DiskHealthCard
-              v-if="hasLocalSmart || !isProxmoxLinked"
-              :host-id="hostId"
-              :initial-health="(diskHealth as any)"
-              class="mb-4"
-            />
-            <ProxmoxHostDiskHealthCard
-              v-else
-              :host-id="hostId"
-              :node-name="proxmoxLink?.node_name ?? null"
-              class="mb-4"
+              :host="host"
+              :effective-metrics="effectiveMetrics"
+              :effective-metrics-source="effectiveMetricsSource"
+              :proxmox-link="proxmoxLink"
+              :metrics-updated-at="metricsUpdatedAt"
+              :disk-metrics="(diskMetrics as DiskMetric[] | null)"
+              :disk-health="(diskHealth as DiskHealth[] | null)"
+              :has-local-smart="hasLocalSmart"
+              :is-proxmox-linked="isProxmoxLinked"
             />
           </template>
 
@@ -599,79 +198,13 @@
 
           <!-- Security tab: Per-host permissions (admin only) -->
           <template #securite>
-            <div
+            <HostSecurityTab
               v-if="auth.isAdmin"
-              class="card"
-            >
-              <div class="card-header d-flex align-items-center justify-content-between">
-                <h3 class="card-title mb-0 d-flex align-items-center gap-2">
-                  <IconLock
-                    :size="16"
-                    class="icon icon-sm text-warning"
-                  />
-                  {{ t('host.perHostPermissionsTitle') }}
-                </h3>
-                <span class="badge badge-sm bg-danger text-white">{{ t('common.adminOnly') }}</span>
-              </div>
-              <div class="card-body p-0">
-                <div v-if="permLoading">
-                  <LoadingSkeleton variant="table" />
-                </div>
-                <EmptyState
-                  v-else-if="!hostPerms.length"
-                  :title="t('host.noRestrictionsTitle')"
-                  :subtitle="t('host.noRestrictionsSubtitle')"
-                />
-                <table
-                  v-else
-                  class="table table-vcenter mb-0"
-                >
-                  <thead>
-                    <tr>
-                      <th>{{ t('host.userColumn') }}</th>
-                      <th>{{ t('host.levelColumn') }}</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="p in hostPerms"
-                      :key="p.username"
-                    >
-                      <td>{{ p.username }}</td>
-                      <td>
-                        <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
-                          {{ p.level }}
-                        </span>
-                      </td>
-                      <td class="text-end">
-                        <button
-                          type="button"
-                          class="btn btn-icon btn-sm btn-ghost-danger"
-                          :title="t('host.revokeTooltip')"
-                          :aria-label="t('host.revokeTooltip')"
-                          @click="revokePermission(p.username)"
-                        >
-                          <IconX
-                            :size="16"
-                            class="icon icon-sm"
-                          />
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="card-footer d-flex justify-content-end">
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-primary"
-                  @click="openAddPermission"
-                >
-                  {{ t('host.addPermissionLabel') }}
-                </button>
-              </div>
-            </div>
+              :host-perms="hostPerms"
+              :perm-loading="permLoading"
+              @revoke="revokePermission"
+              @add="openAddPermission"
+            />
           </template>
           <template #console>
             <div class="card">
@@ -731,129 +264,49 @@
     </div>
 
     <!-- Add permission modal -->
-    <div
-      v-if="addPermModal"
-      ref="permModalRef"
-      class="modal modal-blur fade show d-block modal-permissions-overlay"
-      tabindex="-1"
-      @click.self="addPermModal = false"
-    >
-      <div
-        class="modal-dialog modal-dialog-centered modal-permissions-dialog"
-      >
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              {{ t('host.addPermissionTitle') }}
-            </h5>
-            <button
-              type="button"
-              :aria-label="t('common.close')"
-              class="btn-close"
-              @click="addPermModal = false"
-            />
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">{{ t('host.userColumn') }}</label>
-              <select
-                v-model="newPermUsername"
-                class="form-select"
-              >
-                <option value="">
-                  {{ t('host.chooseEllipsis') }}
-                </option>
-                <option
-                  v-for="u in availableUsers"
-                  :key="u.username"
-                  :value="u.username"
-                >
-                  {{ u.username }}
-                </option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">{{ t('host.levelColumn') }}</label>
-              <select
-                v-model="newPermLevel"
-                class="form-select"
-              >
-                <option value="viewer">
-                  {{ t('host.viewerReadOnlyOption') }}
-                </option>
-                <option value="operator">
-                  {{ t('host.operatorOption') }}
-                </option>
-              </select>
-            </div>
-            <div
-              v-if="permError"
-              class="alert alert-danger py-2"
-            >
-              {{ permError }}
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              @click="addPermModal = false"
-            >
-              {{ t('host.cancel') }}
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              :disabled="!newPermUsername || permSaving"
-              @click="savePermission"
-            >
-              <span
-                v-if="permSaving"
-                class="spinner-border spinner-border-sm me-1"
-              />
-              {{ t('host.saveLabel') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <HostPermissionModal
+      v-model:open="addPermModal"
+      v-model:username="newPermUsername"
+      v-model:level="newPermLevel"
+      :available-users="availableUsers"
+      :perm-saving="permSaving"
+      :perm-error="permError"
+      @save="savePermission"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
-import { useModalChrome } from '../composables/useModalChrome'
-import RelativeTime from '../components/RelativeTime.vue'
-import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'
-import DiskHealthCard from '../components/disk/DiskHealthCard.vue'
-import ProxmoxHostDiskHealthCard from '../components/proxmox/ProxmoxHostDiskHealthCard.vue'
+import { useHostLxcConsole } from '../composables/useHostLxcConsole'
+import { useHostTabs } from '../composables/useHostTabs'
 import NetworkFlowsTable from '../components/network-flows/NetworkFlowsTable.vue'
-import DiskHistoryChart from '../components/disk/DiskHistoryChart.vue'
-import HostMetricsPanel from '../components/host/HostMetricsPanel.vue'
 import HostProcessesPanel from '../components/host/HostProcessesPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import HostAptTab from '../components/host/HostAptTab.vue'
 import HostBackupTab from '../components/host/HostBackupTab.vue'
 import HostDiagnosticsBanner from '../components/host/HostDiagnosticsBanner.vue'
 import EntityTabShell from '../components/EntityTabShell.vue'
-import type { EntityTab } from '../components/EntityTabShell.vue'
 import type { DiagnosticIssue } from '../types/host'
 import HostDockerTab from '../components/host/HostDockerTab.vue'
+import type { DiskMetric } from '../composables/useDiskMetrics'
+import type { DiskHealth } from '../composables/useDiskHealth'
+import HostDetailHeader from '../components/host/HostDetailHeader.vue'
+import HostProxmoxLinkPanel from '../components/host/HostProxmoxLinkPanel.vue'
+import HostOverviewTab from '../components/host/HostOverviewTab.vue'
+import HostMetricsTab from '../components/host/HostMetricsTab.vue'
+import HostSecurityTab from '../components/host/HostSecurityTab.vue'
+import HostPermissionModal from '../components/host/HostPermissionModal.vue'
 import HostEditForm from '../components/host/HostEditForm.vue'
 import HostExposureTab from '../components/host/HostExposureTab.vue'
 import HostSystemTab from '../components/host/HostSystemTab.vue'
 import HostTasksTab from '../components/host/HostTasksTab.vue'
 import HostCustomTasksTab from '../components/host/HostCustomTasksTab.vue'
 import HostTimelineTab from '../components/host/HostTimelineTab.vue'
-import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import EmptyState from '../components/EmptyState.vue'
-import BadgePill from '../components/common/BadgePill.vue'
-import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
-import { getMetricColorClass } from '../utils/metricColor'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 
 const { t } = useI18n()
 
@@ -930,9 +383,6 @@ const {
   openUULog,
 } = useHostDetail()
 
-const permModalRef = ref<HTMLElement | null>(null)
-useModalChrome(permModalRef, () => addPermModal.value, { onClose: () => { addPermModal.value = false } })
-
 // "Recent commands" KPI card jumps to the Timeline tab pre-filtered to
 // command-type events — the Timeline tab absorbed the standalone Commands
 // tab (same underlying remote_commands data, Timeline already merged it in
@@ -968,21 +418,6 @@ const dockerRunningCount = computed(() =>
 const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
 const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
 
-// CPU/RAM/disk % for the linked guest's live metrics, colored with the same
-// shared thresholds as the dashboard/Proxmox views (see metricColor.ts) —
-// mirrors ProxmoxGuestView's own KPI cards for the same guest.
-const linkRamPct = computed(() => {
-  const link = proxmoxLink.value
-  if (!link?.mem_alloc) return null
-  return (link.mem_usage / link.mem_alloc) * 100
-})
-
-const linkDiskPct = computed(() => {
-  const link = proxmoxLink.value
-  if (!link?.disk_alloc) return null
-  return (link.disk_usage / link.disk_alloc) * 100
-})
-
 // Fed by HostExposureTab's @loaded emit. The tab is one of the few that stay
 // eager precisely because of this: the count is its own tab's badge, and a
 // lazy tab would leave the badge empty until the user clicked it — which is
@@ -1005,121 +440,20 @@ const hostAlertsLink = computed(() => ({
   query: { tab: 'incidents', host: host.value?.name || host.value?.hostname || '' },
 }))
 
-// `lazy` is set on every tab that fetches its own data from a `host-id` prop
-// and feeds nothing back to the view — mounting those eagerly meant one page
-// load issued their requests too, whether or not the user ever opened them
-// (Timeline alone is a ~1.4 MB response). The eager ones are eager for a
-// reason: `overview` is the default tab, `metrics`/`docker`/`apt` render data
-// the view already holds from the WS snapshot (no request to save), and
-// `exposition`/`taches-personnalisees`/`planifiees` each emit a count the
-// view renders as a badge or a KPI, so deferring them would blank that count
-// until first visit.
-// The PVE console (termproxy) exists for LXC only, needs an admin session, and
-// is addressed by the Proxmox guest a confirmed link points at.
-const hasLxcConsole = computed(() => {
-  const link = proxmoxLink.value
-  return !!auth.isAdmin && !!link && link.status === 'confirmed' && link.guest_type === 'lxc'
-})
-const ProxmoxConsoleLazy = defineAsyncComponent(() => import('../components/proxmox/ProxmoxConsole.vue'))
-const showLxcConsole = ref(false)
-const hasOpenedLxcConsole = ref(false)
-// A single panel holds either console; `consoleKind` is which one it shows
-// (and which one the reopen button brings back). Opening one closes the other.
-const consoleKind = ref<'live' | 'lxc'>('live')
-watch(showConsole, (open) => {
-  if (!open) return
-  consoleKind.value = 'live'
-  showLxcConsole.value = false
+const { hasLxcConsole, ProxmoxConsoleLazy, showLxcConsole, hasOpenedLxcConsole, consoleKind, openLxcConsole, reopenConsole, closeActiveConsole } = useHostLxcConsole({
+  isAdmin: () => !!auth.isAdmin, proxmoxLink, activeTab, showConsole, closeConsoleAndStream,
 })
 
-function openLxcConsole(): void {
-  hasOpenedLxcConsole.value = true
-  consoleKind.value = 'lxc'
-  showLxcConsole.value = true
-  showConsole.value = false
-}
-
-function reopenConsole(): void {
-  if (consoleKind.value === 'lxc') showLxcConsole.value = true
-  else showConsole.value = true
-}
-
-function closeActiveConsole(): void {
-  if (consoleKind.value === 'lxc') showLxcConsole.value = false
-  else closeConsoleAndStream()
-}
-
-watch(activeTab, (tab) => {
-  if (tab === 'console' && hasLxcConsole.value && !hasOpenedLxcConsole.value) openLxcConsole()
-})
-
-const hostTabs = computed<EntityTab[]>(() => {
-  const securityUpdates = aptStatus.value?.security_updates || 0
-  const pendingPackages = aptStatus.value?.pending_packages || 0
-
-  const tabs: EntityTab[] = [
-    {
-      key: 'overview',
-      label: t('host.overviewTabLabel'),
-      badges: hostActiveIncidents.value.length
-        ? [{ value: hostActiveIncidents.value.length, badgeClass: 'badge bg-danger-lt text-danger ms-1' }]
-        : [],
-    },
-    { key: 'metrics', label: t('host.metricsTabLabel') },
-    {
-      key: 'docker',
-      label: 'Docker',
-      badges: containers.value.length ? [{ value: containers.value.length, badgeClass: 'badge bg-blue-lt text-blue ms-1' }] : [],
-    },
-    {
-      key: 'apt',
-      label: 'APT',
-      badges: securityUpdates > 0
-        ? [{ value: securityUpdates, badgeClass: 'badge bg-danger-lt text-danger ms-1' }]
-        : pendingPackages > 0
-          ? [{ value: pendingPackages, badgeClass: 'badge bg-warning-lt text-warning ms-1' }]
-          : [],
-    },
-    { key: 'backup', label: t('host.backupTabLabel'), lazy: true },
-    { key: 'reseau-flux', label: t('host.networkTrafficTabLabel'), lazy: true },
-    {
-      key: 'exposition',
-      label: t('host.exposureLabel'),
-      badges: exposureDomainCount.value > 0
-        ? [{ value: exposureDomainCount.value, badgeClass: 'badge bg-azure-lt text-azure ms-1' }]
-        : [],
-    },
-  ]
-
-  if (canRunApt.value) {
-    tabs.push(
-      { key: 'systeme', label: t('host.systemTabLabel'), lazy: true },
-      { key: 'processus', label: t('host.processesTabLabel'), lazy: true }
-    )
-  }
-
-  // Labeled "Permissions" (not "Security") to avoid colliding with
-  // ProxmoxNodeView's "Security logs" tab — same word, unrelated content
-  // (per-host RBAC here vs. PVE syslog auth-failure search there).
-  if (auth.isAdmin) {
-    tabs.push({ key: 'securite', label: t('host.permissionsTabLabel') })
-  }
-  tabs.push({
-    key: 'taches-personnalisees',
-    label: t('host.customTasksTabLabel'),
-    badges: customTasksCount.value ? [{ value: customTasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
-  })
-  tabs.push({
-    key: 'planifiees',
-    label: t('host.scheduledTasksTabLabel'),
-    badges: tasksCount.value ? [{ value: tasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
-  })
-  tabs.push({ key: 'timeline', label: 'Timeline', lazy: true })
-  if (hasLxcConsole.value) {
-    tabs.push({ key: 'console', label: t('host.consoleTabLabel') })
-  }
-
-  return tabs
+const hostTabs = useHostTabs({
+  isAdmin: () => !!auth.isAdmin,
+  canRunApt,
+  aptStatus,
+  containers,
+  hostActiveIncidents,
+  exposureDomainCount,
+  customTasksCount,
+  tasksCount,
+  hasLxcConsole,
 })
 </script>
 
@@ -1146,9 +480,5 @@ const hostTabs = computed<EntityTab[]>(() => {
   :deep(.side-panel) {
     width: 100%;
   }
-}
-
-.candidate-select {
-  max-width: 320px;
 }
 </style>
