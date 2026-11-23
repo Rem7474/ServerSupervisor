@@ -147,3 +147,32 @@ func TestReleaseTracker_DeleteRequiresAdmin(t *testing.T) {
 		t.Fatalf("viewer must not delete trackers, got %d (%s)", w.Code, w.Body.String())
 	}
 }
+
+func TestReleaseTracker_SelfHostedGitInstance(t *testing.T) {
+	r := newReleaseTrackerRouter(t, models.RoleAdmin)
+
+	bad := doJSON(t, r, http.MethodPost, "/release-trackers", map[string]any{
+		"name": "ssrf", "tracker_type": "git", "provider": "gitea",
+		"repo_owner": "o", "repo_name": "r", "git_base_url": "http://169.254.169.254",
+	})
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("link-local base URL must be rejected, got %d (%s)", bad.Code, bad.Body.String())
+	}
+
+	ok := doJSON(t, r, http.MethodPost, "/release-trackers", map[string]any{
+		"name": "lan-gitlab", "tracker_type": "git", "provider": "gitlab",
+		"repo_owner": "grp", "repo_name": "app",
+		"git_base_url": "https://git.lan/", "git_token": "glpat-secret",
+	})
+	if ok.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d (%s)", ok.Code, ok.Body.String())
+	}
+	list := doJSON(t, r, http.MethodGet, "/release-trackers", nil)
+	body := list.Body.String()
+	if strings.Contains(body, "glpat-secret") {
+		t.Fatalf("token must never be returned: %s", body)
+	}
+	if !strings.Contains(body, `"git_base_url":"https://git.lan"`) || !strings.Contains(body, `"has_git_token":true`) {
+		t.Fatalf("instance fields missing from list: %s", body)
+	}
+}

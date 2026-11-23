@@ -32,7 +32,7 @@ func ResolveLatestAgentVersion(cfg *config.Config) string {
 		return latestAgentVersionCache.version
 	}
 
-	client := gitprovider.NewClient("github", cfg.GitHubToken)
+	client := gitprovider.NewClient("github", cfg.GitHubToken, "")
 	tag, _, _, err := client.FetchLatestRelease(agentReleaseOwner, agentReleaseRepo)
 	if err != nil {
 		if latestAgentVersionCache.version != "" {

@@ -51,6 +51,17 @@ type ReleaseTracker struct {
 	// actually-deployed digest no longer matches LatestImageDigest. Always
 	// false for non-compose trackers or ones with no digest recorded yet.
 	DriftDetected bool `json:"drift_detected,omitempty"`
+
+	// GitBaseURL is the self-hosted instance root for gitlab/gitea trackers
+	// (empty = the public instance). Always empty for github.
+	GitBaseURL string `json:"git_base_url"`
+	// GitToken is the gitlab/gitea access token. Write-only: never serialized,
+	// the API exposes HasGitToken instead.
+	GitToken string `json:"-"`
+	// ClearGitToken asks UpdateReleaseTracker to erase the stored token (an
+	// empty GitToken otherwise keeps it). Never serialized.
+	ClearGitToken bool `json:"-"`
+	HasGitToken   bool `json:"has_git_token"`
 }
 
 // ReleaseTrackerRequest is the create/update body for a release tracker — the
@@ -82,6 +93,11 @@ type ReleaseTrackerRequest struct {
 	RollbackOnFailure     bool     `json:"rollback_on_failure"`
 	RegistryCredentialsID string   `json:"registry_credentials_id"`
 	ReconcileDrift        bool     `json:"reconcile_drift"`
+	// Self-hosted GitLab/Gitea instance. git_token is write-only; an empty
+	// value keeps the stored token on update, clear_git_token erases it.
+	GitBaseURL    string `json:"git_base_url"`
+	GitToken      string `json:"git_token"`
+	ClearGitToken bool   `json:"clear_git_token"`
 }
 
 // ToModel maps the request onto a ReleaseTracker (config fields only; callers
@@ -111,6 +127,9 @@ func (r ReleaseTrackerRequest) ToModel() ReleaseTracker {
 		RollbackOnFailure:     r.RollbackOnFailure,
 		RegistryCredentialsID: r.RegistryCredentialsID,
 		ReconcileDrift:        r.ReconcileDrift,
+		GitBaseURL:            r.GitBaseURL,
+		GitToken:              r.GitToken,
+		ClearGitToken:         r.ClearGitToken,
 	}
 }
 

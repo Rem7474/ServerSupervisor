@@ -10,6 +10,7 @@ import { gitProviderBadgeClass } from '../utils/categoryBadges'
 import { formatDate, formatDateTimeSeconds } from '../utils/formatters'
 import { storeToRefs } from 'pinia'
 import { useHostsStore } from '../stores/hosts'
+import { gitRepoUrl } from '../utils/gitRepoLinks'
 
 interface TrackerCmd {
   id: string
@@ -64,6 +65,7 @@ interface ReleaseTracker {
   provider: string
   repo_owner: string
   repo_name: string
+  git_base_url?: string
   last_release_tag?: string
   last_execution?: ExecutionPayload
   tracker_type?: string
@@ -458,14 +460,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   }
 
   function repoURL(tracker: ReleaseTracker): string {
-    switch (tracker.provider) {
-      case 'gitlab':
-        return `https://gitlab.com/${tracker.repo_owner}/${tracker.repo_name}`
-      case 'gitea':
-        return `https://codeberg.org/${tracker.repo_owner}/${tracker.repo_name}`
-      default:
-        return `https://github.com/${tracker.repo_owner}/${tracker.repo_name}`
-    }
+    return gitRepoUrl(tracker)
   }
 
   function providerBadge(provider: string): string {

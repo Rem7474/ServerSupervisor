@@ -248,5 +248,13 @@
   "createTaskButton": "Create a task",
   "monitorOnlyModeHint": "Monitor-only mode: configure a target VM and a task to allow manual execution.",
   "manualRunUnavailableError": "Manual execution is not available in this mode.",
-  "triggerError": "Error while triggering"
+  "triggerError": "Error while triggering",
+  "gitBaseUrlLabel": "Instance URL",
+  "gitBaseUrlPlaceholder": "ex: https://git.example.lan",
+  "gitBaseUrlHint": "Leave empty for the public instance (gitlab.com / codeberg.org). Self-hosted instances on a private network are allowed; loopback and link-local addresses are refused.",
+  "gitTokenLabel": "Access token",
+  "gitTokenHint": "Needed for private repositories. Stored on the server and never shown again.",
+  "gitTokenStoredPlaceholder": "•••••••• (token stored, leave empty to keep it)",
+  "gitTokenClearLabel": "Remove the stored token",
+  "gitBaseUrlInvalidError": "The instance URL must be a valid http(s) URL without credentials, query string or fragment."
 }
