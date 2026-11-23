@@ -37,7 +37,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useAutoRefresh } from '../../composables/useAutoRefresh'
 import { useI18n } from 'vue-i18n'
 import api from '../../api'
 import ExposureDomainsPanel from '../security/ExposureDomainsPanel.vue'
@@ -65,7 +66,6 @@ const error = ref('')
 const period = ref('24h')
 const autoRefresh = ref(true)
 const lastUpdatedAt = ref<Date | null>(null)
-let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 const periodLabel = computed(() => PERIODS.value.find((p) => p.value === period.value)?.label ?? period.value)
 
@@ -84,21 +84,9 @@ async function load(): Promise<void> {
   }
 }
 
-function startRefreshTimer(): void {
-  stopRefreshTimer()
-  refreshTimer = setInterval(() => {
-    if (autoRefresh.value) load()
-  }, EXPOSURE_REFRESH_SEC * 1000)
-}
-
-function stopRefreshTimer(): void {
-  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
-}
-
 watch(period, load)
+useAutoRefresh(load, { intervalSec: EXPOSURE_REFRESH_SEC, enabled: autoRefresh })
 onMounted(() => {
   load()
-  startRefreshTimer()
 })
-onUnmounted(stopRefreshTimer)
 </script>
