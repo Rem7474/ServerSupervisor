@@ -127,8 +127,8 @@ describe('AuditLogsView', () => {
     expect(wrapper.text()).toContain('No command recorded')
   })
 
-  it('loads the journal tab immediately on mount when ?tab=journal', async () => {
-    route.query = { tab: 'journal' }
+  it('loads the journal tab immediately on mount when ?tab=audit-log', async () => {
+    route.query = { tab: 'audit-log' }
     const wrapper = mountAuditView()
     await flushPromises()
 
@@ -137,30 +137,39 @@ describe('AuditLogsView', () => {
     expect(wrapper.find('a.nav-link.active').text()).toBe('Journal')
   })
 
+  it('loads the logins tab immediately on mount when ?tab=logins', async () => {
+    route.query = { tab: 'logins' }
+    const wrapper = mountAuditView()
+    await flushPromises()
+
+    expect(getLoginEventsAdmin).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('a.nav-link.active').text()).toBe('Connexions')
+  })
+
   it('switches tabs reactively when route.query.tab changes while already on /audit', async () => {
-    route.query = { tab: 'commandes' }
+    route.query = { tab: 'commands' }
     const wrapper = mountAuditView()
     await flushPromises()
     expect(wrapper.find('a.nav-link.active').text()).toBe('Commandes')
 
-    route.query.tab = 'journal'
+    route.query.tab = 'audit-log'
     await flushPromises()
     expect(getAuditLogs).toHaveBeenCalledTimes(1)
     expect(wrapper.find('a.nav-link.active').text()).toBe('Journal')
 
-    route.query.tab = 'connexions'
+    route.query.tab = 'logins'
     await flushPromises()
     expect(getLoginEventsAdmin).toHaveBeenCalledTimes(1)
     expect(wrapper.find('a.nav-link.active').text()).toBe('Connexions')
 
-    route.query.tab = 'commandes'
+    route.query.tab = 'commands'
     await flushPromises()
     expect(wrapper.find('a.nav-link.active').text()).toBe('Commandes')
   })
 
-  it('restricts operators to the commandes tab even if ?tab=journal is requested', async () => {
+  it('restricts operators to the commandes tab even if ?tab=audit-log is requested', async () => {
     useAuthStore().setAuth({ role: 'operator', username: 'op' } as never, 'op')
-    route.query = { tab: 'journal' }
+    route.query = { tab: 'audit-log' }
     const wrapper = mountAuditView()
     await flushPromises()
 

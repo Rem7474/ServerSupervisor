@@ -51,11 +51,8 @@ export function useHostDetail() {
   const dialog = useConfirmDialog()
   const canRunApt = computed(() => auth.canManage)
 
-  // 'commandes' redirects to 'timeline' (its type filter now covers the same
-  // remote_commands data) so a pre-existing bookmark/link to the removed
-  // standalone tab still lands somewhere meaningful instead of a blank pane.
   const requestedTab = typeof route.query.tab === 'string' ? route.query.tab : 'overview'
-  const activeTab = ref<string>(requestedTab === 'commandes' ? 'timeline' : requestedTab)
+  const activeTab = ref<string>(requestedTab)
 
   watch(activeTab, (tab) => {
     router.replace({ query: { ...route.query, tab } })

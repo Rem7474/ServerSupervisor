@@ -27,7 +27,7 @@ export function useAccount() {
 
   const signal = useAbortSignal()
   const requestedTab = new URLSearchParams(window.location.search).get('tab')
-  const activeTab = ref(requestedTab === 'connexions' ? 'connexions' : 'profil')
+  const activeTab = ref(requestedTab === 'logins' ? 'logins' : 'profile')
 
   const profile = ref<Profile | null>(null)
 
@@ -177,7 +177,7 @@ export function useAccount() {
   }
 
   function switchToHistorique() {
-    activeTab.value = 'historique'
+    activeTab.value = 'history'
     if (!allCommands.value.length && !cmdsLoading.value) void loadMyCommands()
   }
 

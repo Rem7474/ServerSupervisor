@@ -364,8 +364,8 @@ function isItemActive(to: string): boolean {
   if (targetPath === '/audit') {
     const targetTab = targetParams.get('tab')
     const currentTab = Array.isArray(route.query.tab) ? route.query.tab[0] : route.query.tab
-    if (targetTab === 'commandes') return !currentTab || currentTab === 'commandes'
-    if (targetTab === 'journal') return currentTab === 'journal' || currentTab === 'connexions'
+    if (targetTab === 'commands') return !currentTab || currentTab === 'commands'
+    if (targetTab === 'audit-log') return currentTab === 'audit-log' || currentTab === 'logins'
   }
   for (const [key, val] of targetParams.entries()) {
     if (route.query[key] !== val) return false

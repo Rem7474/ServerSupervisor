@@ -20,17 +20,17 @@ describe('visibleNavSections', () => {
     const control = sections.find((s) => s.key === 'control')
     const settings = sections.find((s) => s.key === 'settings')
 
-    expect(control?.items.map((i) => i.to)).toContain('/audit?tab=commandes')
-    expect(settings?.items.map((i) => i.to)).toContain('/audit?tab=journal')
+    expect(control?.items.map((i) => i.to)).toContain('/audit?tab=commands')
+    expect(settings?.items.map((i) => i.to)).toContain('/audit?tab=audit-log')
     expect(settings?.items.map((i) => i.to)).toContain('/settings')
   })
 
-  it('shows only /audit?tab=commandes to operators and hides admin settings sections', () => {
+  it('shows only /audit?tab=commands to operators and hides admin settings sections', () => {
     const sections = visibleNavSections(authFor('operator'), passthroughT)
     const allDestinations = sections.flatMap((s) => s.items.map((i) => i.to))
 
-    expect(allDestinations).toContain('/audit?tab=commandes')
-    expect(allDestinations).not.toContain('/audit?tab=journal')
+    expect(allDestinations).toContain('/audit?tab=commands')
+    expect(allDestinations).not.toContain('/audit?tab=audit-log')
     expect(allDestinations).not.toContain('/settings')
     expect(sections.find((s) => s.key === 'settings')).toBeUndefined()
   })
@@ -39,8 +39,8 @@ describe('visibleNavSections', () => {
     const sections = visibleNavSections(authFor('viewer'), passthroughT)
     const allDestinations = sections.flatMap((s) => s.items.map((i) => i.to))
 
-    expect(allDestinations).not.toContain('/audit?tab=commandes')
-    expect(allDestinations).not.toContain('/audit?tab=journal')
+    expect(allDestinations).not.toContain('/audit?tab=commands')
+    expect(allDestinations).not.toContain('/audit?tab=audit-log')
     expect(allDestinations).not.toContain('/settings')
   })
 })
