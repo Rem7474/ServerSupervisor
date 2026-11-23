@@ -145,7 +145,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useAutoRefresh } from '../../composables/useAutoRefresh'
 import { useI18n } from 'vue-i18n'
 import { IconClipboard, IconTerminal2, IconAlertTriangle, IconList } from '@tabler/icons-vue'
 import api from '../../api'
@@ -187,7 +188,6 @@ const error = ref('')
 const typeFilter = ref('')
 const autoRefresh = ref(true)
 const lastUpdatedAt = ref<Date | null>(null)
-let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 const filteredEvents = computed(() =>
   typeFilter.value ? events.value.filter((e) => e.type === typeFilter.value) : events.value
@@ -205,17 +205,6 @@ async function load(): Promise<void> {
   } finally {
     loading.value = false
   }
-}
-
-function startRefreshTimer(): void {
-  stopRefreshTimer()
-  refreshTimer = setInterval(() => {
-    if (autoRefresh.value) void load()
-  }, TIMELINE_REFRESH_SEC * 1000)
-}
-
-function stopRefreshTimer(): void {
-  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
 }
 
 function iconBg(ev: HostTimelineEvent): string {
@@ -248,11 +237,11 @@ function statusLabel(status: string): string {
   return getExecutionStateLabel(status)
 }
 
+useAutoRefresh(load, { intervalSec: TIMELINE_REFRESH_SEC, enabled: autoRefresh })
+
 onMounted(() => {
   void load()
-  startRefreshTimer()
 })
-onUnmounted(stopRefreshTimer)
 
 // Lets a caller (the recent-commands KPI card, since this tab absorbed
 // the standalone commands tab) jump straight to the command-type filter.

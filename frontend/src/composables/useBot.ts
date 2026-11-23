@@ -1,6 +1,7 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import apiClient, { getApiErrorMessage } from '../api'
+import { useAutoRefresh } from './useAutoRefresh'
 import { addToast } from './useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
@@ -24,7 +25,6 @@ export function useBot() {
   const autoRefresh = ref(false)
   const lastUpdatedAt = ref<Date | null>(null)
   const BOT_REFRESH_SEC = 60
-  let refreshTimer: ReturnType<typeof setInterval> | null = null
 
   const showTimeline = ref(false)
   const timelineLoading = ref(false)
@@ -312,11 +312,8 @@ export function useBot() {
   onMounted(() => {
     hostsStore.fetchHosts()
     void loadThreats()
-    refreshTimer = setInterval(() => { if (autoRefresh.value) void loadThreats() }, BOT_REFRESH_SEC * 1000)
   })
-  onUnmounted(() => {
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
-  })
+  useAutoRefresh(loadThreats, { intervalSec: BOT_REFRESH_SEC, enabled: autoRefresh })
 
   return {
     period,

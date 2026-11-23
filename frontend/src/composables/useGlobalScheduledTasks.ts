@@ -1,4 +1,4 @@
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useHostsStore } from '../stores/hosts'
@@ -15,6 +15,7 @@ import { getApiErrorMessage } from '../api/client'
 import { getExecutionStateClass } from '../utils/statusClasses'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { compareStrings, formatDateTime } from '../utils/formatters'
+import { useAutoRefresh } from './useAutoRefresh'
 
 const DEFAULT_CRON = '0 3 * * *'
 const TASKS_REFRESH_SEC = 30
@@ -62,7 +63,6 @@ export function useGlobalScheduledTasks() {
   const runningId = ref<string | number | null>(null)
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
-  let refreshTimer: ReturnType<typeof setInterval> | null = null
 
   const filterText = ref('')
   const filterHost = ref('')
@@ -338,19 +338,6 @@ export function useGlobalScheduledTasks() {
     }
   }
 
-  function startRefreshTimer(): void {
-    stopRefreshTimer()
-    refreshTimer = setInterval(() => {
-      // Skip while a task is manually being run — avoids the row's
-      // "running" state flickering under a refetch mid-execution.
-      if (autoRefresh.value && runningId.value === null) void loadTasks()
-    }, TASKS_REFRESH_SEC * 1000)
-  }
-
-  function stopRefreshTimer(): void {
-    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
-  }
-
   async function toggleTask(task: ScheduledTaskWithHost): Promise<void> {
     const enabling = !task.enabled
     const ok = await dialog.confirm({
@@ -435,9 +422,14 @@ export function useGlobalScheduledTasks() {
   onMounted(() => {
     hostsStore.fetchHosts()
     void loadTasks()
-    startRefreshTimer()
   })
-  onUnmounted(stopRefreshTimer)
+  // Skip while a task is manually being run — avoids the row's "running"
+  // state flickering under a refetch mid-execution.
+  useAutoRefresh(loadTasks, {
+    intervalSec: TASKS_REFRESH_SEC,
+    enabled: autoRefresh,
+    skip: () => runningId.value !== null,
+  })
 
   return {
     hostsStore,

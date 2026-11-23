@@ -174,6 +174,7 @@ import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import EntityTabShell from '../components/EntityTabShell.vue'
 import type { EntityTab } from '../components/EntityTabShell.vue'
 import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
+import { useAutoRefresh } from '../composables/useAutoRefresh'
 import { useAlertsPage } from '../composables/useAlertsPage'
 import { useNotificationHistory } from '../composables/useNotificationHistory'
 import { useAlertRuleTemplates } from '../composables/useAlertRuleTemplates'
@@ -398,7 +399,7 @@ function onTabClick(key: string): void {
   alertsTab.value = key
 }
 
-let incidentsPollTimer: ReturnType<typeof setInterval> | null = null
+useAutoRefresh(loadIncidents, { intervalSec: 300 })
 
 watch(alertsTab, (tab) => {
   router.replace({ query: { ...route.query, tab } })
@@ -426,8 +427,6 @@ onMounted(async () => {
   } else {
     await switchToWarRoom()
   }
-
-  incidentsPollTimer = setInterval(loadIncidents, 300_000)
 })
 
 // Shares the single app-wide notifications WebSocket connection (owned by
@@ -441,9 +440,5 @@ const unsubscribeIncidentsNotifications = onNotificationsMessage(onNotificationH
 onUnmounted(() => {
   unsubscribeNotifications()
   unsubscribeIncidentsNotifications()
-  if (incidentsPollTimer) {
-    clearInterval(incidentsPollTimer)
-    incidentsPollTimer = null
-  }
 })
 </script>
