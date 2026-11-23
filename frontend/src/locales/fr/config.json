@@ -82,6 +82,14 @@
       "label": "Mode démonstration",
       "description": "Désactive tout appel réseau sortant (probes, git, proxmox). Modifiable uniquement via ENV."
     },
+    "METRICS_ENABLED": {
+      "label": "Endpoint Prometheus /metrics",
+      "description": "Expose GET /metrics (auto-observabilité du serveur, format Prometheus). Exige METRICS_TOKEN. Modifiable uniquement via ENV."
+    },
+    "METRICS_TOKEN": {
+      "label": "Jeton d'accès /metrics",
+      "description": "Jeton Bearer exigé pour scraper /metrics. Sans jeton, l'endpoint reste désactivé. Modifiable uniquement via ENV."
+    },
     "TZ": {
       "label": "Fuseau horaire (Timezone)",
       "description": "Fuseau horaire utilisé pour les plannings cron et l'affichage des dates."

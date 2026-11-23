@@ -82,6 +82,14 @@
       "label": "Demo mode",
       "description": "Disables every outbound network call (probes, git, proxmox). Only changeable via ENV."
     },
+    "METRICS_ENABLED": {
+      "label": "Prometheus /metrics endpoint",
+      "description": "Exposes GET /metrics (server self-observability, Prometheus format). Requires METRICS_TOKEN. Only changeable via ENV."
+    },
+    "METRICS_TOKEN": {
+      "label": "/metrics access token",
+      "description": "Bearer token required to scrape /metrics. Without a token the endpoint stays disabled. Only changeable via ENV."
+    },
     "TZ": {
       "label": "Timezone",
       "description": "Timezone used for cron schedules and date display."

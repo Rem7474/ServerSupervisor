@@ -17,6 +17,13 @@ func NewNotificationHub() *NotificationHub {
 	return &NotificationHub{clients: make(map[*websocket.Conn]struct{})}
 }
 
+// Count returns the number of connected clients.
+func (h *NotificationHub) Count() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.clients)
+}
+
 func (h *NotificationHub) Register(conn *websocket.Conn) {
 	h.mu.Lock()
 	h.clients[conn] = struct{}{}

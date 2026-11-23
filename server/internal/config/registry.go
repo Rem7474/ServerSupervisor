@@ -104,6 +104,8 @@ var AllParams = []ConfigParamDef{
 	strParam("BASE_URL", "base_url", "server", "http://localhost:8080", "URL de base publique", "URL racine utilisée pour générer les liens absolus et redirections d'authentification.", false, false, validateURL),
 	boolParam("TLS_ENABLED", "tls_enabled", "server", "false", "HTTPS / TLS activé", "Force le flag Secure sur les cookies de session. Le serveur n'écoute qu'en HTTP : à activer quand l'application est exposée en HTTPS derrière un reverse proxy.", false),
 	boolParam("DEMO_MODE", "demo_mode", "server", "false", "Mode démonstration", "Désactive tout appel réseau sortant (probes, git, proxmox). Modifiable uniquement via ENV.", true, false),
+	boolParam("METRICS_ENABLED", "metrics_enabled", "server", "false", "Endpoint Prometheus /metrics", "Expose GET /metrics (auto-observabilité du serveur, format Prometheus). Exige METRICS_TOKEN. Modifiable uniquement via ENV.", true, false),
+	readOnlyParam("METRICS_TOKEN", "metrics_token", "server", "", "Jeton d'accès /metrics", "Jeton Bearer exigé pour scraper /metrics. Sans jeton, l'endpoint reste désactivé. Modifiable uniquement via ENV.", true, true),
 	strParam("TZ", "tz", "server", "UTC", "Fuseau horaire (Timezone)", "Fuseau horaire utilisé pour les plannings cron et l'affichage des dates.", false, true),
 
 	// ==================== Logging ====================
