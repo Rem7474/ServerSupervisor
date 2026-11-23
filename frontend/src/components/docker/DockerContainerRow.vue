@@ -244,7 +244,7 @@ const props = defineProps<{
   selected: boolean
   canRunDocker: boolean
   /** In-flight lifecycle action for this container, if any. */
-  actionLoading?: string | boolean
+  actionLoading?: string | boolean | null
   trackerRunLoading: boolean
   trackerRunDisabled: boolean
   trackerRunTooltip: string

@@ -1,5 +1,3 @@
-import type { VersionComparisonStatus } from './docker'
-
 export interface Container {
   id: string
   name: string
@@ -14,7 +12,7 @@ export interface Container {
   networks?: string[]
   net_rx_bytes?: number
   net_tx_bytes?: number
-  [key: string]: unknown
+  ports?: string
 }
 
 export interface VersionComparison {
@@ -24,7 +22,7 @@ export interface VersionComparison {
   image_tag?: string
   running_version?: string
   latest_version?: string
-  status?: VersionComparisonStatus
+  status?: string
   is_up_to_date?: boolean
   update_confirmed?: boolean
   last_error?: string

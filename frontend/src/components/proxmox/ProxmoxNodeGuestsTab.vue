@@ -238,11 +238,12 @@ import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { GuestPowerAction } from '../../composables/useProxmoxGuestActions'
+import type { ProxmoxGuest, ProxmoxNode } from '../../types/proxmox'
 import { compareValues } from '../../utils/sort'
 import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
 import { getMetricColorClass } from '../../utils/metricColor'
 
-type Guest = Record<string, any>
+type Guest = ProxmoxGuest
 
 const props = defineProps<{
   kind: 'vm' | 'lxc'
@@ -251,7 +252,7 @@ const props = defineProps<{
   guestNetworksLoading?: boolean
   guestExposure?: Record<string, any>
   guestExposureLoading?: boolean
-  peerNodes: Guest[]
+  peerNodes: ProxmoxNode[]
   nodeId: string
   actionLoading?: Record<string, GuestPowerAction | undefined>
 }>()

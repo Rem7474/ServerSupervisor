@@ -203,7 +203,7 @@ const props = withDefaults(defineProps<{
   containers?: Container[]
   versionComparisons?: VersionComparison[]
   canRunDocker?: boolean
-  actionLoading?: Record<string, string | boolean>
+  actionLoading?: Record<string, string | boolean | null>
   bulkActionLoading?: boolean
 }>(), {
   containers: () => [],
@@ -214,11 +214,11 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  (e: 'container-action', ...args: unknown[]): void
+  (e: 'container-action', payload: { hostId: string; name: string; action: string; container: Container }): void
   (e: 'bulk-container-action', containers: Container[], action: string): void
 }>()
 
-const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers') as any)
+const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
 
 const {
   containerVersion,

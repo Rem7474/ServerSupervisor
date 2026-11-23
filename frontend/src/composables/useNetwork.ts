@@ -1,20 +1,43 @@
-/* eslint-disable @typescript-eslint/no-explicit-any --
- * Verbatim move of NetworkView.vue's business logic (see eslint.config.js's
- * TEMP Phase 7 exemption for the view/NetworkGraph/TrafficWorldMap). The
- * topology config + discovered-port shapes are runtime, cytoscape-facing
- * structures with no Go model; typed in the dedicated cytoscape/d3 follow-up. */
 import { ref, computed, onMounted, watch } from 'vue'
 import apiClient from '../api'
 import { useWebSocket } from './useWebSocket'
 import type { WSNetworkSnapshot } from '../types/ws'
 import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../types/network'
+import type { NetworkHost, NetworkContainer } from '../types/generated'
 import type { NetworkGuestNode, NetworkService } from '../components/network/buildNetworkElements'
 import { formatBytes as formatBytesShared } from '../utils/formatters'
-import { buildDiscoveredPortsByHost, ensureHostPortConfig, type HostPortEntry } from '../utils/networkPorts'
+import { buildDiscoveredPortsByHost, ensureHostPortConfig, type HostPortEntry, type PortSetting } from '../utils/networkPorts'
+
+/** A host's ports as consumed by the graph: discovered from container port mappings. */
+interface GraphPort { port: number; protocol: string; containers: string[] }
+type GraphHost = NetworkHost & { ports: GraphPort[] }
+
+/** A manually configured service (persisted in the topology config's manual_services). */
+interface ManualService {
+  id: string
+  name: string
+  domain: string
+  path: string
+  internalPort: number | null
+  externalPort: number | null
+  hostId: string
+  tags: string
+  linkToProxy: boolean
+  linkToAuthelia: boolean
+  exposedToInternet: boolean
+}
+
+interface HostPortOverride {
+  excludedPorts: number[]
+  portMap: Record<number, string>
+  proxyPorts: Set<number>
+  autheliaPortNumbers: Set<number>
+  internetExposedPorts: Record<number, number | null>
+}
 
 export function useNetwork() {
-  const hosts = ref<any[]>([])
-  const containers = ref<any[]>([])
+  const hosts = ref<NetworkHost[]>([])
+  const containers = ref<NetworkContainer[]>([])
   const proxmoxGuestIPs = ref<NetworkProxmoxGuestIP[]>([])
   const npmEntries = ref<NetworkNPMEntry[]>([])
   const ipInventoryLoading = ref(false)
@@ -27,12 +50,12 @@ export function useNetwork() {
   const autheliaIp = ref('')
   const internetLabel = ref('Internet')
   const internetIp = ref('')
-  const networkServices = ref<any[]>([])
+  const networkServices = ref<ManualService[]>([])
   const hostPortConfig = ref<HostPortEntry[]>([])
   const nodePositions = ref<Record<string, { x: number; y: number }>>({})
   const topologyConfigLoaded = ref(false)
   const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const selectedNode = ref<any>(null)
+  const selectedNode = ref<Record<string, unknown> | null>(null)
   const rootHostId = ref('')
   const autheliaHostId = ref('')
   const rootPortId = ref('')
@@ -133,8 +156,8 @@ export function useNetwork() {
   // ─── Computed: port discovery ──────────────────────────────────────────────
   const discoveredPortsByHost = computed(() => buildDiscoveredPortsByHost(containers.value, hosts.value))
 
-  const hostPortOverrides = computed<Record<string, any>>(() => {
-    const overrides: Record<string, any> = {}
+  const hostPortOverrides = computed<Record<string, HostPortOverride>>(() => {
+    const overrides: Record<string, HostPortOverride> = {}
     for (const entry of hostPortConfig.value) {
       if (!entry.hostId) continue
       const excludedPortsList: number[] = []
@@ -142,7 +165,7 @@ export function useNetwork() {
       const proxyPorts = new Set<number>()
       const autheliaPortNumbers = new Set<number>()
       const internetExposedPorts: Record<number, number | null> = {}
-      for (const [port, settings] of Object.entries(entry.ports || {}) as [string, any][]) {
+      for (const [port, settings] of Object.entries(entry.ports || {}) as [string, PortSetting | undefined][]) {
         const portNumber = Number(port)
         if (!settings?.enabled) excludedPortsList.push(portNumber)
         if (settings?.name) portMap[portNumber] = settings.name
@@ -155,11 +178,11 @@ export function useNetwork() {
     return overrides
   })
 
-  const combinedServices = computed<any[]>(() => {
-    const linkedServices: any[] = []
+  const combinedServices = computed<NetworkService[]>(() => {
+    const linkedServices: NetworkService[] = []
     for (const entry of hostPortConfig.value) {
       if (!entry.hostId) continue
-      for (const [port, settings] of Object.entries(entry.ports || {}) as [string, any][]) {
+      for (const [port, settings] of Object.entries(entry.ports || {}) as [string, PortSetting | undefined][]) {
         if (!settings?.linkToProxy) continue
         const portNumber = Number(port)
         if (!portNumber) continue
@@ -178,7 +201,7 @@ export function useNetwork() {
         })
       }
     }
-    return [...networkServices.value, ...linkedServices]
+    return [...(networkServices.value as NetworkService[]), ...linkedServices]
   })
 
   // ─── Proxmox guest nodes (no agent) auto-detected via NPM correlation ─────
@@ -218,8 +241,8 @@ export function useNetwork() {
       }))
   )
 
-  const graphHosts = computed<any[]>(() => {
-    const portsByHost = new Map<string, Map<string, any>>()
+  const graphHosts = computed<GraphHost[]>(() => {
+    const portsByHost = new Map<string, Map<string, GraphPort>>()
     for (const container of containers.value) {
       const mappings = container.port_mappings || []
       for (const mapping of mappings) {
@@ -237,7 +260,7 @@ export function useNetwork() {
         hostPorts.get(key)!.containers.push(container.name)
       }
     }
-    return hosts.value.map((host: any) => ({
+    return hosts.value.map((host) => ({
       ...host,
       ports: portsByHost.has(host.id) ? Array.from(portsByHost.get(host.id)!.values()) : [],
     }))
@@ -245,15 +268,15 @@ export function useNetwork() {
 
   const filteredGraphHosts = computed(() => {
     if (!filterInternetOnly.value && !filterHideInternal.value) return graphHosts.value
-    return graphHosts.value.map((host: any) => {
+    return graphHosts.value.map((host) => {
       const override = hostPortOverrides.value[host.id] || {}
       const proxyPorts = override.proxyPorts || new Set<number>()
       const internetPorts = override.internetExposedPorts || {}
       let ports = host.ports || []
       if (filterInternetOnly.value) {
-        ports = ports.filter((p: any) => Number(p.port) in internetPorts)
+        ports = ports.filter((p) => Number(p.port) in internetPorts)
       } else if (filterHideInternal.value) {
-        ports = ports.filter((p: any) => {
+        ports = ports.filter((p) => {
           const pn = Number(p.port)
           return proxyPorts.has(pn) || pn in internetPorts
         })
@@ -265,12 +288,12 @@ export function useNetwork() {
   const filteredServices = computed(() => {
     const all = [...combinedServices.value, ...guestServices.value]
     if (!filterInternetOnly.value) return all
-    return all.filter((s: any) => s.exposedToInternet)
+    return all.filter((s) => s.exposedToInternet)
   })
 
-  const totalPorts = computed(() => graphHosts.value.reduce((sum, host: any) => sum + (host.ports?.length || 0), 0))
-  const hostsOnline = computed(() => hosts.value.filter((h: any) => h.status === 'online').length)
-  const containersRunning = computed(() => containers.value.filter((c: any) => c.state === 'running').length)
+  const totalPorts = computed(() => graphHosts.value.reduce((sum, host) => sum + (host.ports?.length || 0), 0))
+  const hostsOnline = computed(() => hosts.value.filter((h) => h.status === 'online').length)
+  const containersRunning = computed(() => containers.value.filter((c) => c.state === 'running').length)
 
   const trafficDelta = ref({ rx: 0, tx: 0, intervalSec: 0 })
   const prevTrafficByHost = ref<Record<string, { rx: number; tx: number }>>({})
