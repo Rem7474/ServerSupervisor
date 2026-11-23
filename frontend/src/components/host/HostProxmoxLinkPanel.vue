@@ -172,7 +172,9 @@
         class="d-flex align-items-center gap-2"
       >
         <select
+          :id="`${uid}-4`"
           v-model="selectedCandidate"
+          :aria-label="t('host.linkHostToGuestLabel')"
           class="form-select form-select-sm candidate-select"
         >
           <option value="">
