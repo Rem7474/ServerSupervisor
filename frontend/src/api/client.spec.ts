@@ -69,7 +69,7 @@ describe('api/client', () => {
 
     it('interpolates i18nKey params', () => {
       setLocale('en')
-      const error = { response: { data: { error: 'ignored', i18nKey: 'GIT_PROVIDER_ERROR', params: { status: '503' } } } }
+      const error = { response: { data: { error: 'ignored', i18nKey: 'GIT_PROVIDER_ERROR', params: { provider: 'GitHub', status: '503' } } } }
       expect(getApiErrorMessage(error)).toContain('503')
     })
 

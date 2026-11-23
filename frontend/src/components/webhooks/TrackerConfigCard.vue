@@ -258,6 +258,7 @@ import RelativeTime from '../RelativeTime.vue'
 import { formatDateTime } from '../../utils/formatters'
 import type { ReleaseTracker } from '../../types/tracker'
 import { notificationChannelBadgeClass } from '../../utils/categoryBadges'
+import { gitRepoUrl, gitReleasesUrl } from '../../utils/gitRepoLinks'
 
 const { t } = useI18n()
 
@@ -277,27 +278,8 @@ defineEmits<{
   (e: 'edit'): void
 }>()
 
-const repoURL = computed(() => {
-  const tracker = props.tracker
-  if (!tracker || !tracker.repo_owner || !tracker.repo_name) return '#'
-  switch (tracker.provider) {
-    case 'gitlab': return `https://gitlab.com/${tracker.repo_owner}/${tracker.repo_name}`
-    case 'gitea': return `https://codeberg.org/${tracker.repo_owner}/${tracker.repo_name}`
-    default: return `https://github.com/${tracker.repo_owner}/${tracker.repo_name}`
-  }
-})
+const repoURL = computed(() => (props.tracker ? gitRepoUrl(props.tracker) : '#'))
 
-const releaseNotesURL = computed(() => {
-  const tracker = props.tracker
-  if (!tracker || !tracker.repo_owner || !tracker.repo_name) return '#'
-  switch (tracker.provider) {
-    case 'gitlab': return `https://gitlab.com/${tracker.repo_owner}/${tracker.repo_name}/-/releases`
-    case 'gitea':
-    case 'forgejo':
-      return `https://codeberg.org/${tracker.repo_owner}/${tracker.repo_name}/releases`
-    default:
-      return `https://github.com/${tracker.repo_owner}/${tracker.repo_name}/releases`
-  }
-})
+const releaseNotesURL = computed(() => (props.tracker ? gitReleasesUrl(props.tracker) : '#'))
 
 </script>

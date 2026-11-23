@@ -147,7 +147,7 @@ interrupteurs de monitoring, dépannage) : **[NPM](https://github.com/Rem7474/Se
 ### Git Webhooks & Suivi de releases
 
 Deux façons de réagir à un événement Git : le **suivi de releases**
-interroge périodiquement GitHub/GitLab/Gitea ou un registre Docker (modèle
+interroge périodiquement GitHub, GitLab/Gitea (publics ou auto-hébergés, URL et token par tracker) ou un registre Docker (modèle
 pull, notification seule ou déclenchement d'une tâche/`compose pull && up -d`,
 avec réconciliation de dérive optionnelle en mode Compose) ; un **webhook
 Git** est appelé directement par votre plateforme à chaque push/tag/release
@@ -430,7 +430,7 @@ dérive : voir le guide complet **[Git-Webhooks-and-Releases](https://github.com
 #### GitHub
 | Variable | Description | Défaut |
 |---|---|---|
-| `GITHUB_TOKEN` | Token GitHub (augmente rate limit 60→5000/h) | `` |
+| `GITHUB_TOKEN` | Token GitHub (augmente rate limit 60→5000/h); GitLab/Gitea utilisent le token propre à chaque tracker | `` |
 | `GITHUB_POLL_INTERVAL` | Intervalle de vérification | `15m` |
 | `DOCKER_IMAGE_POLL_INTERVAL` | Rafraîchissement du cache de versions d'images Docker (balaye toute la flotte, les registres limitent par IP source) | `6h` |
 

@@ -249,3 +249,47 @@ describe('useWebhookForm — computeds', () => {
     expect(isComposeMode.value).toBe(false)
   })
 })
+
+describe('useWebhookForm — self-hosted git instance', () => {
+  function gitlabForm(form: WebhookFormData, overrides: Partial<WebhookFormData> = {}): void {
+    Object.assign(form, {
+      name: 't', tracker_type: 'git', provider: 'gitlab', repo_owner: 'grp', repo_name: 'app',
+      dispatch_task: false, ...overrides,
+    })
+  }
+
+  it('hydrates the instance URL and the stored-token flag, never the token itself', async () => {
+    const { form } = setup(makeProps({
+      mode: 'tracker',
+      item: { name: 't', tracker_type: 'git', provider: 'gitea', repo_owner: 'o', repo_name: 'r', git_base_url: 'https://git.lan', has_git_token: true },
+    }))
+    await Promise.resolve()
+    expect(form.value.git_base_url).toBe('https://git.lan')
+    expect(form.value.has_git_token).toBe(true)
+    expect(form.value.git_token).toBe('')
+    expect(form.value.clear_git_token).toBe(false)
+  })
+
+  it('rejects an invalid instance URL for a self-hostable provider', () => {
+    const { form, submit, validationError, submitted } = setup(makeProps({ mode: 'tracker' }))
+    gitlabForm(form.value, { git_base_url: 'ftp://git.lan' })
+    submit()
+    expect(validationError.value).toContain("L'URL de l'instance doit être une URL http(s) valide")
+    expect(submitted.payload).toBeNull()
+  })
+
+  it('submits the instance URL and the new token for gitlab, without has_git_token', () => {
+    const { form, submit, submitted } = setup(makeProps({ mode: 'tracker' }))
+    gitlabForm(form.value, { git_base_url: 'https://git.lan', git_token: 'glpat-1', has_git_token: true })
+    submit()
+    expect(submitted.payload).toMatchObject({ git_base_url: 'https://git.lan', git_token: 'glpat-1' })
+    expect(submitted.payload).not.toHaveProperty('has_git_token')
+  })
+
+  it('drops instance data when the provider is GitHub, even with stale values', () => {
+    const { form, submit, submitted } = setup(makeProps({ mode: 'tracker' }))
+    gitlabForm(form.value, { provider: 'github', git_base_url: 'ftp://stale', git_token: 'old', clear_git_token: true })
+    submit()
+    expect(submitted.payload).toMatchObject({ git_base_url: '', git_token: '', clear_git_token: false })
+  })
+})

@@ -14,7 +14,6 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
-	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
@@ -74,7 +73,7 @@ func (s *Poller) CheckOne(ctx context.Context, t models.ReleaseTracker) {
 }
 
 func (s *Poller) checkOneGit(ctx context.Context, t models.ReleaseTracker) {
-	providerClient := gitprovider.NewClient(t.Provider, s.cfg.GitHubToken)
+	providerClient := newGitClient(s.cfg, t)
 	tag, releaseURL, releaseName, err := providerClient.FetchLatestRelease(t.RepoOwner, t.RepoName)
 	cooldown := time.Duration(t.CooldownHours) * time.Hour
 	if err != nil {

@@ -10,18 +10,24 @@ import (
 )
 
 // gitProviderI18nKey maps a gitprovider.APIError's HTTP status to the
-// matching apperr catalog key (+ interpolation params for the generic
-// fallback, which embeds the raw status).
-func gitProviderI18nKey(status int) (string, map[string]string) {
-	switch status {
+// matching apperr catalog key (+ interpolation params: the provider display
+// name, and the raw status for the generic fallback).
+func gitProviderI18nKey(apiErr *gitprovider.APIError) (string, map[string]string) {
+	provider := apiErr.Provider
+	if provider == "" {
+		provider = "GitHub"
+	}
+	params := map[string]string{"provider": provider}
+	switch apiErr.Status {
 	case http.StatusUnauthorized:
-		return apperr.CodeGitProviderUnauthorized, nil
+		return apperr.CodeGitProviderUnauthorized, params
 	case http.StatusForbidden:
-		return apperr.CodeGitProviderRateLimited, nil
+		return apperr.CodeGitProviderRateLimited, params
 	case http.StatusNotFound:
-		return apperr.CodeGitProviderNotFound, nil
+		return apperr.CodeGitProviderNotFound, params
 	default:
-		return apperr.CodeGitProviderError, map[string]string{"status": strconv.Itoa(status)}
+		params["status"] = strconv.Itoa(apiErr.Status)
+		return apperr.CodeGitProviderError, params
 	}
 }
 
@@ -32,7 +38,7 @@ func gitProviderI18nKey(status int) (string, map[string]string) {
 func gitProviderHTTPError(err error) *apperr.Error {
 	var apiErr *gitprovider.APIError
 	if errors.As(err, &apiErr) {
-		key, params := gitProviderI18nKey(apiErr.Status)
+		key, params := gitProviderI18nKey(apiErr)
 		return apperr.BadGateway(apperr.GetMessage(key, "en", params)).I18n(key, params)
 	}
 	return apperr.BadGateway(err.Error())
@@ -46,7 +52,7 @@ func gitProviderHTTPError(err error) *apperr.Error {
 func gitProviderPollError(err error) string {
 	var apiErr *gitprovider.APIError
 	if errors.As(err, &apiErr) {
-		key, params := gitProviderI18nKey(apiErr.Status)
+		key, params := gitProviderI18nKey(apiErr)
 		return apperr.GetMessage(key, "fr", params)
 	}
 	return err.Error()

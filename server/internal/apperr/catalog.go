@@ -45,6 +45,7 @@ const (
 	CodeGitProviderRateLimited  = "GIT_PROVIDER_RATE_LIMITED"
 	CodeGitProviderNotFound     = "GIT_PROVIDER_NOT_FOUND"
 	CodeGitProviderError        = "GIT_PROVIDER_ERROR"
+	CodeInvalidGitBaseURL       = "INVALID_GIT_BASE_URL"
 
 	// Alert rules (internal/services/alertrule)
 	CodeAlertRuleNotFound                = "ALERT_RULE_NOT_FOUND"
@@ -212,20 +213,24 @@ var ErrorCatalog = map[string]ErrorMessage{
 		"fr": "opérateur invalide",
 	},
 	CodeGitProviderUnauthorized: {
-		"en": "invalid or expired GitHub token (401) — check GITHUB_TOKEN in settings",
-		"fr": "token GitHub invalide ou expiré (401) — vérifiez GITHUB_TOKEN dans les paramètres",
+		"en": "invalid or expired {provider} token (401) — check the access token (GITHUB_TOKEN in settings for GitHub)",
+		"fr": "token {provider} invalide ou expiré (401) — vérifiez le token d'accès (GITHUB_TOKEN dans les paramètres pour GitHub)",
 	},
 	CodeGitProviderRateLimited: {
-		"en": "GitHub rate limit reached (403) — configure a GITHUB_TOKEN to raise the limit",
-		"fr": "limite de taux GitHub atteinte (403) — configurez un GITHUB_TOKEN pour augmenter la limite",
+		"en": "{provider} rate limit reached or access denied (403) — check the access token and its permissions",
+		"fr": "limite de taux {provider} atteinte ou accès refusé (403) — vérifiez le token d'accès et ses permissions",
 	},
 	CodeGitProviderNotFound: {
-		"en": "repository not found on GitHub (404) — check owner/repo",
-		"fr": "dépôt introuvable sur GitHub (404) — vérifiez owner/repo",
+		"en": "repository not found on {provider} (404) — check owner/repo and the instance URL",
+		"fr": "dépôt introuvable sur {provider} (404) — vérifiez owner/repo et l'URL de l'instance",
 	},
 	CodeGitProviderError: {
-		"en": "GitHub API error ({status})",
-		"fr": "erreur GitHub API ({status})",
+		"en": "{provider} API error ({status})",
+		"fr": "erreur {provider} API ({status})",
+	},
+	CodeInvalidGitBaseURL: {
+		"en": "invalid instance URL: it must be an http(s) URL with a host, without credentials, query string, loopback or link-local address",
+		"fr": "URL d'instance invalide : elle doit être une URL http(s) avec un hôte, sans identifiants, paramètres, adresse loopback ni lien-local",
 	},
 
 	CodeAlertRuleNotFound:             {"en": "alert rule not found", "fr": "règle d'alerte introuvable"},

@@ -149,6 +149,9 @@ func (s *Service) Create(ctx context.Context, req models.ReleaseTrackerRequest) 
 	if msg := validateTracker(&m, true); msg != "" {
 		return nil, apperr.Validation(msg)
 	}
+	if aerr := normalizeGitInstance(&m); aerr != nil {
+		return nil, aerr
+	}
 	return s.repo.CreateReleaseTracker(ctx, m)
 }
 
@@ -156,6 +159,9 @@ func (s *Service) Update(ctx context.Context, id string, req models.ReleaseTrack
 	m := req.ToModel()
 	if msg := validateTracker(&m, false); msg != "" {
 		return apperr.Validation(msg)
+	}
+	if aerr := normalizeGitInstance(&m); aerr != nil {
+		return aerr
 	}
 	return s.repo.UpdateReleaseTracker(ctx, id, m)
 }
@@ -272,7 +278,7 @@ func (s *Service) VersionHistory(ctx context.Context, id string, limit int) ([]m
 		}
 		s.enrichWithGitReleases(ctx, *t, history, limit)
 	} else {
-		releases, ferr := gitprovider.NewClient(t.Provider, s.cfg.GitHubToken).FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
+		releases, ferr := newGitClient(s.cfg, *t).FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
 		if ferr != nil {
 			return nil, gitProviderHTTPError(ferr)
 		}
@@ -299,7 +305,7 @@ func (s *Service) enrichWithGitReleases(ctx context.Context, t models.ReleaseTra
 	if !hasGitLink(t) || len(history) == 0 {
 		return
 	}
-	releases, err := gitprovider.NewClient(t.Provider, s.cfg.GitHubToken).FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
+	releases, err := newGitClient(s.cfg, t).FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
 	if err != nil {
 		slog.WarnContext(ctx, fmt.Sprintf("Docker tracker %s: linked repo %s/%s release notes unavailable: %v", t.Name, t.RepoOwner, t.RepoName, err))
 		return

@@ -20,18 +20,39 @@ Dashboard → **Git / Automatisation** → onglet **Suivi de releases**.
 |---|---|
 | Nom | Libre |
 | Provider | `github` (défaut) / `gitlab` / `gitea` |
+| URL de l'instance / Token d'accès | `gitlab` et `gitea` uniquement, voir ci-dessous |
 | Dépôt | `owner` + `repo` (deux champs séparés) |
 | Déclencher une tâche lors d'une mise à jour | Décoché = **surveillance seule**, enregistre juste la nouvelle version détectée. Coché = exécute une tâche `tasks.yaml` sur l'hôte choisi |
 | Cooldown (heures) | `0`–`168`, délai avant de redéclencher après détection |
 
-> **Jetons d'authentification — limite actuelle** : une seule variable
-> `GITHUB_TOKEN` existe côté serveur, réutilisée telle quelle comme
-> `Authorization: Bearer` (GitHub) ou `PRIVATE-TOKEN` (GitLab). Il n'y a
-> **pas** de `GITLAB_TOKEN`/`GITEA_TOKEN` dédié, et les clients GitLab/Gitea
-> sont **codés en dur** sur `gitlab.com`/`gitea.io` — un dépôt sur une
-> instance GitLab ou Gitea auto-hébergée n'est actuellement pas supporté
-> par le suivi de releases. Sans `GITHUB_TOKEN`, GitHub reste utilisable en
-> anonyme (rate limit public, 60 req/h).
+**Instance auto-hébergée (GitLab / Gitea / Forgejo)** — pour `gitlab` et
+`gitea`, deux champs supplémentaires apparaissent :
+
+| Champ | Valeur |
+|---|---|
+| URL de l'instance | Racine de l'instance, sous-chemin accepté (`https://git.example.lan`, `https://example.com/gitlab`). Vide = instance publique (`gitlab.com` / `codeberg.org`). Stockée sans `/` final |
+| Token d'accès | Optionnel (dépôts privés). Envoyé en `PRIVATE-TOKEN` (GitLab) ou `Authorization: token` (Gitea). Écriture seule : l'API n'expose que `has_git_token`; laisser le champ vide à l'édition conserve le token, la case « Supprimer le token enregistré » l'efface |
+
+Le token est propre au tracker et n'est jamais envoyé qu'à l'instance
+configurée. `GITHUB_TOKEN` (variable serveur, rate limit 60 → 5000 req/h) ne
+sert que pour GitHub; sans lui GitHub reste utilisable en anonyme. Le champ
+« Dépôt Git lié » d'un tracker Docker accepte les mêmes champs.
+
+Les releases sont lues via `/api/v4/projects/:id/releases` (GitLab) et
+`/api/v1/repos/:owner/:repo/releases` (Gitea); sans release, le tag le plus
+récent est utilisé. Le propriétaire peut être un sous-groupe GitLab
+(`groupe/sous-groupe`).
+
+**Politique réseau de l'URL d'instance** : les instances sur réseau privé
+(RFC 1918, ULA) sont autorisées, puisqu'une instance auto-hébergée est
+typiquement sur le LAN. Sont refusés : tout schéma autre que `http`/`https`,
+les identifiants intégrés à l'URL, query string et fragment,
+`localhost`, les adresses loopback, lien-local (dont `169.254.169.254`),
+non spécifiées et multicast. La vérification porte sur l'URL saisie puis sur
+chaque adresse résolue à la connexion (résolution DNS comprise); les
+redirections HTTP ne sont pas suivies et aucun proxy d'environnement n'est
+utilisé. Une instance qui tourne sur la même machine que le serveur doit être
+jointe par son adresse LAN, pas par `localhost`.
 
 ### 1.2 Tracker Docker (registre d'images)
 

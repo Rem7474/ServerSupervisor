@@ -230,19 +230,22 @@ func (c *gitHubClient) fetchGitHubTagHistory(owner, repo string, limit int) ([]R
 	return out, nil
 }
 
-// APIError is a typed GitHub API failure carrying just the HTTP status — no
+// APIError is a typed git provider API failure carrying just the HTTP status — no
 // English/French text. The caller (which knows how to render an HTTP
 // response, this package doesn't) maps Status to an apperr i18n key via
 // apperr.Error.I18n so the message renders in the requester's language
 // instead of a language baked in at the source.
 type APIError struct {
 	Status int
+	// Provider is the display name of the failing provider ("GitHub",
+	// "GitLab", "Gitea").
+	Provider string
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("github api error (%d)", e.Status)
+	return fmt.Sprintf("%s api error (%d)", e.Provider, e.Status)
 }
 
 func githubAPIError(status int) error {
-	return &APIError{Status: status}
+	return &APIError{Status: status, Provider: "GitHub"}
 }
