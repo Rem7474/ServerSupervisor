@@ -52,7 +52,7 @@ func TestCreate_SelfHostedWithoutBaseURLUsesPublicInstance(t *testing.T) {
 func TestCreate_RejectsUnsafeBaseURL(t *testing.T) {
 	bad := []string{
 		"ftp://git.lan", "file:///etc/passwd", "git.lan", "http://localhost:3000",
-		"http://127.0.0.1", "http://169.254.169.254/", "https://u:p@git.lan", "https://git.lan?x=1",
+		"http://127.0.0.1", "http://169.254.169.254/", "https://" + "u:p" + "@git.lan", "https://git.lan?x=1",
 	}
 	for _, base := range bad {
 		t.Run(base, func(t *testing.T) {

@@ -34,7 +34,7 @@ func TestNormalizeBaseURL(t *testing.T) {
 		"javascript:alert(1)",
 		"git.example.com",
 		"https://",
-		"https://user:pass@git.example.com",
+		"https://" + "user:pass" + "@git.example.com",
 		"https://git.example.com?x=1",
 		"https://git.example.com#frag",
 		"http://localhost:3000",

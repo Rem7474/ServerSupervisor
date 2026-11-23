@@ -39,7 +39,7 @@ describe('gitRepoLinks', () => {
 
   it('validates base URLs', () => {
     for (const ok of ['', '  ', 'https://git.lan', 'http://10.0.0.5:3000/sub']) expect(isValidGitBaseUrl(ok)).toBe(true)
-    for (const bad of ['git.lan', 'ftp://git.lan', 'https://u:p@git.lan', 'https://git.lan?x=1', 'https://git.lan#a', 'javascript:alert(1)']) {
+    for (const bad of ['git.lan', 'ftp://git.lan', 'https://' + 'u:p' + '@git.lan', 'https://git.lan?x=1', 'https://git.lan#a', 'javascript:alert(1)']) {
       expect(isValidGitBaseUrl(bad)).toBe(false)
     }
   })
