@@ -712,7 +712,6 @@ import { useDockerContainerPorts } from '../../composables/useDockerContainerPor
 import { usePagination } from '../../composables/usePagination'
 import { getApiErrorMessage } from '../../api/client'
 import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
-import type { VersionComparisonStatus } from '../../types/docker'
 import {
   getComposeInfo as getComposeInfoFromLabels,
   isComposeContainer as isComposeContainerFromLabels,
@@ -733,7 +732,7 @@ interface Container {
   networks?: string[]
   net_rx_bytes?: number
   net_tx_bytes?: number
-  [key: string]: any
+  ports?: string
 }
 
 interface VersionComparison {
@@ -743,7 +742,7 @@ interface VersionComparison {
   image_tag?: string
   running_version?: string
   latest_version?: string
-  status?: VersionComparisonStatus
+  status?: string
   is_up_to_date?: boolean
   update_confirmed?: boolean
   last_error?: string
@@ -756,7 +755,7 @@ const props = withDefaults(defineProps<{
   containers?: Container[]
   versionComparisons?: VersionComparison[]
   canRunDocker?: boolean
-  actionLoading?: Record<string, string | boolean>
+  actionLoading?: Record<string, string | boolean | null>
   bulkActionLoading?: boolean
 }>(), {
   containers: () => [],
@@ -766,7 +765,7 @@ const props = withDefaults(defineProps<{
   bulkActionLoading: false,
 })
 
-const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers') as any)
+const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
 
 // Two kinds of rows land here: ambient ones (one per host+image+tag group,
 // carrying image_tag) and tracker ones (aggregated across tags, image_tag
@@ -790,7 +789,7 @@ function containerVersion(c: Container): VersionComparison | null {
 }
 
 const emit = defineEmits<{
-  (e: 'container-action', ...args: unknown[]): void
+  (e: 'container-action', payload: { hostId: string; name: string; action: string; container: Container }): void
   (e: 'bulk-container-action', containers: Container[], action: string): void
 }>()
 

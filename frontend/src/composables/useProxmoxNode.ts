@@ -1,26 +1,53 @@
-/* eslint-disable @typescript-eslint/no-explicit-any --
- * Verbatim move of ProxmoxNodeView.vue's business logic (see eslint.config.js's
- * TEMP Phase 7 exemption for the view itself). The guest/link/task/RRD payloads
- * carry runtime fields beyond the generated Proxmox models; typed properly when
- * this domain gets its own typed models in a follow-up. */
 import { ref, computed, shallowRef, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
-import type { ProxmoxBackupJob, ProxmoxBackupRun } from '../types/proxmox'
+import type { ProxmoxBackupJob, ProxmoxBackupRun, ProxmoxNode, ProxmoxGuest, ProxmoxTask } from '../types/proxmox'
 import { getApexChartPalette } from '../utils/apexChartTheme'
 import type { RRDChartSeries } from '../components/proxmox/RRDChartCard.vue'
 
 interface RRDPoint { x: number; y: number }
+
+interface SensorSourceCandidate { id: string; name?: string; hostname?: string; ip_address?: string }
+interface LiveStatusUsage { used: number; total: number }
+interface LiveStatus {
+  wait: number
+  swap: LiveStatusUsage
+  rootfs: LiveStatusUsage
+  [key: string]: unknown
+}
+interface LiveTask { host_name: string; module: string; action: string; target: string; status: string; output: string }
+type GuestRef = Pick<ProxmoxGuest, 'vmid' | 'name'> & Partial<ProxmoxGuest>
+interface MigrateModalState {
+  open: boolean
+  guest: GuestRef | null
+  guestType: string
+  target: string
+  online: boolean
+  loading: boolean
+  error: string
+}
+interface ServiceInfo { name: string; state?: string; 'active-state'?: string; desc?: string; [key: string]: unknown }
+interface GuestNetwork { [key: string]: unknown }
+interface TempPoint { timestamp: string; cpu_temperature?: number; fan_rpm?: number }
+interface NodeRRDPoint {
+  time: number
+  cpu?: number | null
+  memused?: number | null
+  memtotal?: number | null
+  iowait?: number | null
+  netin?: number | null
+  netout?: number | null
+}
 
 export function useProxmoxNode() {
   const { t } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const guestActions = useProxmoxGuestActions()
-  const node = ref<any>(null)
+  const node = ref<ProxmoxNode | null>(null)
   const loading = ref(true)
   const error = ref('')
   const tab = ref('vms')
@@ -28,7 +55,7 @@ export function useProxmoxNode() {
     router.replace({ query: { ...route.query, tab: newTab } })
   })
 
-  const sensorSourceCandidates = ref<any[]>([])
+  const sensorSourceCandidates = ref<SensorSourceCandidate[]>([])
   const sensorSourceHostId = ref('')
   const sensorSourceLoading = ref(false)
   const sensorSourceSaving = ref(false)
@@ -54,9 +81,9 @@ export function useProxmoxNode() {
   const aptRefreshOk = ref(false)
 
   // peer nodes for migration target list
-  const peerNodes = ref<any[]>([])
+  const peerNodes = ref<ProxmoxNode[]>([])
 
-  const migrateModal = ref<any>({
+  const migrateModal = ref<MigrateModalState>({
     open: false,
     guest: null,
     guestType: 'vm',
@@ -66,7 +93,7 @@ export function useProxmoxNode() {
     error: '',
   })
 
-  const liveStatus = ref<any>(null)
+  const liveStatus = ref<LiveStatus | null>(null)
   const liveStatusLoading = ref(false)
   const lastUpdatedAt = ref<Date | null>(null)
   const liveStatusError = ref('')
@@ -90,12 +117,12 @@ export function useProxmoxNode() {
   const rrdError = ref('')
 
   const showConsole = ref(false)
-  const liveTask = ref<any>(null)
+  const liveTask = ref<LiveTask | null>(null)
   const activeUpid = ref<string | null>(null)
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let liveStatusTimer: ReturnType<typeof setInterval> | null = null
 
-  const guestNetworks = ref<Record<string, any[]>>({})
+  const guestNetworks = ref<Record<string, GuestNetwork[]>>({})
   const guestNetworksLoading = ref(false)
 
   async function loadGuestNetworks(): Promise<void> {
@@ -110,7 +137,7 @@ export function useProxmoxNode() {
 
   // NPM domains routing to each guest's own IP(s), keyed by vmid — same
   // lazy/load-once-per-mount pattern as guestNetworks above.
-  const guestExposure = ref<Record<string, any>>({})
+  const guestExposure = ref<Record<string, unknown>>({})
   const guestExposureLoading = ref(false)
 
   async function loadGuestExposure(): Promise<void> {
@@ -124,7 +151,7 @@ export function useProxmoxNode() {
   }
 
   // services
-  const services = ref<any[]>([])
+  const services = ref<ServiceInfo[]>([])
   const servicesLoading = ref(false)
   const servicesError = ref('')
   const svcActionMsg = ref('')
@@ -144,8 +171,8 @@ export function useProxmoxNode() {
     backupRuns.value.filter((r) => r.node_name === node.value?.node_name)
   )
 
-  const vms = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'vm') ?? [])
-  const lxcs = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'lxc') ?? [])
+  const vms = computed(() => node.value?.guests?.filter((g: ProxmoxGuest) => g.guest_type === 'vm') ?? [])
+  const lxcs = computed(() => node.value?.guests?.filter((g: ProxmoxGuest) => g.guest_type === 'lxc') ?? [])
 
   // Re-fetches only the guest statuses after a start/shutdown/reboot — a full
   // load() also re-triggers sensor/live-status/RRD/peer-node fetches and
@@ -160,11 +187,11 @@ export function useProxmoxNode() {
     }
   }
 
-  async function handleGuestAction(guest: any, action: GuestPowerAction): Promise<void> {
+  async function handleGuestAction(guest: ProxmoxGuest, action: GuestPowerAction): Promise<void> {
     await guestActions.performGuestAction(guest, action, refreshGuests)
   }
   const failedTaskCount = computed(() =>
-    (node.value?.tasks ?? []).filter((task: any) => task.status === 'stopped' && task.exit_status && task.exit_status !== 'OK').length
+    (node.value?.tasks ?? []).filter((task: ProxmoxTask) => task.status === 'stopped' && task.exit_status && task.exit_status !== 'OK').length
   )
   async function load(): Promise<void> {
     loading.value = true
@@ -213,12 +240,12 @@ export function useProxmoxNode() {
       }
 
       const res = await api.getProxmoxNodeCpuTempHistory(String(route.params.id), hours)
-      const points = (Array.isArray(res.data) ? res.data : []).filter((p: any) => Number(p?.cpu_temperature) > 0)
+      const points = (Array.isArray(res.data) ? res.data : []).filter((p: TempPoint) => Number(p?.cpu_temperature) > 0)
       if (!points.length) {
         return
       }
 
-      const data: RRDPoint[] = points.map((p: any) => ({ x: new Date(p.timestamp).getTime(), y: Number(p.cpu_temperature) }))
+      const data: RRDPoint[] = points.map((p: TempPoint) => ({ x: new Date(p.timestamp).getTime(), y: Number(p.cpu_temperature) }))
       nodeCpuTempCurrent.value = data[data.length - 1]?.y || 0
       nodeTempChart.value = [{ name: t('proxmox.temperatureSeriesLabel'), data, color: cssVar('--tblr-red') }]
     } catch (e: unknown) {
@@ -241,12 +268,12 @@ export function useProxmoxNode() {
       }
 
       const res = await api.getProxmoxNodeFanRPMHistory(String(route.params.id), hours)
-      const points = (Array.isArray(res.data) ? res.data : []).filter((p: any) => Number(p?.fan_rpm) > 0)
+      const points = (Array.isArray(res.data) ? res.data : []).filter((p: TempPoint) => Number(p?.fan_rpm) > 0)
       if (!points.length) {
         return
       }
 
-      const data: RRDPoint[] = points.map((p: any) => ({ x: new Date(p.timestamp).getTime(), y: Number(p.fan_rpm) }))
+      const data: RRDPoint[] = points.map((p: TempPoint) => ({ x: new Date(p.timestamp).getTime(), y: Number(p.fan_rpm) }))
       nodeFanRPMCurrent.value = data[data.length - 1]?.y || 0
       nodeFanChart.value = [{ name: 'RPM', data, color: cssVar('--tblr-azure') }]
     } catch (e: unknown) {
@@ -319,31 +346,31 @@ export function useProxmoxNode() {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   }
 
-  function buildRRDCharts(points: any[]): void {
+  function buildRRDCharts(points: NodeRRDPoint[]): void {
     const palette = getApexChartPalette()
 
     const cpuData: RRDPoint[] = points
-      .filter((p: any) => p.cpu != null)
-      .map((p: any) => ({ x: p.time * 1000, y: p.cpu * 100 }))
+      .filter((p) => p.cpu != null)
+      .map((p) => ({ x: p.time * 1000, y: (p.cpu as number) * 100 }))
     rrdCpuChart.value = cpuData.length ? [{ name: 'CPU', data: cpuData, color: palette.cpu }] : null
 
     // RAM: memused / memtotal are raw bytes from PVE RRD (JSON keys: memused, memtotal)
     const ramData: RRDPoint[] = points
-      .filter((p: any) => p.memused != null && p.memtotal != null && p.memtotal > 0)
-      .map((p: any) => ({ x: p.time * 1000, y: (p.memused / p.memtotal) * 100 }))
+      .filter((p) => p.memused != null && p.memtotal != null && p.memtotal > 0)
+      .map((p) => ({ x: p.time * 1000, y: ((p.memused as number) / (p.memtotal as number)) * 100 }))
     rrdRamChart.value = ramData.length ? [{ name: 'RAM', data: ramData, color: palette.ram }] : null
 
     const iowaitData: RRDPoint[] = points
-      .filter((p: any) => p.iowait != null)
-      .map((p: any) => ({ x: p.time * 1000, y: p.iowait * 100 }))
+      .filter((p) => p.iowait != null)
+      .map((p) => ({ x: p.time * 1000, y: (p.iowait as number) * 100 }))
     rrdIowaitChart.value = iowaitData.length ? [{ name: 'IO Wait', data: iowaitData, color: cssVar('--tblr-yellow') }] : null
 
     const rxData: RRDPoint[] = points
-      .filter((p: any) => p.netin != null)
-      .map((p: any) => ({ x: p.time * 1000, y: p.netin }))
+      .filter((p) => p.netin != null)
+      .map((p) => ({ x: p.time * 1000, y: p.netin as number }))
     const txData: RRDPoint[] = points
-      .filter((p: any) => p.netout != null)
-      .map((p: any) => ({ x: p.time * 1000, y: p.netout }))
+      .filter((p) => p.netout != null)
+      .map((p) => ({ x: p.time * 1000, y: p.netout as number }))
     rrdNetChart.value = (rxData.length || txData.length) ? [
       { name: t('proxmox.netInLabel'), data: rxData, color: cssVar('--tblr-indigo') },
       { name: t('proxmox.netOutLabel'), data: txData, color: cssVar('--tblr-pink') },
@@ -424,7 +451,7 @@ export function useProxmoxNode() {
           const output = log.truncated
             ? `${t('proxmox.taskLogTruncated', { shown: log.lines?.length ?? 0, total: log.total })}\n\n${body}`
             : body
-          liveTask.value = { ...liveTask.value, output, status }
+          if (liveTask.value) liveTask.value = { ...liveTask.value, output, status }
           if (!done) {
             pollTimer = setTimeout(poll, 2000)
           } else if (pollResolve) {
@@ -515,13 +542,13 @@ export function useProxmoxNode() {
     if (!node.value?.connection_id) return
     try {
       const res = await api.getProxmoxNodes(node.value.connection_id)
-      peerNodes.value = (res.data ?? []).filter((n: any) => n.node_name !== node.value?.node_name && n.status === 'online')
+      peerNodes.value = (res.data ?? []).filter((n: ProxmoxNode) => n.node_name !== node.value?.node_name && n.status === 'online')
     } catch {
       peerNodes.value = []
     }
   }
 
-  function openMigrateModal(guest: any, guestType: string = 'vm'): void {
+  function openMigrateModal(guest: GuestRef, guestType: string = 'vm'): void {
     migrateModal.value = {
       open: true,
       guest,

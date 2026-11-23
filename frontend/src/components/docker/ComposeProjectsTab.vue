@@ -372,7 +372,6 @@ import DataToolbar from '../common/DataToolbar.vue'
 import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 import { useModalChrome } from '../../composables/useModalChrome'
-import type { VersionComparisonStatus } from '../../types/docker'
 
 interface ComposeProject {
   id: string | number
@@ -401,7 +400,7 @@ interface VersionComparison {
   image_tag?: string
   running_version?: string
   latest_version?: string
-  status?: VersionComparisonStatus
+  status?: string
   is_up_to_date?: boolean
   update_confirmed?: boolean
 }
@@ -411,7 +410,7 @@ const props = withDefaults(defineProps<{
   containers?: Container[]
   versionComparisons?: VersionComparison[]
   canRunDocker?: boolean
-  actionLoading?: Record<string, string | boolean>
+  actionLoading?: Record<string, string | boolean | null>
 }>(), {
   composeProjects: () => [],
   containers: () => [],
@@ -421,7 +420,7 @@ const props = withDefaults(defineProps<{
 })
 
 defineEmits<{
-  (e: 'compose-action', ...args: unknown[]): void
+  (e: 'compose-action', payload: { hostId: string; name: string; action: string; workingDir?: string }): void
 }>()
 
 const { t } = useI18n()
