@@ -314,6 +314,34 @@
       "label": "Suspicious HTTP method weight",
       "description": "Weight of unusual or dangerous HTTP methods (CONNECT, PROPFIND, etc.)."
     },
+    "THREAT_WEIGHT_STATUS_2XX": {
+      "label": "2xx response weight",
+      "description": "Weight of requests answered with a 2xx (success) status in the threat score."
+    },
+    "THREAT_WEIGHT_STATUS_3XX": {
+      "label": "3xx response weight",
+      "description": "Weight of requests answered with a 3xx redirect in the threat score."
+    },
+    "THREAT_WEIGHT_STATUS_404": {
+      "label": "404 response weight",
+      "description": "Weight of requests answered with a 404 (not found), typical of path scanning."
+    },
+    "THREAT_WEIGHT_STATUS_4XX": {
+      "label": "Other 4xx response weight",
+      "description": "Weight of requests answered with a 4xx status other than 404 (401, 403, 405...)."
+    },
+    "THREAT_WEIGHT_STATUS_5XX": {
+      "label": "5xx response weight",
+      "description": "Weight of requests that triggered a 5xx server error in the threat score."
+    },
+    "THREAT_WEIGHT_BREADTH": {
+      "label": "Targeting breadth weight",
+      "description": "Weight applied to how widely an IP spreads its requests (number of distinct paths or hosts targeted)."
+    },
+    "THREAT_WEIGHT_HITS": {
+      "label": "Request volume weight",
+      "description": "Weight applied to the request volume sent by an IP in the threat score."
+    },
     "THREAT_THRESHOLD_MEDIUM": {
       "label": "Threat threshold: Medium",
       "description": "Total score above which an IP address is classified as a medium threat."
