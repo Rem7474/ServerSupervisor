@@ -104,7 +104,7 @@ func chatPayload(provider string, msg ChatMessage) (any, error) {
 				map[string]any{
 					"contentType": "application/vnd.microsoft.card.adaptive",
 					"content": map[string]any{
-						"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+						"$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
 						"type":    "AdaptiveCard",
 						"version": "1.4",
 						"body":    body,

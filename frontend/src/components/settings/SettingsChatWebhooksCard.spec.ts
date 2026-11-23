@@ -31,6 +31,14 @@ describe('SettingsChatWebhooksCard', () => {
     expect(wrapper.text()).toContain('Discord')
   })
 
+  it('emits the typed URL instead of mutating the prop', async () => {
+    const props = baseProps()
+    const wrapper = mount(SettingsChatWebhooksCard, { props })
+    await wrapper.findAll('input')[2].setValue('https://discord.com/api/webhooks/1/x')
+    expect(wrapper.emitted('update:url')?.[0]).toEqual(['discord', 'https://discord.com/api/webhooks/1/x'])
+    expect(props.urls.discord).toBe('')
+  })
+
   it('only lets a provider be tested once its URL is saved, and emits the provider', async () => {
     const wrapper = mount(SettingsChatWebhooksCard, {
       props: baseProps({ configured: { slack: false, teams: true, discord: false } }),

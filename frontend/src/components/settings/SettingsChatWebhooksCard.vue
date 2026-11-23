@@ -21,12 +21,13 @@
         <div class="input-group">
           <input
             :id="`${uid}-${i}`"
-            v-model="urls[provider]"
+            :value="urls[provider]"
             type="password"
             class="form-control"
             :placeholder="configured[provider] ? '••••••••' : placeholders[provider]"
             autocomplete="new-password"
             :aria-describedby="`${uid}-hint-${i}`"
+            @input="$emit('update:url', provider, ($event.target as HTMLInputElement).value)"
           >
           <button
             type="button"
@@ -110,6 +111,7 @@ withDefaults(defineProps<{
 
 defineEmits<{
   (e: 'save'): void
+  (e: 'update:url', provider: ChatProvider, value: string): void
   (e: 'test', provider: ChatProvider): void
 }>()
 </script>

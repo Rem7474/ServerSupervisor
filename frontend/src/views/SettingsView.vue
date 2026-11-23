@@ -121,6 +121,7 @@
               :save-ok="chatWebhooks.saveOk.value"
               :test-msg="chatWebhooks.testMsg.value"
               :test-ok="chatWebhooks.testOk.value"
+              @update:url="(p, v) => { chatWebhooks.urls[p] = v }"
               @save="chatWebhooks.save"
               @test="chatWebhooks.test"
             />
