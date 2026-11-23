@@ -22,8 +22,12 @@
         class="row g-2 align-items-end"
       >
         <div class="col-md-6">
-          <label class="form-label form-label-sm">{{ t('alerts.actionLabel') }}</label>
+          <label
+            :for="`${uid}-1`"
+            class="form-label form-label-sm"
+          >{{ t('alerts.actionLabel') }}</label>
           <select
+            :id="`${uid}-1`"
             :value="modelValue.action"
             class="form-select form-select-sm"
             @change="onActionChange(($event.target as HTMLSelectElement).value)"
@@ -66,10 +70,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DispatchStepEditor from '../DispatchStepEditor.vue'
 import type { DispatchOption } from '../../utils/dispatchStep'
+
+const uid = useId()
 
 type CommandModule = 'processes' | 'journal' | 'systemd' | 'docker'
 

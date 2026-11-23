@@ -4,6 +4,8 @@
     ref="modalRef"
     class="modal modal-blur fade show d-block"
     tabindex="-1"
+    role="dialog"
+    aria-modal="true"
     @click.self="$emit('close')"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">

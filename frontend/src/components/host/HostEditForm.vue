@@ -11,8 +11,12 @@
         @submit.prevent="saveEdit"
       >
         <div class="col-md-6">
-          <label class="form-label">{{ t('host.nameLabel') }}</label>
+          <label
+            :for="`${uid}-1`"
+            class="form-label"
+          >{{ t('host.nameLabel') }}</label>
           <input
+            :id="`${uid}-1`"
             v-model="editForm.name"
             type="text"
             class="form-control"
@@ -20,8 +24,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">Hostname</label>
+          <label
+            :for="`${uid}-2`"
+            class="form-label"
+          >Hostname</label>
           <input
+            :id="`${uid}-2`"
             v-model="editForm.hostname"
             type="text"
             class="form-control"
@@ -29,8 +37,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('host.ipAddressLabel') }}</label>
+          <label
+            :for="`${uid}-3`"
+            class="form-label"
+          >{{ t('host.ipAddressLabel') }}</label>
           <input
+            :id="`${uid}-3`"
             v-model="editForm.ip_address"
             type="text"
             class="form-control"
@@ -38,8 +50,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">OS</label>
+          <label
+            :for="`${uid}-4`"
+            class="form-label"
+          >OS</label>
           <input
+            :id="`${uid}-4`"
             v-model="editForm.os"
             type="text"
             class="form-control"
@@ -47,8 +63,12 @@
           >
         </div>
         <div class="col-12">
-          <label class="form-label">Tags</label>
+          <label
+            :for="`${uid}-5`"
+            class="form-label"
+          >Tags</label>
           <input
+            :id="`${uid}-5`"
             v-model="editForm.tags"
             type="text"
             class="form-control"
@@ -161,13 +181,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import apiClient from '../../api'
 import { getApiErrorMessage } from '../../api/client'
 import { parseTagsInput, formatTagsInput } from '../../utils/tags'
 import { buildInstallCommand, buildAgentConfig } from '../../utils/agentInstall'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+
+const uid = useId()
 
 interface Host {
   name?: string

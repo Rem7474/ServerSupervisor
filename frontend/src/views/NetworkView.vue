@@ -12,9 +12,9 @@
         <span class="text-muted mx-1">/</span>
         <span>{{ t('network.networkArchitectureBreadcrumb') }}</span>
       </div>
-      <h2 class="page-title">
+      <h1 class="page-title">
         {{ t('network.networkArchitectureTitle') }}
-      </h2>
+      </h1>
       <div class="text-secondary">
         {{ t('network.pageSubtitle') }}
       </div>

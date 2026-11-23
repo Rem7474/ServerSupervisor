@@ -27,7 +27,10 @@
     <div class="card-body border-bottom py-3">
       <div class="row g-3 align-items-end">
         <div class="col-12 col-xl-4">
-          <label class="form-label text-muted small mb-2">
+          <label
+            :for="`${uid}-1`"
+            class="form-label text-muted small mb-2"
+          >
             {{ t('alerts.searchLabel') }}
           </label>
           <div class="input-icon">
@@ -38,6 +41,7 @@
               />
             </span>
             <input
+              :id="`${uid}-1`"
               v-model="searchQuery"
               type="text"
               class="form-control"
@@ -413,7 +417,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconBell, IconCheck, IconChevronRight, IconEye, IconLink, IconList, IconSearch, IconStack2, IconX } from '@tabler/icons-vue'
 import BadgePill from '../common/BadgePill.vue'
@@ -442,6 +446,8 @@ import {
 } from '../../utils/incidentFormat'
 import type { NotificationItem } from '../../types/generated'
 import { formatDateTimeSeconds } from '../../utils/formatters'
+
+const uid = useId()
 
 type Incident = NotificationItem
 

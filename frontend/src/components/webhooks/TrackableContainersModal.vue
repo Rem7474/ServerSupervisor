@@ -49,8 +49,12 @@
               <div class="card-body py-2">
                 <div class="row g-2 align-items-end">
                   <div class="col-md-4">
-                    <label class="form-label mb-1">{{ t('webhooks.healthcheckSecondsLabel') }}</label>
+                    <label
+                      :for="`${uid}-1`"
+                      class="form-label mb-1"
+                    >{{ t('webhooks.healthcheckSecondsLabel') }}</label>
                     <input
+                      :id="`${uid}-1`"
                       v-model.number="options.healthcheck_timeout_sec"
                       type="number"
                       min="0"
@@ -158,12 +162,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '../../api'
 import { useModalChrome } from '../../composables/useModalChrome'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import EmptyState from '../EmptyState.vue'
+
+const uid = useId()
 
 const { t } = useI18n()
 

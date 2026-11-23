@@ -9,9 +9,9 @@
         <div class="page-pretitle">
           ServerSupervisor
         </div>
-        <h2 class="page-title">
+        <h1 class="page-title">
           Dashboard
-        </h2>
+        </h1>
         <div class="text-secondary">
           {{ t('dashboard.subtitle') }}
         </div>

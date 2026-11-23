@@ -11,9 +11,9 @@
         <span class="text-muted mx-1">/</span>
         <span>{{ probe?.name || 'Sonde' }}</span>
       </div>
-      <h2 class="page-title">
+      <h1 class="page-title">
         {{ probe?.name || '...' }}
-      </h2>
+      </h1>
       <div
         v-if="probe"
         class="text-secondary"

@@ -13,9 +13,9 @@
             <span class="text-muted mx-1">/</span>
             <span>{{ TAB_TITLES[alertsTab] || t('alerts.rulesPageTitle') }}</span>
           </div>
-          <h2 class="page-title">
+          <h1 class="page-title">
             {{ TAB_TITLES[alertsTab] || t('alerts.rulesPageTitle') }}
-          </h2>
+          </h1>
         </div>
         <div class="col-auto ms-auto d-flex gap-2">
           <button

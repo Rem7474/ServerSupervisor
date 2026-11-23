@@ -233,8 +233,12 @@
                 {{ taskModalError }}
               </div>
               <div class="mb-3">
-                <label class="form-label">{{ t('host.nameColumn') }}</label>
+                <label
+                  :for="`${uid}-1`"
+                  class="form-label"
+                >{{ t('host.nameColumn') }}</label>
                 <input
+                  :id="`${uid}-1`"
                   v-model="taskForm.name"
                   type="text"
                   class="form-control"
@@ -335,7 +339,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconClock, IconList, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
@@ -354,6 +358,8 @@ import { getApiErrorMessage } from '../../api/client'
 import { getExecutionStateClass } from '../../utils/statusClasses'
 import { commandStatusLabel } from '../../utils/commandStatus'
 import { scheduledTaskModules, availableScheduledTaskModules, scheduledTaskActions, scheduledTaskTargetConfig } from '../../utils/scheduledTaskDispatch'
+
+const uid = useId()
 
 interface Task {
   id: string | number

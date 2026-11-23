@@ -3,9 +3,9 @@
     <div class="page-header mb-3">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
-          <h2 class="page-title">
+          <h1 class="page-title">
             {{ t('webhooks.pageTitle') }}
-          </h2>
+          </h1>
           <div class="text-muted">
             {{ t('webhooks.pageSubtitle') }}
           </div>
@@ -548,6 +548,8 @@
       <div
         ref="secretModalRef"
         class="modal modal-blur fade show d-block"
+        role="dialog"
+        aria-modal="true"
       >
         <div class="modal-dialog modal-md">
           <div class="modal-content">

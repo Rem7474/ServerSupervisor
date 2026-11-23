@@ -4,8 +4,12 @@
       v-if="showHost"
       class="col-md-3"
     >
-      <label class="form-label form-label-sm">{{ t('common.dispatchHostLabel') }}</label>
+      <label
+        :for="`${uid}-1`"
+        class="form-label form-label-sm"
+      >{{ t('common.dispatchHostLabel') }}</label>
       <select
+        :id="`${uid}-1`"
         v-model="hostId"
         class="form-select form-select-sm"
       >
@@ -22,8 +26,12 @@
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label form-label-sm">Module</label>
+      <label
+        :for="`${uid}-2`"
+        class="form-label form-label-sm"
+      >Module</label>
       <select
+        :id="`${uid}-2`"
         v-model="module"
         class="form-select form-select-sm"
         @change="onModuleChange"
@@ -41,9 +49,13 @@
       v-if="module !== 'custom'"
       class="col-md-3"
     >
-      <label class="form-label form-label-sm">Action</label>
+      <label
+        :for="`${uid}-3`"
+        class="form-label form-label-sm"
+      >Action</label>
       <select
         v-if="actionOptions.length"
+        :id="`${uid}-3`"
         v-model="action"
         class="form-select form-select-sm"
       >
@@ -66,7 +78,9 @@
       v-if="targetInfo"
       class="col-md-3"
     >
-      <label class="form-label form-label-sm">{{ targetInfo.label }}</label>
+      <div class="form-label form-label-sm">
+        {{ targetInfo.label }}
+      </div>
       <RestrictedSelect
         v-model="target"
         :options="targetOptions"
@@ -84,14 +98,16 @@
       v-if="showCron"
       class="col-12"
     >
-      <label class="form-label form-label-sm">{{ t('common.dispatchSchedulingLabel') }}</label>
+      <div class="form-label form-label-sm">
+        {{ t('common.dispatchSchedulingLabel') }}
+      </div>
       <CronBuilder v-model="cronExpression" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import apiClient from '../api'
 import { useHostsStore } from '../stores/hosts'
@@ -101,6 +117,8 @@ import type { SelectOption, OptionGroup } from './RestrictedSelect.vue'
 import type { CustomTaskSummary } from '../types/task'
 import { dispatchModules } from '../utils/dispatchStep'
 import type { DispatchOption } from '../utils/dispatchStep'
+
+const uid = useId()
 
 const props = withDefaults(defineProps<{
   // Returns the selectable actions for a module, or [] to fall back to a
