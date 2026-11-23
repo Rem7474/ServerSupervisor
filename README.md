@@ -438,6 +438,8 @@ dérive : voir le guide complet **[Git-Webhooks-and-Releases](https://github.com
 | Variable | Description | Défaut |
 |---|---|---|
 | `DEMO_MODE` | Mode démonstration (jeu de données figé, actions désactivées) — voir [CONTRIBUTING.md](CONTRIBUTING.md#mode-démo) | `false` |
+| `METRICS_ENABLED` | Expose `GET /metrics` (Prometheus, auto-observabilité du serveur) — voir le wiki [Monitoring](wiki/Prometheus-Metrics.md) | `false` |
+| `METRICS_TOKEN` | Jeton Bearer exigé pour scraper `/metrics` ; sans jeton l'endpoint reste désactivé | `` |
 | `TLS_ENABLED` | **Ne fait pas servir le HTTPS.** Force uniquement le flag `Secure` sur les cookies de session — à activer quand l'app est exposée en HTTPS derrière un reverse proxy. Le serveur lui-même n'écoute qu'en HTTP | `false` |
 | `WEBAUTHN_RP_ID` | Relying Party ID WebAuthn (déduit de `BASE_URL` si absent) | dérivé |
 | `WEBAUTHN_RP_ORIGINS` | Origines WebAuthn autorisées (déduites de `ALLOWED_ORIGINS` si absent) | dérivé |

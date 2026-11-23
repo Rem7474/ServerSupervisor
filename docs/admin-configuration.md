@@ -80,6 +80,8 @@ Docker déjà définie, pas l'inverse.
 | `BASE_URL` | `BASE_URL` | Serveur | string | `http://localhost:8080` | Non | Non | URL racine pour liens et redirections SSO |
 | `TLS_ENABLED` | `TLS_ENABLED` | Serveur | bool | `false` | Non | Non | Force le flag `Secure` sur les cookies de session (le serveur n'écoute qu'en HTTP ; à activer derrière un reverse proxy HTTPS) |
 | `DEMO_MODE` | `DEMO_MODE` | Serveur | bool | `false` | Non | Oui | Coupe les appels réseau sortants (ENV-only) |
+| `METRICS_ENABLED` | `METRICS_ENABLED` | Serveur | bool | `false` | Non | Oui | Expose `GET /metrics` au format Prometheus (ENV-only, exige `METRICS_TOKEN`) |
+| `METRICS_TOKEN` | `METRICS_TOKEN` | Serveur | string | `""` | Oui | Oui | Jeton Bearer exigé pour scraper `/metrics` (ENV-only ; sans jeton l'endpoint reste désactivé) |
 | `TZ` | `TZ` | Serveur | string | `UTC` | Non | Oui | Fuseau horaire pour crons et affichage |
 | `LOG_LEVEL` | `LOG_LEVEL` | Logging | select | `info` | Non | Non | Niveau des logs (debug, info, warn, error) |
 | `LOG_FORMAT` | `LOG_FORMAT` | Logging | select | `json` | Non | Oui | Format des logs (json, text) |
@@ -177,7 +179,7 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
         "has_conflict": false
       }
     ],
-    "total_params": 70,
+    "total_params": 72,
     "env_count": 12,
     "ui_count": 4,
     "default_count": 36,

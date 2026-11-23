@@ -17,6 +17,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/logging"
+	"github.com/serversupervisor/server/internal/metrics"
 	"github.com/serversupervisor/server/internal/notify"
 	"github.com/serversupervisor/server/internal/safego"
 	"github.com/serversupervisor/server/internal/services/push"
@@ -80,7 +81,9 @@ func (d *Dispatcher) Send(ctx context.Context, ev Event) {
 				slog.WarnContext(ctx, "notifychannels: SMTP to/from not configured", slog.String("source", logging.Sanitize(ev.LogID)))
 				continue
 			}
-			if err := d.notifier.SendSMTP(d.cfg, d.cfg.SMTPFrom, ev.SMTPTo, ev.SMTPSubject, ev.SMTPBody); err != nil {
+			err := d.notifier.SendSMTP(d.cfg, d.cfg.SMTPFrom, ev.SMTPTo, ev.SMTPSubject, ev.SMTPBody)
+			metrics.NotificationSent("smtp", err)
+			if err != nil {
 				slog.ErrorContext(ctx, "notifychannels: SMTP send failed", slog.String("source", logging.Sanitize(ev.LogID)), slog.Any("err", err))
 			}
 
@@ -89,7 +92,9 @@ func (d *Dispatcher) Send(ctx context.Context, ev Event) {
 				slog.WarnContext(ctx, "notifychannels: ntfy URL not configured", slog.String("source", logging.Sanitize(ev.LogID)))
 				continue
 			}
-			if err := d.notifier.SendNtfy(d.cfg, ev.NtfyURL, ev.NtfyTitle, ev.NtfyBody); err != nil {
+			err := d.notifier.SendNtfy(d.cfg, ev.NtfyURL, ev.NtfyTitle, ev.NtfyBody)
+			metrics.NotificationSent("ntfy", err)
+			if err != nil {
 				slog.ErrorContext(ctx, "notifychannels: ntfy send failed", slog.String("source", logging.Sanitize(ev.LogID)), slog.Any("err", err))
 			}
 
@@ -106,6 +111,7 @@ func (d *Dispatcher) Send(ctx context.Context, ev Event) {
 			req.Header.Set("Content-Type", "application/json")
 			client := &http.Client{Timeout: 10 * time.Second}
 			resp, err := client.Do(req)
+			metrics.NotificationSent("notify", err)
 			if err != nil {
 				slog.ErrorContext(ctx, "notifychannels: legacy notify webhook failed", slog.Any("err", err))
 				continue
