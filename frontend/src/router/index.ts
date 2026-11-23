@@ -86,7 +86,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/account/security',
-    redirect: { path: '/account', query: { tab: 'connexions' } },
+    redirect: { path: '/account', query: { tab: 'logins' } },
   },
   {
     path: '/users',

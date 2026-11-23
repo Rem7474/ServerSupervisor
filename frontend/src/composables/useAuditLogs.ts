@@ -49,11 +49,11 @@ export function useAuditLogs() {
   const moduleFilterOptions = computed(() => remoteCommandModuleOptions())
   const journalCategoryFilterOptions = computed(() => journalCategoryOptions())
 
-  function resolveTab(raw: unknown): 'commandes' | 'connexions' | 'journal' {
+  function resolveTab(raw: unknown): 'commands' | 'logins' | 'audit-log' {
     const val = Array.isArray(raw) ? raw[0] : raw
-    if (val === 'connexions' && auth.role === 'admin') return 'connexions'
-    if (val === 'journal' && auth.role === 'admin') return 'journal'
-    return 'commandes'
+    if (val === 'logins' && auth.role === 'admin') return 'logins'
+    if (val === 'audit-log' && auth.role === 'admin') return 'audit-log'
+    return 'commands'
   }
 
   const activeTab = ref<string>(resolveTab(route.query.tab))
@@ -69,8 +69,8 @@ export function useAuditLogs() {
     (nextTab) => {
       const target = resolveTab(nextTab)
       if (target === activeTab.value) return
-      if (target === 'connexions') void switchToConnexions()
-      else if (target === 'journal') void switchToJournal()
+      if (target === 'logins') void switchToConnexions()
+      else if (target === 'audit-log') void switchToJournal()
       else void switchToCommandes()
     }
   )
@@ -308,7 +308,7 @@ export function useAuditLogs() {
   }
 
   async function switchToCommandes(): Promise<void> {
-    activeTab.value = 'commandes'
+    activeTab.value = 'commands'
     if (!cmdsLoaded.value) await fetchCmds()
   }
 
@@ -317,7 +317,7 @@ export function useAuditLogs() {
       await switchToCommandes()
       return
     }
-    activeTab.value = 'connexions'
+    activeTab.value = 'logins'
     if (!connexionsLoaded.value) await fetchConnexions()
   }
 
@@ -359,7 +359,7 @@ export function useAuditLogs() {
       await switchToCommandes()
       return
     }
-    activeTab.value = 'journal'
+    activeTab.value = 'audit-log'
     if (!journalLoaded.value) await fetchJournal()
   }
 
@@ -451,8 +451,8 @@ export function useAuditLogs() {
   onMounted(async () => {
     if (route.query.module) cmdModuleFilter.value = String(route.query.module)
     const initialTab = resolveTab(route.query.tab)
-    if (initialTab === 'connexions') await switchToConnexions()
-    else if (initialTab === 'journal') await switchToJournal()
+    if (initialTab === 'logins') await switchToConnexions()
+    else if (initialTab === 'audit-log') await switchToJournal()
     else await switchToCommandes()
     const cmdId = route.query.command
     if (cmdId) {
@@ -464,13 +464,13 @@ export function useAuditLogs() {
   })
   onMounted(() => {
     auditPollTimer = setInterval(() => {
-      if (activeTab.value === 'commandes') {
+      if (activeTab.value === 'commands') {
         const now = Date.now()
         const refreshMs = hasActiveCommands.value ? 5000 : 30000
         if (now - lastCmdFetchAt.value >= refreshMs) {
           void fetchCmds()
         }
-      } else if (activeTab.value === 'connexions' && auth.role === 'admin') {
+      } else if (activeTab.value === 'logins' && auth.role === 'admin') {
         const now = Date.now()
         if (now - lastConnFetchAt.value >= 30000) {
           void fetchConnexions()

@@ -59,15 +59,15 @@ describe('router navigation guards', () => {
     const auth = useAuthStore()
 
     auth.setAuth({ role: 'viewer', username: 'bob' }, 'bob')
-    await router.push('/audit?tab=commandes')
+    await router.push('/audit?tab=commands')
     expect(router.currentRoute.value.path).toBe('/')
 
     auth.setAuth({ role: 'operator', username: 'carol' }, 'carol')
-    await router.push('/audit?tab=commandes')
+    await router.push('/audit?tab=commands')
     expect(router.currentRoute.value.path).toBe('/audit')
 
     auth.setAuth({ role: 'admin', username: 'alice' }, 'alice')
-    await router.push('/audit?tab=journal')
+    await router.push('/audit?tab=audit-log')
     expect(router.currentRoute.value.path).toBe('/audit')
   })
 })

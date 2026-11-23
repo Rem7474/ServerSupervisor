@@ -44,8 +44,8 @@
         <button
           type="button"
           class="nav-link"
-          :class="{ active: activeTab === 'profil' }"
-          @click="activeTab = 'profil'"
+          :class="{ active: activeTab === 'profile' }"
+          @click="activeTab = 'profile'"
         >
           {{ t('account.profileTab') }}
         </button>
@@ -54,7 +54,7 @@
         <button
           type="button"
           class="nav-link"
-          :class="{ active: activeTab === 'historique' }"
+          :class="{ active: activeTab === 'history' }"
           @click="switchToHistorique"
         >
           {{ t('account.historyTab') }}
@@ -68,8 +68,8 @@
         <button
           type="button"
           class="nav-link"
-          :class="{ active: activeTab === 'connexions' }"
-          @click="activeTab = 'connexions'"
+          :class="{ active: activeTab === 'logins' }"
+          @click="activeTab = 'logins'"
         >
           {{ t('account.connectionsTab') }}
         </button>
@@ -77,7 +77,7 @@
     </ul>
 
     <!-- ── Onglet Profil ── -->
-    <div v-show="activeTab === 'profil'">
+    <div v-show="activeTab === 'profile'">
       <div class="row g-4">
         <!-- Profile info card -->
         <div class="col-12 col-lg-4">
@@ -161,7 +161,7 @@
               <button
                 type="button"
                 class="btn btn-outline-secondary w-100"
-                @click="activeTab = 'connexions'"
+                @click="activeTab = 'logins'"
               >
                 {{ t('account.manageMfaButton') }}
               </button>
@@ -304,7 +304,7 @@
 
     <!-- ── Onglet Historique ── -->
     <div
-      v-show="activeTab === 'historique'"
+      v-show="activeTab === 'history'"
       class="side-layout"
     >
       <!-- Table principale -->
@@ -406,7 +406,7 @@
     </div>
 
     <!-- ── Onglet Connexions ── -->
-    <AccountSecurityPanel v-if="activeTab === 'connexions'" />
+    <AccountSecurityPanel v-if="activeTab === 'logins'" />
   </div>
 </template>
 

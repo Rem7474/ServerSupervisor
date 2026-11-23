@@ -29,7 +29,7 @@
       >
         <a
           class="nav-link"
-          :class="{ active: activeTab === 'commandes' }"
+          :class="{ active: activeTab === 'commands' }"
           href="#"
           @click.prevent="switchToCommandes"
         >
@@ -42,7 +42,7 @@
       >
         <a
           class="nav-link"
-          :class="{ active: activeTab === 'connexions' }"
+          :class="{ active: activeTab === 'logins' }"
           href="#"
           @click.prevent="switchToConnexions"
         >
@@ -55,7 +55,7 @@
       >
         <a
           class="nav-link"
-          :class="{ active: activeTab === 'journal' }"
+          :class="{ active: activeTab === 'audit-log' }"
           href="#"
           @click.prevent="switchToJournal"
         >
@@ -66,7 +66,7 @@
 
     <!-- ── Commandes tab ────────────────────────────────────────────────────── -->
     <div
-      v-show="activeTab === 'commandes'"
+      v-show="activeTab === 'commands'"
       class="side-layout"
     >
       <div class="side-main">
@@ -293,7 +293,7 @@
     <!-- ── Connexions tab (admin only) ────────────────────────────────────── -->
     <div
       v-if="auth.role === 'admin'"
-      v-show="activeTab === 'connexions'"
+      v-show="activeTab === 'logins'"
     >
       <AuditSecurityPanel
         :security="security"
@@ -333,7 +333,7 @@
     <!-- ── Journal tab (raw audit_logs, admin only) ───────────────────────── -->
     <div
       v-if="auth.role === 'admin'"
-      v-show="activeTab === 'journal'"
+      v-show="activeTab === 'audit-log'"
     >
       <div class="card">
         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">

@@ -57,7 +57,7 @@ const navigationSections: NavSectionDef[] = [
     items: [
       { key: 'dashboard', to: '/', icon: IconLayoutDashboard },
       { key: 'alerts', to: '/alerts', icon: IconBell },
-      { key: 'commands', to: '/audit?tab=commandes', icon: IconTerminal2, requiresPermission: 'view:audit:commands' },
+      { key: 'commands', to: '/audit?tab=commands', icon: IconTerminal2, requiresPermission: 'view:audit:commands' },
     ],
   },
   {
@@ -101,7 +101,7 @@ const navigationSections: NavSectionDef[] = [
     items: [
       { key: 'settings', to: '/settings', icon: IconSettings, adminOnly: true },
       { key: 'users', to: '/users', icon: IconUsers, adminOnly: true },
-      { key: 'audit', to: '/audit?tab=journal', icon: IconClipboardList, adminOnly: true },
+      { key: 'audit', to: '/audit?tab=audit-log', icon: IconClipboardList, adminOnly: true },
     ],
   },
 ]
