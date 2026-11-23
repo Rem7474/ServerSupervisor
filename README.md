@@ -197,7 +197,9 @@ planifiée, fuseau horaire d'exécution du cron, dépannage) :
 
 ### Sécurité
 - Authentification JWT avec refresh tokens
-- MFA/2FA optionnel par compte : TOTP et/ou clés de sécurité/passkeys (WebAuthn)
+- SSO OpenID Connect optionnel (mapping de groupes → rôles, création auto des comptes, login local conservable) — paramètres `OIDC_*`, voir [docs/admin-configuration.md](docs/admin-configuration.md)
+- Interface de configuration centralisée (`/settings` → Configuration avancée) : paramètres serveur éditables à chaud, avec la variable d'environnement prioritaire quand elle est définie
+- MFA/2FA optionnel par compte : TOTP et/ou clés de sécurité/passkeys WebAuthn (y compris connexion sans mot de passe via passkey discoverable)
 - API Keys uniques par agent avec rotation
 - Vérification stricte de l'appartenance des commandes à chaque hôte
 - Rate limiting par IP avec cleanup automatique et support reverse proxy
@@ -388,7 +390,7 @@ dérive : voir le guide complet **[Git-Webhooks-and-Releases](https://github.com
 | `SERVER_PORT` | Port d'écoute | `8080` |
 | `BASE_URL` | URL publique (CORS + WebSocket) | `http://localhost:8080` |
 | `TZ` | Fuseau horaire d'interprétation des expressions cron des Tâches planifiées globales et de calcul de leur prochaine exécution — nom IANA/tzdata (ex: `Europe/Paris`). Laissé à `UTC`, une tâche créée pour "23h00" s'exécute réellement à 23h00 UTC, soit 01h00 le lendemain en UTC+2 | `UTC` |
-| `TRUSTED_PROXIES` | CIDRs des reverse proxies (ex: `172.18.0.0/16`) | `` |
+| `TRUSTED_PROXIES` | CIDRs des reverse proxies (ex: `172.18.0.0/16`) — utilisés pour la résolution de l'IP cliente | `` |
 | `ALLOWED_ORIGINS` | Origins CORS supplémentaires autorisées (virgule) | `` |
 | `APP_ENV` | `dev`/`development` assouplit la validation stricte des secrets (JWT auto-généré) ; toute autre valeur = production stricte | `production` |
 | `LOG_LEVEL` | Niveau de log (`debug`/`info`/`warn`/`error`) | `info` |
@@ -437,8 +439,6 @@ dérive : voir le guide complet **[Git-Webhooks-and-Releases](https://github.com
 |---|---|---|
 | `DEMO_MODE` | Mode démonstration (jeu de données figé, actions désactivées) — voir [CONTRIBUTING.md](CONTRIBUTING.md#mode-démo) | `false` |
 | `TLS_ENABLED` | **Ne fait pas servir le HTTPS.** Force uniquement le flag `Secure` sur les cookies de session — à activer quand l'app est exposée en HTTPS derrière un reverse proxy. Le serveur lui-même n'écoute qu'en HTTP | `false` |
-| `ALLOWED_ORIGINS` | Origines WebSocket/CORS additionnelles (séparées par des virgules) | `` |
-| `TRUSTED_PROXIES` | Proxies de confiance pour la résolution d'IP cliente | `` |
 | `WEBAUTHN_RP_ID` | Relying Party ID WebAuthn (déduit de `BASE_URL` si absent) | dérivé |
 | `WEBAUTHN_RP_ORIGINS` | Origines WebAuthn autorisées (déduites de `ALLOWED_ORIGINS` si absent) | dérivé |
 
@@ -630,6 +630,12 @@ Comportement de `--init` :
 | `web_logs_cursor_file` | Fichier de cursor incrémental web logs | `/var/lib/serversupervisor/web_logs_cursor.json` | `SUPERVISOR_WEB_LOGS_CURSOR_FILE` |
 | `apt_auto_update_on_start` | Lancer `apt update` au démarrage de l'agent | `false` | `SUPERVISOR_APT_AUTO_UPDATE_ON_START` |
 | `insecure_skip_verify` | Ignorer les erreurs TLS (certificats auto-signés) | `false` | `SUPERVISOR_INSECURE_SKIP_VERIFY` |
+| `collect_network_flows` | Activer la collecte des flux réseau (conntrack) | `false` | `SUPERVISOR_COLLECT_NETWORK_FLOWS` |
+| `network_flows_top_n` | Nombre max de pairs distants remontés | `50` | `SUPERVISOR_NETWORK_FLOWS_TOP_N` |
+| `network_flows_l7_capture` | Lire le SNI TLS des connexions sortantes (nécessite `CAP_NET_RAW`) | `false` | `SUPERVISOR_NETWORK_FLOWS_L7_CAPTURE` |
+| `disable_ws_push` | Désactiver le canal WebSocket de push de commandes (retour au polling) | `false` | `SUPERVISOR_DISABLE_WS_PUSH` |
+| `log_level` | Niveau de log (`debug`/`info`/`warn`/`error`) | `info` | `SUPERVISOR_LOG_LEVEL` |
+| `log_format` | Format de log (`text`/`json`) | `text` | `SUPERVISOR_LOG_FORMAT` |
 
 > Toutes les options sont également configurables via variables d'environnement (préfixe `SUPERVISOR_`), utile pour les déploiements Docker/Kubernetes.
 >
@@ -1228,7 +1234,7 @@ suivent leur propre posture (voir [Proxmox](https://github.com/Rem7474/ServerSup
 ## Développement
 
 ### Prérequis
-- Go 1.25+ (version exacte dans `server/go.mod` / `agent/go.mod`)
+- Go 1.26+ (version exacte dans `server/go.mod` / `agent/go.mod`)
 - Node.js 22+ (utilisé en CI ; le Dockerfile build sur Node 26)
 - TimescaleDB 2.27.2 (PostgreSQL 16) — prérequis obligatoire (hypertables, time_bucket, retention policies)
 

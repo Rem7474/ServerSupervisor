@@ -45,6 +45,7 @@ function mountApp() {
       { path: '/', component: { template: '<div />' } },
       { path: '/account', component: { template: '<div />' } },
       { path: '/alerts', component: { template: '<div />' } },
+      { path: '/audit', component: { template: '<div />' } },
       { path: '/login', component: { template: '<div />' } },
     ],
   })
@@ -146,6 +147,33 @@ describe('App.vue — nav section active state', () => {
     expect(activeSection.exists()).toBe(true)
     expect(activeSection.text()).toContain('Centre de contrôle')
     wrapper.unmount()
+  })
+})
+
+describe('App.vue — /audit tab-aware nav item highlighting', () => {
+  async function activeItemsAt(path: string): Promise<string[]> {
+    const { wrapper, router } = mountApp()
+    await router.push(path)
+    await flushPromises()
+    const labels = wrapper.findAll('a.dropdown-item.active').map((a) => a.text())
+    wrapper.unmount()
+    return labels
+  }
+
+  it('highlights Commandes (and not Audit) on /audit without a tab or with ?tab=commands', async () => {
+    for (const path of ['/audit', '/audit?tab=commands']) {
+      const labels = await activeItemsAt(path)
+      expect(labels.some((l) => l.includes('Commandes'))).toBe(true)
+      expect(labels.some((l) => l.includes('Audit'))).toBe(false)
+    }
+  })
+
+  it('highlights Audit (and not Commandes) for the audit-log and logins tabs', async () => {
+    for (const path of ['/audit?tab=audit-log', '/audit?tab=logins']) {
+      const labels = await activeItemsAt(path)
+      expect(labels.some((l) => l.includes('Audit'))).toBe(true)
+      expect(labels.some((l) => l.includes('Commandes'))).toBe(false)
+    }
   })
 })
 

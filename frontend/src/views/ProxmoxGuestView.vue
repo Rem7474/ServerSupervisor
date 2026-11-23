@@ -51,9 +51,9 @@
             <span>{{ guest.guest_type.toUpperCase() }} {{ guest.vmid }}</span>
           </div>
           <div class="d-flex align-items-center gap-3 flex-wrap">
-            <h2 class="page-title mb-0">
+            <h1 class="page-title mb-0">
               {{ guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}` }}
-            </h2>
+            </h1>
             <span :class="getEntityStateClass(guest.status)">{{ getEntityStateLabel(guest.status) }}</span>
             <span class="badge bg-azure-lt text-azure">{{ guest.guest_type.toUpperCase() }}</span>
             <GuestLinkCell

@@ -26,16 +26,24 @@
       class="d-flex align-items-end gap-2 flex-wrap"
     >
       <div>
-        <label class="form-label mb-0 small">{{ t('common.from') }}</label>
+        <label
+          :for="`${uid}-1`"
+          class="form-label mb-0 small"
+        >{{ t('common.from') }}</label>
         <input
+          :id="`${uid}-1`"
           v-model="fromLocal"
           type="datetime-local"
           class="form-control form-control-sm"
         >
       </div>
       <div>
-        <label class="form-label mb-0 small">{{ t('common.to') }}</label>
+        <label
+          :for="`${uid}-2`"
+          class="form-label mb-0 small"
+        >{{ t('common.to') }}</label>
         <input
+          :id="`${uid}-2`"
           v-model="toLocal"
           type="datetime-local"
           class="form-control form-control-sm"
@@ -60,10 +68,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import dayjs from '../../utils/dayjs'
 import type { TimeRangeModel, TimeRangePreset } from '../../types/timeRange'
+
+const uid = useId()
 
 const { t } = useI18n()
 

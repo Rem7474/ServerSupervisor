@@ -2,6 +2,8 @@
   <div
     ref="modalRef"
     class="modal modal-blur fade show d-block"
+    role="dialog"
+    aria-modal="true"
     @click.self="emit('close')"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -73,28 +75,30 @@
                 v-if="Object.keys(container.env_vars || {}).length === 0"
                 :title="t('docker.noEnvVars')"
               />
-              <table
+              <div
                 v-else
-                class="table table-sm table-vcenter"
+                class="table-responsive"
               >
-                <thead><tr><th>{{ t('docker.variableColumn') }}</th><th>{{ t('docker.valueColumn') }}</th></tr></thead>
-                <tbody>
-                  <tr
-                    v-for="(val, key) in container.env_vars"
-                    :key="key"
-                  >
-                    <td class="font-monospace small fw-semibold">
-                      {{ key }}
-                    </td>
-                    <td
-                      class="font-monospace small text-secondary"
-                      style="word-break: break-all;"
+                <table class="table table-sm table-vcenter">
+                  <thead><tr><th>{{ t('docker.variableColumn') }}</th><th>{{ t('docker.valueColumn') }}</th></tr></thead>
+                  <tbody>
+                    <tr
+                      v-for="(val, key) in container.env_vars"
+                      :key="key"
                     >
-                      {{ val }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                      <td class="font-monospace small fw-semibold">
+                        {{ key }}
+                      </td>
+                      <td
+                        class="font-monospace small text-secondary"
+                        style="word-break: break-all;"
+                      >
+                        {{ val }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
             <div v-if="tab === 'volumes'">
               <EmptyState

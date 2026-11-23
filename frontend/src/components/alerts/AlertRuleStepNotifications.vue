@@ -22,8 +22,12 @@
       v-if="commandTriggerEnabled"
       class="mb-3"
     >
-      <label class="form-label">{{ t('alerts.cooldownLabel') }}</label>
+      <label
+        :for="`${uid}-1`"
+        class="form-label"
+      >{{ t('alerts.cooldownLabel') }}</label>
       <input
+        :id="`${uid}-1`"
         v-model.number="form.actions.cooldown"
         type="number"
         class="form-control"
@@ -37,8 +41,12 @@
     </div>
 
     <div class="mb-3">
-      <label class="form-label">{{ t('alerts.escalateLabel') }}</label>
+      <label
+        :for="`${uid}-2`"
+        class="form-label"
+      >{{ t('alerts.escalateLabel') }}</label>
       <input
+        :id="`${uid}-2`"
         v-model.number="form.actions.escalate_after_minutes"
         type="number"
         min="0"
@@ -53,10 +61,14 @@
     </div>
 
     <div class="mb-3">
-      <label class="form-label">{{ t('alerts.channelsLabel') }}</label>
+      <label
+        :for="`${uid}-3`"
+        class="form-label"
+      >{{ t('alerts.channelsLabel') }}</label>
       <div>
         <label class="form-check form-check-inline">
           <input
+            :id="`${uid}-3`"
             v-model="channelSmtp"
             class="form-check-input"
             type="checkbox"
@@ -115,8 +127,12 @@
       v-if="channelSmtp"
       class="mb-3"
     >
-      <label class="form-label">{{ t('alerts.smtpRecipientsLabel') }}</label>
+      <label
+        :for="`${uid}-4`"
+        class="form-label"
+      >{{ t('alerts.smtpRecipientsLabel') }}</label>
       <input
+        :id="`${uid}-4`"
         v-model="form.actions.smtp_to"
         type="text"
         class="form-control"
@@ -133,8 +149,12 @@
       v-if="channelNtfy"
       class="mb-3"
     >
-      <label class="form-label">{{ t('alerts.ntfyTopicLabel') }}</label>
+      <label
+        :for="`${uid}-5`"
+        class="form-label"
+      >{{ t('alerts.ntfyTopicLabel') }}</label>
       <input
+        :id="`${uid}-5`"
         v-model="form.actions.ntfy_topic"
         type="text"
         class="form-control"
@@ -163,10 +183,13 @@
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AlertRuleCommandTrigger from './AlertRuleCommandTrigger.vue'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
 import { formatDateTimeSeconds } from '../../utils/formatters'
+
+const uid = useId()
 
 interface TestResults {
   any_fires?: boolean

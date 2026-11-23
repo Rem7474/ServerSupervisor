@@ -2,6 +2,8 @@
   <div
     ref="modalRef"
     class="modal modal-blur fade show d-block"
+    role="dialog"
+    aria-modal="true"
     @click.self="emit('close')"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -19,25 +21,35 @@
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.containerLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.containerLabel') }}
+            </div>
             <div>{{ container.name }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.composeProjectLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.composeProjectLabel') }}
+            </div>
             <div>{{ composeInfo.project || '-' }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.serviceLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.serviceLabel') }}
+            </div>
             <div>{{ composeInfo.service || '-' }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.workingDirLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.workingDirLabel') }}
+            </div>
             <div class="font-monospace small">
               {{ composeInfo.workingDir || '-' }}
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.configFilesLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.configFilesLabel') }}
+            </div>
             <div class="font-monospace small">
               {{ composeInfo.configFiles || '-' }}
             </div>
@@ -46,7 +58,9 @@
             v-if="Object.keys(container.labels || {}).length > 0"
             class="mb-3"
           >
-            <label class="form-label fw-semibold">{{ t('docker.labelsLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.labelsLabel') }}
+            </div>
             <div
               class="border rounded p-2 bg-dark small font-monospace"
               style="max-height: 200px; overflow-y: auto;"

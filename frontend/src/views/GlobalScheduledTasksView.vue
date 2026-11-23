@@ -19,9 +19,9 @@
             <span class="text-muted mx-1">/</span>
             <span>{{ t('scheduledTasks.pageTitle') }}</span>
           </div>
-          <h2 class="page-title">
+          <h1 class="page-title">
             {{ t('scheduledTasks.pageTitle') }}
-          </h2>
+          </h1>
         </div>
         <div class="d-flex gap-2">
           <button
@@ -403,6 +403,8 @@
         ref="createModalRef"
         class="modal modal-blur fade show d-block"
         tabindex="-1"
+        role="dialog"
+        aria-modal="true"
         @click.self="createModalOpen = false"
       >
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -428,8 +430,12 @@
                 </div>
                 <div class="row g-3">
                   <div class="col-md-6">
-                    <label class="form-label required">{{ t('scheduledTasks.nameColumn') }}</label>
+                    <label
+                      :for="`${uid}-1`"
+                      class="form-label required"
+                    >{{ t('scheduledTasks.nameColumn') }}</label>
                     <input
+                      :id="`${uid}-1`"
                       v-model="createForm.name"
                       type="text"
                       class="form-control"
@@ -517,6 +523,8 @@
         ref="editModalRef"
         class="modal modal-blur fade show d-block"
         tabindex="-1"
+        role="dialog"
+        aria-modal="true"
         @click.self="editTask = null"
       >
         <div class="modal-dialog modal-dialog-centered">
@@ -534,8 +542,12 @@
             </div>
             <div class="modal-body">
               <div class="mb-3">
-                <label class="form-label">{{ t('scheduledTasks.nameColumn') }}</label>
+                <label
+                  :for="`${uid}-2`"
+                  class="form-label"
+                >{{ t('scheduledTasks.nameColumn') }}</label>
                 <input
+                  :id="`${uid}-2`"
                   v-model="editForm.name"
                   type="text"
                   class="form-control"
@@ -557,7 +569,9 @@
                 v-if="!editManualOnly"
                 class="mb-3"
               >
-                <label class="form-label">{{ t('common.dispatchSchedulingLabel') }}</label>
+                <div class="form-label">
+                  {{ t('common.dispatchSchedulingLabel') }}
+                </div>
                 <CronBuilder v-model="editForm.cron_expression" />
                 <div
                   v-if="editNextRun"
@@ -621,6 +635,8 @@
         ref="historyModalRef"
         class="modal modal-blur fade show d-block"
         tabindex="-1"
+        role="dialog"
+        aria-modal="true"
         @click.self="historyTask = null"
       >
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -658,52 +674,54 @@
                 :title="t('scheduledTasks.noExecutionForTaskTitle')"
               />
               <div v-else>
-                <table class="table table-vcenter table-hover mb-0">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>{{ t('common.status') }}</th>
-                      <th>{{ t('scheduledTasks.durationColumn') }}</th>
-                      <th>{{ t('scheduledTasks.triggeredByColumn') }}</th>
-                      <th class="text-end" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="ex in executions"
-                      :key="ex.id"
-                    >
-                      <td class="text-nowrap">
-                        {{ formatDate(ex.created_at) }}
-                      </td>
-                      <td>
-                        <span :class="statusBadge(ex.status)">{{ commandStatusLabel(ex.status) }}</span>
-                      </td>
-                      <td class="text-nowrap">
-                        <span v-if="ex.ended_at && ex.started_at">{{ durationSec(ex.started_at, ex.ended_at) }}s</span>
-                        <span
-                          v-else
-                          class="text-muted"
-                        >—</span>
-                      </td>
-                      <td>{{ ex.triggered_by || '—' }}</td>
-                      <td class="text-end">
-                        <button
-                          type="button"
-                          class="btn btn-icon btn-sm btn-ghost-secondary"
-                          :title="t('scheduledTasks.viewLogsTooltip')"
-                          :aria-label="t('scheduledTasks.viewLogsTooltip')"
-                          @click="watchExecution(historyTask, ex)"
-                        >
-                          <IconList
-                            :size="16"
-                            class="icon icon-sm"
-                          />
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div class="table-responsive">
+                  <table class="table table-vcenter table-hover mb-0">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>{{ t('common.status') }}</th>
+                        <th>{{ t('scheduledTasks.durationColumn') }}</th>
+                        <th>{{ t('scheduledTasks.triggeredByColumn') }}</th>
+                        <th class="text-end" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="ex in executions"
+                        :key="ex.id"
+                      >
+                        <td class="text-nowrap">
+                          {{ formatDate(ex.created_at) }}
+                        </td>
+                        <td>
+                          <span :class="statusBadge(ex.status)">{{ commandStatusLabel(ex.status) }}</span>
+                        </td>
+                        <td class="text-nowrap">
+                          <span v-if="ex.ended_at && ex.started_at">{{ durationSec(ex.started_at, ex.ended_at) }}s</span>
+                          <span
+                            v-else
+                            class="text-muted"
+                          >—</span>
+                        </td>
+                        <td>{{ ex.triggered_by || '—' }}</td>
+                        <td class="text-end">
+                          <button
+                            type="button"
+                            class="btn btn-icon btn-sm btn-ghost-secondary"
+                            :title="t('scheduledTasks.viewLogsTooltip')"
+                            :aria-label="t('scheduledTasks.viewLogsTooltip')"
+                            @click="watchExecution(historyTask, ex)"
+                          >
+                            <IconList
+                              :size="16"
+                              class="icon icon-sm"
+                            />
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
             <div class="modal-footer">
@@ -735,7 +753,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconClock, IconList, IconPencil, IconPlayerPlay, IconTrash } from '@tabler/icons-vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
@@ -750,6 +768,8 @@ import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { availableScheduledTaskModules, scheduledTaskActions, scheduledTaskTargetConfig } from '../utils/scheduledTaskDispatch'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 import { useModalChrome } from '../composables/useModalChrome'
+
+const uid = useId()
 
 const { t } = useI18n()
 

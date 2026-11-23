@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/serversupervisor/server/internal/apperr"
@@ -102,17 +103,17 @@ func (s *Service) Scan(ctx context.Context, cidr string) ([]models.DiscoveredHos
 func usableIPs(cidr string) ([]string, error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		return nil, apperr.Validation("adresse CIDR invalide")
+		return nil, apperr.Validation("invalid CIDR address").I18n(apperr.CodeDiscoveryCIDRInvalid, nil)
 	}
 	if ip.To4() == nil {
-		return nil, apperr.Validation("seul IPv4 est pris en charge pour la découverte réseau")
+		return nil, apperr.Validation("only IPv4 is supported for network discovery").I18n(apperr.CodeDiscoveryIPv4Only, nil)
 	}
 	ones, bits := ipnet.Mask.Size()
 	if bits != 32 {
-		return nil, apperr.Validation("seul IPv4 est pris en charge pour la découverte réseau")
+		return nil, apperr.Validation("only IPv4 is supported for network discovery").I18n(apperr.CodeDiscoveryIPv4Only, nil)
 	}
 	if ones < minPrefixLen || ones > maxPrefixLen {
-		return nil, apperr.Validation(fmt.Sprintf("le préfixe doit être compris entre /%d et /%d (254 adresses max)", minPrefixLen, maxPrefixLen))
+		return nil, apperr.Validation(fmt.Sprintf("the prefix must be between /%d and /%d (254 addresses max)", minPrefixLen, maxPrefixLen)).I18n(apperr.CodeDiscoveryPrefixRange, map[string]string{"min": strconv.Itoa(minPrefixLen), "max": strconv.Itoa(maxPrefixLen)})
 	}
 
 	base := ipnet.IP.To4()

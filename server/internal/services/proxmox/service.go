@@ -282,10 +282,10 @@ func (s *Service) UpdateLink(ctx context.Context, id string, req models.ProxmoxG
 	validStatuses := map[string]bool{"suggested": true, "confirmed": true, "ignored": true}
 	validMetricsSources := map[string]bool{"auto": true, "agent": true, "proxmox": true}
 	if req.Status != nil && !validStatuses[*req.Status] {
-		return nil, apperr.Validation("status invalide : doit être suggested, confirmed ou ignored")
+		return nil, apperr.Validation("invalid status: must be suggested, confirmed or ignored").I18n(apperr.CodeProxmoxLinkStatusInvalid, nil)
 	}
 	if req.MetricsSource != nil && !validMetricsSources[*req.MetricsSource] {
-		return nil, apperr.Validation("metrics_source invalide : doit être auto, agent ou proxmox")
+		return nil, apperr.Validation("invalid metrics_source: must be auto, agent or proxmox").I18n(apperr.CodeProxmoxMetricsSourceInvalid, nil)
 	}
 	link, err := s.repo.UpdateProxmoxGuestLink(ctx, id, req.Status, req.MetricsSource)
 	if err == nil && link != nil {
@@ -867,7 +867,7 @@ func (s *Service) OpenGuestConsole(ctx context.Context, guestID string) (*models
 		return nil, nil, apperr.NotFound("guest not found")
 	}
 	if guest.GuestType != "lxc" {
-		return guest, nil, apperr.Validation("console non disponible pour les VM QEMU — V2 à venir")
+		return guest, nil, apperr.Validation("console is not available for QEMU VMs yet").I18n(apperr.CodeProxmoxConsoleQemuUnsupported, nil)
 	}
 	secret, conn, err := s.resolveSecret(ctx, guest.ConnectionID)
 	if err != nil {
@@ -878,7 +878,7 @@ func (s *Service) OpenGuestConsole(ctx context.Context, guestID string) (*models
 		return guest, nil, err
 	}
 	if pveUsername == "" || pvePassword == "" {
-		return guest, nil, apperr.Validation("console PVE non configurée pour cette connexion : identifiants requis")
+		return guest, nil, apperr.Validation("PVE console is not configured for this connection: credentials required").I18n(apperr.CodeProxmoxConsoleNotConfigured, nil)
 	}
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	session, err := client.OpenLXCConsole(ctx, guest.NodeName, guest.VMID, pveUsername, pvePassword)

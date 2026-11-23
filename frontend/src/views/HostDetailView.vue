@@ -13,9 +13,9 @@
             <span class="text-muted mx-1">/</span>
             <span>{{ t('host.hostBreadcrumb') }}</span>
           </div>
-          <h2 class="page-title">
+          <h1 class="page-title">
             {{ host?.name || host?.hostname || t('host.loadingLabel') }}
-          </h2>
+          </h1>
           <div class="text-secondary">
             {{ host?.hostname || t('host.notConnected') }} - {{ host?.os || t('host.unknownOs') }} - {{ host?.ip_address }}
             <span v-if="host?.last_seen">- {{ t('host.lastActivityLabel') }} <RelativeTime :date="host.last_seen" /></span>
@@ -169,8 +169,12 @@
           v-if="proxmoxLink.status === 'confirmed'"
           class="d-flex align-items-center gap-2 ms-auto"
         >
-          <label class="form-label mb-0 text-muted small">{{ t('host.metricsSourceLabel') }}</label>
+          <label
+            :for="`${uid}-1`"
+            class="form-label mb-0 text-muted small"
+          >{{ t('host.metricsSourceLabel') }}</label>
           <select
+            :id="`${uid}-1`"
             class="form-select form-select-sm"
             style="width:auto"
             :value="proxmoxLink.metrics_source"
@@ -622,45 +626,49 @@
                   :title="t('host.noRestrictionsTitle')"
                   :subtitle="t('host.noRestrictionsSubtitle')"
                 />
-                <table
+                <div
                   v-else
-                  class="table table-vcenter mb-0"
+                  class="table-responsive"
                 >
-                  <thead>
-                    <tr>
-                      <th>{{ t('host.userColumn') }}</th>
-                      <th>{{ t('host.levelColumn') }}</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="p in hostPerms"
-                      :key="p.username"
-                    >
-                      <td>{{ p.username }}</td>
-                      <td>
-                        <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
-                          {{ p.level }}
-                        </span>
-                      </td>
-                      <td class="text-end">
-                        <button
-                          type="button"
-                          class="btn btn-icon btn-sm btn-ghost-danger"
-                          :title="t('host.revokeTooltip')"
-                          :aria-label="t('host.revokeTooltip')"
-                          @click="revokePermission(p.username)"
-                        >
-                          <IconX
-                            :size="16"
-                            class="icon icon-sm"
-                          />
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                  <table
+                    class="table table-vcenter mb-0"
+                  >
+                    <thead>
+                      <tr>
+                        <th>{{ t('host.userColumn') }}</th>
+                        <th>{{ t('host.levelColumn') }}</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="p in hostPerms"
+                        :key="p.username"
+                      >
+                        <td>{{ p.username }}</td>
+                        <td>
+                          <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
+                            {{ p.level }}
+                          </span>
+                        </td>
+                        <td class="text-end">
+                          <button
+                            type="button"
+                            class="btn btn-icon btn-sm btn-ghost-danger"
+                            :title="t('host.revokeTooltip')"
+                            :aria-label="t('host.revokeTooltip')"
+                            @click="revokePermission(p.username)"
+                          >
+                            <IconX
+                              :size="16"
+                              class="icon icon-sm"
+                            />
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <div class="card-footer d-flex justify-content-end">
                 <button
@@ -736,6 +744,8 @@
       ref="permModalRef"
       class="modal modal-blur fade show d-block modal-permissions-overlay"
       tabindex="-1"
+      role="dialog"
+      aria-modal="true"
       @click.self="addPermModal = false"
     >
       <div
@@ -755,8 +765,12 @@
           </div>
           <div class="modal-body">
             <div class="mb-3">
-              <label class="form-label">{{ t('host.userColumn') }}</label>
+              <label
+                :for="`${uid}-2`"
+                class="form-label"
+              >{{ t('host.userColumn') }}</label>
               <select
+                :id="`${uid}-2`"
                 v-model="newPermUsername"
                 class="form-select"
               >
@@ -773,8 +787,12 @@
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label">{{ t('host.levelColumn') }}</label>
+              <label
+                :for="`${uid}-3`"
+                class="form-label"
+              >{{ t('host.levelColumn') }}</label>
               <select
+                :id="`${uid}-3`"
                 v-model="newPermLevel"
                 class="form-select"
               >
@@ -821,7 +839,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, ref, watch, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
@@ -854,6 +872,8 @@ import EmptyState from '../components/EmptyState.vue'
 import BadgePill from '../components/common/BadgePill.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { getMetricColorClass } from '../utils/metricColor'
+
+const uid = useId()
 
 const { t } = useI18n()
 

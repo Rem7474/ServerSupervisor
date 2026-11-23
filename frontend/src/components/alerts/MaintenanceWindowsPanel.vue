@@ -30,8 +30,12 @@
       <form @submit.prevent="onSubmit">
         <div class="row g-3">
           <div class="col-12 col-lg-4">
-            <label class="form-label">{{ t('alerts.hostLabel') }}</label>
+            <label
+              :for="`${uid}-1`"
+              class="form-label"
+            >{{ t('alerts.hostLabel') }}</label>
             <select
+              :id="`${uid}-1`"
               v-model="form.hostId"
               class="form-select"
             >
@@ -51,8 +55,12 @@
             </div>
           </div>
           <div class="col-12 col-lg-4">
-            <label class="form-label required">{{ t('alerts.startsAtLabel') }}</label>
+            <label
+              :for="`${uid}-2`"
+              class="form-label required"
+            >{{ t('alerts.startsAtLabel') }}</label>
             <input
+              :id="`${uid}-2`"
               v-model="form.startsAt"
               type="datetime-local"
               class="form-control"
@@ -60,8 +68,12 @@
             >
           </div>
           <div class="col-12 col-lg-4">
-            <label class="form-label required">{{ t('alerts.endsAtLabel') }}</label>
+            <label
+              :for="`${uid}-3`"
+              class="form-label required"
+            >{{ t('alerts.endsAtLabel') }}</label>
             <input
+              :id="`${uid}-3`"
               v-model="form.endsAt"
               type="datetime-local"
               class="form-control"
@@ -69,8 +81,12 @@
             >
           </div>
           <div class="col-12">
-            <label class="form-label required">{{ t('alerts.reasonLabel') }}</label>
+            <label
+              :for="`${uid}-4`"
+              class="form-label required"
+            >{{ t('alerts.reasonLabel') }}</label>
             <input
+              :id="`${uid}-4`"
               v-model="form.reason"
               type="text"
               class="form-control"
@@ -186,7 +202,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
@@ -195,6 +211,8 @@ import { useMaintenanceWindows } from '../../composables/useMaintenanceWindows'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useHostsStore } from '../../stores/hosts'
 import { storeToRefs } from 'pinia'
+
+const uid = useId()
 
 defineProps<{ isAdmin: boolean }>()
 

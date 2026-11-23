@@ -17,9 +17,9 @@
         <span class="text-muted mx-1">/</span>
         <span>{{ t('proxmox.breadcrumbTitle') }}</span>
       </div>
-      <h2 class="page-title">
+      <h1 class="page-title">
         {{ t('proxmox.breadcrumbTitle') }}
-      </h2>
+      </h1>
       <div class="text-secondary">
         {{ t('proxmox.overviewPageDescription') }}
       </div>

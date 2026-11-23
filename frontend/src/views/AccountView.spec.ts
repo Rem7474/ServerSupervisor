@@ -105,6 +105,24 @@ describe('AccountView', () => {
     expect(wrapper.text()).toContain('Historique de connexion')
   })
 
+  it('opens directly on the logins tab when the URL carries ?tab=logins, and on the profile tab otherwise', async () => {
+    window.history.replaceState({}, '', '/account?tab=logins')
+    try {
+      const wrapper = mount(AccountView, mountOpts)
+      await flushPromises()
+      expect(wrapper.findAll('button.nav-link')[2].classes()).toContain('active')
+      wrapper.unmount()
+
+      window.history.replaceState({}, '', '/account?tab=connexions')
+      const fallback = mount(AccountView, mountOpts)
+      await flushPromises()
+      expect(fallback.findAll('button.nav-link')[0].classes()).toContain('active')
+      fallback.unmount()
+    } finally {
+      window.history.replaceState({}, '', '/')
+    }
+  })
+
   it('opens the Connexions tab from the profile MFA button', async () => {
     const wrapper = mount(AccountView, mountOpts)
     await flushPromises()

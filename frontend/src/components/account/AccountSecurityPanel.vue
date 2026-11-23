@@ -239,45 +239,49 @@
           variant="list"
         />
 
-        <table
+        <div
           v-else-if="webauthnCredentials.length"
-          class="table table-vcenter mb-3"
+          class="table-responsive"
         >
-          <thead class="visually-hidden">
-            <tr>
-              <th>{{ t('account.passkeyColumnName') }}</th>
-              <th>{{ t('account.passkeyColumnDetails') }}</th>
-              <th>{{ t('account.passkeyColumnActions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="cred in webauthnCredentials"
-              :key="cred.id"
-            >
-              <td>
-                <IconKey
-                  :size="16"
-                  class="icon me-2 text-secondary"
-                />
-                {{ cred.name || t('account.securityKeyFallbackName') }}
-              </td>
-              <td class="text-secondary small">
-                {{ t('account.addedOnLabel', { date: formatExactDate(cred.created_at) }) }}
-                <span v-if="cred.last_used_at"> · {{ t('account.lastUsedLabel', { relative: formatRelativeTime(cred.last_used_at) }) }}</span>
-              </td>
-              <td class="text-end">
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-danger"
-                  @click="deletePasskey(cred)"
-                >
-                  {{ t('account.deleteButton') }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          <table
+            class="table table-vcenter mb-3"
+          >
+            <thead class="visually-hidden">
+              <tr>
+                <th>{{ t('account.passkeyColumnName') }}</th>
+                <th>{{ t('account.passkeyColumnDetails') }}</th>
+                <th>{{ t('account.passkeyColumnActions') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="cred in webauthnCredentials"
+                :key="cred.id"
+              >
+                <td>
+                  <IconKey
+                    :size="16"
+                    class="icon me-2 text-secondary"
+                  />
+                  {{ cred.name || t('account.securityKeyFallbackName') }}
+                </td>
+                <td class="text-secondary small">
+                  {{ t('account.addedOnLabel', { date: formatExactDate(cred.created_at) }) }}
+                  <span v-if="cred.last_used_at"> · {{ t('account.lastUsedLabel', { relative: formatRelativeTime(cred.last_used_at) }) }}</span>
+                </td>
+                <td class="text-end">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger"
+                    @click="deletePasskey(cred)"
+                  >
+                    {{ t('account.deleteButton') }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <p
           v-else-if="!addingPasskey"

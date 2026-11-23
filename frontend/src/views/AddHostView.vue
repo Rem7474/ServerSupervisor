@@ -13,9 +13,9 @@
             <span class="text-muted mx-1">/</span>
             <span>{{ t('host.addHostTitle') }}</span>
           </div>
-          <h2 class="page-title">
+          <h1 class="page-title">
             {{ t('host.addHostTitle') }}
-          </h2>
+          </h1>
           <div class="text-secondary">
             {{ t('host.registerNewHostDesc') }}
           </div>

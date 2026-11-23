@@ -7,8 +7,12 @@
     </div>
     <div class="card-body">
       <div class="mb-3">
-        <label class="form-label">URL ntfy.sh</label>
+        <label
+          :for="`${uid}-1`"
+          class="form-label"
+        >URL ntfy.sh</label>
         <input
+          :id="`${uid}-1`"
           v-model="form.ntfyUrl"
           type="text"
           class="form-control"
@@ -24,9 +28,13 @@
         </div>
       </div>
       <div class="mb-0">
-        <label class="form-label">GitHub Token</label>
+        <label
+          :for="`${uid}-2`"
+          class="form-label"
+        >GitHub Token</label>
         <div class="input-group">
           <input
+            :id="`${uid}-2`"
             v-model="form.githubToken"
             :type="showGitHubToken ? 'text' : 'password'"
             class="form-control"
@@ -85,7 +93,10 @@
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+
+const uid = useId()
 
 const { t } = useI18n()
 

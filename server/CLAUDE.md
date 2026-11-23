@@ -22,6 +22,12 @@ A user-facing error also carries a catalog key: `apperr.Validation("...").I18n(a
 
 Never start a bare `go func(){...}()`. Use `internal/safego` (`safego.Go`, `.Recover`, `.RecoverErr`) instead — Go has no way for one goroutine to recover another's panic, so an unprotected goroutine takes down the entire process, not just itself. Use `RecoverErr` specifically when the goroutine reports back over a channel another goroutine is blocked reading (e.g. a fan-out joined via `select` on N channels) — a bare `Recover` would just log and leave that reader blocked forever.
 
+## Logging and authorization
+
+- Any user-controlled value passed to `slog` (path, query, client IP, usernames, names…) goes through `logging.Sanitize` — CodeQL's `go/log-injection` gate is blocking.
+- Per-host access checks go through `requireHostAccess` (handlers) / `HostPermissionMiddleware` (router). With no `host_permissions` row for the host, a mutation (`operator` level) still requires the global `operator` or `admin` role — never treat "unrestricted" as "anyone authenticated". Proxmox mutations and `PUT /network/config` write an `audit_logs` entry.
+- Configurable parameters live in `internal/config/registry.go` (single catalog behind `/settings` → Advanced configuration and `docs/admin-configuration.md`). Adding or removing one means updating that doc's table and `total_params`.
+
 ## Migrations
 
 - `internal/database/migrations/*.sql`, embedded and applied in filename order at startup; applied ones are tracked in `schema_migrations`. **Forward-only** — there is no `Down()` and no rollback tooling.
