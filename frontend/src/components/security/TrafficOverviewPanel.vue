@@ -422,8 +422,8 @@
                 <th>{{ t('security.targetDomainColumn') }}</th>
                 <th>{{ t('security.methodColumn') }}</th>
                 <th>{{ t('security.pathColumn') }}</th>
-                <th>Status</th>
-                <th>Bytes</th>
+                <th>{{ t('common.status') }}</th>
+                <th>{{ t('common.bytes') }}</th>
               </tr>
             </thead>
             <tbody>

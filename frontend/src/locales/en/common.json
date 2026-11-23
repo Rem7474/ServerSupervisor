@@ -218,5 +218,12 @@
   "fieldInvalidEmail": "Invalid email",
   "fieldInvalidUrl": "Invalid URL",
   "saveError": "Could not save",
-  "stateWarnings": "Warnings"
+  "stateWarnings": "Warnings",
+  "adminOnly": "Admin only",
+  "bytes": "Bytes",
+  "hits": "Hits",
+  "timeline": "Timeline",
+  "uptime": "Uptime",
+  "task": "Task",
+  "sourceType": "Source type"
 }

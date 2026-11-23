@@ -327,7 +327,7 @@
                     <th>{{ t('security.pathColumn') }}</th>
                     <th>
                       <SortableHeader
-                        label="Status"
+                        :label="t('common.status')"
                         :active="sortKey === 'status'"
                         :direction="sortDir"
                         @toggle="$emit('toggle-sort', 'status')"
@@ -335,7 +335,7 @@
                     </th>
                     <th>
                       <SortableHeader
-                        label="Bytes"
+                        :label="t('common.bytes')"
                         :active="sortKey === 'bytes'"
                         :direction="sortDir"
                         @toggle="$emit('toggle-sort', 'bytes')"

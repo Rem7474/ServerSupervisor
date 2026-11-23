@@ -167,7 +167,7 @@
                     <th>{{ t('security.ipColumn') }}</th>
                     <th class="text-end">
                       <SortableHeader
-                        label="Hits"
+                        :label="t('common.hits')"
                         :active="ipSortKey === 'hits'"
                         :direction="ipSortDir"
                         @toggle="toggleIPSort('hits')"
@@ -388,7 +388,7 @@
                     <th>{{ t('security.targetDomainColumn') }}</th>
                     <th class="text-end">
                       <SortableHeader
-                        label="Hits"
+                        :label="t('common.hits')"
                         :active="hostSortKey === 'hits'"
                         :direction="hostSortDir"
                         @toggle="toggleHostSort('hits')"
@@ -446,7 +446,7 @@
                     </th>
                     <th class="text-end">
                       <SortableHeader
-                        label="Hits"
+                        :label="t('common.hits')"
                         :active="matrixSortKey === 'hits'"
                         :direction="matrixSortDir"
                         @toggle="toggleMatrixSort('hits')"

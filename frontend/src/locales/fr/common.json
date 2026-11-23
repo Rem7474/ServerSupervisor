@@ -218,5 +218,12 @@
   "fieldInvalidEmail": "Email invalide",
   "fieldInvalidUrl": "URL invalide",
   "saveError": "Erreur lors de l'enregistrement",
-  "stateWarnings": "Avertissements"
+  "stateWarnings": "Avertissements",
+  "adminOnly": "Réservé aux admins",
+  "bytes": "Octets",
+  "hits": "Requêtes",
+  "timeline": "Chronologie",
+  "uptime": "Disponibilité",
+  "task": "Tâche",
+  "sourceType": "Type de source"
 }
