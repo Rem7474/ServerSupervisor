@@ -71,4 +71,40 @@ describe('TrackableContainersModal', () => {
     expect(wrapper.text()).toContain('Enable automatic update')
     expect(wrapper.text()).toContain('No container to track')
   })
+
+  it('summarizes a partial bulk creation with pluralized counts and the failed names', async () => {
+    const second = { ...container, compose_service: 'db' }
+    getTrackableContainers.mockResolvedValue({ data: { containers: [container, second] } })
+    createReleaseTrackersBulk.mockResolvedValue({
+      data: {
+        created: 1,
+        results: [{ name: 'stack/web', created: true }, { name: 'stack/db', created: false }],
+      },
+    })
+    const wrapper = mount(TrackableContainersModal, { props: { visible: true } })
+    await flushPromises()
+
+    const submit = wrapper.findAll('button').find((b) => b.text().includes('Créer 2 trackers'))
+    await submit!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('1 tracker créé, 1 en échec : stack/db')
+    expect(wrapper.emitted('created')).toHaveLength(1)
+  })
+
+  it('uses the plural forms when several trackers were created and several failed', async () => {
+    const second = { ...container, compose_service: 'db' }
+    getTrackableContainers.mockResolvedValue({ data: { containers: [container, second] } })
+    createReleaseTrackersBulk.mockResolvedValue({
+      data: { created: 0, results: [{ name: 'stack/web', created: false }, { created: false }] },
+    })
+    const wrapper = mount(TrackableContainersModal, { props: { visible: true } })
+    await flushPromises()
+
+    const submit = wrapper.findAll('button').find((b) => b.text().includes('Créer 2 trackers'))
+    await submit!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('0 tracker créé, 2 en échec : stack/web, ?')
+  })
 })
