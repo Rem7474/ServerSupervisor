@@ -12,7 +12,7 @@ import { useAutoRefresh } from './useAutoRefresh'
 
 type SSLCert = SSLCertificate
 
-interface CertForm {
+export interface CertForm {
   id: string
   name: string
   host: string

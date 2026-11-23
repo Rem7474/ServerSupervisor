@@ -22,7 +22,7 @@ interface HeartbeatTick {
 // renders once per row in a list instead of as the page's own focal point.
 const ROW_HEARTBEAT_SIZE = 20
 
-interface ProbeForm {
+export interface ProbeForm {
   id: string
   name: string
   type: string
