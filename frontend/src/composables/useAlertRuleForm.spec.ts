@@ -44,3 +44,27 @@ describe('useAlertRuleForm — docker container scope migration', () => {
     expect(form.value.docker_scope.container_ids).toEqual([])
   })
 })
+
+describe('useAlertRuleForm — chat channels', () => {
+  it('hydrates slack/teams/discord from the rule and writes them back after the built-in channels', () => {
+    const { channelChat, channelSmtp, hydrateFormFromRule, buildPayload } = useAlertRuleForm()
+
+    hydrateFormFromRule({
+      metric: 'cpu',
+      actions: { channels: ['smtp', 'discord', 'slack', 'unknown'] },
+    })
+
+    expect(channelSmtp.value).toBe(true)
+    expect(channelChat.value).toEqual(['slack', 'discord'])
+    expect(buildPayload().actions.channels).toEqual(['smtp', 'slack', 'discord'])
+  })
+
+  it('clears the chat selection when the form is hydrated for a new rule', () => {
+    const { channelChat, hydrateFormFromRule } = useAlertRuleForm()
+    channelChat.value = ['teams']
+
+    hydrateFormFromRule(null)
+
+    expect(channelChat.value).toEqual([])
+  })
+})

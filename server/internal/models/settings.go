@@ -5,7 +5,9 @@ package models
 // threat-detection weights) are persisted to the settings table. The threat
 // weights use *float64 rather than float64 because 0 is a legitimate value
 // for a weight (e.g. "ignore 2xx entirely") and must be distinguishable from
-// "not provided" — same reasoning as SMTPTLS being a *bool.
+// "not provided" — same reasoning as SMTPTLS being a *bool. The three chat
+// webhook URLs (Slack/Teams/Discord) are secrets: an empty value or the masked
+// sentinel leaves the stored URL untouched.
 type SettingsUpdateRequest struct {
 	SMTPHost             string `json:"smtp_host"`
 	SMTPPort             int    `json:"smtp_port"`
@@ -15,6 +17,9 @@ type SettingsUpdateRequest struct {
 	SMTPTo               string `json:"smtp_to"`
 	SMTPTLS              *bool  `json:"smtp_tls"`
 	NtfyURL              string `json:"ntfy_url"`
+	SlackWebhookURL      string `json:"slack_webhook_url"`
+	TeamsWebhookURL      string `json:"teams_webhook_url"`
+	DiscordWebhookURL    string `json:"discord_webhook_url"`
 	GitHubToken          string `json:"github_token"`
 	MetricsRetentionDays int    `json:"metrics_retention_days"`
 	AuditRetentionDays   int    `json:"audit_retention_days"`

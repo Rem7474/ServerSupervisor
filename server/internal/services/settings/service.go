@@ -18,6 +18,7 @@ import (
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/notify"
 )
 
 // Repository is the data-access port. *database.DB satisfies it structurally; its
@@ -40,10 +41,11 @@ type Service struct {
 	repo          Repository
 	cfg           *config.Config
 	latestVersion func() string
+	notifier      notify.Notifier
 }
 
 func NewService(repo Repository, cfg *config.Config, latestVersion func() string) *Service {
-	return &Service{repo: repo, cfg: cfg, latestVersion: latestVersion}
+	return &Service{repo: repo, cfg: cfg, latestVersion: latestVersion, notifier: notify.New()}
 }
 
 // Snapshot returns the current configuration and database status. Secrets
@@ -72,6 +74,9 @@ func (s *Service) Snapshot(ctx context.Context) map[string]any {
 			"smtpTo":                       c.SMTPTo,
 			"smtpTls":                      c.SMTPTLS,
 			"ntfyUrl":                      c.NotifyURL,
+			"slackWebhookConfigured":       c.SlackWebhookURL != "",
+			"teamsWebhookConfigured":       c.TeamsWebhookURL != "",
+			"discordWebhookConfigured":     c.DiscordWebhookURL != "",
 			"githubToken":                  "",
 			"githubTokenConfigured":        c.GitHubToken != "",
 			"latestAgentVersion":           s.latestVersion(),
@@ -120,6 +125,26 @@ func isUpdatableSecret(v string) bool {
 	return v != "" && v != config.MaskedSecretSentinel
 }
 
+// ValidateUpdate rejects a request carrying a chat webhook URL that is not an
+// acceptable outbound destination (non-https, local/private address). The
+// handler calls it before Update so nothing is persisted on a bad request.
+func (s *Service) ValidateUpdate(req models.SettingsUpdateRequest) error {
+	for provider, v := range map[string]string{
+		notify.ProviderSlack:   req.SlackWebhookURL,
+		notify.ProviderTeams:   req.TeamsWebhookURL,
+		notify.ProviderDiscord: req.DiscordWebhookURL,
+	} {
+		if !isUpdatableSecret(v) {
+			continue
+		}
+		if err := config.ValidateChatWebhookURL(v); err != nil {
+			return apperr.Validation(fmt.Sprintf("invalid %s webhook URL: %v", provider, err)).
+				I18n(apperr.CodeSettingsWebhookURLInvalid, map[string]string{"provider": provider})
+		}
+	}
+	return nil
+}
+
 // Update persists configuration changes and applies them to the in-memory config.
 func (s *Service) Update(ctx context.Context, req models.SettingsUpdateRequest, username, clientIP string) {
 	save := func(key, value string) {
@@ -149,6 +174,15 @@ func (s *Service) Update(ctx context.Context, req models.SettingsUpdateRequest, 
 	}
 	if req.NtfyURL != "" {
 		save("ntfy_url", req.NtfyURL)
+	}
+	for key, v := range map[string]string{
+		"slack_webhook_url":   req.SlackWebhookURL,
+		"teams_webhook_url":   req.TeamsWebhookURL,
+		"discord_webhook_url": req.DiscordWebhookURL,
+	} {
+		if isUpdatableSecret(v) {
+			save(key, strings.TrimSpace(v))
+		}
 	}
 	if isUpdatableSecret(req.GitHubToken) {
 		save("github_token", req.GitHubToken)
@@ -291,6 +325,37 @@ func (s *Service) TestNtfy(_ context.Context) (string, error) {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", apperr.Failed(fmt.Sprintf("ntfy.sh returned status %d", resp.StatusCode))
+	}
+	return "Test notification sent successfully", nil
+}
+
+// TestChatWebhook posts a test message to the configured Slack, Teams or
+// Discord webhook. The webhook URL never appears in the returned error.
+func (s *Service) TestChatWebhook(provider string) (string, error) {
+	var webhookURL string
+	switch provider {
+	case notify.ProviderSlack:
+		webhookURL = s.cfg.SlackWebhookURL
+	case notify.ProviderTeams:
+		webhookURL = s.cfg.TeamsWebhookURL
+	case notify.ProviderDiscord:
+		webhookURL = s.cfg.DiscordWebhookURL
+	default:
+		return "", apperr.Validation("unknown notification provider")
+	}
+	params := map[string]string{"provider": provider}
+	if webhookURL == "" {
+		return "", apperr.Validation(fmt.Sprintf("%s webhook URL not configured", provider)).
+			I18n(apperr.CodeSettingsWebhookNotConfigured, params)
+	}
+	err := s.notifier.SendChat(provider, webhookURL, notify.ChatMessage{
+		Title: "ServerSupervisor",
+		Text:  "Test notification from ServerSupervisor",
+		Color: 0x2fb344,
+	})
+	if err != nil {
+		return "", apperr.Failed(fmt.Sprintf("could not send the %s test message: %v", provider, err)).
+			I18n(apperr.CodeSettingsWebhookSendFailed, map[string]string{"provider": provider, "reason": err.Error()})
 	}
 	return "Test notification sent successfully", nil
 }

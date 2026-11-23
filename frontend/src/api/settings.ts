@@ -6,6 +6,7 @@ export const settingsApi = {
   updateSettings: (payload: Partial<SettingsUpdateRequest>) => api.put('/v1/settings', payload),
   testSmtp: () => api.post('/v1/settings/test-smtp'),
   testNtfy: () => api.post('/v1/settings/test-ntfy'),
+  testWebhook: (provider: string) => api.post(`/v1/settings/test-webhook/${provider}`),
   cleanupMetrics: () => api.post('/v1/settings/cleanup-metrics'),
   cleanupAudit: () => api.post('/v1/settings/cleanup-audit'),
 }

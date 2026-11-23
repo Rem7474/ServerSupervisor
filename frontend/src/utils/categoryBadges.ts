@@ -23,6 +23,9 @@ const NOTIFICATION_CHANNEL_BADGES: Record<string, string> = {
   ntfy: 'bg-orange-lt text-orange',
   browser: 'bg-purple-lt text-purple',
   notify: 'bg-cyan-lt text-cyan',
+  slack: 'bg-teal-lt text-teal',
+  teams: 'bg-indigo-lt text-indigo',
+  discord: 'bg-azure-lt text-azure',
 }
 
 export function notificationChannelBadgeClass(channel: string | null | undefined): string {

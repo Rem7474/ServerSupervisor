@@ -98,7 +98,7 @@ généré depuis le dossier [`wiki/`](wiki/) du dépôt :
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus, restic ou custom), déclenchement manuel immédiat, historique des exécutions — voir [Runbooks & Tâches planifiées](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
-- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy ou notifications navigateur (in-app + Web Push) — un canal `notify` webhook générique existe aussi mais est déprécié, voir [Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting) ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent ; onglet « Modèles » — définir une règle (métrique agent + seuils + notifications) une fois et l'appliquer à plusieurs hôtes en un clic
+- **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhooks Slack / Microsoft Teams / Discord ou notifications navigateur (in-app + Web Push) — un canal `notify` webhook générique existe aussi mais est déprécié, voir [Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting) ; acquittement (« En cours de traitement ») et escalade configurable (relance périodique tant qu'un incident critique reste ouvert et non acquitté) ; corrélation automatique — un hôte hors ligne ne déclenche pas une notification séparée par container Docker/VM Proxmox affecté ; onglet « Vue active » (war-room, onglet par défaut de `/alerts`) — incidents actifs groupés par sévérité, triés du plus ancien au plus récent ; onglet « Modèles » — définir une règle (métrique agent + seuils + notifications) une fois et l'appliquer à plusieurs hôtes en un clic
 - **Fenêtres de maintenance** : suspend les notifications d'un hôte (ou de tous les hôtes) pendant une intervention planifiée, onglet Maintenance de `/alerts`
 - **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy des alertes — voir [Notifications](https://github.com/Rem7474/ServerSupervisor/wiki/Notifications)
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur dans l'onglet Connexions de `/account` (TOTP et/ou clés de sécurité/passkeys WebAuthn) — voir [Two-Factor-Authentication](https://github.com/Rem7474/ServerSupervisor/wiki/Two-Factor-Authentication)
@@ -479,6 +479,9 @@ trop bruyant ou trop laxiste sur votre trafic.
 | `SMTP_TO` | Destinataire par défaut des alertes email | `` |
 | `SMTP_TLS` | Activer TLS | `true` |
 | `NTFY_AUTH_TOKEN` | Token d'authentification ntfy (topics protégés) | `` |
+| `SLACK_WEBHOOK_URL` | URL du webhook entrant Slack (https uniquement, secret) | `` |
+| `TEAMS_WEBHOOK_URL` | URL du webhook entrant Microsoft Teams (https uniquement, secret) | `` |
+| `DISCORD_WEBHOOK_URL` | URL du webhook Discord (https uniquement, secret) | `` |
 
 #### Rétention
 | Variable | Description | Défaut |
@@ -1160,6 +1163,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `GET/PUT` | `/api/v1/settings` | Paramètres globaux | Admin |
 | `POST` | `/api/v1/settings/test-smtp` | Tester la config SMTP | Admin |
 | `POST` | `/api/v1/settings/test-ntfy` | Tester ntfy | Admin |
+| `POST` | `/api/v1/settings/test-webhook/:provider` | Tester un webhook `slack`, `teams` ou `discord` | Admin |
 | `POST` | `/api/v1/settings/cleanup-metrics` | Purger les métriques | Admin |
 | `POST` | `/api/v1/settings/cleanup-audit` | Purger les audit logs | Admin |
 
@@ -1299,7 +1303,7 @@ ServerSupervisor/
 │       ├── releasetracker/          # Helpers purs de comparaison de version (pas le tracker lui-même)
 │       ├── synthetic/               # Sondes uptime HTTP/TCP + vérification de certificats SSL
 │       ├── config/                  # Config env vars + override runtime depuis la table settings
-│       ├── notify/                  # Envoi SMTP + ntfy + template HTML d'alerte
+│       ├── notify/                  # Envoi SMTP + ntfy + webhooks Slack/Teams/Discord + template HTML d'alerte
 │       ├── auth/                    # Génération/vérification TOTP (second facteur)
 │       ├── cookies/                 # Fabrication des cookies de session (flag Secure, SameSite)
 │       ├── networkview/             # Construction du snapshot réseau / inventaire IP

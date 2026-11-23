@@ -230,6 +230,18 @@
       "label": "ntfy authentication token",
       "description": "Optional access token for private ntfy topics."
     },
+    "SLACK_WEBHOOK_URL": {
+      "label": "Slack webhook URL",
+      "description": "Slack incoming-webhook URL (https://hooks.slack.com/services/…) used by the \"slack\" channel of alert rules. The URL is a secret."
+    },
+    "TEAMS_WEBHOOK_URL": {
+      "label": "Microsoft Teams webhook URL",
+      "description": "Microsoft Teams incoming-webhook (Workflows) URL used by the \"teams\" channel of alert rules. The URL is a secret."
+    },
+    "DISCORD_WEBHOOK_URL": {
+      "label": "Discord webhook URL",
+      "description": "Discord webhook URL (https://discord.com/api/webhooks/…) used by the \"discord\" channel of alert rules. The URL is a secret."
+    },
     "SMTP_HOST": {
       "label": "SMTP host",
       "description": "Outgoing mail server address for sending alert emails."

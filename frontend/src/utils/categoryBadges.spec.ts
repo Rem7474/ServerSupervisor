@@ -3,19 +3,19 @@ import { gitProviderBadgeClass, notificationChannelBadgeClass } from './category
 
 describe('categoryBadges', () => {
   it('gives every notification channel its own color', () => {
-    const classes = ['smtp', 'ntfy', 'browser', 'notify'].map(notificationChannelBadgeClass)
-    expect(new Set(classes).size).toBe(4)
+    const classes = ['smtp', 'ntfy', 'browser', 'notify', 'slack', 'teams', 'discord'].map(notificationChannelBadgeClass)
+    expect(new Set(classes).size).toBe(7)
     expect(classes).not.toContain('bg-secondary-lt text-secondary')
   })
 
   it('never uses a state color for a channel', () => {
-    for (const ch of ['smtp', 'ntfy', 'browser', 'notify']) {
+    for (const ch of ['smtp', 'ntfy', 'browser', 'notify', 'slack', 'teams', 'discord']) {
       expect(notificationChannelBadgeClass(ch)).not.toMatch(/success|danger|warning|green|red|yellow/)
     }
   })
 
   it('falls back to neutral for unknown or missing values', () => {
-    expect(notificationChannelBadgeClass('slack')).toBe('bg-secondary-lt text-secondary')
+    expect(notificationChannelBadgeClass('mattermost')).toBe('bg-secondary-lt text-secondary')
     expect(gitProviderBadgeClass(undefined)).toBe('bg-secondary-lt text-secondary')
     expect(gitProviderBadgeClass('bitbucket')).toBe('bg-secondary-lt text-secondary')
   })

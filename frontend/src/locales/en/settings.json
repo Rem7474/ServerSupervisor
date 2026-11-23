@@ -165,5 +165,18 @@
   "ntfyTestSentMsg": "Test message sent",
   "metricsCleanupDoneMsg": "Metrics cleanup finished",
   "auditCleanupDoneMsg": "Audit log cleanup finished",
-  "saveErrorPrefix": "Error: {message}"
+  "saveErrorPrefix": "Error: {message}",
+  "chatWebhooks": {
+    "title": "Chat webhooks (Slack, Teams, Discord)",
+    "intro": "Incoming-webhook URLs used by the Slack, Teams and Discord channels of alert rules. The URL is a secret: it is stored on the server and never shown again. Only public https destinations are accepted.",
+    "slack": "Slack",
+    "teams": "Microsoft Teams",
+    "discord": "Discord",
+    "test": "Test",
+    "testAria": "Send a test message to {provider}",
+    "configuredHint": "A URL is saved. Enter a new one to replace it.",
+    "emptyHint": "No URL saved.",
+    "savedMsg": "Chat webhooks saved",
+    "testSentMsg": "Test message sent to {provider}"
+  }
 }

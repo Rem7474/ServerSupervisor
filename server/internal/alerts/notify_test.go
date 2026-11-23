@@ -1,9 +1,11 @@
 package alerts
 
 import (
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -106,5 +108,26 @@ func TestResolvedEvent(t *testing.T) {
 	}
 	if ev.Push.Status != "resolved" {
 		t.Errorf("resolvedEvent Push.Status = %q, want %q", ev.Push.Status, "resolved")
+	}
+}
+
+func TestFiredEvent_ChatMessage(t *testing.T) {
+	warn, crit := 70.0, 90.0
+	rule := models.AlertRule{ID: 7, Metric: "cpu", Operator: ">", ThresholdWarn: &warn, ThresholdCrit: &crit,
+		Actions: models.AlertActions{Channels: []string{"slack", "teams", "discord"}}}
+	host := models.Host{ID: "h1", Name: "web-1"}
+
+	ev := firedEvent(&config.Config{}, rule, host, 95)
+	if ev.Chat == nil {
+		t.Fatal("firedEvent must carry a chat message")
+	}
+	if ev.Chat.Title != "ServerSupervisor Alert" || !strings.Contains(ev.Chat.Text, "web-1") {
+		t.Errorf("unexpected chat message: %+v", ev.Chat)
+	}
+	if ev.Chat.Color != 0xd63939 {
+		t.Errorf("crit color = %#x", ev.Chat.Color)
+	}
+	if got := firedEvent(&config.Config{}, rule, host, 75).Chat.Color; got != 0xf59f00 {
+		t.Errorf("warn color = %#x", got)
 	}
 }
