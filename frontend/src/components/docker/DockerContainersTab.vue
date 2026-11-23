@@ -1,77 +1,12 @@
 <template>
-  <!-- Filters -->
-  <DataToolbar
-    searchable
+  <DockerContainersToolbar
+    v-model:host-filter="hostFilter"
+    v-model:state-filter="stateFilter"
+    v-model:compose-filter="composeFilter"
     :search="searchInput"
-    :search-placeholder="t('docker.searchContainerPlaceholder')"
+    :unique-hosts="uniqueHosts"
     @update:search="searchInput = $event"
-  >
-    <template #bottom>
-      <div class="row g-3">
-        <div class="col-6 col-md-6 col-lg-4">
-          <select
-            v-model="hostFilter"
-            class="form-select"
-          >
-            <option value="">
-              {{ t('docker.allHosts') }}
-            </option>
-            <option
-              v-for="h in uniqueHosts"
-              :key="h"
-              :value="h"
-            >
-              {{ h }}
-            </option>
-          </select>
-        </div>
-        <div class="col-6 col-md-6 col-lg-4">
-          <select
-            v-model="stateFilter"
-            class="form-select"
-          >
-            <option value="">
-              {{ t('docker.allStates') }}
-            </option>
-            <option value="running">
-              {{ t('docker.running') }}
-            </option>
-            <option value="restarting">
-              {{ t('docker.stateRestarting') }}
-            </option>
-            <option value="paused">
-              {{ t('docker.statePaused') }}
-            </option>
-            <option value="created">
-              {{ t('docker.stateCreated') }}
-            </option>
-            <option value="exited">
-              {{ t('docker.stopped') }}
-            </option>
-            <option value="dead">
-              {{ t('docker.stateDead') }}
-            </option>
-          </select>
-        </div>
-        <div class="col-12 col-md-12 col-lg-4">
-          <select
-            v-model="composeFilter"
-            class="form-select"
-          >
-            <option value="">
-              {{ t('docker.allContainers') }}
-            </option>
-            <option value="compose">
-              Docker Compose
-            </option>
-            <option value="standalone">
-              Standalone
-            </option>
-          </select>
-        </div>
-      </div>
-    </template>
-  </DataToolbar>
+  />
 
   <div
     v-if="sortedContainers.length > 0"
@@ -143,232 +78,27 @@
           </tr>
         </thead>
         <tbody>
-          <tr
+          <DockerContainerRow
             v-for="c in pagedContainers"
             :key="c.id"
-            :class="{ 'table-active': selectedIds.has(c.id) }"
-          >
-            <td v-if="canRunDocker">
-              <label class="form-check mb-0">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  :checked="selectedIds.has(c.id)"
-                  :aria-label="t('docker.selectContainerAriaLabel', { name: c.name })"
-                  @change="toggleSelected(c.id, ($event.target as HTMLInputElement).checked)"
-                >
-              </label>
-            </td>
-            <td class="fw-semibold text-nowrap">
-              {{ c.name }}
-            </td>
-            <td>
-              <router-link
-                :to="`/hosts/${c.host_id}`"
-                class="text-decoration-none"
-              >
-                {{ c.hostname }}
-              </router-link>
-            </td>
-            <td>
-              <DockerComposeBadge :labels="c.labels" />
-            </td>
-            <td class="small">
-              <div>{{ c.image }}</div>
-              <div class="mt-1 d-flex align-items-center gap-1 flex-wrap">
-                <code>{{ containerVersion(c)?.running_version || c.image_tag }}</code>
-                <template v-if="containerVersion(c)">
-                  <span
-                    v-if="containerVersion(c)?.status === 'up_to_date'"
-                    class="badge bg-success-lt text-success"
-                  >{{ t('docker.upToDateBadge') }}</span>
-                  <span
-                    v-else-if="containerVersion(c)?.status === 'update_available'"
-                    class="badge bg-warning-lt text-warning"
-                    :title="t('docker.latestVersionTooltip', { version: containerVersion(c)?.latest_version })"
-                  >{{ t('docker.updateAvailableBadge') }}</span>
-                  <span
-                    v-else
-                    class="badge bg-secondary-lt text-secondary"
-                    :title="unknownVersionTitle(containerVersion(c))"
-                  >{{ t('docker.unknownVersionBadge') }}</span>
-                </template>
-              </div>
-            </td>
-            <td>
-              <span :class="getEntityStateClass(c.state)">{{ getEntityStateLabel(c.state) }}</span>
-            </td>
-            <td class="small">
-              <DockerPortBadges
-                :ports="normalizedPortsForContainer(c)"
-                kind="internal"
-              />
-            </td>
-            <td class="small">
-              <DockerPortBadges
-                :ports="normalizedPortsForContainer(c)"
-                kind="exposed"
-              />
-            </td>
-            <td class="text-secondary small font-monospace">
-              <template v-if="c.state === 'running' && ((c.net_rx_bytes ?? 0) > 0 || (c.net_tx_bytes ?? 0) > 0)">
-                ↓ {{ formatBytes(c.net_rx_bytes) }} / ↑ {{ formatBytes(c.net_tx_bytes) }}
-              </template>
-              <span
-                v-else
-                class="text-muted"
-              >—</span>
-            </td>
-            <td class="text-end">
-              <div class="d-flex align-items-center justify-content-end gap-1">
-                <template v-if="canRunDocker">
-                  <button
-                    v-if="['exited', 'dead', 'created', 'paused'].includes(c.state)"
-                    type="button"
-                    :disabled="!!actionLoading[c.name]"
-                    class="btn btn-icon btn-sm btn-ghost-success"
-                    :title="t('docker.verbStart')"
-                    :aria-label="t('docker.startContainerAriaLabel')"
-                    @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'start', container: c })"
-                  >
-                    <span
-                      v-if="actionLoading[c.name] === 'start'"
-                      class="spinner-border spinner-border-sm"
-                    />
-                    <IconPlayerPlay
-                      v-else
-                      :size="16"
-                      class="icon icon-sm"
-                    />
-                  </button>
-                  <button
-                    v-if="c.state === 'running'"
-                    type="button"
-                    :disabled="!!actionLoading[c.name]"
-                    class="btn btn-icon btn-sm btn-ghost-danger"
-                    :title="t('docker.verbStop')"
-                    :aria-label="t('docker.stopContainerTitle')"
-                    @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'stop', container: c })"
-                  >
-                    <span
-                      v-if="actionLoading[c.name] === 'stop'"
-                      class="spinner-border spinner-border-sm"
-                    />
-                    <IconPlayerStop
-                      v-else
-                      :size="16"
-                      class="icon icon-sm"
-                    />
-                  </button>
-                  <button
-                    v-if="c.state === 'running'"
-                    type="button"
-                    :disabled="!!actionLoading[c.name]"
-                    class="btn btn-icon btn-sm btn-ghost-warning"
-                    :title="t('docker.verbRestart')"
-                    :aria-label="t('docker.restartContainerTitle')"
-                    @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'restart', container: c })"
-                  >
-                    <span
-                      v-if="actionLoading[c.name] === 'restart'"
-                      class="spinner-border spinner-border-sm"
-                    />
-                    <IconRefresh
-                      v-else
-                      :size="16"
-                      class="icon icon-sm"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    :disabled="!!actionLoading[c.name]"
-                    class="btn btn-icon btn-sm btn-ghost-secondary"
-                    :title="t('docker.viewProjectLogsTooltip')"
-                    :aria-label="t('docker.viewContainerLogsAriaLabel')"
-                    @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'logs', container: c })"
-                  >
-                    <span
-                      v-if="actionLoading[c.name] === 'logs'"
-                      class="spinner-border spinner-border-sm"
-                    />
-                    <IconList
-                      v-else
-                      :size="16"
-                      class="icon icon-sm"
-                    />
-                  </button>
-                </template>
-                <button
-                  type="button"
-                  class="btn btn-icon btn-sm btn-ghost-secondary"
-                  :title="t('docker.inspectTooltip')"
-                  :aria-label="t('docker.inspectContainerAriaLabel')"
-                  @click="inspectTarget = c; inspectTab = 'env'"
-                >
-                  <IconSearch
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-                <button
-                  v-if="containerVersion(c)?.tracker_id"
-                  type="button"
-                  class="btn btn-icon btn-sm btn-ghost-secondary"
-                  :title="t('docker.viewVersionTrackingTooltip')"
-                  :aria-label="t('docker.viewVersionTrackingTooltip')"
-                  @click="openTracker(containerVersion(c)?.tracker_id)"
-                >
-                  <IconChevronRight
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-                <button
-                  v-if="containerVersion(c)?.tracker_id"
-                  type="button"
-                  :disabled="isTrackerRunDisabled(containerVersion(c))"
-                  class="btn btn-icon btn-sm btn-ghost-success"
-                  :title="trackerRunTooltip(containerVersion(c))"
-                  :aria-label="t('docker.triggerTracker')"
-                  @click="runTracker(containerVersion(c), c)"
-                >
-                  <span
-                    v-if="trackerRunLoading[containerVersion(c)?.tracker_id || '']"
-                    class="spinner-border spinner-border-sm"
-                  />
-                  <IconPlayerPlay
-                    v-else
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-icon btn-sm btn-ghost-secondary"
-                  :title="t('docker.trackUpdatesTooltip')"
-                  :aria-label="t('docker.createTrackerAriaLabel')"
-                  @click="trackImage(c)"
-                >
-                  <IconActivity
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-                <button
-                  v-if="getComposeInfo(c).project || Object.keys(c.labels || {}).length > 0"
-                  type="button"
-                  class="btn btn-sm btn-ghost-secondary"
-                  :title="getComposeInfo(c).project ? t('docker.composeInfoLabelsTooltip') : t('docker.labelsOnlyTooltip')"
-                  @click="selectedContainer = c"
-                >
-                  <IconClipboard
-                    :size="16"
-                    class="icon icon-sm"
-                  />
-                </button>
-              </div>
-            </td>
-          </tr>
+            :container="c"
+            :version="containerVersion(c)"
+            :ports="normalizedPortsForContainer(c)"
+            :selected="selectedIds.has(c.id)"
+            :can-run-docker="canRunDocker"
+            :action-loading="actionLoading[c.name]"
+            :tracker-run-loading="!!trackerRunLoading[containerVersion(c)?.tracker_id || '']"
+            :tracker-run-disabled="isTrackerRunDisabled(containerVersion(c))"
+            :tracker-run-tooltip="trackerRunTooltip(containerVersion(c))"
+            :unknown-version-title="unknownVersionTitle(containerVersion(c))"
+            @toggle-select="toggleSelected(c.id, $event)"
+            @action="emit('container-action', { hostId: c.host_id, name: c.name, action: $event, container: c })"
+            @inspect="inspectTarget = c"
+            @open-tracker="openTracker(containerVersion(c)?.tracker_id)"
+            @run-tracker="runTracker(containerVersion(c), c)"
+            @track-image="trackImage(c)"
+            @show-info="selectedContainer = c"
+          />
         </tbody>
       </table>
     </div>
@@ -390,7 +120,7 @@
 
   <BulkActionBar
     :count="selectedIds.size"
-    @clear="selectedIds = new Set()"
+    @clear="clearSelection"
   >
     <button
       type="button"
@@ -434,339 +164,37 @@
     </template>
   </EmptyState>
 
-  <!-- Modal conteneur (labels/compose info) -->
-  <div
+  <DockerContainerComposeModal
     v-if="selectedContainer"
-    ref="containerModalRef"
-    class="modal modal-blur fade show d-block"
-    role="dialog"
-    aria-modal="true"
-    @click.self="selectedContainer = null"
-  >
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">
-            {{ t('docker.composeDetailsTitle') }}
-          </h5>
-          <button
-            type="button"
-            class="btn-close"
-            :aria-label="t('common.close')"
-            @click="selectedContainer = null"
-          />
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <div class="form-label fw-semibold">
-              {{ t('docker.containerLabel') }}
-            </div>
-            <div>{{ selectedContainer.name }}</div>
-          </div>
-          <div class="mb-3">
-            <div class="form-label fw-semibold">
-              {{ t('docker.composeProjectLabel') }}
-            </div>
-            <div>{{ getComposeInfo(selectedContainer).project || '-' }}</div>
-          </div>
-          <div class="mb-3">
-            <div class="form-label fw-semibold">
-              {{ t('docker.serviceLabel') }}
-            </div>
-            <div>{{ getComposeInfo(selectedContainer).service || '-' }}</div>
-          </div>
-          <div class="mb-3">
-            <div class="form-label fw-semibold">
-              {{ t('docker.workingDirLabel') }}
-            </div>
-            <div class="font-monospace small">
-              {{ getComposeInfo(selectedContainer).workingDir || '-' }}
-            </div>
-          </div>
-          <div class="mb-3">
-            <div class="form-label fw-semibold">
-              {{ t('docker.configFilesLabel') }}
-            </div>
-            <div class="font-monospace small">
-              {{ getComposeInfo(selectedContainer).configFiles || '-' }}
-            </div>
-          </div>
-          <div
-            v-if="Object.keys(selectedContainer.labels || {}).length > 0"
-            class="mb-3"
-          >
-            <div class="form-label fw-semibold">
-              {{ t('docker.labelsLabel') }}
-            </div>
-            <div
-              class="border rounded p-2 bg-dark small font-monospace"
-              style="max-height: 200px; overflow-y: auto;"
-            >
-              <div
-                v-for="(value, key) in selectedContainer.labels"
-                :key="key"
-                class="mb-1"
-              >
-                <span class="text-muted">{{ key }}:</span> <span class="text-light">{{ value }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button
-            type="button"
-            class="btn"
-            @click="selectedContainer = null"
-          >
-            {{ t('common.close') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div
-    v-if="selectedContainer"
-    class="modal-backdrop fade show"
+    :container="selectedContainer"
+    @close="selectedContainer = null"
   />
 
-  <!-- Modal Inspection (env vars / volumes / networks) -->
-  <div
+  <DockerContainerInspectModal
     v-if="inspectTarget"
-    ref="inspectModalRef"
-    class="modal modal-blur fade show d-block"
-    role="dialog"
-    aria-modal="true"
-    @click.self="inspectTarget = null"
-  >
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <div>
-            <h5 class="modal-title">
-              {{ inspectTarget.name }}
-            </h5>
-            <div class="text-secondary small">
-              {{ inspectTarget.image }}:<code>{{ containerVersion(inspectTarget)?.running_version || inspectTarget.image_tag }}</code>
-              <span
-                class="ms-2"
-                :class="getEntityStateClass(inspectTarget.state)"
-              >{{ getEntityStateLabel(inspectTarget.state) }}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="btn-close"
-            :aria-label="t('common.close')"
-            @click="inspectTarget = null"
-          />
-        </div>
-        <div class="modal-body p-0">
-          <div class="border-bottom px-3">
-            <ul class="nav nav-tabs nav-tabs-alt">
-              <li class="nav-item">
-                <a
-                  class="nav-link"
-                  :class="{ active: inspectTab === 'env' }"
-                  href="#"
-                  @click.prevent="inspectTab = 'env'"
-                >
-                  Env Vars
-                  <span class="badge bg-azure-lt text-azure ms-1">{{ Object.keys(inspectTarget.env_vars || {}).length }}</span>
-                </a>
-              </li>
-              <li class="nav-item">
-                <a
-                  class="nav-link"
-                  :class="{ active: inspectTab === 'volumes' }"
-                  href="#"
-                  @click.prevent="inspectTab = 'volumes'"
-                >
-                  Volumes
-                  <span class="badge bg-azure-lt text-azure ms-1">{{ (inspectTarget.volumes || []).length }}</span>
-                </a>
-              </li>
-              <li class="nav-item">
-                <a
-                  class="nav-link"
-                  :class="{ active: inspectTab === 'networks' }"
-                  href="#"
-                  @click.prevent="inspectTab = 'networks'"
-                >
-                  {{ t('docker.networksTab') }}
-                  <span class="badge bg-azure-lt text-azure ms-1">{{ (inspectTarget.networks || []).length }}</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div
-            class="p-3"
-            style="min-height: 200px; max-height: 400px; overflow-y: auto;"
-          >
-            <div v-if="inspectTab === 'env'">
-              <EmptyState
-                v-if="Object.keys(inspectTarget.env_vars || {}).length === 0"
-                :title="t('docker.noEnvVars')"
-              />
-              <div
-                v-else
-                class="table-responsive"
-              >
-                <table
-                  class="table table-sm table-vcenter"
-                >
-                  <thead><tr><th>{{ t('docker.variableColumn') }}</th><th>{{ t('docker.valueColumn') }}</th></tr></thead>
-                  <tbody>
-                    <tr
-                      v-for="(val, key) in inspectTarget.env_vars"
-                      :key="key"
-                    >
-                      <td class="font-monospace small fw-semibold">
-                        {{ key }}
-                      </td>
-                      <td
-                        class="font-monospace small text-secondary"
-                        style="word-break: break-all;"
-                      >
-                        {{ val }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div v-if="inspectTab === 'volumes'">
-              <EmptyState
-                v-if="!(inspectTarget.volumes || []).length"
-                :title="t('docker.noVolumes')"
-              />
-              <ul
-                v-else
-                class="list-unstyled mb-0"
-              >
-                <li
-                  v-for="vol in inspectTarget.volumes"
-                  :key="vol"
-                  class="py-1 border-bottom font-monospace small"
-                >
-                  {{ vol }}
-                </li>
-              </ul>
-            </div>
-            <div v-if="inspectTab === 'networks'">
-              <EmptyState
-                v-if="!(inspectTarget.networks || []).length"
-                :title="t('docker.noNetworks')"
-              />
-              <div
-                v-else
-                class="d-flex flex-wrap gap-2 pt-1"
-              >
-                <span
-                  v-for="net in inspectTarget.networks"
-                  :key="net"
-                  class="badge bg-blue-lt text-blue fs-6"
-                >{{ net }}</span>
-              </div>
-              <div
-                v-if="(inspectTarget?.net_rx_bytes ?? 0) > 0 || (inspectTarget?.net_tx_bytes ?? 0) > 0"
-                class="mt-3 border-top pt-3"
-              >
-                <div class="text-secondary small fw-semibold mb-1">
-                  {{ t('docker.cumulativeNetworkIO') }}
-                </div>
-                <div class="row row-sm">
-                  <div class="col-6">
-                    <div class="text-muted small">
-                      ↓ {{ t('docker.receivedLabel') }}
-                    </div>
-                    <div class="fw-semibold text-info">
-                      {{ formatBytes(inspectTarget.net_rx_bytes) }}
-                    </div>
-                  </div>
-                  <div class="col-6">
-                    <div class="text-muted small">
-                      ↑ {{ t('docker.sentLabel') }}
-                    </div>
-                    <div class="fw-semibold text-warning">
-                      {{ formatBytes(inspectTarget.net_tx_bytes) }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button
-            type="button"
-            class="btn"
-            @click="inspectTarget = null"
-          >
-            {{ t('common.close') }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div
-    v-if="inspectTarget"
-    class="modal-backdrop fade show"
+    :container="inspectTarget"
+    :version="containerVersion(inspectTarget)"
+    @close="inspectTarget = null"
   />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, toRef } from 'vue'
+import { ref, toRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { IconActivity, IconBox, IconChevronRight, IconClipboard, IconList, IconPlayerPlay, IconRefresh, IconSearch, IconPlayerStop } from '@tabler/icons-vue'
+import { IconBox } from '@tabler/icons-vue'
 import { useRouter } from 'vue-router'
-import apiClient from '../../api'
-import DataToolbar from '../common/DataToolbar.vue'
 import SortableHeader from '../common/SortableHeader.vue'
-import DockerPortBadges from '../common/DockerPortBadges.vue'
-import DockerComposeBadge from './DockerComposeBadge.vue'
 import EmptyState from '../EmptyState.vue'
 import PaginationNav from '../PaginationNav.vue'
 import BulkActionBar from '../BulkActionBar.vue'
-import { useModalChrome } from '../../composables/useModalChrome'
+import DockerContainersToolbar from './DockerContainersToolbar.vue'
+import DockerContainerRow from './DockerContainerRow.vue'
+import DockerContainerComposeModal from './DockerContainerComposeModal.vue'
+import DockerContainerInspectModal from './DockerContainerInspectModal.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
-import { usePagination } from '../../composables/usePagination'
-import { getApiErrorMessage } from '../../api/client'
-import { getEntityStateClass, getEntityStateLabel } from '../../utils/statusClasses'
-import {
-  getComposeInfo as getComposeInfoFromLabels,
-  isComposeContainer as isComposeContainerFromLabels,
-} from '../../utils/dockerCompose'
-import { formatBytes as formatBytesShared } from '../../utils/formatters'
-
-interface Container {
-  id: string
-  name: string
-  hostname?: string
-  host_id: string
-  image: string
-  image_tag?: string
-  state: string
-  labels?: Record<string, string>
-  env_vars?: Record<string, string>
-  volumes?: string[]
-  networks?: string[]
-  net_rx_bytes?: number
-  net_tx_bytes?: number
-  ports?: string
-}
-
-interface VersionComparison {
-  tracker_id?: string
-  host_id: string
-  docker_image: string
-  image_tag?: string
-  running_version?: string
-  latest_version?: string
-  status?: string
-  is_up_to_date?: boolean
-  update_confirmed?: boolean
-  last_error?: string
-}
+import { useDockerContainerVersions } from '../../composables/useDockerContainerVersions'
+import { useDockerContainerList, PAGE_SIZE } from '../../composables/useDockerContainerList'
+import type { Container, VersionComparison } from '../../types/dockerContainersTab'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -785,65 +213,55 @@ const props = withDefaults(defineProps<{
   bulkActionLoading: false,
 })
 
-const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
-
-// Two kinds of rows land here: ambient ones (one per host+image+tag group,
-// carrying image_tag) and tracker ones (aggregated across tags, image_tag
-// empty). Indexing both under distinct keys keeps the exact-tag ambient row
-// preferred while the tracker row stays reachable as the fallback — the server
-// never emits both for the same container group.
-const versionMap = computed<Record<string, VersionComparison>>(() => {
-  const m: Record<string, VersionComparison> = {}
-  for (const vc of props.versionComparisons) {
-    if (vc.image_tag) m[`${vc.host_id}|${vc.docker_image}|${vc.image_tag}`] = vc
-    else m[`${vc.host_id}|${vc.docker_image}`] = vc
-  }
-  return m
-})
-
-function containerVersion(c: Container): VersionComparison | null {
-  return versionMap.value[`${c.host_id}|${c.image}|${c.image_tag || 'latest'}`] ||
-         versionMap.value[`${c.host_id}|${c.image}`] ||
-         versionMap.value[`${c.host_id}|${c.image}:${c.image_tag}`] ||
-         null
-}
-
 const emit = defineEmits<{
   (e: 'container-action', payload: { hostId: string; name: string; action: string; container: Container }): void
   (e: 'bulk-container-action', containers: Container[], action: string): void
 }>()
 
-const selectedIds = ref<Set<string>>(new Set())
+const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
 
-function toggleSelected(id: string, checked: boolean): void {
-  const next = new Set(selectedIds.value)
-  if (checked) next.add(id)
-  else next.delete(id)
-  selectedIds.value = next
-}
+const {
+  containerVersion,
+  trackerRunLoading,
+  trackerFeedback,
+  trackerFeedbackIsError,
+  unknownVersionTitle,
+  isTrackerRunDisabled,
+  trackerRunTooltip,
+  runTracker,
+} = useDockerContainerVersions(toRef(props, 'versionComparisons'), () => props.canRunDocker)
 
-// Scoped to the current page, matching the checkbox's own aria-label
-// (docker.selectAllVisibleAriaLabel) — selecting "all" used to silently span
-// every page of the current filter, which made a bulk stop/restart much
-// wider than what the screen showed.
-const allVisibleSelected = computed(() =>
-  pagedContainers.value.length > 0 && pagedContainers.value.every((c) => selectedIds.value.has(c.id))
-)
+const {
+  searchInput,
+  search,
+  stateFilter,
+  hostFilter,
+  composeFilter,
+  sortBy,
+  sortDir,
+  toggleSort,
+  sortedContainers,
+  uniqueHosts,
+  currentPage,
+  totalPages,
+  pagedContainers,
+  setPage,
+  selectedIds,
+  toggleSelected,
+  allVisibleSelected,
+  toggleSelectAll,
+  clearSelection,
+  selectedContainers,
+} = useDockerContainerList(toRef(props, 'containers'))
 
-function toggleSelectAll(checked: boolean): void {
-  const next = new Set(selectedIds.value)
-  for (const c of pagedContainers.value) {
-    if (checked) next.add(c.id)
-    else next.delete(c.id)
-  }
-  selectedIds.value = next
-}
+const inspectTarget = ref<Container | null>(null)
+const selectedContainer = ref<Container | null>(null)
 
 function emitBulkAction(action: string): void {
-  const selected = sortedContainers.value.filter((c) => selectedIds.value.has(c.id))
+  const selected = selectedContainers()
   if (!selected.length) return
   emit('bulk-container-action', selected, action)
-  selectedIds.value = new Set()
+  clearSelection()
 }
 
 function trackImage(c: Container): void {
@@ -859,174 +277,10 @@ function trackImage(c: Container): void {
   router.push({ path: '/git-webhooks', query })
 }
 
-const searchInput = ref('')
-const search = ref('')
-let searchDebounce: ReturnType<typeof setTimeout> | null = null
-watch(searchInput, (val) => {
-  if (searchDebounce) clearTimeout(searchDebounce)
-  searchDebounce = setTimeout(() => { search.value = val }, 300)
-})
-const stateFilter = ref('')
-const hostFilter = ref('')
-const composeFilter = ref('')
-const sortBy = ref<keyof Container>('hostname')
-const sortDir = ref<'asc' | 'desc'>('asc')
-const inspectTarget = ref<Container | null>(null)
-const inspectTab = ref('env')
-const selectedContainer = ref<Container | null>(null)
-const containerModalRef = ref<HTMLElement | null>(null)
-const inspectModalRef = ref<HTMLElement | null>(null)
-useModalChrome(containerModalRef, () => !!selectedContainer.value, { onClose: () => { selectedContainer.value = null } })
-useModalChrome(inspectModalRef, () => !!inspectTarget.value, { onClose: () => { inspectTarget.value = null } })
-const trackerRunLoading = ref<Record<string, boolean>>({})
-const trackerFeedback = ref('')
-const trackerFeedbackIsError = ref(false)
-
-function toggleSort(key: keyof Container): void {
-  if (sortBy.value === key) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-    return
-  }
-  sortBy.value = key
-  sortDir.value = 'asc'
-}
-
-function getComposeInfo(container: Container) {
-  return getComposeInfoFromLabels(container.labels)
-}
-
-function isComposeContainer(container: Container): boolean {
-  return isComposeContainerFromLabels(container.labels)
-}
-
-// Groups states by operational severity rather than sorting alphabetically
-// (which interleaved "created"/"dead"/"exited" with no meaningful order).
-const STATE_RANK: Record<string, number> = {
-  running: 0,
-  restarting: 1,
-  paused: 1,
-  created: 2,
-  exited: 3,
-  dead: 4,
-  removing: 4,
-}
-
-function stateRank(state: string | undefined): number {
-  return STATE_RANK[state || ''] ?? 5
-}
-
-function formatBytes(bytes: number | undefined): string {
-  return formatBytesShared(bytes || 0)
-}
-
 function openTracker(trackerId: string | undefined): void {
   if (!trackerId) return
   router.push(`/release-trackers/${trackerId}`)
 }
-
-// The ambient engine records why it couldn't classify an image (private
-// registry with no matching credential, registry unreachable, not swept yet) —
-// surface it rather than leaving "Version inconnue" unexplained.
-function unknownVersionTitle(vc: VersionComparison | null | undefined): string {
-  return vc?.last_error || t('docker.unknownVersionTitle')
-}
-
-function canRunTracker(vc: VersionComparison | null | undefined): boolean {
-  return props.canRunDocker && !!vc?.tracker_id
-}
-
-function hasManualTrackerData(vc: VersionComparison | null | undefined): boolean {
-  return !!(vc?.latest_version && String(vc.latest_version).trim())
-}
-
-function isTrackerRunDisabled(vc: VersionComparison | null | undefined): boolean {
-  if (!vc) return true
-  if (!canRunTracker(vc)) return true
-  if (!hasManualTrackerData(vc)) return true
-  return !!trackerRunLoading.value[vc.tracker_id!]
-}
-
-function trackerRunTooltip(vc: VersionComparison | null | undefined): string {
-  if (!props.canRunDocker) return t('docker.adminOperatorOnly')
-  if (!hasManualTrackerData(vc)) return t('docker.waitFirstCheck')
-  return t('docker.triggerTrackerNow')
-}
-
-async function runTracker(vc: VersionComparison | null | undefined, container?: Container): Promise<void> {
-  if (!vc || isTrackerRunDisabled(vc)) return
-  const id = vc.tracker_id!
-  trackerRunLoading.value = { ...trackerRunLoading.value, [id]: true }
-  trackerFeedback.value = ''
-  trackerFeedbackIsError.value = false
-  try {
-    await apiClient.runReleaseTracker(id)
-    trackerFeedback.value = t('docker.triggerLaunchedFor', { name: container?.image || t('docker.trackerFallbackName') })
-  } catch (e: unknown) {
-    trackerFeedback.value = getApiErrorMessage(e, t('docker.triggerFailed'))
-    trackerFeedbackIsError.value = true
-  } finally {
-    const next = { ...trackerRunLoading.value }
-    delete next[id]
-    trackerRunLoading.value = next
-  }
-}
-
-const filteredContainers = computed(() => {
-  return props.containers.filter((c) => {
-    const matchSearch = !search.value ||
-      c.name?.toLowerCase().includes(search.value.toLowerCase()) ||
-      c.image?.toLowerCase().includes(search.value.toLowerCase()) ||
-      getComposeInfo(c).project?.toLowerCase().includes(search.value.toLowerCase())
-    const matchState = !stateFilter.value || c.state === stateFilter.value
-    const matchCompose = !composeFilter.value ||
-      (composeFilter.value === 'compose' && isComposeContainer(c)) ||
-      (composeFilter.value === 'standalone' && !isComposeContainer(c))
-    const matchHost = !hostFilter.value || c.hostname === hostFilter.value
-    return matchSearch && matchState && matchCompose && matchHost
-  })
-})
-
-const sortedContainers = computed(() => {
-  const dir = sortDir.value === 'asc' ? 1 : -1
-  const sorted = [...filteredContainers.value]
-  sorted.sort((a, b) => {
-    if (sortBy.value === 'state') {
-      return (stateRank(a.state) - stateRank(b.state)) * dir
-    }
-
-    let av: unknown = a[sortBy.value]
-    let bv: unknown = b[sortBy.value]
-
-    if (sortBy.value === 'image') {
-      av = `${a.image || ''}:${a.image_tag || ''}`
-      bv = `${b.image || ''}:${b.image_tag || ''}`
-    }
-
-    const aVal = String(av || '').toLowerCase()
-    const bVal = String(bv || '').toLowerCase()
-    return aVal.localeCompare(bVal) * dir
-  })
-  return sorted
-})
-
-const uniqueHosts = computed(() => {
-  const seen = new Set<string>()
-  return props.containers
-    .filter((c) => { if (!c.hostname || seen.has(c.hostname)) return false; seen.add(c.hostname); return true })
-    .map((c) => c.hostname!)
-    .sort()
-})
-
-const PAGE_SIZE = 25
-const { currentPage, totalPages, pagedItems: pagedContainers, resetPage, setPage } = usePagination({
-  items: sortedContainers,
-  pageSize: PAGE_SIZE,
-})
-
-watch([search, stateFilter, hostFilter, composeFilter], () => {
-  resetPage()
-  selectedIds.value = new Set()
-})
 </script>
 
 <style scoped>
