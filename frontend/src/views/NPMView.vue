@@ -17,9 +17,9 @@
         <span class="text-muted mx-1">/</span>
         <span>{{ t('npm.nginxProxyManagerLabel') }}</span>
       </div>
-      <h2 class="page-title">
+      <h1 class="page-title">
         {{ t('npm.proxyHostsTitle') }}
-      </h2>
+      </h1>
     </div>
 
     <div

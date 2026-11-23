@@ -4,7 +4,7 @@ Ce document décrit l'architecture, le fonctionnement et l'utilisation du systè
 
 ### Emplacement dans l'UI et coexistence avec `/settings`
 
-Le catalogue déclaratif (`registry.go`) n'a **pas** sa propre page : il est intégré comme l'onglet **« Configuration avancée »** de `/settings` (`SettingsAdvancedConfigCard.vue`), aux côtés des onglets Général/Notifications/Intégrations/Rétention/Détection de menaces déjà en place. C'est un choix délibéré, pas une limitation temporaire : `/settings` a des cartes dédiées et déjà éprouvées pour les catégories `notifications` (SMTP, ntfy), `retention` (dont une répartition par catégorie d'audit que le catalogue ne peut pas représenter — c'est une map, pas une valeur scalaire) et `threats` (12 poids/seuils, dont 7 n'ont jamais été portés dans `registry.go`). Plutôt que de dupliquer ces trois domaines dans le catalogue générique, l'onglet « Configuration avancée » **n'affiche que les catégories sans carte dédiée** : `server`, `logging`, `network`, `database`, `auth`, `oidc`, `integrations`. Un paramètre n'est donc jamais éditable depuis deux écrans à la fois. Les anciennes routes `/admin/configuration` et `/admin/config` redirigent vers `/settings?tab=advanced` pour tout lien ou favori existant.
+Le catalogue déclaratif (`registry.go`) n'a **pas** sa propre page : il est intégré comme l'onglet **« Configuration avancée »** de `/settings` (`SettingsAdvancedConfigCard.vue`), aux côtés des onglets Général/Notifications/Intégrations/Rétention/Détection de menaces déjà en place. C'est un choix délibéré, pas une limitation temporaire : `/settings` a des cartes dédiées et déjà éprouvées pour les catégories `notifications` (SMTP, ntfy), `retention` (dont une répartition par catégorie d'audit que le catalogue ne peut pas représenter — c'est une map, pas une valeur scalaire) et `threats` (15 poids/seuils, dont 7 n'ont jamais été portés dans `registry.go`). Plutôt que de dupliquer ces trois domaines dans le catalogue générique, l'onglet « Configuration avancée » **n'affiche que les catégories sans carte dédiée** : `server`, `logging`, `network`, `database`, `auth`, `oidc`, `integrations`. Un paramètre n'est donc jamais éditable depuis deux écrans à la fois. Les anciennes routes `/admin/configuration` et `/admin/config` redirigent vers `/settings?tab=advanced` pour tout lien ou favori existant.
 
 Si un paramètre `notifications`/`retention`/`threats` est ajouté à `registry.go` à l'avenir, il restera invisible dans cet onglet tant qu'il n'est pas explicitement ajouté à `RELEVANT_CATEGORIES` (`SettingsAdvancedConfigCard.vue`) — un garde-fou volontaire contre la réapparition d'un doublon, pas un oubli.
 
@@ -78,7 +78,7 @@ Docker déjà définie, pas l'inverse.
 | :--- | :--- | :--- | :--- | :--- | :---: | :---: | :--- |
 | `SERVER_PORT` | `SERVER_PORT` | Serveur | int | `8080` | Non | Oui | Port TCP d'écoute HTTP du serveur |
 | `BASE_URL` | `BASE_URL` | Serveur | string | `http://localhost:8080` | Non | Non | URL racine pour liens et redirections SSO |
-| `TLS_ENABLED` | `TLS_ENABLED` | Serveur | bool | `false` | Non | Non | Active le mode HTTPS natif |
+| `TLS_ENABLED` | `TLS_ENABLED` | Serveur | bool | `false` | Non | Non | Force le flag `Secure` sur les cookies de session (le serveur n'écoute qu'en HTTP ; à activer derrière un reverse proxy HTTPS) |
 | `DEMO_MODE` | `DEMO_MODE` | Serveur | bool | `false` | Non | Oui | Coupe les appels réseau sortants (ENV-only) |
 | `TZ` | `TZ` | Serveur | string | `UTC` | Non | Oui | Fuseau horaire pour crons et affichage |
 | `LOG_LEVEL` | `LOG_LEVEL` | Logging | select | `info` | Non | Non | Niveau des logs (debug, info, warn, error) |
@@ -104,11 +104,17 @@ Docker déjà définie, pas l'inverse.
 | `OIDC_CLIENT_ID` | `OIDC_CLIENT_ID` | OIDC | string | `""` | Non | Non | Client ID OIDC |
 | `OIDC_CLIENT_SECRET` | `OIDC_CLIENT_SECRET` | OIDC | string | `""` | Oui | Non | Client Secret OIDC |
 | `OIDC_REDIRECT_URL` | `OIDC_REDIRECT_URL` | OIDC | string | `""` | Non | Non | URL de callback OIDC |
-| `OIDC_SCOPES` | `OIDC_SCOPES` | OIDC | csv | `openid, profile...` | Non | Non | Portées demandées au fournisseur |
+| `OIDC_SCOPES` | `OIDC_SCOPES` | OIDC | csv | `openid, profile, email, groups` | Non | Non | Portées demandées au fournisseur |
+| `OIDC_USERNAME_CLAIM` | `OIDC_USERNAME_CLAIM` | OIDC | string | `preferred_username` | Non | Non | Claim utilisé comme nom d'utilisateur |
+| `OIDC_EMAIL_CLAIM` | `OIDC_EMAIL_CLAIM` | OIDC | string | `email` | Non | Non | Claim contenant l'email |
+| `OIDC_GROUPS_CLAIM` | `OIDC_GROUPS_CLAIM` | OIDC | string | `groups` | Non | Non | Claim contenant les groupes |
+| `OIDC_ADMIN_GROUP` | `OIDC_ADMIN_GROUP` | OIDC | string | `serversupervisor-admins` | Non | Non | Groupe mappé au rôle `admin` |
+| `OIDC_OPERATOR_GROUP` | `OIDC_OPERATOR_GROUP` | OIDC | string | `serversupervisor-operators` | Non | Non | Groupe mappé au rôle `operator` |
+| `OIDC_VIEWER_GROUP` | `OIDC_VIEWER_GROUP` | OIDC | string | `serversupervisor-viewers` | Non | Non | Groupe mappé au rôle `viewer` |
 | `OIDC_DEFAULT_ROLE` | `OIDC_DEFAULT_ROLE` | OIDC | select | `viewer` | Non | Non | Rôle par défaut (viewer, operator, admin) |
 | `OIDC_AUTO_CREATE_USER` | `OIDC_AUTO_CREATE_USER` | OIDC | bool | `true` | Non | Non | Création auto des comptes à la connexion |
 | `OIDC_ALLOW_LOCAL_LOGIN`| `OIDC_ALLOW_LOCAL_LOGIN`| OIDC | bool | `true` | Non | Non | Maintien du formulaire de login local |
-| `OIDC_INSECURE_SKIP_VERIFY` | `OIDC_INSECURE_SKIP_VERIFY` | OIDC | bool | `false` | Non | Non | Désactive la vérification TLS OIDC |
+| `OIDC_INSECURE_SKIP_VERIFY` | `OIDC_INSECURE_SKIP_VERIFY` | OIDC | bool | `false` | Non | Oui | Désactive la vérification TLS OIDC |
 | `NOTIFY_URL` | `NOTIFY_URL` | Notifications | string | `""` | Non | Non | URL du topic ntfy.sh |
 | `NTFY_AUTH_TOKEN` | `NTFY_AUTH_TOKEN` | Notifications | string | `""` | Oui | Non | Token d'accès topic ntfy privé |
 | `SMTP_HOST` | `SMTP_HOST` | Notifications | string | `""` | Non | Non | Hôte du serveur SMTP sortant |
@@ -158,7 +164,7 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
         "has_conflict": false
       }
     ],
-    "total_params": 52,
+    "total_params": 63,
     "env_count": 12,
     "ui_count": 4,
     "default_count": 36,
@@ -217,7 +223,7 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
 
 L'architecture est entièrement déclarative et extensible. Pour ajouter un nouveau paramètre (ex: `SLACK_WEBHOOK_URL`) :
 
-1. Ouvrez [`server/internal/config/registry.go`](file:///d:/GitHub/ServerSupervisor/server/internal/config/registry.go).
+1. Ouvrez [`server/internal/config/registry.go`](../server/internal/config/registry.go).
 2. Ajoutez l'entrée dans le tableau `AllParams` :
    ```go
    {

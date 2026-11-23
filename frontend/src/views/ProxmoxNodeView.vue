@@ -45,9 +45,9 @@
           <span>{{ node.node_name }}</span>
         </div>
         <div class="d-flex align-items-center gap-3 flex-wrap">
-          <h2 class="page-title mb-0">
+          <h1 class="page-title mb-0">
             {{ node.node_name }}
-          </h2>
+          </h1>
           <span
             v-if="node.status === 'online'"
             class="status status-success"
@@ -477,6 +477,8 @@
         ref="migrateModalRef"
         class="modal modal-blur fade show d-block"
         tabindex="-1"
+        role="dialog"
+        aria-modal="true"
         @click.self="migrateModal.open = false"
       >
         <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -494,8 +496,12 @@
             </div>
             <div class="modal-body">
               <div class="mb-3">
-                <label class="form-label">{{ t('proxmox.targetNodeLabel') }}</label>
+                <label
+                  :for="`${uid}-1`"
+                  class="form-label"
+                >{{ t('proxmox.targetNodeLabel') }}</label>
                 <select
+                  :id="`${uid}-1`"
                   v-model="migrateModal.target"
                   class="form-select"
                 >
@@ -555,7 +561,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, useId } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
@@ -577,6 +583,8 @@ import { useProxmoxNode } from '../composables/useProxmoxNode'
 import { useModalChrome } from '../composables/useModalChrome'
 import { getMetricColorClass, getTemperatureColorClass } from '../utils/metricColor'
 import { formatDateTime, formatUptime, formatBytes as formatBytesShared } from '../utils/formatters'
+
+const uid = useId()
 
 const route = useRoute()
 const { t } = useI18n()

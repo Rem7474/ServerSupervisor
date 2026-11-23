@@ -208,4 +208,19 @@ describe('ProxmoxNodeView (characterization)', () => {
     expect(storageTab!.text()).toContain('1')
     expect(disksTab!.text()).toContain('1')
   })
+
+  it.each([
+    [1, '1 paquet en attente'],
+    [3, '3 paquets en attente'],
+  ])('pluralizes the pending-updates banner for %i package(s)', async (count, expected) => {
+    vi.mocked(apiClient.getProxmoxNode).mockResolvedValue({
+      data: { node_name: 'pve1', status: 'online', pending_updates: count, storages: [], disks: [], tasks: [], guests: [] },
+    } as never)
+
+    const wrapper = mount(ProxmoxNodeView, mountOpts)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('.alert-warning').text()).toContain(expected)
+  })
 })

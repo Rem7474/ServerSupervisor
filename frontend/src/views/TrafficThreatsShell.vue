@@ -12,9 +12,9 @@
           <span class="text-muted mx-1">/</span>
           <span>{{ mode === 'threats' ? t('security.threatsPageTitle') : t('security.trafficPageTitle') }}</span>
         </div>
-        <h2 class="page-title">
+        <h1 class="page-title">
           {{ mode === 'threats' ? t('security.threatsPageTitle') : t('security.trafficPageTitle') }}
-        </h2>
+        </h1>
         <div class="text-secondary">
           {{ mode === 'threats' ? t('security.threatsPageDescription') : t('security.trafficPageDescription') }}
         </div>

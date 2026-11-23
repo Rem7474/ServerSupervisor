@@ -357,10 +357,10 @@ func (s *Service) Run(reqCtx, pollCtx context.Context, id string) error {
 	}
 	if t.TrackerType == "docker" {
 		if t.UpdateAction == "compose" && !trackerHasDispatchTarget(*t) {
-			return apperr.Conflict("mode compose : configurez une VM cible et un projet compose pour déclencher manuellement")
+			return apperr.Conflict("compose mode: configure a target VM and a compose project to trigger manually").I18n(apperr.CodeTrackerComposeTargetRequired, nil)
 		}
 		if t.LatestImageDigest == "" {
-			return apperr.Conflict("aucune vérification initiale effectuée — attendez le prochain cycle de polling avant de déclencher manuellement")
+			return apperr.Conflict("no initial check has run yet: wait for the next polling cycle before triggering manually").I18n(apperr.CodeTrackerNoInitialCheck, nil)
 		}
 		tag := t.DockerTag
 		if tag == "" {
@@ -373,10 +373,10 @@ func (s *Service) Run(reqCtx, pollCtx context.Context, id string) error {
 		return nil
 	}
 	if t.HostID == "" || t.CustomTaskID == "" {
-		return apperr.Conflict("tracker en mode surveillance seule — configurez une VM cible et une tâche pour déclencher manuellement")
+		return apperr.Conflict("tracker is watch-only: configure a target VM and a task to trigger manually").I18n(apperr.CodeTrackerWatchOnly, nil)
 	}
 	if t.LastReleaseTag == "" {
-		return apperr.Conflict("aucune release initiale enregistrée — attendez le prochain cycle de polling avant de déclencher manuellement")
+		return apperr.Conflict("no initial release recorded: wait for the next polling cycle before triggering manually").I18n(apperr.CodeTrackerNoInitialRelease, nil)
 	}
 	go func() {
 		defer safego.Recover(pollCtx, "releasetracker.Run.dispatchGit")

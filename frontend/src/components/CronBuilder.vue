@@ -1,7 +1,10 @@
 <template>
   <div class="border p-3 rounded">
     <div class="d-flex align-items-center justify-content-between mb-2">
-      <label class="form-label mb-0">{{ t('common.cronBuilderExpressionLabel') }}</label>
+      <label
+        :for="expertMode ? `${uid}-expression` : undefined"
+        class="form-label mb-0"
+      >{{ t('common.cronBuilderExpressionLabel') }}</label>
       <div class="btn-group btn-group-sm">
         <button
           type="button"
@@ -25,6 +28,7 @@
     <!-- Expert mode: raw input -->
     <div v-if="expertMode">
       <input
+        :id="`${uid}-expression`"
         :value="modelValue"
         type="text"
         class="form-control font-monospace"
@@ -43,7 +47,9 @@
     <!-- Visual builder -->
     <div v-else>
       <div class="mb-2">
-        <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderFrequencyLabel') }}</label>
+        <div class="form-label text-secondary small mb-1">
+          {{ t('common.cronBuilderFrequencyLabel') }}
+        </div>
         <div class="d-flex flex-wrap gap-2">
           <button
             v-for="f in frequencies"
@@ -63,7 +69,10 @@
         v-if="frequency === 'weekly' || frequency === 'custom'"
         class="mb-2"
       >
-        <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderDaysLabel') }}</label>
+        <label
+          :for="`${uid}-1`"
+          class="form-label text-secondary small mb-1"
+        >{{ t('common.cronBuilderDaysLabel') }}</label>
         <div class="d-flex flex-wrap gap-2">
           <label
             v-for="d in daysOfWeek"
@@ -71,6 +80,7 @@
             class="form-check form-check-inline mb-0"
           >
             <input
+              :id="`${uid}-1`"
               type="checkbox"
               class="form-check-input"
               :checked="selectedDays.includes(d.value)"
@@ -86,8 +96,12 @@
         v-if="frequency === 'monthly'"
         class="mb-2"
       >
-        <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderDayOfMonthLabel') }}</label>
+        <label
+          :for="`${uid}-2`"
+          class="form-label text-secondary small mb-1"
+        >{{ t('common.cronBuilderDayOfMonthLabel') }}</label>
         <select
+          :id="`${uid}-2`"
           v-model="dayOfMonth"
           class="form-select form-select-sm w-auto"
           @change="buildCron"
@@ -105,8 +119,12 @@
       <!-- Hour + Minute -->
       <div class="d-flex gap-3 mb-2">
         <div>
-          <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderHourLabel') }}</label>
+          <label
+            :for="`${uid}-3`"
+            class="form-label text-secondary small mb-1"
+          >{{ t('common.cronBuilderHourLabel') }}</label>
           <select
+            :id="`${uid}-3`"
             v-model="hour"
             class="form-select form-select-sm"
             @change="buildCron"
@@ -121,8 +139,12 @@
           </select>
         </div>
         <div>
-          <label class="form-label text-secondary small mb-1">{{ t('common.cronBuilderMinuteLabel') }}</label>
+          <label
+            :for="`${uid}-4`"
+            class="form-label text-secondary small mb-1"
+          >{{ t('common.cronBuilderMinuteLabel') }}</label>
           <select
+            :id="`${uid}-4`"
             v-model="minute"
             class="form-select form-select-sm"
             @change="buildCron"
@@ -158,10 +180,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconClock } from '@tabler/icons-vue'
 import { describeCron } from '../utils/cron'
+
+const uid = useId()
 
 const { t } = useI18n()
 

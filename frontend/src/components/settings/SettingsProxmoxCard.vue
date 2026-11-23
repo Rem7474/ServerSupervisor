@@ -25,8 +25,12 @@
     >
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.name') }} *</label>
+          <label
+            :for="`${uid}-1`"
+            class="form-label"
+          >{{ t('settings.name') }} *</label>
           <input
+            :id="`${uid}-1`"
             v-model="form.name"
             type="text"
             class="form-control"
@@ -34,8 +38,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.apiUrl') }} *</label>
+          <label
+            :for="`${uid}-2`"
+            class="form-label"
+          >{{ t('settings.apiUrl') }} *</label>
           <input
+            :id="`${uid}-2`"
             v-model="form.api_url"
             type="text"
             class="form-control"
@@ -43,8 +51,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.tokenId') }} *</label>
+          <label
+            :for="`${uid}-3`"
+            class="form-label"
+          >{{ t('settings.tokenId') }} *</label>
           <input
+            :id="`${uid}-3`"
             v-model="form.token_id"
             type="text"
             class="form-control"
@@ -52,8 +64,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.tokenSecret') }} {{ editingId ? t('settings.unchangedIfEmpty') : '*' }}</label>
+          <label
+            :for="`${uid}-4`"
+            class="form-label"
+          >{{ t('settings.tokenSecret') }} {{ editingId ? t('settings.unchangedIfEmpty') : '*' }}</label>
           <input
+            :id="`${uid}-4`"
             v-model="form.token_secret"
             type="password"
             class="form-control"
@@ -61,8 +77,12 @@
           >
         </div>
         <div class="col-md-4">
-          <label class="form-label">{{ t('settings.pollIntervalCollect') }}</label>
+          <label
+            :for="`${uid}-5`"
+            class="form-label"
+          >{{ t('settings.pollIntervalCollect') }}</label>
           <input
+            :id="`${uid}-5`"
             v-model.number="form.poll_interval_sec"
             type="number"
             class="form-control"
@@ -90,9 +110,9 @@
           </label>
         </div>
         <div class="col-12">
-          <label class="form-label">
+          <div class="form-label">
             {{ t('settings.pveConsoleCredsOptional') }}
-          </label>
+          </div>
           <div class="form-hint mb-2">
             {{ t('settings.pveConsoleHintIntro') }}
             <code>VM.Console</code>
@@ -302,7 +322,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconClock, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
@@ -312,6 +332,8 @@ import { useConnectionCrud } from '../../composables/useConnectionCrud'
 import EmptyState from '../EmptyState.vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { formatDateTime } from '../../utils/formatters'
+
+const uid = useId()
 
 const { t } = useI18n()
 

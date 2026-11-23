@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"sync"
 	"testing"
 
@@ -66,6 +67,9 @@ func lastNonRunningResult(t *testing.T, results []map[string]any) map[string]any
 // so the actual upgrade attempt itself fails harmlessly; reportRunUUTerminal
 // bundles the fresh status regardless of that outcome.
 func TestHandleApt_RunUU_BundlesFreshAptStatus(t *testing.T) {
+	if _, err := exec.LookPath("apt-get"); err != nil {
+		t.Skip("apt-get not available on this platform")
+	}
 	srv, results := fakeAgentServer(t)
 	s := sender.New(&config.Config{ServerURL: srv.URL, APIKey: "test-key"})
 	cmd := sender.PendingCommand{ID: "cmd-run-uu", Module: "apt", Action: "run_uu"}

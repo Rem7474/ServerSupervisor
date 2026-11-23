@@ -3,9 +3,9 @@
     <div class="page-header mb-3">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
-          <h2 class="page-title">
+          <h1 class="page-title">
             {{ t('monitoring.pageTitle') }}
-          </h2>
+          </h1>
           <div class="text-muted">
             {{ t('monitoring.pageSubtitle') }}
           </div>

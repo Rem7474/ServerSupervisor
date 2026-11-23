@@ -24,6 +24,7 @@ et la référence API, voir le
 | [Monitoring](Monitoring.md) | Sondes uptime HTTP/TCP/ICMP et certificats SSL/TLS |
 | [Notifications](Notifications.md) | Centre de notifications in-app et Web Push (VAPID) |
 | [Two-Factor-Authentication](Two-Factor-Authentication.md) | TOTP et clés de sécurité/passkeys (WebAuthn) |
+| [SSO-OIDC](SSO-OIDC.md) | Connexion unique OpenID Connect (client, groupes → rôles, rattachement des comptes) |
 | [Host-Discovery](Host-Discovery.md) | Scan de sous-réseau et ajout en masse |
 | [Custom-Tasks-Examples](Custom-Tasks-Examples.md) | Exemples de `tasks.yaml` prêts à copier |
 | [Internationalization](Internationalization.md) | Langues de l'interface, choix de la langue, ajout d'une traduction |
