@@ -70,6 +70,10 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_POLL_INTERVAL: ${GITHUB_POLL_INTERVAL:-15m}
       
+      # Prometheus /metrics (désactivé par défaut)
+      METRICS_ENABLED: ${METRICS_ENABLED:-false}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+
       # Alerts
       NOTIFY_URL: ${NOTIFY_URL:-}
       SMTP_HOST: ${SMTP_HOST:-}

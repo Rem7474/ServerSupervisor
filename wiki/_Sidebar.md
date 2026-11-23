@@ -17,6 +17,7 @@
 **Alertes & Monitoring**
 - [Alerting](Alerting.md)
 - [Monitoring](Monitoring.md)
+- [Prometheus-Metrics](Prometheus-Metrics.md)
 - [Notifications](Notifications.md)
 
 **Compte & Sécurité**

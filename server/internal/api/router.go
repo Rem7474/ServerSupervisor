@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/handlers"
+	"github.com/serversupervisor/server/internal/metrics"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/networkview"
 	"github.com/serversupervisor/server/internal/safego"
@@ -58,6 +60,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(RequestIDMiddleware())
+	r.Use(metrics.Middleware())
 	r.Use(RequestLogger())
 	r.Use(SecurityHeadersMiddleware())
 	r.Use(CORSMiddleware(cfg.BaseURL, cfg.AllowedOrigins))
@@ -158,6 +161,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	})
 
 	registerPublicRoutes(r, authH, oidcH, db)
+	registerMetricsRoute(r, cfg, db, wsH, notifHub)
 	registerWSRoutes(r, wsH, cfg)
 	registerAgentRoutes(r, db, cfg, agentH, wsH, agentRateLimiter)
 
@@ -225,6 +229,22 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, oidcH *handler
 		}
 		c.JSON(200, gin.H{"status": "ok", "db": "ok"})
 	})
+}
+
+// registerMetricsRoute always mounts GET /metrics so that, when disabled, it
+// answers 404 instead of falling through to the SPA's index.html (200). The
+// handler enforces METRICS_ENABLED and the bearer token.
+func registerMetricsRoute(r *gin.Engine, cfg *config.Config, db *database.DB, wsH *ws.WSHandler, notifHub *ws.NotificationHub) {
+	if cfg.MetricsEnabled && cfg.MetricsToken == "" {
+		slog.Warn("METRICS_ENABLED is true but METRICS_TOKEN is empty: /metrics stays disabled")
+	}
+	agentHub := wsH.GetAgentHub()
+	metrics.SetSources(metrics.Sources{
+		AgentsConnected: agentHub.Count,
+		WSClients:       notifHub.Count,
+		DBStats:         db.Stats,
+	})
+	r.GET("/metrics", metrics.Handler(cfg.MetricsEnabled, cfg.MetricsToken))
 }
 
 func registerWSRoutes(r *gin.Engine, h *ws.WSHandler, cfg *config.Config) {

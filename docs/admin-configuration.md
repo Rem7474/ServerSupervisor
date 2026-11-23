@@ -4,7 +4,7 @@ Ce document décrit l'architecture, le fonctionnement et l'utilisation du systè
 
 ### Emplacement dans l'UI et coexistence avec `/settings`
 
-Le catalogue déclaratif (`registry.go`) n'a **pas** sa propre page : il est intégré comme l'onglet **« Configuration avancée »** de `/settings` (`SettingsAdvancedConfigCard.vue`), aux côtés des onglets Général/Notifications/Intégrations/Rétention/Détection de menaces déjà en place. C'est un choix délibéré, pas une limitation temporaire : `/settings` a des cartes dédiées et déjà éprouvées pour les catégories `notifications` (SMTP, ntfy, webhooks Slack/Teams/Discord), `retention` (dont une répartition par catégorie d'audit que le catalogue ne peut pas représenter — c'est une map, pas une valeur scalaire) et `threats` (15 poids/seuils, dont 7 n'ont jamais été portés dans `registry.go`). Plutôt que de dupliquer ces trois domaines dans le catalogue générique, l'onglet « Configuration avancée » **n'affiche que les catégories sans carte dédiée** : `server`, `logging`, `network`, `database`, `auth`, `oidc`, `integrations`. Un paramètre n'est donc jamais éditable depuis deux écrans à la fois. Les anciennes routes `/admin/configuration` et `/admin/config` redirigent vers `/settings?tab=advanced` pour tout lien ou favori existant.
+Le catalogue déclaratif (`registry.go`) n'a **pas** sa propre page : il est intégré comme l'onglet **« Configuration avancée »** de `/settings` (`SettingsAdvancedConfigCard.vue`), aux côtés des onglets Général/Notifications/Intégrations/Rétention/Détection de menaces déjà en place. C'est un choix délibéré, pas une limitation temporaire : `/settings` a des cartes dédiées et déjà éprouvées pour les catégories `notifications` (SMTP, ntfy, webhooks Slack/Teams/Discord), `retention` (dont une répartition par catégorie d'audit que le catalogue ne peut pas représenter — c'est une map, pas une valeur scalaire) et `threats` (15 poids/seuils, tous déclarés dans `registry.go`). Plutôt que de dupliquer ces trois domaines dans le catalogue générique, l'onglet « Configuration avancée » **n'affiche que les catégories sans carte dédiée** : `server`, `logging`, `network`, `database`, `auth`, `oidc`, `integrations`. Un paramètre n'est donc jamais éditable depuis deux écrans à la fois. Les anciennes routes `/admin/configuration` et `/admin/config` redirigent vers `/settings?tab=advanced` pour tout lien ou favori existant.
 
 Si un paramètre `notifications`/`retention`/`threats` est ajouté à `registry.go` à l'avenir, il restera invisible dans cet onglet tant qu'il n'est pas explicitement ajouté à `RELEVANT_CATEGORIES` (`SettingsAdvancedConfigCard.vue`) — un garde-fou volontaire contre la réapparition d'un doublon, pas un oubli.
 
@@ -80,6 +80,8 @@ Docker déjà définie, pas l'inverse.
 | `BASE_URL` | `BASE_URL` | Serveur | string | `http://localhost:8080` | Non | Non | URL racine pour liens et redirections SSO |
 | `TLS_ENABLED` | `TLS_ENABLED` | Serveur | bool | `false` | Non | Non | Force le flag `Secure` sur les cookies de session (le serveur n'écoute qu'en HTTP ; à activer derrière un reverse proxy HTTPS) |
 | `DEMO_MODE` | `DEMO_MODE` | Serveur | bool | `false` | Non | Oui | Coupe les appels réseau sortants (ENV-only) |
+| `METRICS_ENABLED` | `METRICS_ENABLED` | Serveur | bool | `false` | Non | Oui | Expose `GET /metrics` au format Prometheus (ENV-only, exige `METRICS_TOKEN`) |
+| `METRICS_TOKEN` | `METRICS_TOKEN` | Serveur | string | `""` | Oui | Oui | Jeton Bearer exigé pour scraper `/metrics` (ENV-only ; sans jeton l'endpoint reste désactivé) |
 | `TZ` | `TZ` | Serveur | string | `UTC` | Non | Oui | Fuseau horaire pour crons et affichage |
 | `LOG_LEVEL` | `LOG_LEVEL` | Logging | select | `info` | Non | Non | Niveau des logs (debug, info, warn, error) |
 | `LOG_FORMAT` | `LOG_FORMAT` | Logging | select | `json` | Non | Oui | Format des logs (json, text) |
@@ -134,8 +136,21 @@ Docker déjà définie, pas l'inverse.
 | `AUDIT_RETENTION_DAYS` | `AUDIT_RETENTION_DAYS` | Rétention | int | `90` | Non | Non | Rétention des logs d'audit (jours) |
 | `WEB_LOGS_RETENTION_DAYS`| `WEB_LOGS_RETENTION_DAYS`| Rétention | int | `30` | Non | Non | Rétention des logs HTTP (jours) |
 | `NETWORK_FLOWS_RETENTION_DAYS` | `NETWORK_FLOWS_RETENTION_DAYS` | Rétention | int | `14` | Non | Non | Rétention des flux réseau (jours) |
-| `THREAT_WEIGHT_*` | `THREAT_WEIGHT_*` | Menaces | float | *variables* | Non | Non | Coefficients de score de menace web |
-| `THREAT_THRESHOLD_*` | `THREAT_THRESHOLD_*` | Menaces | float | *variables* | Non | Non | Seuils d'alerte (Medium, High, Critical) |
+| `THREAT_WEIGHT_WORDPRESS` | `THREAT_WEIGHT_WORDPRESS` | Menaces | float | `2` | Non | Non | Scans WordPress |
+| `THREAT_WEIGHT_ADMIN_PANEL` | `THREAT_WEIGHT_ADMIN_PANEL` | Menaces | float | `3` | Non | Non | Panneaux d'admin |
+| `THREAT_WEIGHT_PATH_TRAVERSAL` | `THREAT_WEIGHT_PATH_TRAVERSAL` | Menaces | float | `5` | Non | Non | Traversée de répertoires |
+| `THREAT_WEIGHT_KNOWN_SCANNER` | `THREAT_WEIGHT_KNOWN_SCANNER` | Menaces | float | `4` | Non | Non | Scanners connus |
+| `THREAT_WEIGHT_SUSPICIOUS_METHOD` | `THREAT_WEIGHT_SUSPICIOUS_METHOD` | Menaces | float | `2` | Non | Non | Méthodes HTTP suspectes |
+| `THREAT_WEIGHT_STATUS_2XX` | `THREAT_WEIGHT_STATUS_2XX` | Menaces | float | `0.1` | Non | Non | Réponses 2xx |
+| `THREAT_WEIGHT_STATUS_3XX` | `THREAT_WEIGHT_STATUS_3XX` | Menaces | float | `1` | Non | Non | Réponses 3xx |
+| `THREAT_WEIGHT_STATUS_404` | `THREAT_WEIGHT_STATUS_404` | Menaces | float | `2` | Non | Non | Réponses 404 |
+| `THREAT_WEIGHT_STATUS_4XX` | `THREAT_WEIGHT_STATUS_4XX` | Menaces | float | `1.5` | Non | Non | Autres réponses 4xx |
+| `THREAT_WEIGHT_STATUS_5XX` | `THREAT_WEIGHT_STATUS_5XX` | Menaces | float | `3` | Non | Non | Réponses 5xx |
+| `THREAT_WEIGHT_BREADTH` | `THREAT_WEIGHT_BREADTH` | Menaces | float | `3` | Non | Non | Étendue du ciblage |
+| `THREAT_WEIGHT_HITS` | `THREAT_WEIGHT_HITS` | Menaces | float | `2` | Non | Non | Volume de requêtes |
+| `THREAT_THRESHOLD_MEDIUM` | `THREAT_THRESHOLD_MEDIUM` | Menaces | float | `15` | Non | Non | Seuil Modéré |
+| `THREAT_THRESHOLD_HIGH` | `THREAT_THRESHOLD_HIGH` | Menaces | float | `50` | Non | Non | Seuil Élevé |
+| `THREAT_THRESHOLD_CRITICAL` | `THREAT_THRESHOLD_CRITICAL` | Menaces | float | `150` | Non | Non | Seuil Critique |
 
 ---
 
@@ -167,7 +182,7 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
         "has_conflict": false
       }
     ],
-    "total_params": 66,
+    "total_params": 75,
     "env_count": 12,
     "ui_count": 4,
     "default_count": 36,

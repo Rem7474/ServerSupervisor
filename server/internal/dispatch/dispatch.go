@@ -6,6 +6,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/logging"
+	"github.com/serversupervisor/server/internal/metrics"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -93,6 +94,7 @@ func (d *Dispatcher) Create(ctx context.Context, req Request) (*Result, error) {
 		auditLogIDPtr,
 	)
 	if err != nil {
+		metrics.CommandDispatched(req.Module, err)
 		if auditLogIDPtr != nil {
 			_ = d.db.UpdateAuditLogStatus(ctx, *auditLogIDPtr, "failed", err.Error())
 		}
@@ -102,6 +104,7 @@ func (d *Dispatcher) Create(ctx context.Context, req Request) (*Result, error) {
 	if d.pusher != nil {
 		d.pusher.Notify(req.HostID)
 	}
+	metrics.CommandDispatched(req.Module, nil)
 
 	return &Result{Command: cmd, AuditLogID: auditLogIDPtr}, nil
 }

@@ -244,6 +244,9 @@ func (db *DB) ensureTimescaleObjects(ctx context.Context) error {
 func (db *DB) Close() error { return db.conn.Close() }
 func (db *DB) Ping() error  { return db.conn.Ping() }
 
+// Stats returns the connection pool statistics (used by the metrics endpoint).
+func (db *DB) Stats() sql.DBStats { return db.conn.Stats() }
+
 // Query executes a query that returns rows. The provided context controls
 // cancellation and per-request timeouts: when ctx is cancelled the in-flight
 // statement is aborted and Postgres returns an error rather than blocking.

@@ -104,6 +104,8 @@ var AllParams = []ConfigParamDef{
 	strParam("BASE_URL", "base_url", "server", "http://localhost:8080", "URL de base publique", "URL racine utilisée pour générer les liens absolus et redirections d'authentification.", false, false, validateURL),
 	boolParam("TLS_ENABLED", "tls_enabled", "server", "false", "HTTPS / TLS activé", "Force le flag Secure sur les cookies de session. Le serveur n'écoute qu'en HTTP : à activer quand l'application est exposée en HTTPS derrière un reverse proxy.", false),
 	boolParam("DEMO_MODE", "demo_mode", "server", "false", "Mode démonstration", "Désactive tout appel réseau sortant (probes, git, proxmox). Modifiable uniquement via ENV.", true, false),
+	boolParam("METRICS_ENABLED", "metrics_enabled", "server", "false", "Endpoint Prometheus /metrics", "Expose GET /metrics (auto-observabilité du serveur, format Prometheus). Exige METRICS_TOKEN. Modifiable uniquement via ENV.", true, false),
+	readOnlyParam("METRICS_TOKEN", "metrics_token", "server", "", "Jeton d'accès /metrics", "Jeton Bearer exigé pour scraper /metrics. Sans jeton, l'endpoint reste désactivé. Modifiable uniquement via ENV.", true, true),
 	strParam("TZ", "tz", "server", "UTC", "Fuseau horaire (Timezone)", "Fuseau horaire utilisé pour les plannings cron et l'affichage des dates.", false, true),
 
 	// ==================== Logging ====================
@@ -186,6 +188,13 @@ var AllParams = []ConfigParamDef{
 	floatParam("THREAT_WEIGHT_PATH_TRAVERSAL", "threat_weight_pathtraversal", "threats", "5", "Pondération traversée de répertoires", "Poids des requêtes contenant ../ ou des patterns d'évasion de chemin.", validateNonNegativeFloat),
 	floatParam("THREAT_WEIGHT_KNOWN_SCANNER", "threat_weight_knownscanner", "threats", "4", "Pondération scanners connus", "Poids des User-Agents identifiés comme outils de scan de vulnérabilités.", validateNonNegativeFloat),
 	floatParam("THREAT_WEIGHT_SUSPICIOUS_METHOD", "threat_weight_suspiciousmethod", "threats", "2", "Pondération méthodes HTTP suspectes", "Poids des méthodes HTTP inhabituelles ou dangereuses (CONNECT, PROPFIND, etc.).", validateNonNegativeFloat),
+	floatParam("THREAT_WEIGHT_STATUS_2XX", "threat_weight_status_2xx", "threats", "0.1", "Pondération réponses 2xx", "Poids des requêtes ayant reçu une réponse 2xx (succès) dans le score de menace.", validateNonNegativeFloat),
+	floatParam("THREAT_WEIGHT_STATUS_3XX", "threat_weight_status_3xx", "threats", "1", "Pondération réponses 3xx", "Poids des requêtes ayant reçu une redirection 3xx dans le score de menace.", validateNonNegativeFloat),
+	floatParam("THREAT_WEIGHT_STATUS_404", "threat_weight_status_404", "threats", "2", "Pondération réponses 404", "Poids des requêtes ayant reçu une réponse 404 (ressource introuvable), typique d'un balayage de chemins.", validateNonNegativeFloat),
+	floatParam("THREAT_WEIGHT_STATUS_4XX", "threat_weight_status_4xx", "threats", "1.5", "Pondération autres réponses 4xx", "Poids des requêtes ayant reçu une autre réponse 4xx que 404 (401, 403, 405...).", validateNonNegativeFloat),
+	floatParam("THREAT_WEIGHT_STATUS_5XX", "threat_weight_status_5xx", "threats", "3", "Pondération réponses 5xx", "Poids des requêtes ayant provoqué une erreur serveur 5xx dans le score de menace.", validateNonNegativeFloat),
+	floatParam("THREAT_WEIGHT_BREADTH", "threat_weight_breadth", "threats", "3", "Pondération étendue du ciblage", "Poids appliqué à l'étendue du ciblage d'une IP (nombre de chemins ou d'hôtes distincts visés).", validateNonNegativeFloat),
+	floatParam("THREAT_WEIGHT_HITS", "threat_weight_hits", "threats", "2", "Pondération volume de requêtes", "Poids appliqué au volume de requêtes émises par une IP dans le score de menace.", validateNonNegativeFloat),
 	floatParam("THREAT_THRESHOLD_MEDIUM", "threat_threshold_medium", "threats", "15", "Seuil de menace : Modéré", "Score total à partir duquel une adresse IP est classée comme menace modérée.", validatePositiveFloat),
 	floatParam("THREAT_THRESHOLD_HIGH", "threat_threshold_high", "threats", "50", "Seuil de menace : Élevé", "Score total à partir duquel une adresse IP est classée comme menace élevée.", validatePositiveFloat),
 	floatParam("THREAT_THRESHOLD_CRITICAL", "threat_threshold_critical", "threats", "150", "Seuil de menace : Critique", "Score total à partir duquel une adresse IP est classée comme menace critique.", validatePositiveFloat),

@@ -165,3 +165,41 @@ func TestAgentHub_Notify(t *testing.T) {
 		}
 	})
 }
+
+func TestAgentHub_Count(t *testing.T) {
+	hub := NewAgentHub()
+	if got := hub.Count(); got != 0 {
+		t.Fatalf("empty hub Count() = %d", got)
+	}
+	s1, _ := newTestAgentConn(t)
+	s2, _ := newTestAgentConn(t)
+	hub.Register("host-1", s1)
+	hub.Register("host-2", s2)
+	if got := hub.Count(); got != 2 {
+		t.Fatalf("Count() = %d, want 2", got)
+	}
+	s3, _ := newTestAgentConn(t)
+	hub.Register("host-1", s3) // reconnect replaces, does not add
+	if got := hub.Count(); got != 2 {
+		t.Fatalf("Count() after reconnect = %d, want 2", got)
+	}
+	hub.Unregister("host-2", s2)
+	if got := hub.Count(); got != 1 {
+		t.Fatalf("Count() after unregister = %d, want 1", got)
+	}
+}
+
+func TestNotificationHub_Count(t *testing.T) {
+	hub := NewNotificationHub()
+	s1, _ := newTestAgentConn(t)
+	s2, _ := newTestAgentConn(t)
+	hub.Register(s1)
+	hub.Register(s2)
+	if got := hub.Count(); got != 2 {
+		t.Fatalf("Count() = %d, want 2", got)
+	}
+	hub.Unregister(s1)
+	if got := hub.Count(); got != 1 {
+		t.Fatalf("Count() after unregister = %d, want 1", got)
+	}
+}

@@ -22,6 +22,7 @@ et la référence API, voir le
 | [Restic-Example-Nextcloud-AIO](Restic-Example-Nextcloud-AIO.md) / [Restic-Example-Immich](Restic-Example-Immich.md) | Recettes resticprofile complètes pour deux apps auto-hébergées courantes |
 | [Alerting](Alerting.md) | Moteur d'alertes : seuils, hystérésis, incidents, ack/escalade, corrélation, maintenance, modèles |
 | [Monitoring](Monitoring.md) | Sondes uptime HTTP/TCP/ICMP et certificats SSL/TLS |
+| [Prometheus-Metrics](Prometheus-Metrics.md) | Endpoint `/metrics` d'auto-observabilité du serveur (Prometheus) |
 | [Notifications](Notifications.md) | Centre de notifications in-app et Web Push (VAPID) |
 | [Two-Factor-Authentication](Two-Factor-Authentication.md) | TOTP et clés de sécurité/passkeys (WebAuthn) |
 | [SSO-OIDC](SSO-OIDC.md) | Connexion unique OpenID Connect (client, groupes → rôles, rattachement des comptes) |

@@ -70,6 +70,13 @@ func (h *AgentHub) Unregister(hostID string, conn *websocket.Conn) {
 	}
 }
 
+// Count returns the number of hosts with a live push connection.
+func (h *AgentHub) Count() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.conns)
+}
+
 // Connected reports whether hostID currently has a live push connection.
 func (h *AgentHub) Connected(hostID string) bool {
 	h.mu.RLock()

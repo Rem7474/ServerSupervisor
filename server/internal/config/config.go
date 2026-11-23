@@ -36,6 +36,12 @@ type Config struct {
 	// demo/screenshot pipeline relies on).
 	DemoMode bool
 
+	// MetricsEnabled turns on GET /metrics (Prometheus). MetricsToken is the
+	// bearer token that endpoint requires; without one it stays off. Both are
+	// env-only (not stored in the settings table).
+	MetricsEnabled bool
+	MetricsToken   string
+
 	// Logging
 	LogLevel  string // debug|info|warn|error
 	LogFormat string // json|text
@@ -216,6 +222,9 @@ func Load() *Config {
 		BaseURL:    getEnv("BASE_URL", "http://localhost:8080"),
 		TLSEnabled: getBoolEnv("TLS_ENABLED", false),
 		DemoMode:   getBoolEnv("DEMO_MODE", false),
+
+		MetricsEnabled: getBoolEnv("METRICS_ENABLED", false),
+		MetricsToken:   getEnv("METRICS_TOKEN", ""),
 
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		LogFormat: logFormatDefault(),
