@@ -306,6 +306,34 @@
       "label": "Pondération méthodes HTTP suspectes",
       "description": "Poids des méthodes HTTP inhabituelles ou dangereuses (CONNECT, PROPFIND, etc.)."
     },
+    "THREAT_WEIGHT_STATUS_2XX": {
+      "label": "Pondération réponses 2xx",
+      "description": "Poids des requêtes ayant reçu une réponse 2xx (succès) dans le score de menace."
+    },
+    "THREAT_WEIGHT_STATUS_3XX": {
+      "label": "Pondération réponses 3xx",
+      "description": "Poids des requêtes ayant reçu une redirection 3xx dans le score de menace."
+    },
+    "THREAT_WEIGHT_STATUS_404": {
+      "label": "Pondération réponses 404",
+      "description": "Poids des requêtes ayant reçu une réponse 404 (ressource introuvable), typique d'un balayage de chemins."
+    },
+    "THREAT_WEIGHT_STATUS_4XX": {
+      "label": "Pondération autres réponses 4xx",
+      "description": "Poids des requêtes ayant reçu une autre réponse 4xx que 404 (401, 403, 405...)."
+    },
+    "THREAT_WEIGHT_STATUS_5XX": {
+      "label": "Pondération réponses 5xx",
+      "description": "Poids des requêtes ayant provoqué une erreur serveur 5xx dans le score de menace."
+    },
+    "THREAT_WEIGHT_BREADTH": {
+      "label": "Pondération étendue du ciblage",
+      "description": "Poids appliqué à l'étendue du ciblage d'une IP (nombre de chemins ou d'hôtes distincts visés)."
+    },
+    "THREAT_WEIGHT_HITS": {
+      "label": "Pondération volume de requêtes",
+      "description": "Poids appliqué au volume de requêtes émises par une IP dans le score de menace."
+    },
     "THREAT_THRESHOLD_MEDIUM": {
       "label": "Seuil de menace : Modéré",
       "description": "Score total à partir duquel une adresse IP est classée comme menace modérée."
