@@ -11,9 +11,9 @@
         <span class="text-muted mx-1">/</span>
         <span>{{ cert?.name || 'Certificat' }}</span>
       </div>
-      <h2 class="page-title">
+      <h1 class="page-title">
         {{ cert?.name || '...' }}
-      </h2>
+      </h1>
       <div
         v-if="cert"
         class="text-secondary"

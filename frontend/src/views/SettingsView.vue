@@ -11,9 +11,9 @@
         <span class="text-muted mx-1">/</span>
         <span>{{ t('settings.pageTitle') }}</span>
       </div>
-      <h2 class="page-title">
+      <h1 class="page-title">
         {{ t('settings.pageTitle') }}
-      </h2>
+      </h1>
     </div>
 
     <div class="row">

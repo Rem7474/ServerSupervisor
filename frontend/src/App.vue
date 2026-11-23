@@ -128,8 +128,9 @@
         :class="navbarOpen ? 'd-flex' : 'd-none d-md-flex'"
       >
         <div class="container-xl">
-          <div
+          <nav
             id="navbar-menu"
+            :aria-label="t('common.mainNavigation')"
             :class="['collapse navbar-collapse', { show: navbarOpen }]"
           >
             <ul class="navbar-nav">
@@ -201,7 +202,7 @@
                 </div>
               </li>
             </ul>
-          </div>
+          </nav>
         </div>
       </header>
 
@@ -238,7 +239,7 @@
       </div>
 
       <div class="page-wrapper">
-        <div
+        <main
           id="main-content"
           class="page-body"
         >
@@ -247,7 +248,7 @@
               <router-view />
             </ErrorBoundary>
           </div>
-        </div>
+        </main>
         <AppFooter />
       </div>
 

@@ -8,8 +8,12 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-8">
-          <label class="form-label">{{ t('settings.smtpHost') }}</label>
+          <label
+            :for="`${uid}-1`"
+            class="form-label"
+          >{{ t('settings.smtpHost') }}</label>
           <input
+            :id="`${uid}-1`"
             v-model="form.smtpHost"
             type="text"
             class="form-control"
@@ -17,8 +21,12 @@
           >
         </div>
         <div class="col-md-4">
-          <label class="form-label">Port</label>
+          <label
+            :for="`${uid}-2`"
+            class="form-label"
+          >Port</label>
           <input
+            :id="`${uid}-2`"
             v-model.number="form.smtpPort"
             type="number"
             class="form-control"
@@ -26,8 +34,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('common.user') }}</label>
+          <label
+            :for="`${uid}-3`"
+            class="form-label"
+          >{{ t('common.user') }}</label>
           <input
+            :id="`${uid}-3`"
             v-model="form.smtpUser"
             type="text"
             class="form-control"
@@ -36,9 +48,13 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.password') }}</label>
+          <label
+            :for="`${uid}-4`"
+            class="form-label"
+          >{{ t('settings.password') }}</label>
           <div class="input-group">
             <input
+              :id="`${uid}-4`"
               v-model="form.smtpPass"
               :type="showSmtpPass ? 'text' : 'password'"
               class="form-control"
@@ -55,8 +71,12 @@
           </div>
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.sender') }}</label>
+          <label
+            :for="`${uid}-5`"
+            class="form-label"
+          >{{ t('settings.sender') }}</label>
           <input
+            :id="`${uid}-5`"
             v-model="form.smtpFrom"
             type="email"
             class="form-control"
@@ -64,8 +84,12 @@
           >
         </div>
         <div class="col-md-6">
-          <label class="form-label">{{ t('settings.recipient') }}</label>
+          <label
+            :for="`${uid}-6`"
+            class="form-label"
+          >{{ t('settings.recipient') }}</label>
           <input
+            :id="`${uid}-6`"
             v-model="form.smtpTo"
             type="email"
             class="form-control"
@@ -124,7 +148,10 @@
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+
+const uid = useId()
 
 const { t } = useI18n()
 

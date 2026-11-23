@@ -2,9 +2,13 @@
   <div class="card mb-4">
     <div class="card-body d-flex flex-wrap gap-2 align-items-end traffic-filters">
       <div class="traffic-filter-field">
-        <label class="form-label mb-1">{{ t('security.sourceLabel') }}</label>
+        <label
+          :for="`${uid}-1`"
+          class="form-label mb-1"
+        >{{ t('security.sourceLabel') }}</label>
         <div class="input-group input-group-sm">
           <select
+            :id="`${uid}-1`"
             v-model="source"
             class="form-select form-select-sm"
             :disabled="loading"
@@ -46,8 +50,12 @@
       </div>
 
       <div class="traffic-filter-field">
-        <label class="form-label mb-1">{{ t('security.hostLabel') }}</label>
+        <label
+          :for="`${uid}-2`"
+          class="form-label mb-1"
+        >{{ t('security.hostLabel') }}</label>
         <select
+          :id="`${uid}-2`"
           v-model="hostId"
           class="form-select form-select-sm"
           :disabled="loading"
@@ -80,9 +88,13 @@
       </button>
 
       <div class="traffic-filter-field ms-auto">
-        <label class="form-label mb-1">{{ t('security.searchDomainOrIpLabel') }}</label>
+        <label
+          :for="`${uid}-3`"
+          class="form-label mb-1"
+        >{{ t('security.searchDomainOrIpLabel') }}</label>
         <div class="input-group input-group-sm">
           <input
+            :id="`${uid}-3`"
             v-model="searchTerm"
             type="text"
             class="form-control form-control-sm"
@@ -105,9 +117,12 @@
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle } from '@tabler/icons-vue'
 import { useHostsStore } from '../../stores/hosts'
+
+const uid = useId()
 
 const { t } = useI18n()
 

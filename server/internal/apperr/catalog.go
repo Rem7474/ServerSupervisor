@@ -90,6 +90,29 @@ const (
 	CodeRunbookStepModuleInvalid   = "RUNBOOK_STEP_MODULE_INVALID"
 	CodeRunbookStepActionInvalid   = "RUNBOOK_STEP_ACTION_INVALID"
 	CodeRunbookStepTargetRequired  = "RUNBOOK_STEP_TARGET_REQUIRED"
+
+	// Config / scheduled tasks / Proxmox / release trackers / discovery / host permissions
+	CodeHostPermLevelInvalid          = "HOST_PERM_LEVEL_INVALID"
+	CodeConfigParamUnknown            = "CONFIG_PARAM_UNKNOWN"
+	CodeConfigParamEnvOnly            = "CONFIG_PARAM_ENV_ONLY"
+	CodeConfigParamNotEditable        = "CONFIG_PARAM_NOT_EDITABLE"
+	CodeConfigValueInvalid            = "CONFIG_VALUE_INVALID"
+	CodeConfigSaveFailed              = "CONFIG_SAVE_FAILED"
+	CodeConfigResetFailed             = "CONFIG_RESET_FAILED"
+	CodeScheduledTaskModuleInvalid    = "SCHEDULED_TASK_MODULE_INVALID"
+	CodeScheduledTaskActionRequired   = "SCHEDULED_TASK_ACTION_REQUIRED"
+	CodeScheduledTaskCronInvalid      = "SCHEDULED_TASK_CRON_INVALID"
+	CodeProxmoxLinkStatusInvalid      = "PROXMOX_LINK_STATUS_INVALID"
+	CodeProxmoxMetricsSourceInvalid   = "PROXMOX_METRICS_SOURCE_INVALID"
+	CodeProxmoxConsoleQemuUnsupported = "PROXMOX_CONSOLE_QEMU_UNSUPPORTED"
+	CodeProxmoxConsoleNotConfigured   = "PROXMOX_CONSOLE_NOT_CONFIGURED"
+	CodeTrackerComposeTargetRequired  = "TRACKER_COMPOSE_TARGET_REQUIRED"
+	CodeTrackerNoInitialCheck         = "TRACKER_NO_INITIAL_CHECK"
+	CodeTrackerWatchOnly              = "TRACKER_WATCH_ONLY"
+	CodeTrackerNoInitialRelease       = "TRACKER_NO_INITIAL_RELEASE"
+	CodeDiscoveryCIDRInvalid          = "DISCOVERY_CIDR_INVALID"
+	CodeDiscoveryIPv4Only             = "DISCOVERY_IPV4_ONLY"
+	CodeDiscoveryPrefixRange          = "DISCOVERY_PREFIX_RANGE"
 )
 
 // DefaultLanguage is what GetMessage falls back to for a language it has no
@@ -231,25 +254,46 @@ var ErrorCatalog = map[string]ErrorMessage{
 	},
 	CodeAlertTemplateNotFound: {"en": "template not found", "fr": "modèle introuvable"},
 
-	CodeRunbookNotFound:            {"en": "runbook not found", "fr": "runbook introuvable"},
-	CodeRunbookNameRequired:        {"en": "the runbook name is required", "fr": "le nom du runbook est requis"},
-	CodeRunbookCreateFailed:        {"en": "could not create the runbook", "fr": "erreur lors de la création du runbook"},
-	CodeRunbookUpdateFailed:        {"en": "could not update the runbook", "fr": "erreur lors de la mise à jour du runbook"},
-	CodeRunbookNoSteps:             {"en": "this runbook has no steps", "fr": "ce runbook n'a aucune étape"},
-	CodeRunbookRunFailed:           {"en": "could not start the runbook", "fr": "erreur lors du lancement du runbook"},
-	CodeRunbookExecutionNotFound:   {"en": "execution not found", "fr": "exécution introuvable"},
-	CodeRunbookStepsRequired:       {"en": "a runbook must have at least one step", "fr": "le runbook doit avoir au moins une étape"},
-	CodeRunbookStepsInvalid:        {"en": "could not validate the steps", "fr": "erreur lors de la validation des étapes"},
-	CodeAlertRuleIDInvalid:         {"en": "invalid alert rule id", "fr": "identifiant de règle invalide"},
-	CodeAlertChannelInvalid:        {"en": "invalid notification channel: {channel}", "fr": "canal de notification invalide : {channel}"},
-	CodeAlertCommandModuleInvalid:  {"en": "invalid command module: {module}", "fr": "module de commande invalide : {module}"},
-	CodeAlertCommandActionInvalid:  {"en": "invalid action for module {module}: {action}", "fr": "action invalide pour le module {module} : {action}"},
-	CodeAlertCommandTargetRequired: {"en": "module {module} requires a target", "fr": "le module {module} requiert une cible"},
-	CodeRunbookStepHostRequired:    {"en": "step {step}: the host is required", "fr": "étape {step} : l'hôte est requis"},
-	CodeRunbookStepHostNotFound:    {"en": "step {step}: host not found", "fr": "étape {step} : hôte introuvable"},
-	CodeRunbookStepModuleInvalid:   {"en": "step {step}: invalid module ({module})", "fr": "étape {step} : module invalide ({module})"},
-	CodeRunbookStepActionInvalid:   {"en": "step {step}: invalid action for module {module} ({action})", "fr": "étape {step} : action invalide pour le module {module} ({action})"},
-	CodeRunbookStepTargetRequired:  {"en": "step {step}: module {module} requires a target", "fr": "étape {step} : le module {module} requiert une cible"},
+	CodeRunbookNotFound:               {"en": "runbook not found", "fr": "runbook introuvable"},
+	CodeRunbookNameRequired:           {"en": "the runbook name is required", "fr": "le nom du runbook est requis"},
+	CodeRunbookCreateFailed:           {"en": "could not create the runbook", "fr": "erreur lors de la création du runbook"},
+	CodeRunbookUpdateFailed:           {"en": "could not update the runbook", "fr": "erreur lors de la mise à jour du runbook"},
+	CodeRunbookNoSteps:                {"en": "this runbook has no steps", "fr": "ce runbook n'a aucune étape"},
+	CodeRunbookRunFailed:              {"en": "could not start the runbook", "fr": "erreur lors du lancement du runbook"},
+	CodeRunbookExecutionNotFound:      {"en": "execution not found", "fr": "exécution introuvable"},
+	CodeRunbookStepsRequired:          {"en": "a runbook must have at least one step", "fr": "le runbook doit avoir au moins une étape"},
+	CodeRunbookStepsInvalid:           {"en": "could not validate the steps", "fr": "erreur lors de la validation des étapes"},
+	CodeAlertRuleIDInvalid:            {"en": "invalid alert rule id", "fr": "identifiant de règle invalide"},
+	CodeAlertChannelInvalid:           {"en": "invalid notification channel: {channel}", "fr": "canal de notification invalide : {channel}"},
+	CodeAlertCommandModuleInvalid:     {"en": "invalid command module: {module}", "fr": "module de commande invalide : {module}"},
+	CodeAlertCommandActionInvalid:     {"en": "invalid action for module {module}: {action}", "fr": "action invalide pour le module {module} : {action}"},
+	CodeAlertCommandTargetRequired:    {"en": "module {module} requires a target", "fr": "le module {module} requiert une cible"},
+	CodeRunbookStepHostRequired:       {"en": "step {step}: the host is required", "fr": "étape {step} : l'hôte est requis"},
+	CodeRunbookStepHostNotFound:       {"en": "step {step}: host not found", "fr": "étape {step} : hôte introuvable"},
+	CodeRunbookStepModuleInvalid:      {"en": "step {step}: invalid module ({module})", "fr": "étape {step} : module invalide ({module})"},
+	CodeRunbookStepActionInvalid:      {"en": "step {step}: invalid action for module {module} ({action})", "fr": "étape {step} : action invalide pour le module {module} ({action})"},
+	CodeRunbookStepTargetRequired:     {"en": "step {step}: module {module} requires a target", "fr": "étape {step} : le module {module} requiert une cible"},
+	CodeHostPermLevelInvalid:          {"en": "level must be 'viewer' or 'operator'", "fr": "le niveau doit être 'viewer' ou 'operator'"},
+	CodeConfigParamUnknown:            {"en": "unknown configuration parameter: {key}", "fr": "paramètre de configuration inconnu : {key}"},
+	CodeConfigParamEnvOnly:            {"en": "parameter {key} is managed through the Docker environment only", "fr": "le paramètre {key} est géré uniquement via l'environnement Docker"},
+	CodeConfigParamNotEditable:        {"en": "parameter {key} is not editable", "fr": "le paramètre {key} n'est pas modifiable"},
+	CodeConfigValueInvalid:            {"en": "invalid value for {key}: {reason}", "fr": "valeur invalide pour {key} : {reason}"},
+	CodeConfigSaveFailed:              {"en": "could not save {key}: {reason}", "fr": "erreur lors de l'enregistrement de {key} : {reason}"},
+	CodeConfigResetFailed:             {"en": "could not reset {key}: {reason}", "fr": "erreur lors de la réinitialisation de {key} : {reason}"},
+	CodeScheduledTaskModuleInvalid:    {"en": "invalid module: {module}", "fr": "module invalide : {module}"},
+	CodeScheduledTaskActionRequired:   {"en": "action is required", "fr": "action requise"},
+	CodeScheduledTaskCronInvalid:      {"en": "invalid cron expression: {reason}", "fr": "expression cron invalide : {reason}"},
+	CodeProxmoxLinkStatusInvalid:      {"en": "invalid status: must be suggested, confirmed or ignored", "fr": "status invalide : doit être suggested, confirmed ou ignored"},
+	CodeProxmoxMetricsSourceInvalid:   {"en": "invalid metrics_source: must be auto, agent or proxmox", "fr": "metrics_source invalide : doit être auto, agent ou proxmox"},
+	CodeProxmoxConsoleQemuUnsupported: {"en": "console is not available for QEMU VMs yet", "fr": "console non disponible pour les VM QEMU pour le moment"},
+	CodeProxmoxConsoleNotConfigured:   {"en": "PVE console is not configured for this connection: credentials required", "fr": "console PVE non configurée pour cette connexion : identifiants requis"},
+	CodeTrackerComposeTargetRequired:  {"en": "compose mode: configure a target VM and a compose project to trigger manually", "fr": "mode compose : configurez une VM cible et un projet compose pour déclencher manuellement"},
+	CodeTrackerNoInitialCheck:         {"en": "no initial check has run yet: wait for the next polling cycle before triggering manually", "fr": "aucune vérification initiale effectuée — attendez le prochain cycle de polling avant de déclencher manuellement"},
+	CodeTrackerWatchOnly:              {"en": "tracker is watch-only: configure a target VM and a task to trigger manually", "fr": "tracker en mode surveillance seule — configurez une VM cible et une tâche pour déclencher manuellement"},
+	CodeTrackerNoInitialRelease:       {"en": "no initial release recorded: wait for the next polling cycle before triggering manually", "fr": "aucune release initiale enregistrée — attendez le prochain cycle de polling avant de déclencher manuellement"},
+	CodeDiscoveryCIDRInvalid:          {"en": "invalid CIDR address", "fr": "adresse CIDR invalide"},
+	CodeDiscoveryIPv4Only:             {"en": "only IPv4 is supported for network discovery", "fr": "seul IPv4 est pris en charge pour la découverte réseau"},
+	CodeDiscoveryPrefixRange:          {"en": "the prefix must be between /{min} and /{max} (254 addresses max)", "fr": "le préfixe doit être compris entre /{min} et /{max} (254 adresses max)"},
 }
 
 // ErrorResponse is the standalone error-response shape used by call sites

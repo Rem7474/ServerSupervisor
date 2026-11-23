@@ -28,9 +28,9 @@
             <span class="text-muted mx-1">/</span>
             <span>{{ t('common.myAccount') }}</span>
           </div>
-          <h2 class="page-title">
+          <h1 class="page-title">
             {{ t('common.myAccount') }}
-          </h2>
+          </h1>
           <div class="text-secondary">
             {{ t('account.manageAccountSubtitle') }}
           </div>
@@ -184,8 +184,12 @@
             <div class="card-body">
               <form @submit.prevent="submitChangePassword">
                 <div class="mb-3">
-                  <label class="form-label required">{{ t('account.currentPasswordLabel') }}</label>
+                  <label
+                    :for="`${uid}-1`"
+                    class="form-label required"
+                  >{{ t('account.currentPasswordLabel') }}</label>
                   <input
+                    :id="`${uid}-1`"
                     v-model="pwForm.current"
                     type="password"
                     class="form-control"
@@ -201,8 +205,12 @@
                   </div>
                 </div>
                 <div class="mb-3">
-                  <label class="form-label required">{{ t('account.newPasswordLabel') }}</label>
+                  <label
+                    :for="`${uid}-2`"
+                    class="form-label required"
+                  >{{ t('account.newPasswordLabel') }}</label>
                   <input
+                    :id="`${uid}-2`"
                     v-model="pwForm.next"
                     type="password"
                     class="form-control"
@@ -242,8 +250,12 @@
                   </div>
                 </div>
                 <div class="mb-4">
-                  <label class="form-label required">{{ t('account.confirmNewPasswordLabel') }}</label>
+                  <label
+                    :for="`${uid}-3`"
+                    class="form-label required"
+                  >{{ t('account.confirmNewPasswordLabel') }}</label>
                   <input
+                    :id="`${uid}-3`"
                     v-model="pwForm.confirm"
                     type="password"
                     class="form-control"
@@ -411,6 +423,7 @@
 </template>
 
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
 import AccountSecurityPanel from '../components/account/AccountSecurityPanel.vue'
@@ -419,6 +432,8 @@ import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { useAccount } from '../composables/useAccount'
+
+const uid = useId()
 
 const { t } = useI18n()
 

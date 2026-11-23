@@ -137,6 +137,15 @@ describe('AuditLogsView', () => {
     expect(wrapper.find('a.nav-link.active').text()).toBe('Journal')
   })
 
+  it('loads the logins tab immediately on mount when ?tab=logins', async () => {
+    route.query = { tab: 'logins' }
+    const wrapper = mountAuditView()
+    await flushPromises()
+
+    expect(getLoginEventsAdmin).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('a.nav-link.active').text()).toBe('Connexions')
+  })
+
   it('switches tabs reactively when route.query.tab changes while already on /audit', async () => {
     route.query = { tab: 'commands' }
     const wrapper = mountAuditView()

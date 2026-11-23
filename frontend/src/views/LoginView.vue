@@ -18,9 +18,9 @@
         @submit.prevent="handleLogin"
       >
         <div class="card-body">
-          <h2 class="card-title text-center mb-4">
+          <h1 class="card-title text-center mb-4 h2">
             {{ t('auth.signIn') }}
-          </h2>
+          </h1>
 
           <!-- OIDC / SSO Button -->
           <div
@@ -46,8 +46,12 @@
 
           <div v-if="!oidcStatus?.enabled || oidcStatus?.allow_local_login">
             <div class="mb-3">
-              <label class="form-label">{{ t('common.user') }}</label>
+              <label
+                :for="`${uid}-1`"
+                class="form-label"
+              >{{ t('common.user') }}</label>
               <input
+                :id="`${uid}-1`"
                 ref="usernameInput"
                 v-model="username"
                 type="text"
@@ -60,8 +64,12 @@
               >
             </div>
             <div class="mb-3">
-              <label class="form-label">{{ t('auth.password') }}</label>
+              <label
+                :for="`${uid}-2`"
+                class="form-label"
+              >{{ t('auth.password') }}</label>
               <input
+                :id="`${uid}-2`"
                 v-model="password"
                 type="password"
                 class="form-control"
@@ -81,10 +89,12 @@
             >
               <label
                 v-if="mfaMethods?.totp"
+                :for="`${uid}-3`"
                 class="form-label"
               >{{ t('auth.totpCode') }}</label>
               <input
                 v-if="mfaMethods?.totp"
+                :id="`${uid}-3`"
                 ref="totpInput"
                 v-model="totpCode"
                 type="text"
@@ -148,11 +158,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconKey } from '@tabler/icons-vue'
 import { useLogin } from '../composables/useLogin'
 import LocaleSwitcher from '../components/LocaleSwitcher.vue'
+
+const uid = useId()
 
 const { t } = useI18n()
 

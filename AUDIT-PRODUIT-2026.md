@@ -1,5 +1,7 @@
 # Audit produit — ServerSupervisor (août 2026)
 
+> Document figé (état d'août 2026). L'exécution est suivie dans les [Milestones GitHub](https://github.com/Rem7474/ServerSupervisor/milestones) et dans [ROADMAP.md](ROADMAP.md).
+
 Cet audit complète [AUDIT-2025.md](AUDIT-2025.md) (architecture technique, résolu) par une
 lecture **produit** : cartographie fonctionnelle, valeur utilisateur, écarts vis-à-vis d'un
 outil de supervision complet type Checkmk, et priorisation. Il a été réalisé à partir d'une

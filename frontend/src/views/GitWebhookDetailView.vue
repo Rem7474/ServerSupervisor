@@ -12,7 +12,7 @@
           <span class="text-muted mx-1">/</span>
           <span>{{ webhook?.name || id }}</span>
         </div>
-        <h2 class="page-title d-flex align-items-center gap-2">
+        <h1 class="page-title d-flex align-items-center gap-2">
           {{ webhook?.name }}
           <span
             v-if="webhook"
@@ -23,7 +23,7 @@
             v-if="webhook && !webhook.enabled"
             class="badge bg-secondary-lt text-secondary"
           >{{ t('webhooks.disabledBadge') }}</span>
-        </h2>
+        </h1>
       </div>
     </div>
 

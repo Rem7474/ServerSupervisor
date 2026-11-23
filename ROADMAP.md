@@ -8,6 +8,10 @@ Statut à maintenir au fil de l'eau : `Non démarré` / `En cours` / `Fait` / `�
 justification si écarté). Ne pas laisser ce document dériver du code réel — le mettre à jour
 au moment où un item change de statut, pas rétroactivement en bloc.
 
+> **Suivi courant :** le travail planifié est suivi dans les [Milestones GitHub](https://github.com/Rem7474/ServerSupervisor/milestones)
+> (`v12.1.0` Qualité/A11y/Docs, `v12.x` Backlog produit : alerting & fleet, observabilité & API externe,
+> infrastructure avancée). Les statuts ci-dessous restent la référence pour l'historique des items #1–#14.
+
 ---
 
 ## 1. Fonctionnalités manquantes, par palier

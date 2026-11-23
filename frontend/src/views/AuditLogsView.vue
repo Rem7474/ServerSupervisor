@@ -12,9 +12,9 @@
           <span class="text-muted mx-1">/</span>
           <span>{{ t('account.auditPageTitle') }}</span>
         </div>
-        <h2 class="page-title">
+        <h1 class="page-title">
           {{ t('account.auditPageTitle') }}
-        </h2>
+        </h1>
         <div class="text-secondary">
           {{ t('account.auditPageSubtitle') }}
         </div>

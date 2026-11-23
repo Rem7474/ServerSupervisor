@@ -439,6 +439,8 @@
     v-if="selectedContainer"
     ref="containerModalRef"
     class="modal modal-blur fade show d-block"
+    role="dialog"
+    aria-modal="true"
     @click.self="selectedContainer = null"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -456,25 +458,35 @@
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.containerLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.containerLabel') }}
+            </div>
             <div>{{ selectedContainer.name }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.composeProjectLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.composeProjectLabel') }}
+            </div>
             <div>{{ getComposeInfo(selectedContainer).project || '-' }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.serviceLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.serviceLabel') }}
+            </div>
             <div>{{ getComposeInfo(selectedContainer).service || '-' }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.workingDirLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.workingDirLabel') }}
+            </div>
             <div class="font-monospace small">
               {{ getComposeInfo(selectedContainer).workingDir || '-' }}
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">{{ t('docker.configFilesLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.configFilesLabel') }}
+            </div>
             <div class="font-monospace small">
               {{ getComposeInfo(selectedContainer).configFiles || '-' }}
             </div>
@@ -483,7 +495,9 @@
             v-if="Object.keys(selectedContainer.labels || {}).length > 0"
             class="mb-3"
           >
-            <label class="form-label fw-semibold">{{ t('docker.labelsLabel') }}</label>
+            <div class="form-label fw-semibold">
+              {{ t('docker.labelsLabel') }}
+            </div>
             <div
               class="border rounded p-2 bg-dark small font-monospace"
               style="max-height: 200px; overflow-y: auto;"
@@ -520,6 +534,8 @@
     v-if="inspectTarget"
     ref="inspectModalRef"
     class="modal modal-blur fade show d-block"
+    role="dialog"
+    aria-modal="true"
     @click.self="inspectTarget = null"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -591,28 +607,32 @@
                 v-if="Object.keys(inspectTarget.env_vars || {}).length === 0"
                 :title="t('docker.noEnvVars')"
               />
-              <table
+              <div
                 v-else
-                class="table table-sm table-vcenter"
+                class="table-responsive"
               >
-                <thead><tr><th>{{ t('docker.variableColumn') }}</th><th>{{ t('docker.valueColumn') }}</th></tr></thead>
-                <tbody>
-                  <tr
-                    v-for="(val, key) in inspectTarget.env_vars"
-                    :key="key"
-                  >
-                    <td class="font-monospace small fw-semibold">
-                      {{ key }}
-                    </td>
-                    <td
-                      class="font-monospace small text-secondary"
-                      style="word-break: break-all;"
+                <table
+                  class="table table-sm table-vcenter"
+                >
+                  <thead><tr><th>{{ t('docker.variableColumn') }}</th><th>{{ t('docker.valueColumn') }}</th></tr></thead>
+                  <tbody>
+                    <tr
+                      v-for="(val, key) in inspectTarget.env_vars"
+                      :key="key"
                     >
-                      {{ val }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                      <td class="font-monospace small fw-semibold">
+                        {{ key }}
+                      </td>
+                      <td
+                        class="font-monospace small text-secondary"
+                        style="word-break: break-all;"
+                      >
+                        {{ val }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
             <div v-if="inspectTab === 'volumes'">
               <EmptyState

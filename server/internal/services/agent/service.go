@@ -20,6 +20,7 @@ import (
 	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // CommandCompletionListener reacts to a remote command terminal state update.
@@ -207,7 +208,8 @@ func (s *Service) ReportCommandResult(ctx context.Context, hostID string, result
 		copy(listeners, s.completionListeners)
 		s.completionMu.RUnlock()
 		for _, listener := range listeners {
-			go listener.HandleCommandCompletion(result.CommandID, result.Status)
+			commandID, status := result.CommandID, result.Status
+			safego.Go(ctx, "command-completion-listener", func() { listener.HandleCommandCompletion(commandID, status) })
 		}
 	}
 
