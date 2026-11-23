@@ -238,6 +238,18 @@
       "label": "Jeton d'authentification ntfy",
       "description": "Token d'accès optionnel pour les topics ntfy privés."
     },
+    "SLACK_WEBHOOK_URL": {
+      "label": "URL du webhook Slack",
+      "description": "URL du webhook entrant Slack (https://hooks.slack.com/services/…) utilisée par le canal « slack » des règles d'alerte. L'URL est un secret."
+    },
+    "TEAMS_WEBHOOK_URL": {
+      "label": "URL du webhook Microsoft Teams",
+      "description": "URL du webhook entrant (Workflows) Microsoft Teams utilisée par le canal « teams » des règles d'alerte. L'URL est un secret."
+    },
+    "DISCORD_WEBHOOK_URL": {
+      "label": "URL du webhook Discord",
+      "description": "URL du webhook Discord (https://discord.com/api/webhooks/…) utilisée par le canal « discord » des règles d'alerte. L'URL est un secret."
+    },
     "SMTP_HOST": {
       "label": "Hôte SMTP",
       "description": "Adresse du serveur de messagerie sortant pour l'envoi d'emails d'alerte."

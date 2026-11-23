@@ -155,6 +155,9 @@ var AllParams = []ConfigParamDef{
 	// ==================== Notifications / Alerts ====================
 	strParam("NOTIFY_URL", "ntfy_url", "notifications", "", "URL du topic ntfy.sh", "URL complète du topic ntfy pour les alertes push instantanées (ex: https://ntfy.sh/mon-serveur).", false, false),
 	strParam("NTFY_AUTH_TOKEN", "ntfy_auth_token", "notifications", "", "Jeton d'authentification ntfy", "Token d'accès optionnel pour les topics ntfy privés.", true, false),
+	strParam("SLACK_WEBHOOK_URL", "slack_webhook_url", "notifications", "", "URL du webhook Slack", "URL du webhook entrant Slack (https://hooks.slack.com/services/…) utilisée par le canal « slack » des règles d'alerte. L'URL est un secret.", true, false, ValidateChatWebhookURL),
+	strParam("TEAMS_WEBHOOK_URL", "teams_webhook_url", "notifications", "", "URL du webhook Microsoft Teams", "URL du webhook entrant (Workflows) Microsoft Teams utilisée par le canal « teams » des règles d'alerte. L'URL est un secret.", true, false, ValidateChatWebhookURL),
+	strParam("DISCORD_WEBHOOK_URL", "discord_webhook_url", "notifications", "", "URL du webhook Discord", "URL du webhook Discord (https://discord.com/api/webhooks/…) utilisée par le canal « discord » des règles d'alerte. L'URL est un secret.", true, false, ValidateChatWebhookURL),
 	strParam("SMTP_HOST", "smtp_host", "notifications", "", "Hôte SMTP", "Adresse du serveur de messagerie sortant pour l'envoi d'emails d'alerte.", false, false),
 	intParam("SMTP_PORT", "smtp_port", "notifications", "587", "Port SMTP", "Port de connexion SMTP (généralement 587 pour STARTTLS, 465 pour SMTPS).", false, validatePort),
 	strParam("SMTP_USER", "smtp_user", "notifications", "", "Utilisateur SMTP", "Identifiant d'authentification auprès du serveur SMTP.", false, false),

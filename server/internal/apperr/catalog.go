@@ -114,6 +114,9 @@ const (
 	CodeDiscoveryCIDRInvalid          = "DISCOVERY_CIDR_INVALID"
 	CodeDiscoveryIPv4Only             = "DISCOVERY_IPV4_ONLY"
 	CodeDiscoveryPrefixRange          = "DISCOVERY_PREFIX_RANGE"
+	CodeSettingsWebhookURLInvalid     = "SETTINGS_WEBHOOK_URL_INVALID"
+	CodeSettingsWebhookNotConfigured  = "SETTINGS_WEBHOOK_NOT_CONFIGURED"
+	CodeSettingsWebhookSendFailed     = "SETTINGS_WEBHOOK_SEND_FAILED"
 )
 
 // DefaultLanguage is what GetMessage falls back to for a language it has no
@@ -298,6 +301,9 @@ var ErrorCatalog = map[string]ErrorMessage{
 	CodeTrackerNoInitialRelease:       {"en": "no initial release recorded: wait for the next polling cycle before triggering manually", "fr": "aucune release initiale enregistrée — attendez le prochain cycle de polling avant de déclencher manuellement"},
 	CodeDiscoveryCIDRInvalid:          {"en": "invalid CIDR address", "fr": "adresse CIDR invalide"},
 	CodeDiscoveryIPv4Only:             {"en": "only IPv4 is supported for network discovery", "fr": "seul IPv4 est pris en charge pour la découverte réseau"},
+	CodeSettingsWebhookURLInvalid:     {"en": "invalid {provider} webhook URL: it must be an https URL that does not target a local or private address", "fr": "URL de webhook {provider} invalide : elle doit être en https et ne pas cibler une adresse locale ou privée"},
+	CodeSettingsWebhookNotConfigured:  {"en": "{provider} webhook URL not configured", "fr": "URL de webhook {provider} non configurée"},
+	CodeSettingsWebhookSendFailed:     {"en": "could not send the {provider} test message: {reason}", "fr": "échec de l'envoi du message de test {provider} : {reason}"},
 	CodeDiscoveryPrefixRange:          {"en": "the prefix must be between /{min} and /{max} (254 addresses max)", "fr": "le préfixe doit être compris entre /{min} et /{max} (254 adresses max)"},
 }
 

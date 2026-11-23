@@ -165,5 +165,18 @@
   "ntfyTestSentMsg": "Message test envoyé",
   "metricsCleanupDoneMsg": "Nettoyage des métriques terminé",
   "auditCleanupDoneMsg": "Nettoyage des logs audit terminé",
-  "saveErrorPrefix": "Erreur : {message}"
+  "saveErrorPrefix": "Erreur : {message}",
+  "chatWebhooks": {
+    "title": "Webhooks de messagerie (Slack, Teams, Discord)",
+    "intro": "URL de webhooks entrants utilisées par les canaux Slack, Teams et Discord des règles d'alerte. L'URL est un secret : elle est stockée côté serveur et n'est plus affichée. Seules les destinations https publiques sont acceptées.",
+    "slack": "Slack",
+    "teams": "Microsoft Teams",
+    "discord": "Discord",
+    "test": "Tester",
+    "testAria": "Envoyer un message de test à {provider}",
+    "configuredHint": "Une URL est enregistrée. Saisissez-en une nouvelle pour la remplacer.",
+    "emptyHint": "Aucune URL enregistrée.",
+    "savedMsg": "Webhooks de messagerie enregistrés",
+    "testSentMsg": "Message de test envoyé à {provider}"
+  }
 }

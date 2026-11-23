@@ -112,6 +112,7 @@
                 v-model:channel-smtp="channelSmtp"
                 v-model:channel-ntfy="channelNtfy"
                 v-model:channel-browser="channelBrowser"
+                v-model:channel-chat="channelChat"
                 v-model:command-trigger-enabled="commandTriggerEnabled"
                 :form="form"
                 :rule="rule"
@@ -336,6 +337,7 @@ const {
   channelSmtp,
   channelNtfy,
   channelBrowser,
+  channelChat,
   commandTriggerEnabled,
   hydrateFormFromRule,
   onMetricChange,

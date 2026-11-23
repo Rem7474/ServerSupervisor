@@ -98,6 +98,9 @@ plus ancien au plus récent.
 |---|---|---|
 | `smtp` | Email | `SMTP_HOST`/`SMTP_FROM` globaux + `actions.smtp_to` sur la règle |
 | `ntfy` | Push ntfy | `NOTIFY_URL` global fournit le serveur (schéma + hôte) ; `actions.ntfy_topic` surcharge le topic par règle |
+| `slack` | Message Slack (webhook entrant) | URL enregistrée dans **Paramètres → Notifications** (`SLACK_WEBHOOK_URL`) |
+| `teams` | Carte adaptive Microsoft Teams (webhook entrant Workflows) | URL enregistrée dans **Paramètres → Notifications** (`TEAMS_WEBHOOK_URL`) |
+| `discord` | Embed Discord (webhook) | URL enregistrée dans **Paramètres → Notifications** (`DISCORD_WEBHOOK_URL`) |
 | `browser` | Notification in-app (WebSocket) **et** Web Push si le navigateur est abonné | Aucune — les clés VAPID sont générées et persistées automatiquement au premier envoi (voir [Notifications](Notifications.md)) |
 | `notify` | **Déprécié.** POST JSON brut vers `NOTIFY_URL` | `NOTIFY_URL` |
 
@@ -106,11 +109,12 @@ il ne fait pas échouer les autres canaux de la même notification. Le Web Push 
 qu'aux comptes **admin** abonnés, quel que soit le rôle ciblé par la règle — voir
 [Notifications](Notifications.md#3-portée--qui-reçoit-quoi).
 
-> Le canal `notify` est la seule forme de « webhook générique » existante, et
-> il est marqué déprécié dans le code. Un vrai canal
-> Slack/Teams/Discord/webhook reste un item ouvert de la
-> [roadmap](https://github.com/Rem7474/ServerSupervisor/blob/main/ROADMAP.md) (#6) — ne comptez pas dessus pour une intégration
-> neuve.
+Les canaux `slack`, `teams` et `discord` partagent les mêmes règles :
+
+- L'URL du webhook est un **secret** : stockée côté serveur, jamais renvoyée par l'API (seul un indicateur « configuré » l'est) ni écrite dans les logs. Saisir une nouvelle URL dans la carte « Webhooks de messagerie » remplace l'ancienne ; laisser le champ vide la conserve.
+- Seules les URL `https` visant une destination publique sont acceptées : une adresse littérale locale, privée ou link-local, `localhost` ou des identifiants dans l'URL sont refusés à l'enregistrement, et le serveur refuse aussi de se connecter à une adresse locale/privée résolue par DNS. Les redirections ne sont pas suivies, et aucun proxy n'est utilisé. Un serveur compatible Slack hébergé sur le réseau privé n'est donc pas joignable.
+- Le bouton **Tester** de la carte envoie un message de test à l'URL enregistrée (`POST /api/v1/settings/test-webhook/{slack|teams|discord}`).
+- Comme `smtp` et `ntfy`, ces canaux ne notifient que le déclenchement d'une alerte, pas sa résolution.
 
 ### Cooldown et escalade
 

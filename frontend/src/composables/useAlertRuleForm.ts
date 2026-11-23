@@ -116,11 +116,14 @@ interface AlertRulePayload extends Omit<AlertRuleFormData, 'proxmox_scope' | 'do
   threshold_clear_crit: number | null
 }
 
+export const CHAT_CHANNELS = ['slack', 'teams', 'discord']
+
 interface AlertRuleFormApi {
   form: Ref<AlertRuleFormData>
   channelSmtp: Ref<boolean>
   channelNtfy: Ref<boolean>
   channelBrowser: Ref<boolean>
+  channelChat: Ref<string[]>
   commandTriggerEnabled: Ref<boolean>
   defaultCommandTrigger: () => CommandTrigger
   defaultForm: () => AlertRuleFormData
@@ -139,6 +142,8 @@ export function useAlertRuleForm(): AlertRuleFormApi {
   const channelSmtp: Ref<boolean> = ref(false)
   const channelNtfy: Ref<boolean> = ref(false)
   const channelBrowser: Ref<boolean> = ref(false)
+  // Slack/Teams/Discord webhook channels selected for the rule.
+  const channelChat: Ref<string[]> = ref([])
   const commandTriggerEnabled: Ref<boolean> = ref(false)
 
   const defaultCommandTrigger = (): CommandTrigger => ({ module: 'processes', action: 'list', target: '' })
@@ -189,6 +194,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       form.value = defaultForm()
       channelSmtp.value = false
       channelNtfy.value = false
+      channelChat.value = []
       channelBrowser.value = false
       commandTriggerEnabled.value = false
       return
@@ -260,6 +266,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     channelSmtp.value = actions.channels?.includes('smtp') || false
     channelNtfy.value = actions.channels?.includes('ntfy') || false
     channelBrowser.value = actions.channels?.includes('browser') || false
+    channelChat.value = CHAT_CHANNELS.filter(c => actions.channels?.includes(c))
     commandTriggerEnabled.value = !!commandTrigger
   }
 
@@ -371,6 +378,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     if (channelSmtp.value) channels.push('smtp')
     if (channelNtfy.value) channels.push('ntfy')
     if (channelBrowser.value) channels.push('browser')
+    channels.push(...channelChat.value)
 
     const actions: AlertRuleFormActions = {
       ...form.value.actions,
@@ -400,6 +408,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     channelSmtp,
     channelNtfy,
     channelBrowser,
+    channelChat,
     commandTriggerEnabled,
     defaultCommandTrigger,
     defaultForm,

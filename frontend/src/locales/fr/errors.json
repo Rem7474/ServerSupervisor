@@ -101,5 +101,8 @@
   "TRACKER_NO_INITIAL_RELEASE": "aucune release initiale enregistrée — attendez le prochain cycle de polling avant de déclencher manuellement",
   "DISCOVERY_CIDR_INVALID": "adresse CIDR invalide",
   "DISCOVERY_IPV4_ONLY": "seul IPv4 est pris en charge pour la découverte réseau",
-  "DISCOVERY_PREFIX_RANGE": "le préfixe doit être compris entre /{min} et /{max} (254 adresses max)"
+  "DISCOVERY_PREFIX_RANGE": "le préfixe doit être compris entre /{min} et /{max} (254 adresses max)",
+  "SETTINGS_WEBHOOK_URL_INVALID": "URL de webhook {provider} invalide : elle doit être en https et ne pas cibler une adresse locale ou privée",
+  "SETTINGS_WEBHOOK_NOT_CONFIGURED": "URL de webhook {provider} non configurée",
+  "SETTINGS_WEBHOOK_SEND_FAILED": "échec de l'envoi du message de test {provider} : {reason}"
 }

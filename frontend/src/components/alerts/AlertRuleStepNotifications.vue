@@ -83,6 +83,19 @@
           >
           <span class="form-check-label">{{ t('alerts.channelNtfyLabel') }}</span>
         </label>
+        <label
+          v-for="chat in CHAT_CHANNELS"
+          :key="chat"
+          class="form-check form-check-inline"
+        >
+          <input
+            v-model="channelChat"
+            class="form-check-input"
+            type="checkbox"
+            :value="chat"
+          >
+          <span class="form-check-label">{{ t(CHAT_LABEL_KEYS[chat]) }}</span>
+        </label>
         <label class="form-check form-check-inline">
           <input
             v-model="channelBrowser"
@@ -186,10 +199,16 @@
 import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AlertRuleCommandTrigger from './AlertRuleCommandTrigger.vue'
-import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
+import { CHAT_CHANNELS, type AlertRuleFormData } from '../../composables/useAlertRuleForm'
 import { formatDateTimeSeconds } from '../../utils/formatters'
 
 const uid = useId()
+
+const CHAT_LABEL_KEYS: Record<string, string> = {
+  slack: 'alerts.channelSlackLabel',
+  teams: 'alerts.channelTeamsLabel',
+  discord: 'alerts.channelDiscordLabel',
+}
 
 interface TestResults {
   any_fires?: boolean
@@ -209,6 +228,7 @@ const { t } = useI18n()
 const channelSmtp = defineModel<boolean>('channelSmtp', { default: false })
 const channelNtfy = defineModel<boolean>('channelNtfy', { default: false })
 const channelBrowser = defineModel<boolean>('channelBrowser', { default: false })
+const channelChat = defineModel<string[]>('channelChat', { default: () => [] })
 const commandTriggerEnabled = defineModel<boolean>('commandTriggerEnabled', { default: false })
 
 function formatDate(dateStr?: string): string {

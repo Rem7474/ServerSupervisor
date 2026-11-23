@@ -25,7 +25,7 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 | 3 | Escalade d'alertes (relance après N minutes si non acquittée) | Aucune existante — un incident critique non vu reste silencieux | Fait |
 | 4 | Acquittement (ack) d'incident + statut « en cours de traitement » | Prérequis technique de l'escalade (#3) et du dédup (#5) | Fait |
 | 5 | Déduplication / groupement d'alertes corrélées | Un hôte down peut aujourd'hui déclencher une cascade d'alertes filles indépendantes | Fait |
-| 6 | Canal Slack / Teams / Discord / webhook générique | Canaux réels : SMTP, ntfy, navigateur (in-app + Web Push), plus un canal `notify` **déprécié** qui POSTe du JSON brut vers `NOTIFY_URL` — c'est lui, et non ntfy, que la prose « webhook » recouvrait | Non démarré |
+| 6 | Canal Slack / Teams / Discord / webhook générique | Canaux Slack, Teams et Discord (webhooks entrants, déclenchement d'alerte) ; le canal `notify` déprécié POSTe du JSON brut vers `NOTIFY_URL`. Un webhook générique sortant (corps JSON libre, en-têtes) n'existe pas | Partiel |
 | 7 | Groupes dynamiques d'hôtes + règles par groupe | Le tagging brut **existe** (`hosts.tags`, éditable, filtrable sur le dashboard et à l'application d'un modèle de règle) — ce qui manque est la couche au-dessus : groupes dérivés d'un tag, et règles/permissions ciblant un groupe plutôt qu'un hôte | En cours |
 
 ### Should have — élargit la couverture sans agent
@@ -141,7 +141,7 @@ jamais pièce par pièce (voir `CLAUDE.md`, section serveur).
 2. ~~Fenêtres de maintenance~~ — fait
 3. ~~Escalade + ack d'incidents~~ — fait
 4. ~~Déduplication / groupement d'alertes~~ — fait
-5. Canal webhook générique (Slack/Teams/Discord)
+5. Canal webhook générique — Slack/Teams/Discord faits, webhook JSON libre non démarré
 6. Groupes dynamiques d'hôtes (le tagging brut existe déjà)
 7. ~~Secret scanning + Trivy bloquant en CI~~ — fait
 8. Finir les assets PWA réels (icônes, captures — actuellement des placeholders SVG)

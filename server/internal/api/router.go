@@ -435,6 +435,7 @@ func registerSettingsRoutes(g *gin.RouterGroup, h *handlers.SettingsHandler) {
 	g.PUT("/settings", h.UpdateSettings)
 	g.POST("/settings/test-smtp", h.TestSmtp)
 	g.POST("/settings/test-ntfy", h.TestNtfy)
+	g.POST("/settings/test-webhook/:provider", h.TestWebhook)
 	g.POST("/settings/cleanup-metrics", h.CleanupMetrics)
 	g.POST("/settings/cleanup-audit", h.CleanupAuditLogs)
 }

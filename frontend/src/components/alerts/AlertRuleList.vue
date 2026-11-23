@@ -237,6 +237,9 @@ function channelLabel(channel: string): string {
   if (channel === 'smtp') return t('alerts.channelEmail')
   if (channel === 'ntfy') return t('alerts.channelNtfyShort')
   if (channel === 'notify') return t('alerts.channelNotify')
+  if (channel === 'slack') return t('alerts.channelSlackLabel')
+  if (channel === 'teams') return t('alerts.channelTeamsLabel')
+  if (channel === 'discord') return t('alerts.channelDiscordLabel')
   return channel
 }
 

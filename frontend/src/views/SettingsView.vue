@@ -110,6 +110,22 @@
               @test="testNtfy"
             />
           </div>
+          <div class="mt-4">
+            <SettingsChatWebhooksCard
+              :urls="chatWebhooks.urls"
+              :configured="{ slack: settings.slackWebhookConfigured, teams: settings.teamsWebhookConfigured, discord: settings.discordWebhookConfigured }"
+              :testing="chatWebhooks.testing"
+              :auth-is-admin="auth.isAdmin"
+              :saving="chatWebhooks.saving.value"
+              :save-msg="chatWebhooks.saveMsg.value"
+              :save-ok="chatWebhooks.saveOk.value"
+              :test-msg="chatWebhooks.testMsg.value"
+              :test-ok="chatWebhooks.testOk.value"
+              @update:url="(p, v) => { chatWebhooks.urls[p] = v }"
+              @save="chatWebhooks.save"
+              @test="chatWebhooks.test"
+            />
+          </div>
         </div>
 
         <!-- Integrations -->
@@ -188,7 +204,9 @@ import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCar
 import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 import SettingsNPMCard from '../components/settings/SettingsNPMCard.vue'
 import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegistryCredentialsCard.vue'
+import SettingsChatWebhooksCard from '../components/settings/SettingsChatWebhooksCard.vue'
 import { useSettings } from '../composables/useSettings'
+import { useChatWebhooks } from '../composables/useChatWebhooks'
 
 const { t } = useI18n()
 
@@ -242,5 +260,8 @@ const {
   testNtfy,
   cleanMetrics,
   cleanAuditLogs,
+  fetchSettings,
 } = useSettings()
+
+const chatWebhooks = useChatWebhooks(fetchSettings)
 </script>

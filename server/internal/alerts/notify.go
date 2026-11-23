@@ -113,6 +113,7 @@ func firedEvent(cfg *config.Config, rule models.AlertRule, host models.Host, val
 		NtfyTitle:   "ServerSupervisor Alert",
 		NtfyBody:    msg,
 		NtfyURL:     ntfyURL,
+		Chat:        &notify.ChatMessage{Title: "ServerSupervisor Alert", Text: msg, Color: chatSeverityColor(DetermineSeverity(rule, host, value))},
 		LegacyWebhook: map[string]interface{}{
 			"title":          "ServerSupervisor Alert",
 			"message":        msg,
@@ -387,4 +388,13 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 		return nil
 	}
 	return &result.Command.ID
+}
+
+// chatSeverityColor is the accent of the Discord embed: the UI's "warning"
+// amber for a warn-level breach, the "danger" red otherwise.
+func chatSeverityColor(sev AlertSeverity) int {
+	if sev == SeverityWarn {
+		return 0xf59f00
+	}
+	return 0xd63939
 }

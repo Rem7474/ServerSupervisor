@@ -101,5 +101,8 @@
   "TRACKER_NO_INITIAL_RELEASE": "no initial release recorded: wait for the next polling cycle before triggering manually",
   "DISCOVERY_CIDR_INVALID": "invalid CIDR address",
   "DISCOVERY_IPV4_ONLY": "only IPv4 is supported for network discovery",
-  "DISCOVERY_PREFIX_RANGE": "the prefix must be between /{min} and /{max} (254 addresses max)"
+  "DISCOVERY_PREFIX_RANGE": "the prefix must be between /{min} and /{max} (254 addresses max)",
+  "SETTINGS_WEBHOOK_URL_INVALID": "invalid {provider} webhook URL: it must be an https URL that does not target a local or private address",
+  "SETTINGS_WEBHOOK_NOT_CONFIGURED": "{provider} webhook URL not configured",
+  "SETTINGS_WEBHOOK_SEND_FAILED": "could not send the {provider} test message: {reason}"
 }

@@ -106,13 +106,18 @@ type Config struct {
 	// Alerts
 	NotifyURL     string
 	NtfyAuthToken string
-	SMTPHost      string
-	SMTPPort      int
-	SMTPUser      string
-	SMTPPass      string
-	SMTPFrom      string
-	SMTPTo        string
-	SMTPTLS       bool
+	// Incoming-webhook URLs of the Slack/Teams/Discord channels. The URL is
+	// the credential, so all three are secrets.
+	SlackWebhookURL   string
+	TeamsWebhookURL   string
+	DiscordWebhookURL string
+	SMTPHost          string
+	SMTPPort          int
+	SMTPUser          string
+	SMTPPass          string
+	SMTPFrom          string
+	SMTPTo            string
+	SMTPTLS           bool
 
 	// Metrics and Audit retention
 	MetricsRetentionDays int
@@ -270,15 +275,18 @@ func Load() *Config {
 
 		DockerImagePollInterval: getDurationEnv("DOCKER_IMAGE_POLL_INTERVAL", 6*time.Hour),
 
-		NotifyURL:     getEnv("NOTIFY_URL", ""),
-		NtfyAuthToken: getEnv("NTFY_AUTH_TOKEN", ""),
-		SMTPHost:      getEnv("SMTP_HOST", ""),
-		SMTPPort:      getIntEnv("SMTP_PORT", 587),
-		SMTPUser:      getEnv("SMTP_USER", ""),
-		SMTPPass:      getEnv("SMTP_PASS", ""),
-		SMTPFrom:      getEnv("SMTP_FROM", ""),
-		SMTPTo:        getEnv("SMTP_TO", ""),
-		SMTPTLS:       getBoolEnv("SMTP_TLS", true),
+		NotifyURL:         getEnv("NOTIFY_URL", ""),
+		NtfyAuthToken:     getEnv("NTFY_AUTH_TOKEN", ""),
+		SlackWebhookURL:   getEnv("SLACK_WEBHOOK_URL", ""),
+		TeamsWebhookURL:   getEnv("TEAMS_WEBHOOK_URL", ""),
+		DiscordWebhookURL: getEnv("DISCORD_WEBHOOK_URL", ""),
+		SMTPHost:          getEnv("SMTP_HOST", ""),
+		SMTPPort:          getIntEnv("SMTP_PORT", 587),
+		SMTPUser:          getEnv("SMTP_USER", ""),
+		SMTPPass:          getEnv("SMTP_PASS", ""),
+		SMTPFrom:          getEnv("SMTP_FROM", ""),
+		SMTPTo:            getEnv("SMTP_TO", ""),
+		SMTPTLS:           getBoolEnv("SMTP_TLS", true),
 
 		MetricsRetentionDays:      getIntEnv("METRICS_RETENTION_DAYS", 30),
 		AuditRetentionDays:        getIntEnv("AUDIT_RETENTION_DAYS", 90),
@@ -367,6 +375,18 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) map[string]bool {
 	if v, ok := settings["ntfy_auth_token"]; ok && v != "" {
 		c.NtfyAuthToken = v
 		applied["ntfy_auth_token"] = true
+	}
+	if v, ok := settings["slack_webhook_url"]; ok && v != "" {
+		c.SlackWebhookURL = v
+		applied["slack_webhook_url"] = true
+	}
+	if v, ok := settings["teams_webhook_url"]; ok && v != "" {
+		c.TeamsWebhookURL = v
+		applied["teams_webhook_url"] = true
+	}
+	if v, ok := settings["discord_webhook_url"]; ok && v != "" {
+		c.DiscordWebhookURL = v
+		applied["discord_webhook_url"] = true
 	}
 	if v, ok := settings["github_token"]; ok && v != "" {
 		c.GitHubToken = v

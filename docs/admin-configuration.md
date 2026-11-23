@@ -4,7 +4,7 @@ Ce document décrit l'architecture, le fonctionnement et l'utilisation du systè
 
 ### Emplacement dans l'UI et coexistence avec `/settings`
 
-Le catalogue déclaratif (`registry.go`) n'a **pas** sa propre page : il est intégré comme l'onglet **« Configuration avancée »** de `/settings` (`SettingsAdvancedConfigCard.vue`), aux côtés des onglets Général/Notifications/Intégrations/Rétention/Détection de menaces déjà en place. C'est un choix délibéré, pas une limitation temporaire : `/settings` a des cartes dédiées et déjà éprouvées pour les catégories `notifications` (SMTP, ntfy), `retention` (dont une répartition par catégorie d'audit que le catalogue ne peut pas représenter — c'est une map, pas une valeur scalaire) et `threats` (15 poids/seuils, tous déclarés dans `registry.go`). Plutôt que de dupliquer ces trois domaines dans le catalogue générique, l'onglet « Configuration avancée » **n'affiche que les catégories sans carte dédiée** : `server`, `logging`, `network`, `database`, `auth`, `oidc`, `integrations`. Un paramètre n'est donc jamais éditable depuis deux écrans à la fois. Les anciennes routes `/admin/configuration` et `/admin/config` redirigent vers `/settings?tab=advanced` pour tout lien ou favori existant.
+Le catalogue déclaratif (`registry.go`) n'a **pas** sa propre page : il est intégré comme l'onglet **« Configuration avancée »** de `/settings` (`SettingsAdvancedConfigCard.vue`), aux côtés des onglets Général/Notifications/Intégrations/Rétention/Détection de menaces déjà en place. C'est un choix délibéré, pas une limitation temporaire : `/settings` a des cartes dédiées et déjà éprouvées pour les catégories `notifications` (SMTP, ntfy, webhooks Slack/Teams/Discord), `retention` (dont une répartition par catégorie d'audit que le catalogue ne peut pas représenter — c'est une map, pas une valeur scalaire) et `threats` (15 poids/seuils, tous déclarés dans `registry.go`). Plutôt que de dupliquer ces trois domaines dans le catalogue générique, l'onglet « Configuration avancée » **n'affiche que les catégories sans carte dédiée** : `server`, `logging`, `network`, `database`, `auth`, `oidc`, `integrations`. Un paramètre n'est donc jamais éditable depuis deux écrans à la fois. Les anciennes routes `/admin/configuration` et `/admin/config` redirigent vers `/settings?tab=advanced` pour tout lien ou favori existant.
 
 Si un paramètre `notifications`/`retention`/`threats` est ajouté à `registry.go` à l'avenir, il restera invisible dans cet onglet tant qu'il n'est pas explicitement ajouté à `RELEVANT_CATEGORIES` (`SettingsAdvancedConfigCard.vue`) — un garde-fou volontaire contre la réapparition d'un doublon, pas un oubli.
 
@@ -44,7 +44,7 @@ majorité des paramètres du registre (`server`, `logging`, `network`,
 sous-ensemble de clés historiques que `config.OverrideFromDB` (dans
 `server/internal/config/config.go`, antérieur à cette page d'administration)
 laisse la base de données écraser sans condition dès qu'une valeur y est
-enregistrée — SMTP, ntfy, le token GitHub, toutes les rétentions en jours,
+enregistrée — SMTP, ntfy, les URL de webhook Slack/Teams/Discord, le token GitHub, toutes les rétentions en jours,
 les durées JWT/refresh token, et l'intégralité des paramètres `oidc_*` et
 `threat_*`. Pour ces clés-là, une valeur enregistrée via cette UI est
 **immédiatement active et prend le pas sur une variable d'environnement**
@@ -119,6 +119,9 @@ Docker déjà définie, pas l'inverse.
 | `OIDC_INSECURE_SKIP_VERIFY` | `OIDC_INSECURE_SKIP_VERIFY` | OIDC | bool | `false` | Non | Oui | Désactive la vérification TLS OIDC |
 | `NOTIFY_URL` | `NOTIFY_URL` | Notifications | string | `""` | Non | Non | URL du topic ntfy.sh |
 | `NTFY_AUTH_TOKEN` | `NTFY_AUTH_TOKEN` | Notifications | string | `""` | Oui | Non | Token d'accès topic ntfy privé |
+| `SLACK_WEBHOOK_URL` | `SLACK_WEBHOOK_URL` | Notifications | string | `""` | Oui | Non | URL du webhook entrant Slack (canal `slack`) |
+| `TEAMS_WEBHOOK_URL` | `TEAMS_WEBHOOK_URL` | Notifications | string | `""` | Oui | Non | URL du webhook entrant Microsoft Teams (canal `teams`) |
+| `DISCORD_WEBHOOK_URL` | `DISCORD_WEBHOOK_URL` | Notifications | string | `""` | Oui | Non | URL du webhook Discord (canal `discord`) |
 | `SMTP_HOST` | `SMTP_HOST` | Notifications | string | `""` | Non | Non | Hôte du serveur SMTP sortant |
 | `SMTP_PORT` | `SMTP_PORT` | Notifications | int | `587` | Non | Non | Port SMTP (587 STARTTLS, 465 SMTPS) |
 | `SMTP_USER` | `SMTP_USER` | Notifications | string | `""` | Non | Non | Identifiant SMTP |
@@ -179,7 +182,7 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
         "has_conflict": false
       }
     ],
-    "total_params": 72,
+    "total_params": 75,
     "env_count": 12,
     "ui_count": 4,
     "default_count": 36,
@@ -236,15 +239,15 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
 
 ## 5. Guide Développeur : Comment Ajouter un Nouveau Paramètre Configurable
 
-L'architecture est entièrement déclarative et extensible. Pour ajouter un nouveau paramètre (ex: `SLACK_WEBHOOK_URL`) :
+L'architecture est entièrement déclarative et extensible. Pour ajouter un nouveau paramètre (ex: `OPSGENIE_API_URL`) :
 
 1. Ouvrez [`server/internal/config/registry.go`](../server/internal/config/registry.go).
 2. Ajoutez l'entrée dans le tableau `AllParams` :
    ```go
    {
-       Key:             "SLACK_WEBHOOK_URL",
-       SettingKey:      "slack_webhook_url",
-       EnvVar:          "SLACK_WEBHOOK_URL",
+       Key:             "OPSGENIE_API_URL",
+       SettingKey:      "opsgenie_api_url",
+       EnvVar:          "OPSGENIE_API_URL",
        Type:            TypeString,
        DefaultValue:    "",
        Category:        "notifications",
@@ -258,14 +261,14 @@ L'architecture est entièrement déclarative et extensible. Pour ajouter un nouv
    ```
 3. Si le paramètre doit être mappé directement sur le struct `Config` de l'application :
    - Ajoutez le champ dans le struct `Config` (`server/internal/config/config.go`).
-   - Dans `Load()`, lisez la variable : `SlackWebhookURL: getEnv("SLACK_WEBHOOK_URL", "")`.
+   - Dans `Load()`, lisez la variable : `SlackWebhookURL: getEnv("OPSGENIE_API_URL", "")`.
    - Dans `OverrideFromDB()`, appliquez la surcharge DB :
      ```go
-     if v, ok := settings["slack_webhook_url"]; ok && v != "" {
+     if v, ok := settings["opsgenie_api_url"]; ok && v != "" {
          c.SlackWebhookURL = v
      }
      ```
-4. Ajoutez sa traduction dans `frontend/src/locales/{fr,en}/config.json`, sous `params.SLACK_WEBHOOK_URL.label`/`.description` — sans ça, `TestEveryParamHasAFrontendTranslation` (`server/internal/config/registry_test.go`) échoue, et l'UI n'a que le texte français brut envoyé par le backend en repli.
+4. Ajoutez sa traduction dans `frontend/src/locales/{fr,en}/config.json`, sous `params.OPSGENIE_API_URL.label`/`.description` — sans ça, `TestEveryParamHasAFrontendTranslation` (`server/internal/config/registry_test.go`) échoue, et l'UI n'a que le texte français brut envoyé par le backend en repli.
 5. Si la catégorie choisie est `notifications`, `retention` ou `threats`, le paramètre est géré par la carte Settings dédiée (`SettingsSmtpCard`/`SettingsNotificationsCard`/`SettingsRetentionCard`/`SettingsThreatDetectionCard`), pas par le catalogue générique — étendez cette carte plutôt que `SettingsAdvancedConfigCard.vue`, pour ne pas recréer le doublon que ce document décrit plus haut. Pour toute autre catégorie, il apparaît automatiquement dans :
    - L'API `GET /api/v1/config`.
    - L'onglet « Configuration avancée » de `/settings`, avec champ adapté, validation et gestion des secrets.

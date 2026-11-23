@@ -34,6 +34,9 @@ export function useSettings() {
     smtpConfigured: false,
     smtpPassConfigured: false,
     githubTokenConfigured: false,
+    slackWebhookConfigured: false,
+    teamsWebhookConfigured: false,
+    discordWebhookConfigured: false,
     smtpHost: '',
     smtpPort: 587,
     ntfyUrl: '',
@@ -129,6 +132,9 @@ export function useSettings() {
           ...s,
           smtpPassConfigured: Boolean(s.smtpPassConfigured),
           githubTokenConfigured: Boolean(s.githubTokenConfigured),
+          slackWebhookConfigured: Boolean(s.slackWebhookConfigured),
+          teamsWebhookConfigured: Boolean(s.teamsWebhookConfigured),
+          discordWebhookConfigured: Boolean(s.discordWebhookConfigured),
           auditCategories: s.auditCategories || [],
         }
         dbStatus.value = res.data.dbStatus || {}

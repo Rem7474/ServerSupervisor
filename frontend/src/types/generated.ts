@@ -1943,7 +1943,9 @@ export interface RunbookUpdate {
  * threat-detection weights) are persisted to the settings table. The threat
  * weights use *float64 rather than float64 because 0 is a legitimate value
  * for a weight (e.g. "ignore 2xx entirely") and must be distinguishable from
- * "not provided" — same reasoning as SMTPTLS being a *bool.
+ * "not provided" — same reasoning as SMTPTLS being a *bool. The three chat
+ * webhook URLs (Slack/Teams/Discord) are secrets: an empty value or the masked
+ * sentinel leaves the stored URL untouched.
  */
 export interface SettingsUpdateRequest {
   smtp_host: string;
@@ -1954,6 +1956,9 @@ export interface SettingsUpdateRequest {
   smtp_to: string;
   smtp_tls?: boolean;
   ntfy_url: string;
+  slack_webhook_url: string;
+  teams_webhook_url: string;
+  discord_webhook_url: string;
   github_token: string;
   metrics_retention_days: number /* int */;
   audit_retention_days: number /* int */;

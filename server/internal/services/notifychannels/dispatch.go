@@ -44,6 +44,11 @@ type Event struct {
 	// NtfyURL is the already-resolved target URL, same reasoning as SMTPTo.
 	NtfyURL string
 
+	// Chat is the message posted on the slack/teams/discord channels, each
+	// formatted for its provider by the notifier. The webhook URL comes from
+	// the global configuration (it is a secret, never part of an Event).
+	Chat *notify.ChatMessage
+
 	// LegacyWebhook, when non-nil, is POSTed as JSON to cfg.NotifyURL on the
 	// deprecated "notify" channel (alert rules only — git webhooks and release
 	// trackers never put "notify" in Channels).
@@ -70,8 +75,21 @@ func NewDispatcher(cfg *config.Config, pushSvc *push.Service) *Dispatcher {
 	return &Dispatcher{cfg: cfg, notifier: notify.New(), pushSvc: pushSvc}
 }
 
+// chatWebhookURL returns the configured incoming-webhook URL of a chat channel.
+func (d *Dispatcher) chatWebhookURL(channel string) string {
+	switch channel {
+	case notify.ProviderSlack:
+		return d.cfg.SlackWebhookURL
+	case notify.ProviderTeams:
+		return d.cfg.TeamsWebhookURL
+	case notify.ProviderDiscord:
+		return d.cfg.DiscordWebhookURL
+	}
+	return ""
+}
+
 // Send fans ev out across every channel it names. A channel left
-// unconfigured (missing SMTP/ntfy destination) is logged and skipped rather
+// unconfigured (missing SMTP/ntfy/chat-webhook destination) is logged and skipped rather
 // than failing the whole event.
 func (d *Dispatcher) Send(ctx context.Context, ev Event) {
 	for _, ch := range ev.Channels {
@@ -96,6 +114,16 @@ func (d *Dispatcher) Send(ctx context.Context, ev Event) {
 			metrics.NotificationSent("ntfy", err)
 			if err != nil {
 				slog.ErrorContext(ctx, "notifychannels: ntfy send failed", slog.String("source", logging.Sanitize(ev.LogID)), slog.Any("err", err))
+			}
+
+		case notify.ProviderSlack, notify.ProviderTeams, notify.ProviderDiscord:
+			url := d.chatWebhookURL(ch)
+			if url == "" || ev.Chat == nil {
+				slog.WarnContext(ctx, "notifychannels: chat webhook not configured", slog.String("channel", ch), slog.String("source", logging.Sanitize(ev.LogID)))
+				continue
+			}
+			if err := d.notifier.SendChat(ch, url, *ev.Chat); err != nil {
+				slog.ErrorContext(ctx, "notifychannels: chat send failed", slog.String("channel", ch), slog.String("source", logging.Sanitize(ev.LogID)), slog.Any("err", err))
 			}
 
 		case "notify":

@@ -45,6 +45,10 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
+	if err := h.svc.ValidateUpdate(req); err != nil {
+		respondError(c, err)
+		return
+	}
 	h.svc.Update(c.Request.Context(), req, c.GetString("username"), c.ClientIP())
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Paramètres mis à jour"})
 }
@@ -70,6 +74,21 @@ func (h *SettingsHandler) TestNtfy(c *gin.Context) {
 		return
 	}
 	message, err := h.svc.TestNtfy(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": message})
+}
+
+// TestWebhook sends a test message to the Slack, Teams or Discord webhook
+// named by the :provider path parameter.
+func (h *SettingsHandler) TestWebhook(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		respondError(c, apperr.Forbidden("insufficient permissions"))
+		return
+	}
+	message, err := h.svc.TestChatWebhook(c.Param("provider"))
 	if err != nil {
 		respondError(c, err)
 		return

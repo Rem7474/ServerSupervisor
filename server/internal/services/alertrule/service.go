@@ -361,6 +361,7 @@ var validAlertOperators = map[string]bool{">": true, "<": true, ">=": true, "<="
 
 var validAlertChannels = map[string]bool{
 	"smtp": true, "ntfy": true, "browser": true, "notify": true,
+	"slack": true, "teams": true, "discord": true,
 }
 
 var commandModuleActions = map[string][]string{
