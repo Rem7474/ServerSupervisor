@@ -345,7 +345,7 @@
         <div class="d-flex align-items-center gap-3">
           <div>
             <strong>{{ t('proxmox.updatesAvailableTitle') }}</strong>
-            {{ node.pending_updates }} {{ t('proxmox.pendingPackagesShortLabel') }}
+            {{ node.pending_updates }} {{ t('proxmox.pendingPackagesShortLabel', node.pending_updates ?? 0) }}
           </div>
           <div
             v-if="node.last_update_check_at"

@@ -56,7 +56,7 @@
         <template v-else>
           <div class="d-flex align-items-center justify-content-between mb-2">
             <div class="text-secondary small">
-              {{ t('host.discoveryScanSummary', { scanned: results.length, candidates: candidates.length }) }}
+              {{ t('host.discoveryScanSummary', { scanned: t('host.discoveryScannedCount', { count: results.length }, results.length), candidates: t('host.discoveryCandidatesCount', { count: candidates.length }, candidates.length) }) }}
             </div>
             <button
               v-if="candidates.length"

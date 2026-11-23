@@ -5,7 +5,7 @@
   "warRoomWarningColumn": "Warning",
   "warRoomNoneOfSeverityActive": "No active {severity} incident.",
   "warRoomInProgressBadge": "In progress",
-  "warRoomCorrelatedCountBadge": "+{count} correlated",
+  "warRoomCorrelatedCountBadge": "+{count} correlated | +{count} correlated",
   "warRoomCorrelatedCountTitle": "{count} incident on this host's containers/VMs, correlated to this one — no separate notification | {count} incidents on this host's containers/VMs, correlated to this one — no separate notification",
   "warRoomUnknownSource": "Unknown source",
   "warRoomSinceLabel": "Since {duration}",

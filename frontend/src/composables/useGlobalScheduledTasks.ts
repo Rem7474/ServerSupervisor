@@ -403,7 +403,10 @@ export function useGlobalScheduledTasks() {
       if (failed === 0) {
         addToast(t('scheduledTasks.tasksProcessedToast', { count: succeeded }, succeeded), 'success')
       } else {
-        addToast(t('scheduledTasks.partialResultToast', { succeeded, failed }), failed === results.length ? 'error' : 'warning', 6000)
+        addToast(t('scheduledTasks.partialResultToast', {
+          processed: t('scheduledTasks.partialProcessedCount', { count: succeeded }, succeeded),
+          failed: t('scheduledTasks.partialFailedCount', { count: failed }, failed),
+        }), failed === results.length ? 'error' : 'warning', 6000)
       }
     } finally {
       bulkLoading.value = false
