@@ -321,6 +321,8 @@
   "consoleTabLabel": "Console",
   "consoleTabDescription": "Interactive shell on the linked LXC container (via Proxmox).",
   "consoleTabOpen": "Open console",
+  "consoleTabVncDescription": "Graphical display of the linked QEMU VM (VNC through Proxmox).",
+  "consoleTabOpenVnc": "Open VNC console",
   "metricsTabLabel": "Metrics",
   "backupTabLabel": "Backups",
   "networkTrafficTabLabel": "Network traffic",

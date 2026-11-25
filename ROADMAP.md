@@ -59,7 +59,7 @@ numérotation #1-#26) mais qui font partie du même plan d'exécution.
 | # | Fonctionnalité | Pourquoi | Statut |
 |---|---|---|---|
 | 27 | Console interactive LXC (xterm.js ↔ PVE `termproxy`) | Ouvrir un shell sur un conteneur obligeait à sortir de ServerSupervisor (UI Proxmox ou SSH) | Fait |
-| 28 | Console QEMU/VM (VNC/RFB) | La V1 de #27 ne couvre que les LXC : QEMU n'expose pas `termproxy` mais du VNC/RFB, un protocole de fil entièrement différent. Le bouton Console est grisé sur une VM en attendant | Non démarré |
+| 28 | Console QEMU/VM (VNC/RFB) | QEMU n'expose pas `termproxy` mais du VNC/RFB : la console #27 ne couvre pas les VM | Fait |
 
 ### Later / optional — ne pas engager sans demande prouvée
 

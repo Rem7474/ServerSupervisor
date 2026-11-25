@@ -42,6 +42,13 @@ func TestSetupRouter_WiresProxmoxConsoleRoute(t *testing.T) {
 	if w.Code == http.StatusNotFound {
 		t.Errorf("proxmox console route not registered, got 404")
 	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/ws/proxmox/vnc/some-guest-id", nil)
+	r.ServeHTTP(w, req)
+	if w.Code == http.StatusNotFound {
+		t.Errorf("proxmox vnc route not registered, got 404")
+	}
 }
 
 func TestStaticFiles_HEADAndCacheHeaders(t *testing.T) {
