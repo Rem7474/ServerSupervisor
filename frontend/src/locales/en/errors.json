@@ -104,5 +104,16 @@
   "DISCOVERY_PREFIX_RANGE": "the prefix must be between /{min} and /{max} (254 addresses max)",
   "SETTINGS_WEBHOOK_URL_INVALID": "invalid {provider} webhook URL: it must be an https URL that does not target a local or private address",
   "SETTINGS_WEBHOOK_NOT_CONFIGURED": "{provider} webhook URL not configured",
-  "SETTINGS_WEBHOOK_SEND_FAILED": "could not send the {provider} test message: {reason}"
+  "SETTINGS_WEBHOOK_SEND_FAILED": "could not send the {provider} test message: {reason}",
+  "API_KEY_INVALID": "invalid API key",
+  "API_KEY_EXPIRED": "API key expired",
+  "API_KEY_REVOKED": "API key revoked",
+  "API_KEY_READ_ONLY": "this API key is read-only",
+  "API_KEY_ROUTE_FORBIDDEN": "this endpoint is not available with an API key",
+  "API_KEY_RATE_LIMITED": "rate limit exceeded for this API key",
+  "API_KEY_NAME_INVALID": "the key name must be 1 to {max} characters",
+  "API_KEY_SCOPE_INVALID": "the scope must be read or write",
+  "API_KEY_EXPIRY_INVALID": "the validity must be between 0 (never expires) and {max} days",
+  "API_KEY_LIMIT_REACHED": "you already have {max} active API keys: revoke one first",
+  "API_KEY_NOT_FOUND": "API key not found"
 }

@@ -117,6 +117,19 @@ const (
 	CodeSettingsWebhookURLInvalid     = "SETTINGS_WEBHOOK_URL_INVALID"
 	CodeSettingsWebhookNotConfigured  = "SETTINGS_WEBHOOK_NOT_CONFIGURED"
 	CodeSettingsWebhookSendFailed     = "SETTINGS_WEBHOOK_SEND_FAILED"
+
+	// API keys (internal/services/apikey, api.APIKeyOrSessionMiddleware)
+	CodeAPIKeyInvalid        = "API_KEY_INVALID"
+	CodeAPIKeyExpired        = "API_KEY_EXPIRED"
+	CodeAPIKeyRevoked        = "API_KEY_REVOKED"
+	CodeAPIKeyReadOnly       = "API_KEY_READ_ONLY"
+	CodeAPIKeyRouteForbidden = "API_KEY_ROUTE_FORBIDDEN"
+	CodeAPIKeyRateLimited    = "API_KEY_RATE_LIMITED"
+	CodeAPIKeyNameInvalid    = "API_KEY_NAME_INVALID"
+	CodeAPIKeyScopeInvalid   = "API_KEY_SCOPE_INVALID"
+	CodeAPIKeyExpiryInvalid  = "API_KEY_EXPIRY_INVALID"
+	CodeAPIKeyLimitReached   = "API_KEY_LIMIT_REACHED"
+	CodeAPIKeyNotFound       = "API_KEY_NOT_FOUND"
 )
 
 // DefaultLanguage is what GetMessage falls back to for a language it has no
@@ -304,6 +317,17 @@ var ErrorCatalog = map[string]ErrorMessage{
 	CodeSettingsWebhookURLInvalid:     {"en": "invalid {provider} webhook URL: it must be an https URL that does not target a local or private address", "fr": "URL de webhook {provider} invalide : elle doit être en https et ne pas cibler une adresse locale ou privée"},
 	CodeSettingsWebhookNotConfigured:  {"en": "{provider} webhook URL not configured", "fr": "URL de webhook {provider} non configurée"},
 	CodeSettingsWebhookSendFailed:     {"en": "could not send the {provider} test message: {reason}", "fr": "échec de l'envoi du message de test {provider} : {reason}"},
+	CodeAPIKeyInvalid:                 {"en": "invalid API key", "fr": "clé API invalide"},
+	CodeAPIKeyExpired:                 {"en": "API key expired", "fr": "clé API expirée"},
+	CodeAPIKeyRevoked:                 {"en": "API key revoked", "fr": "clé API révoquée"},
+	CodeAPIKeyReadOnly:                {"en": "this API key is read-only", "fr": "cette clé API est en lecture seule"},
+	CodeAPIKeyRouteForbidden:          {"en": "this endpoint is not available with an API key", "fr": "ce point d'accès n'est pas accessible avec une clé API"},
+	CodeAPIKeyRateLimited:             {"en": "rate limit exceeded for this API key", "fr": "limite de requêtes atteinte pour cette clé API"},
+	CodeAPIKeyNameInvalid:             {"en": "the key name must be 1 to {max} characters", "fr": "le nom de la clé doit faire entre 1 et {max} caractères"},
+	CodeAPIKeyScopeInvalid:            {"en": "the scope must be read or write", "fr": "la portée doit être lecture ou écriture"},
+	CodeAPIKeyExpiryInvalid:           {"en": "the validity must be between 0 (never expires) and {max} days", "fr": "la validité doit être comprise entre 0 (sans expiration) et {max} jours"},
+	CodeAPIKeyLimitReached:            {"en": "you already have {max} active API keys: revoke one first", "fr": "vous avez déjà {max} clés API actives : révoquez-en une d'abord"},
+	CodeAPIKeyNotFound:                {"en": "API key not found", "fr": "clé API introuvable"},
 	CodeDiscoveryPrefixRange:          {"en": "the prefix must be between /{min} and /{max} (254 addresses max)", "fr": "le préfixe doit être compris entre /{min} et /{max} (254 adresses max)"},
 }
 

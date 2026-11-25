@@ -104,5 +104,16 @@
   "DISCOVERY_PREFIX_RANGE": "le préfixe doit être compris entre /{min} et /{max} (254 adresses max)",
   "SETTINGS_WEBHOOK_URL_INVALID": "URL de webhook {provider} invalide : elle doit être en https et ne pas cibler une adresse locale ou privée",
   "SETTINGS_WEBHOOK_NOT_CONFIGURED": "URL de webhook {provider} non configurée",
-  "SETTINGS_WEBHOOK_SEND_FAILED": "échec de l'envoi du message de test {provider} : {reason}"
+  "SETTINGS_WEBHOOK_SEND_FAILED": "échec de l'envoi du message de test {provider} : {reason}",
+  "API_KEY_INVALID": "clé API invalide",
+  "API_KEY_EXPIRED": "clé API expirée",
+  "API_KEY_REVOKED": "clé API révoquée",
+  "API_KEY_READ_ONLY": "cette clé API est en lecture seule",
+  "API_KEY_ROUTE_FORBIDDEN": "ce point d'accès n'est pas accessible avec une clé API",
+  "API_KEY_RATE_LIMITED": "limite de requêtes atteinte pour cette clé API",
+  "API_KEY_NAME_INVALID": "le nom de la clé doit faire entre 1 et {max} caractères",
+  "API_KEY_SCOPE_INVALID": "la portée doit être lecture ou écriture",
+  "API_KEY_EXPIRY_INVALID": "la validité doit être comprise entre 0 (sans expiration) et {max} jours",
+  "API_KEY_LIMIT_REACHED": "vous avez déjà {max} clés API actives : révoquez-en une d'abord",
+  "API_KEY_NOT_FOUND": "clé API introuvable"
 }

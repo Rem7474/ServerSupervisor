@@ -400,6 +400,54 @@ export interface AlertRuleUpdate {
 }
 
 //////////
+// source: apikey.go
+
+/**
+ * API key scopes. Whatever the scope, a key never reaches the routes closed to
+ * API keys (account, users, API keys, settings/config — see
+ * api.apiKeyForbiddenRoute) nor more than its owner's role allows.
+ */
+export const APIKeyScopeRead = "read"; // GET/HEAD only
+/**
+ * API key scopes. Whatever the scope, a key never reaches the routes closed to
+ * API keys (account, users, API keys, settings/config — see
+ * api.apiKeyForbiddenRoute) nor more than its owner's role allows.
+ */
+export const APIKeyScopeWrite = "write"; // every method
+/**
+ * APIKey is a personal API key as listed to its owner (or to an admin). The
+ * secret is never part of it: only the public Prefix identifies the key.
+ */
+export interface APIKey {
+  id: number /* int64 */;
+  name: string;
+  prefix: string;
+  scope: string; // read | write
+  username: string;
+  expires_at?: string;
+  last_used_at?: string;
+  revoked_at?: string;
+  created_at: string;
+}
+/**
+ * APIKeyCreateRequest is the body of POST /api/v1/auth/api-keys.
+ * ExpiresInDays = 0 means the key never expires.
+ */
+export interface APIKeyCreateRequest {
+  name: string;
+  scope: string;
+  expires_in_days: number /* int */;
+}
+/**
+ * APIKeyCreated is returned once, at creation: Secret is the full key and
+ * cannot be retrieved again.
+ */
+export interface APIKeyCreated {
+  key: APIKey;
+  secret: string;
+}
+
+//////////
 // source: audit.go
 
 /**
@@ -2398,16 +2446,6 @@ export interface RefreshToken {
   id: string;
   user_id: number /* int64 */;
   expires_at: string;
-  created_at: string;
-}
-/**
- * APIKey allows automated access
- */
-export interface APIKey {
-  id: string;
-  user_id: number /* int64 */;
-  name: string;
-  expires_at?: string;
   created_at: string;
 }
 /**
