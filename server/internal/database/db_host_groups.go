@@ -6,8 +6,6 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 )
 
-const hostGroupSelectCols = `id, name, description, match_mode, tags::text, os_contains, created_at, updated_at`
-
 func scanHostGroup(row interface {
 	Scan(dest ...interface{}) error
 }) (models.HostGroup, error) {
@@ -24,7 +22,7 @@ func scanHostGroup(row interface {
 // MemberIDs is left empty: membership is computed by the caller from the
 // current hosts.
 func (db *DB) ListHostGroups(ctx context.Context) ([]models.HostGroup, error) {
-	rows, err := db.conn.QueryContext(ctx, `SELECT `+hostGroupSelectCols+` FROM host_groups ORDER BY name`)
+	rows, err := db.conn.QueryContext(ctx, `SELECT id, name, description, match_mode, tags::text, os_contains, created_at, updated_at FROM host_groups ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +41,7 @@ func (db *DB) ListHostGroups(ctx context.Context) ([]models.HostGroup, error) {
 
 // GetHostGroupByID returns one host group, or sql.ErrNoRows when absent.
 func (db *DB) GetHostGroupByID(ctx context.Context, id string) (*models.HostGroup, error) {
-	g, err := scanHostGroup(db.conn.QueryRowContext(ctx, `SELECT `+hostGroupSelectCols+` FROM host_groups WHERE id::text = $1`, id))
+	g, err := scanHostGroup(db.conn.QueryRowContext(ctx, `SELECT id, name, description, match_mode, tags::text, os_contains, created_at, updated_at FROM host_groups WHERE id::text = $1`, id))
 	if err != nil {
 		return nil, err
 	}
