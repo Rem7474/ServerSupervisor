@@ -112,7 +112,7 @@
               <span
                 v-if="ruleSourceType(rule) === 'agent'"
                 class="badge bg-secondary-lt text-secondary"
-              >{{ t('alerts.agentSourceLabel', { host: getHostName(rule.host_id) || t('alerts.allHostsBadge') }) }}</span>
+              >{{ t('alerts.agentSourceLabel', { host: agentTargetLabel(rule) }) }}</span>
               <span
                 v-else-if="ruleSourceType(rule) === 'docker'"
                 class="badge bg-teal-lt text-teal"
@@ -246,6 +246,7 @@ function channelLabel(channel: string): string {
 const props = withDefaults(defineProps<{
   rules?: AlertRule[]
   hosts?: Host[]
+  hostGroups?: { id: string; name: string }[]
   loading?: boolean
   fetched?: boolean
   error?: string
@@ -254,6 +255,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   rules: () => [],
   hosts: () => [],
+  hostGroups: () => [],
   loading: false,
   fetched: false,
   error: '',
@@ -291,6 +293,21 @@ const sortedRules = computed(() => {
     return av.toLowerCase().localeCompare(bv.toLowerCase()) * dir
   })
 })
+
+// Who an agent rule watches: a host, every host, a group or tags. Rules
+// saved before targeting existed have no target_type (host_id decides).
+function agentTargetLabel(rule: AlertRule): string {
+  const target = rule.target_type || (rule.host_id ? 'host' : 'all')
+  if (target === 'group') {
+    const group = props.hostGroups.find((g) => g.id === rule.host_group_id)
+    return group ? t('alerts.targetGroupLabel', { name: group.name }) : t('alerts.targetUnknownGroupLabel')
+  }
+  if (target === 'tag') {
+    return t('alerts.targetTagsLabel', { tags: (rule.target_tags || []).join(', ') })
+  }
+  if (target === 'host' && rule.host_id) return getHostName(rule.host_id) || rule.host_id
+  return t('alerts.allHostsBadge')
+}
 
 function getHostName(hostId: string | undefined): string | undefined {
   return hostId

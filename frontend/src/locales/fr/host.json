@@ -347,5 +347,6 @@
   "deleteProxmoxLinkConfirmTitle": "Supprimer le lien Proxmox",
   "deleteProxmoxLinkConfirmMessage": "Le lien entre cet hôte et sa VM/LXC Proxmox sera supprimé. Les métriques basculeront sur la source agent (si disponible).",
   "revokePermissionConfirmTitle": "Révoquer la permission",
-  "revokePermissionConfirmMessage": "{username} n'aura plus accès à cet hôte."
+  "revokePermissionConfirmMessage": "{username} n'aura plus accès à cet hôte.",
+  "tagsListAriaLabel": "Tags de l'hôte"
 }

@@ -164,10 +164,18 @@ type AlertActions struct {
 }
 
 type AlertRule struct {
-	ID                 int64               `json:"id" db:"id"`
-	Name               *string             `json:"name,omitempty" db:"name"`
-	SourceType         AlertSourceType     `json:"source_type,omitempty" db:"source_type"`
-	HostID             *string             `json:"host_id" db:"host_id"`
+	ID         int64           `json:"id" db:"id"`
+	Name       *string         `json:"name,omitempty" db:"name"`
+	SourceType AlertSourceType `json:"source_type,omitempty" db:"source_type"`
+	HostID     *string         `json:"host_id" db:"host_id"`
+	// TargetType selects the hosts an agent rule evaluates (AlertTarget*
+	// constants): HostID, every host, the members of HostGroupID, or the
+	// hosts carrying one of TargetTags. Resolved on every evaluation, so a
+	// host gaining a tag is covered without editing the rule. Empty for
+	// Docker/Proxmox rules, which carry their own scope.
+	TargetType         string              `json:"target_type,omitempty" db:"target_type"`
+	HostGroupID        *string             `json:"host_group_id,omitempty" db:"host_group_id"`
+	TargetTags         []string            `json:"target_tags,omitempty" db:"target_tags"`
 	ProxmoxScope       *ProxmoxMetricScope `json:"proxmox_scope,omitempty" db:"proxmox_scope"`
 	DockerScope        *DockerMetricScope  `json:"docker_scope,omitempty" db:"docker_scope"`
 	Metric             string              `json:"metric" db:"metric"`
@@ -303,10 +311,16 @@ type PushSubscription struct {
 // ========== Alert Rules - Create/Update Helpers ==========
 
 type AlertRuleCreate struct {
-	Name               string              `json:"name" binding:"required"`
-	Enabled            bool                `json:"enabled"`
-	SourceType         AlertSourceType     `json:"source_type"`
-	HostID             *string             `json:"host_id"`
+	Name       string          `json:"name" binding:"required"`
+	Enabled    bool            `json:"enabled"`
+	SourceType AlertSourceType `json:"source_type"`
+	HostID     *string         `json:"host_id"`
+	// TargetType/HostGroupID/TargetTags — see AlertRule's field doc. An
+	// empty TargetType keeps the historical behavior: HostID when set,
+	// every host otherwise.
+	TargetType         string              `json:"target_type"`
+	HostGroupID        *string             `json:"host_group_id"`
+	TargetTags         []string            `json:"target_tags"`
 	ProxmoxScope       *ProxmoxMetricScope `json:"proxmox_scope"`
 	DockerScope        *DockerMetricScope  `json:"docker_scope"`
 	Metric             string              `json:"metric" binding:"required"`
@@ -378,10 +392,15 @@ type ApplyAlertRuleTemplateResult struct {
 }
 
 type AlertRuleUpdate struct {
-	Name               *string             `json:"name"`
-	Enabled            *bool               `json:"enabled"`
-	SourceType         *AlertSourceType    `json:"source_type"`
-	HostID             *string             `json:"host_id"`
+	Name       *string          `json:"name"`
+	Enabled    *bool            `json:"enabled"`
+	SourceType *AlertSourceType `json:"source_type"`
+	HostID     *string          `json:"host_id"`
+	// TargetType, when set, replaces the whole target at once: HostID,
+	// HostGroupID and TargetTags are taken as sent (nil clears them).
+	TargetType         *string             `json:"target_type"`
+	HostGroupID        *string             `json:"host_group_id"`
+	TargetTags         []string            `json:"target_tags"`
 	ProxmoxScope       *ProxmoxMetricScope `json:"proxmox_scope"`
 	DockerScope        *DockerMetricScope  `json:"docker_scope"`
 	Metric             *string             `json:"metric"`
@@ -549,10 +568,103 @@ func (ds *DockerMetricScope) Validate(metric string) error {
 	return nil
 }
 
+// Agent rule target types — see AlertRule.TargetType.
+const (
+	AlertTargetHost  = "host"
+	AlertTargetAll   = "all"
+	AlertTargetGroup = "group"
+	AlertTargetTag   = "tag"
+)
+
 func (ar *AlertRule) NormalizeCompatibility() {
 	if ar.SourceType == "" {
 		ar.SourceType = InferAlertSourceType(ar.Metric)
 	}
+	// A rule saved before targets existed only has host_id: that host when
+	// set, every host otherwise — the coverage it always had.
+	if ar.SourceType == AlertSourceAgent && ar.TargetType == "" {
+		if ar.HostID != nil && strings.TrimSpace(*ar.HostID) != "" {
+			ar.TargetType = AlertTargetHost
+		} else {
+			ar.TargetType = AlertTargetAll
+		}
+	}
+}
+
+// validateAgentTarget checks the target of an agent rule and clears the
+// fields its target type does not use, so a stale host_id or group id can
+// never linger behind another target type.
+func (ar *AlertRule) validateAgentTarget() error {
+	switch ar.TargetType {
+	case AlertTargetHost:
+		if ar.HostID == nil || strings.TrimSpace(*ar.HostID) == "" {
+			return fmt.Errorf("une alerte agent ciblant un hote doit preciser l'hote")
+		}
+		ar.HostGroupID = nil
+		ar.TargetTags = nil
+	case AlertTargetAll:
+		ar.HostID = nil
+		ar.HostGroupID = nil
+		ar.TargetTags = nil
+	case AlertTargetGroup:
+		if ar.HostGroupID == nil || strings.TrimSpace(*ar.HostGroupID) == "" {
+			return fmt.Errorf("une alerte ciblant un groupe doit preciser le groupe")
+		}
+		ar.HostID = nil
+		ar.TargetTags = nil
+	case AlertTargetTag:
+		ar.TargetTags = NormalizeTags(ar.TargetTags)
+		if len(ar.TargetTags) == 0 {
+			return fmt.Errorf("une alerte ciblant des tags doit preciser au moins un tag")
+		}
+		ar.HostID = nil
+		ar.HostGroupID = nil
+	default:
+		return fmt.Errorf("type de cible invalide: %s", ar.TargetType)
+	}
+	return nil
+}
+
+// clearAgentTarget drops the agent-only target fields from a Docker/Proxmox rule.
+func (ar *AlertRule) clearAgentTarget() {
+	ar.HostID = nil
+	ar.TargetType = ""
+	ar.HostGroupID = nil
+	ar.TargetTags = nil
+}
+
+// ResolveAgentTargets returns the hosts an agent rule evaluates right now.
+// groups maps host group id to group; a group-targeted rule whose group is
+// missing from it resolves to no host at all rather than to every host.
+func (ar AlertRule) ResolveAgentTargets(hosts []Host, groups map[string]HostGroup) []Host {
+	out := make([]Host, 0)
+	switch ar.TargetType {
+	case AlertTargetHost:
+		if ar.HostID == nil {
+			return out
+		}
+		for _, h := range hosts {
+			if h.ID == *ar.HostID {
+				return append(out, h)
+			}
+		}
+	case AlertTargetGroup:
+		if ar.HostGroupID == nil {
+			return out
+		}
+		if g, ok := groups[*ar.HostGroupID]; ok {
+			return g.Members(hosts)
+		}
+	case AlertTargetTag:
+		for _, h := range hosts {
+			if HostHasAnyTag(h, ar.TargetTags) {
+				out = append(out, h)
+			}
+		}
+	case AlertTargetAll:
+		return append(out, hosts...)
+	}
+	return out
 }
 
 func (ar *AlertRule) Validate() error {
@@ -560,8 +672,8 @@ func (ar *AlertRule) Validate() error {
 
 	switch ar.SourceType {
 	case AlertSourceAgent:
-		if ar.HostID == nil || strings.TrimSpace(*ar.HostID) == "" {
-			return fmt.Errorf("une alerte agent doit cibler un hote")
+		if err := ar.validateAgentTarget(); err != nil {
+			return err
 		}
 		if IsProxmoxMetric(ar.Metric) {
 			return fmt.Errorf("la metrique %s est reservee a la source Proxmox", ar.Metric)
@@ -575,7 +687,7 @@ func (ar *AlertRule) Validate() error {
 		if !IsProxmoxMetric(ar.Metric) {
 			return fmt.Errorf("la metrique %s est reservee a la source agent", ar.Metric)
 		}
-		ar.HostID = nil
+		ar.clearAgentTarget()
 		ar.DockerScope = nil
 		if err := ar.ProxmoxScope.Validate(ar.Metric); err != nil {
 			return err
@@ -584,7 +696,7 @@ func (ar *AlertRule) Validate() error {
 		if !IsDockerMetric(ar.Metric) {
 			return fmt.Errorf("la metrique %s n'est pas une metrique Docker", ar.Metric)
 		}
-		ar.HostID = nil
+		ar.clearAgentTarget()
 		ar.ProxmoxScope = nil
 		if err := ar.DockerScope.Validate(ar.Metric); err != nil {
 			return err

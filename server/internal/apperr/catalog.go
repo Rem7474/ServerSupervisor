@@ -70,6 +70,16 @@ const (
 	CodeAlertMetricRequiresProxmox       = "ALERT_METRIC_REQUIRES_PROXMOX"
 	CodeAlertTemplateMetricNotHostScoped = "ALERT_TEMPLATE_METRIC_NOT_HOST_SCOPED"
 	CodeAlertTemplateNotFound            = "ALERT_TEMPLATE_NOT_FOUND"
+	CodeAlertHostGroupNotFound           = "ALERT_HOST_GROUP_NOT_FOUND"
+
+	// Host groups (internal/services/hostgroup)
+	CodeHostGroupNotFound         = "HOST_GROUP_NOT_FOUND"
+	CodeHostGroupNameRequired     = "HOST_GROUP_NAME_REQUIRED"
+	CodeHostGroupFieldTooLong     = "HOST_GROUP_FIELD_TOO_LONG"
+	CodeHostGroupNameTaken        = "HOST_GROUP_NAME_TAKEN"
+	CodeHostGroupMatchModeInvalid = "HOST_GROUP_MATCH_MODE_INVALID"
+	CodeHostGroupCriteriaRequired = "HOST_GROUP_CRITERIA_REQUIRED"
+	CodeHostGroupInUse            = "HOST_GROUP_IN_USE"
 
 	// Runbooks (internal/services/runbook)
 	CodeRunbookNotFound            = "RUNBOOK_NOT_FOUND"
@@ -263,7 +273,15 @@ var ErrorCatalog = map[string]ErrorMessage{
 		"en": "Docker, Proxmox and synthetic metrics cannot be used in a template — they do not apply host by host",
 		"fr": "les métriques Docker, Proxmox ou synthétiques ne peuvent pas être utilisées dans un template — elles ne s'appliquent pas hôte par hôte",
 	},
-	CodeAlertTemplateNotFound: {"en": "template not found", "fr": "modèle introuvable"},
+	CodeAlertTemplateNotFound:     {"en": "template not found", "fr": "modèle introuvable"},
+	CodeAlertHostGroupNotFound:    {"en": "host group not found for this rule", "fr": "groupe d'hôtes introuvable pour cette règle"},
+	CodeHostGroupNotFound:         {"en": "host group not found", "fr": "groupe d'hôtes introuvable"},
+	CodeHostGroupNameRequired:     {"en": "the group name is required", "fr": "le nom du groupe est requis"},
+	CodeHostGroupFieldTooLong:     {"en": "the group name and OS filter must not exceed 100 characters", "fr": "le nom du groupe et le filtre d'OS ne doivent pas dépasser 100 caractères"},
+	CodeHostGroupNameTaken:        {"en": "a host group with this name already exists", "fr": "un groupe d'hôtes porte déjà ce nom"},
+	CodeHostGroupMatchModeInvalid: {"en": "invalid match mode (allowed: all, any)", "fr": "mode de correspondance invalide (valeurs autorisées : all, any)"},
+	CodeHostGroupCriteriaRequired: {"en": "a group needs at least one tag or an OS filter", "fr": "un groupe doit définir au moins un tag ou un filtre d'OS"},
+	CodeHostGroupInUse:            {"en": "this group is still targeted by alert rules ({count}): retarget them before deleting it", "fr": "ce groupe est encore ciblé par des règles d'alerte ({count}) : changez leur cible avant de le supprimer"},
 
 	CodeRunbookNotFound:               {"en": "runbook not found", "fr": "runbook introuvable"},
 	CodeRunbookNameRequired:           {"en": "the runbook name is required", "fr": "le nom du runbook est requis"},

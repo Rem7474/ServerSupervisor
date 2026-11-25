@@ -977,6 +977,10 @@ Permissions par hôte (voir [RBAC](#rbac)) :
 | `PATCH` | `/api/v1/alert-rule-templates/:id` | Modifier un modèle | Admin |
 | `DELETE` | `/api/v1/alert-rule-templates/:id` | Supprimer un modèle | Admin |
 | `POST` | `/api/v1/alert-rule-templates/:id/apply` | Appliquer un modèle à N hôtes (`host_ids`) | Admin |
+| `GET` | `/api/v1/host-groups` | Groupes d'hôtes dynamiques, avec leurs membres calculés | Admin |
+| `POST` | `/api/v1/host-groups` | Créer un groupe (règle sur les tags + filtre d'OS optionnel) | Admin |
+| `PUT` | `/api/v1/host-groups/:id` | Modifier un groupe | Admin |
+| `DELETE` | `/api/v1/host-groups/:id` | Supprimer un groupe (refusé s'il est ciblé par une règle) | Admin |
 
 Métriques additionnelles disponibles pour les règles d'alertes :
 - `npm_requests`
