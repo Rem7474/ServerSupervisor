@@ -71,6 +71,11 @@ const (
 	CodeAlertTemplateMetricNotHostScoped = "ALERT_TEMPLATE_METRIC_NOT_HOST_SCOPED"
 	CodeAlertTemplateNotFound            = "ALERT_TEMPLATE_NOT_FOUND"
 	CodeAlertHostGroupNotFound           = "ALERT_HOST_GROUP_NOT_FOUND"
+	CodeAlertTargetHostRequired          = "ALERT_TARGET_HOST_REQUIRED"
+	CodeAlertTargetGroupRequired         = "ALERT_TARGET_GROUP_REQUIRED"
+	CodeAlertTargetTagsRequired          = "ALERT_TARGET_TAGS_REQUIRED"
+	CodeAlertTargetTypeInvalid           = "ALERT_TARGET_TYPE_INVALID"
+	CodeAlertSyntheticMetricRequired     = "ALERT_SYNTHETIC_METRIC_REQUIRED"
 
 	// Host groups (internal/services/hostgroup)
 	CodeHostGroupNotFound         = "HOST_GROUP_NOT_FOUND"
@@ -270,8 +275,16 @@ var ErrorCatalog = map[string]ErrorMessage{
 		"en": "Docker, Proxmox and synthetic metrics cannot be used in a template — they do not apply host by host",
 		"fr": "les métriques Docker, Proxmox ou synthétiques ne peuvent pas être utilisées dans un template — elles ne s'appliquent pas hôte par hôte",
 	},
-	CodeAlertTemplateNotFound:     {"en": "template not found", "fr": "modèle introuvable"},
-	CodeAlertHostGroupNotFound:    {"en": "host group not found for this rule", "fr": "groupe d'hôtes introuvable pour cette règle"},
+	CodeAlertTemplateNotFound:    {"en": "template not found", "fr": "modèle introuvable"},
+	CodeAlertHostGroupNotFound:   {"en": "host group not found for this rule", "fr": "groupe d'hôtes introuvable pour cette règle"},
+	CodeAlertTargetHostRequired:  {"en": "an agent rule targeting a host must name the host", "fr": "une règle agent ciblant un hôte doit préciser l'hôte"},
+	CodeAlertTargetGroupRequired: {"en": "a rule targeting a group must name the group", "fr": "une règle ciblant un groupe doit préciser le groupe"},
+	CodeAlertTargetTagsRequired:  {"en": "a rule targeting tags must name at least one tag", "fr": "une règle ciblant des tags doit préciser au moins un tag"},
+	CodeAlertTargetTypeInvalid:   {"en": "invalid target type {type} (allowed: host, all, group, tag)", "fr": "type de cible {type} invalide (valeurs autorisées : host, all, group, tag)"},
+	CodeAlertSyntheticMetricRequired: {
+		"en": "the metric {metric} is not a synthetic monitoring metric",
+		"fr": "la métrique {metric} n'est pas une métrique de supervision synthétique",
+	},
 	CodeHostGroupNotFound:         {"en": "host group not found", "fr": "groupe d'hôtes introuvable"},
 	CodeHostGroupNameRequired:     {"en": "the group name is required", "fr": "le nom du groupe est requis"},
 	CodeHostGroupFieldTooLong:     {"en": "the group name and OS filter must not exceed 100 characters", "fr": "le nom du groupe et le filtre d'OS ne doivent pas dépasser 100 caractères"},

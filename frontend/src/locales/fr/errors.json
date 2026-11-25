@@ -112,5 +112,10 @@
   "HOST_GROUP_NAME_TAKEN": "un groupe d'hôtes porte déjà ce nom",
   "HOST_GROUP_MATCH_MODE_INVALID": "mode de correspondance invalide (valeurs autorisées : all, any)",
   "HOST_GROUP_CRITERIA_REQUIRED": "un groupe doit définir au moins un tag ou un filtre d'OS",
-  "HOST_GROUP_IN_USE": "ce groupe est encore ciblé par des règles d'alerte ({count}) : changez leur cible avant de le supprimer"
+  "HOST_GROUP_IN_USE": "ce groupe est encore ciblé par des règles d'alerte ({count}) : changez leur cible avant de le supprimer",
+  "ALERT_TARGET_HOST_REQUIRED": "une règle agent ciblant un hôte doit préciser l'hôte",
+  "ALERT_TARGET_GROUP_REQUIRED": "une règle ciblant un groupe doit préciser le groupe",
+  "ALERT_TARGET_TAGS_REQUIRED": "une règle ciblant des tags doit préciser au moins un tag",
+  "ALERT_TARGET_TYPE_INVALID": "type de cible {type} invalide (valeurs autorisées : host, all, group, tag)",
+  "ALERT_SYNTHETIC_METRIC_REQUIRED": "la métrique {metric} n'est pas une métrique de supervision synthétique"
 }

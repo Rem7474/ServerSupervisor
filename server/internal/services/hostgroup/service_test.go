@@ -21,6 +21,9 @@ type fakeRepo struct {
 	deletedID string
 	listErr   error
 	updateErr error
+	deleteErr error
+	// ruleCounts, when set, is returned by successive count calls.
+	ruleCounts []int
 }
 
 func (f *fakeRepo) ListHostGroups(context.Context) ([]models.HostGroup, error) {
@@ -49,8 +52,19 @@ func (f *fakeRepo) UpdateHostGroup(_ context.Context, g *models.HostGroup) error
 	f.updated = g
 	return nil
 }
-func (f *fakeRepo) DeleteHostGroup(_ context.Context, id string) error { f.deletedID = id; return nil }
+func (f *fakeRepo) DeleteHostGroup(_ context.Context, id string) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	f.deletedID = id
+	return nil
+}
 func (f *fakeRepo) CountAlertRulesForHostGroup(context.Context, string) (int, error) {
+	if len(f.ruleCounts) > 0 {
+		n := f.ruleCounts[0]
+		f.ruleCounts = f.ruleCounts[1:]
+		return n, nil
+	}
 	return f.ruleCount, nil
 }
 func (f *fakeRepo) GetAllHosts(context.Context) ([]models.Host, error) { return f.hosts, nil }
@@ -215,6 +229,30 @@ func TestDelete(t *testing.T) {
 		}
 		if repo.deletedID != "g1" {
 			t.Errorf("deleted = %q", repo.deletedID)
+		}
+	})
+	// A rule targeting the group lands between the count and the delete:
+	// the foreign key refusal is a 409, not a 500.
+	t.Run("foreign key refusal after the count", func(t *testing.T) {
+		repo := &fakeRepo{groups: existing, ruleCounts: []int{0, 3}, deleteErr: models.ErrHostGroupInUse}
+		err := NewService(repo).Delete(context.Background(), "g1")
+		var ae *apperr.Error
+		if !errors.As(err, &ae) || ae.HTTPStatus != 409 || ae.I18nKey != apperr.CodeHostGroupInUse || ae.Params["count"] != "3" {
+			t.Fatalf("err = %#v", err)
+		}
+	})
+	t.Run("foreign key refusal with the rule already gone again", func(t *testing.T) {
+		repo := &fakeRepo{groups: existing, deleteErr: models.ErrHostGroupInUse}
+		err := NewService(repo).Delete(context.Background(), "g1")
+		var ae *apperr.Error
+		if !errors.As(err, &ae) || ae.I18nKey != apperr.CodeHostGroupInUse || ae.Params["count"] != "1" {
+			t.Fatalf("err = %#v", err)
+		}
+	})
+	t.Run("other delete failure propagates", func(t *testing.T) {
+		boom := errors.New("boom")
+		if err := NewService(&fakeRepo{groups: existing, deleteErr: boom}).Delete(context.Background(), "g1"); !errors.Is(err, boom) {
+			t.Fatalf("err = %v", err)
 		}
 	})
 	t.Run("unknown group", func(t *testing.T) {

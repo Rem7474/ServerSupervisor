@@ -300,7 +300,9 @@ function agentTargetLabel(rule: AlertRule): string {
   const target = rule.target_type || (rule.host_id ? 'host' : 'all')
   if (target === 'group') {
     const group = props.hostGroups.find((g) => g.id === rule.host_group_id)
-    return group ? t('alerts.targetGroupLabel', { name: group.name }) : t('alerts.targetUnknownGroupLabel')
+    if (group) return t('alerts.targetGroupLabel', { name: group.name })
+    // Group definitions are admin-only: a viewer is told why no name shows.
+    return props.isAdmin ? t('alerts.targetUnknownGroupLabel') : t('alerts.targetRestrictedGroupLabel')
   }
   if (target === 'tag') {
     return t('alerts.targetTagsLabel', { tags: (rule.target_tags || []).join(', ') })

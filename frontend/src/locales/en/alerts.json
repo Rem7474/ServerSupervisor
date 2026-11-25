@@ -442,6 +442,7 @@
   "sourceTargetNoTagsHint": "No host has a tag: add some from a host's page (Edit).",
   "sourceTargetPreview": "{count} host covered right now. | {count} hosts covered right now.",
   "targetGroupLabel": "group {name}",
-  "targetUnknownGroupLabel": "host group",
+  "targetRestrictedGroupLabel": "a host group (details for admins only)",
+  "targetUnknownGroupLabel": "unknown host group",
   "targetTagsLabel": "tags {tags}"
 }

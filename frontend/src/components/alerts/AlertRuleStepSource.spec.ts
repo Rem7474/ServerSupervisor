@@ -334,6 +334,20 @@ describe('AlertRuleStepSource — agent rule target', () => {
     expect(wrapper.text()).not.toContain('couvert')
   })
 
+  it('tag target keeps a targeted tag no host carries any more', async () => {
+    const form = formFor('cpu', { target_type: 'tag', target_tags: ['legacy'] })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form, hosts: [{ id: 'h', name: 'x' }] }) })
+
+    const boxes = wrapper.findAll('input[type="checkbox"]')
+    expect(wrapper.findAll('.form-check-label').map(l => l.text())).toEqual(['legacy'])
+    expect((boxes[0].element as HTMLInputElement).checked).toBe(true)
+    expect(wrapper.text()).not.toContain('Aucun hôte n\'a de tag')
+    expect(wrapper.text()).toContain('0 hôte couvert actuellement.')
+
+    await boxes[0].trigger('change')
+    expect(lastForm(wrapper).target_tags).toEqual([])
+  })
+
   it('a global metric only allows the "all hosts" target', () => {
     const wrapper = mount(AlertRuleStepSource, { props: baseProps({ metricSupportsHostFilter: false }) })
     const disabled = wrapper.findAll('fieldset .btn-group button').filter(b => b.attributes('disabled') !== undefined)

@@ -83,7 +83,7 @@ func (s *Service) TestRun(ctx context.Context, in TestRunInput) ([]TestRunResult
 
 	rule := in.toRule()
 	if err := rule.Validate(); err != nil {
-		return nil, false, apperr.Validation(err.Error())
+		return nil, false, ruleValidationError(err)
 	}
 	if err := s.validateScope(ctx, &rule); err != nil {
 		return nil, false, err
@@ -122,6 +122,8 @@ func (s *Service) TestRun(ctx context.Context, in TestRunInput) ([]TestRunResult
 		for _, target := range s.engine.BuildDockerTargets(ctx, rule) {
 			eval(target)
 		}
+	case models.AlertSourceSynthetic:
+		eval(models.SyntheticTarget(rule.Metric))
 	default:
 		targets, err := s.agentTargets(ctx, rule)
 		if err != nil {

@@ -60,9 +60,58 @@ updated_at = NOW()
 	return err
 }
 
-func (db *DB) DeleteAlertRule(ctx context.Context, id int64) error {
-	_, err := db.conn.ExecContext(ctx, `DELETE FROM alert_rules WHERE id = $1`, id)
-	return err
+// DeleteAlertRule removes a rule. Its open incidents are resolved in the
+// same transaction (silently: nothing evaluates them once the rule is gone,
+// and the foreign key would otherwise leave them open with a NULL rule_id),
+// each with an alert_resolved_rule_deleted audit entry attributed to actor.
+func (db *DB) DeleteAlertRule(ctx context.Context, id int64, actor string) error {
+	tx, err := db.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.QueryContext(ctx,
+		`UPDATE alert_incidents SET resolved_at = NOW()
+		 WHERE rule_id = $1 AND resolved_at IS NULL
+		 RETURNING id, host_id, severity`, id)
+	if err != nil {
+		return err
+	}
+	type resolved struct {
+		id               int64
+		hostID, severity string
+	}
+	var incidents []resolved
+	for rows.Next() {
+		var r resolved
+		if err := rows.Scan(&r.id, &r.hostID, &r.severity); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		incidents = append(incidents, r)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	const action = "alert_resolved_rule_deleted"
+	for _, inc := range incidents {
+		details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d,"severity":%q}`, id, inc.id, inc.severity)
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO audit_logs (username, action, host_id, ip_address, details, status, category)
+			 VALUES ($1, $2, $3, '', $4, 'success', $5)`,
+			actor, action, inc.hostID, details, models.CategorizeAuditAction(action)); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM alert_rules WHERE id = $1`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (db *DB) GetAlertRules(ctx context.Context) ([]models.AlertRule, error) {

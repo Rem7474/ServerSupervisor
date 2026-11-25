@@ -112,5 +112,10 @@
   "HOST_GROUP_NAME_TAKEN": "a host group with this name already exists",
   "HOST_GROUP_MATCH_MODE_INVALID": "invalid match mode (allowed: all, any)",
   "HOST_GROUP_CRITERIA_REQUIRED": "a group needs at least one tag or an OS filter",
-  "HOST_GROUP_IN_USE": "this group is still targeted by alert rules ({count}): retarget them before deleting it"
+  "HOST_GROUP_IN_USE": "this group is still targeted by alert rules ({count}): retarget them before deleting it",
+  "ALERT_TARGET_HOST_REQUIRED": "an agent rule targeting a host must name the host",
+  "ALERT_TARGET_GROUP_REQUIRED": "a rule targeting a group must name the group",
+  "ALERT_TARGET_TAGS_REQUIRED": "a rule targeting tags must name at least one tag",
+  "ALERT_TARGET_TYPE_INVALID": "invalid target type {type} (allowed: host, all, group, tag)",
+  "ALERT_SYNTHETIC_METRIC_REQUIRED": "the metric {metric} is not a synthetic monitoring metric"
 }

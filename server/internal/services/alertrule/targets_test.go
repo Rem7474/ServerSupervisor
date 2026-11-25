@@ -183,3 +183,61 @@ func TestRun_GroupAndTagTargets(t *testing.T) {
 		t.Errorf("missing group preview err = %v", err)
 	}
 }
+
+// The rule form sends source_type "synthetic" for the uptime/SSL metrics.
+func TestCreate_SyntheticSource(t *testing.T) {
+	repo := &fakeRepo{}
+	rule, err := newSvc(repo).Create(context.Background(), models.AlertRuleCreate{
+		Name: "uptime", Metric: "uptime_down_count", Operator: ">", ThresholdWarn: 0, ThresholdCrit: 1,
+		SourceType: models.AlertSourceSynthetic, TargetType: models.AlertTargetAll,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rule.SourceType != models.AlertSourceSynthetic || rule.TargetType != "" || repo.created == nil {
+		t.Errorf("rule = source %q target %q persisted=%v", rule.SourceType, rule.TargetType, repo.created != nil)
+	}
+
+	_, err = newSvc(&fakeRepo{}).Create(context.Background(), models.AlertRuleCreate{
+		Name: "x", Metric: "cpu", Operator: ">", ThresholdWarn: 70, ThresholdCrit: 90,
+		SourceType: models.AlertSourceSynthetic,
+	})
+	if i18nKey(err) != apperr.CodeAlertSyntheticMetricRequired || status(err) != 400 {
+		t.Fatalf("synthetic source with an agent metric: err = %v", err)
+	}
+}
+
+// Catalogued model errors keep their i18n code through the service.
+func TestCreate_TargetErrorKeepsI18nCode(t *testing.T) {
+	_, err := newSvc(&fakeRepo{}).Create(context.Background(), cpuCreate(models.AlertTargetGroup))
+	if i18nKey(err) != apperr.CodeAlertTargetGroupRequired || status(err) != 400 {
+		t.Fatalf("err = %v", err)
+	}
+	repo := &fakeRepo{rule: &models.AlertRule{
+		ID: 1, SourceType: models.AlertSourceAgent, TargetType: models.AlertTargetAll,
+		Metric: "cpu", Operator: ">", ThresholdWarn: ptr(70.0), ThresholdCrit: ptr(90.0),
+	}}
+	err = newSvc(repo).Update(context.Background(), 1, models.AlertRuleUpdate{TargetType: ptr("everywhere")})
+	if i18nKey(err) != apperr.CodeAlertTargetTypeInvalid {
+		t.Fatalf("update err = %v", err)
+	}
+}
+
+func TestRun_SyntheticSourceEvaluatesOneTarget(t *testing.T) {
+	repo := &fakeRepo{allHosts: []models.Host{{ID: "h1"}, {ID: "h2"}}}
+	results, _, err := NewService(repo, nil, newEngineStub(2, true, false)).TestRun(context.Background(), TestRunInput{
+		SourceType: models.AlertSourceSynthetic, Metric: "uptime_down_count", Operator: ">", ThresholdWarn: 0, ThresholdCrit: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].HostID != "synthetic:uptime_down_count" {
+		t.Fatalf("results = %+v", results)
+	}
+	_, _, err = NewService(repo, nil, newEngineStub(2, true, false)).TestRun(context.Background(), TestRunInput{
+		Metric: "cpu", Operator: ">", ThresholdWarn: 70, ThresholdCrit: 90, TargetType: models.AlertTargetTag,
+	})
+	if i18nKey(err) != apperr.CodeAlertTargetTagsRequired {
+		t.Fatalf("preview err = %v", err)
+	}
+}

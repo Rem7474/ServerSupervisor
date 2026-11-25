@@ -164,7 +164,11 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
+	username := c.GetString("username")
+	if username == "" {
+		username = "unknown"
+	}
+	if err := h.svc.Delete(c.Request.Context(), id, username); err != nil {
 		respondError(c, err)
 		return
 	}
