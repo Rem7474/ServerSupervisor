@@ -24,6 +24,7 @@ et la référence API, voir le
 | [Monitoring](Monitoring.md) | Sondes uptime HTTP/TCP/ICMP et certificats SSL/TLS |
 | [Prometheus-Metrics](Prometheus-Metrics.md) | Endpoint `/metrics` d'auto-observabilité du serveur (Prometheus) |
 | [Notifications](Notifications.md) | Centre de notifications in-app et Web Push (VAPID) |
+| [API](API.md) | Clés API personnelles (portées, routes refusées) et spécification OpenAPI |
 | [Two-Factor-Authentication](Two-Factor-Authentication.md) | TOTP et clés de sécurité/passkeys (WebAuthn) |
 | [SSO-OIDC](SSO-OIDC.md) | Connexion unique OpenID Connect (client, groupes → rôles, rattachement des comptes) |
 | [Host-Discovery](Host-Discovery.md) | Scan de sous-réseau et ajout en masse |
