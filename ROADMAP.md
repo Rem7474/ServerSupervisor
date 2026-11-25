@@ -26,7 +26,7 @@ au moment où un item change de statut, pas rétroactivement en bloc.
 | 4 | Acquittement (ack) d'incident + statut « en cours de traitement » | Prérequis technique de l'escalade (#3) et du dédup (#5) | Fait |
 | 5 | Déduplication / groupement d'alertes corrélées | Un hôte down peut aujourd'hui déclencher une cascade d'alertes filles indépendantes | Fait |
 | 6 | Canal Slack / Teams / Discord / webhook générique | Canaux Slack, Teams et Discord (webhooks entrants, déclenchement d'alerte) ; le canal `notify` déprécié POSTe du JSON brut vers `NOTIFY_URL`. Un webhook générique sortant (corps JSON libre, en-têtes) n'existe pas | Partiel |
-| 7 | Groupes dynamiques d'hôtes + règles par groupe | Le tagging brut **existe** (`hosts.tags`, éditable, filtrable sur le dashboard et à l'application d'un modèle de règle) — ce qui manque est la couche au-dessus : groupes dérivés d'un tag, et règles/permissions ciblant un groupe plutôt qu'un hôte | En cours |
+| 7 | Groupes dynamiques d'hôtes + règles par groupe | Groupes d'hôtes définis par une règle sur les tags (tous/au moins un) et un filtre d'OS optionnel, membres calculés à la volée ; règles d'alerte agent ciblant un hôte, tous les hôtes, un groupe ou des tags. Les permissions par hôte (`host_permissions`) ne s'appliquent pas encore à un groupe | Partiel |
 
 ### Should have — élargit la couverture sans agent
 

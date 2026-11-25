@@ -104,5 +104,13 @@
   "DISCOVERY_PREFIX_RANGE": "the prefix must be between /{min} and /{max} (254 addresses max)",
   "SETTINGS_WEBHOOK_URL_INVALID": "invalid {provider} webhook URL: it must be an https URL that does not target a local or private address",
   "SETTINGS_WEBHOOK_NOT_CONFIGURED": "{provider} webhook URL not configured",
-  "SETTINGS_WEBHOOK_SEND_FAILED": "could not send the {provider} test message: {reason}"
+  "SETTINGS_WEBHOOK_SEND_FAILED": "could not send the {provider} test message: {reason}",
+  "ALERT_HOST_GROUP_NOT_FOUND": "host group not found for this rule",
+  "HOST_GROUP_NOT_FOUND": "host group not found",
+  "HOST_GROUP_NAME_REQUIRED": "the group name is required",
+  "HOST_GROUP_FIELD_TOO_LONG": "the group name and OS filter must not exceed 100 characters",
+  "HOST_GROUP_NAME_TAKEN": "a host group with this name already exists",
+  "HOST_GROUP_MATCH_MODE_INVALID": "invalid match mode (allowed: all, any)",
+  "HOST_GROUP_CRITERIA_REQUIRED": "a group needs at least one tag or an OS filter",
+  "HOST_GROUP_IN_USE": "this group is still targeted by alert rules ({count}): retarget them before deleting it"
 }

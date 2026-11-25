@@ -32,6 +32,7 @@ import (
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
+	hostgroupsvc "github.com/serversupervisor/server/internal/services/hostgroup"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
 	maintenancesvc "github.com/serversupervisor/server/internal/services/maintenance"
 	networksvc "github.com/serversupervisor/server/internal/services/network"
@@ -148,6 +149,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	proxmoxH := handlers.NewProxmoxHandler(proxmoxService)
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
+	hostGroupsH := handlers.NewHostGroupsHandler(hostgroupsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
 	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher, cfg))
@@ -187,6 +189,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerRunbookRoutes(v1, runbookH)
 	registerProxmoxRoutes(v1, proxmoxH)
 	registerHostPermissionRoutes(v1, hostPermH)
+	registerHostGroupRoutes(v1, hostGroupsH)
 	registerUptimeRoutes(v1, uptimeH)
 	registerSSLRoutes(v1, sslH)
 	registerBackupRoutes(v1, backupH)
@@ -532,6 +535,17 @@ func registerRunbookRoutes(g *gin.RouterGroup, h *handlers.RunbooksHandler) {
 	admin.POST("/runbooks/:id/run", h.RunRunbook)
 	admin.GET("/runbooks/:id/executions", h.ListRunbookExecutions)
 	admin.GET("/runbooks/:id/executions/:execution_id", h.GetRunbookExecution)
+}
+
+// registerHostGroupRoutes is admin-only: a group defines which hosts every
+// alert rule targeting it covers.
+func registerHostGroupRoutes(g *gin.RouterGroup, h *handlers.HostGroupsHandler) {
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.GET("/host-groups", h.List)
+	admin.POST("/host-groups", h.Create)
+	admin.PUT("/host-groups/:id", h.Update)
+	admin.DELETE("/host-groups/:id", h.Delete)
 }
 
 func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {

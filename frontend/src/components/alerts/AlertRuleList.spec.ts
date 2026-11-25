@@ -169,3 +169,25 @@ describe('AlertRuleList', () => {
     expect(wrapper.find('label.form-switch').attributes('title')).toBe('Réservé aux administrateurs')
   })
 })
+
+describe('AlertRuleList — agent rule target label', () => {
+  beforeEach(() => {
+    setLocale('fr')
+  })
+
+  it.each([
+    ['legacy rule without host', {}, 'Agent › Tous les hôtes'],
+    ['all hosts', { target_type: 'all' }, 'Agent › Tous les hôtes'],
+    ['known group', { target_type: 'group', host_group_id: 'g1' }, 'Agent › groupe Prod'],
+    ['group not loaded', { target_type: 'group', host_group_id: 'gone' }, 'Agent › groupe d\'hôtes'],
+    ['tags', { target_type: 'tag', target_tags: ['db', 'web'] }, 'Agent › tags db, web'],
+    ['unknown host id', { target_type: 'host', host_id: 'h9' }, 'Agent › h9'],
+  ])('%s', (_label, target, expected) => {
+    const wrapper = mountList({
+      rules: [{ id: 1, name: 'r', metric: 'cpu', operator: '>', source_type: 'agent', ...target }],
+      hostGroups: [{ id: 'g1', name: 'Prod' }],
+      fetched: true,
+    })
+    expect(wrapper.text()).toContain(expected)
+  })
+})

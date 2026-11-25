@@ -427,5 +427,21 @@
   "incidentAcknowledgeError": "Could not acknowledge",
   "templateApplyFailedCount": "{failed} failure | {failed} failures",
   "notificationBellEnableHint": "Get alerts even when this tab is closed",
-  "notificationBellEnableButton": "Enable"
+  "notificationBellEnableButton": "Enable",
+  "sourceTargetLabel": "Target",
+  "targetAll": "All hosts",
+  "targetHost": "One host",
+  "targetGroup": "A group",
+  "targetTag": "Tags",
+  "sourceTargetHostPlaceholder": "Pick a host",
+  "sourceTargetGroupLabel": "Host group",
+  "sourceTargetGroupPlaceholder": "Pick a group",
+  "sourceTargetGroupOption": "{name} ({count} host) | {name} ({count} hosts)",
+  "sourceTargetNoGroupsHint": "No host group yet: create one in Settings › Host groups.",
+  "sourceTargetTagsLabel": "Targeted tags",
+  "sourceTargetNoTagsHint": "No host has a tag: add some from a host's page (Edit).",
+  "sourceTargetPreview": "{count} host covered right now. | {count} hosts covered right now.",
+  "targetGroupLabel": "group {name}",
+  "targetUnknownGroupLabel": "host group",
+  "targetTagsLabel": "tags {tags}"
 }
