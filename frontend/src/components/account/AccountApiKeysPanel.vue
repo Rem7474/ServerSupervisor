@@ -89,7 +89,7 @@
                   <div class="fw-medium">
                     {{ key.name }}
                   </div>
-                  <div class="small text-secondary">
+                  <div class="small text-secondary text-nowrap">
                     {{ t('account.addedOnLabel', { date: formatExactDate(key.created_at) }) }}
                   </div>
                 </td>
