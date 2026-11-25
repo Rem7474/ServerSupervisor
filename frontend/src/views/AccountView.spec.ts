@@ -4,7 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../i18n'
 import { useAuthStore } from '../stores/auth'
 
-const { getProfile, getCommandsHistory, changePassword, getMFAStatus, getLoginEvents, listWebAuthnCredentials } = vi.hoisted(() => ({
+const { getProfile, getCommandsHistory, changePassword, getMFAStatus, getLoginEvents, listWebAuthnCredentials, listMyApiKeys } = vi.hoisted(() => ({
+  listMyApiKeys: vi.fn(),
   getMFAStatus: vi.fn(),
   getLoginEvents: vi.fn(),
   listWebAuthnCredentials: vi.fn(),
@@ -14,7 +15,7 @@ const { getProfile, getCommandsHistory, changePassword, getMFAStatus, getLoginEv
 }))
 
 vi.mock('../api', () => ({
-  default: { getProfile, getCommandsHistory, changePassword, getMFAStatus, getLoginEvents, listWebAuthnCredentials },
+  default: { getProfile, getCommandsHistory, changePassword, getMFAStatus, getLoginEvents, listWebAuthnCredentials, listMyApiKeys },
   getApiErrorMessage: (e: unknown, fallback?: string) =>
     (e as { response?: { data?: { error?: string } } })?.response?.data?.error || fallback || String(e),
 }))
@@ -38,6 +39,7 @@ describe('AccountView', () => {
     getMFAStatus.mockResolvedValue({ data: { mfa_enabled: false } })
     getLoginEvents.mockResolvedValue({ data: { events: [] } })
     listWebAuthnCredentials.mockResolvedValue({ data: { credentials: [] } })
+    listMyApiKeys.mockResolvedValue({ data: [] })
   })
 
   it('renders the translated header, tabs and profile card', async () => {
@@ -100,7 +102,7 @@ describe('AccountView', () => {
     await flushPromises()
 
     expect(wrapper.findAll('button.nav-link')[2].classes()).toContain('active')
-    expect(wrapper.findAll('button.nav-link')).toHaveLength(3)
+    expect(wrapper.findAll('button.nav-link')).toHaveLength(4)
     expect(wrapper.text()).toContain('Authentification multi-facteur')
     expect(wrapper.text()).toContain('Historique de connexion')
   })
@@ -118,6 +120,28 @@ describe('AccountView', () => {
       await flushPromises()
       expect(fallback.findAll('button.nav-link')[0].classes()).toContain('active')
       fallback.unmount()
+    } finally {
+      window.history.replaceState({}, '', '/')
+    }
+  })
+
+  it('opens the API keys tab from ?tab=api-keys and loads the keys only then', async () => {
+    const profileFirst = mount(AccountView, mountOpts)
+    await flushPromises()
+    expect(listMyApiKeys).not.toHaveBeenCalled()
+    await profileFirst.findAll('button.nav-link')[3].trigger('click')
+    await flushPromises()
+    expect(listMyApiKeys).toHaveBeenCalledTimes(1)
+    expect(profileFirst.text()).toContain('Aucune clé API')
+    profileFirst.unmount()
+
+    window.history.replaceState({}, '', '/account?tab=api-keys')
+    try {
+      const wrapper = mount(AccountView, mountOpts)
+      await flushPromises()
+      expect(wrapper.findAll('button.nav-link')[3].classes()).toContain('active')
+      expect(listMyApiKeys).toHaveBeenCalledTimes(2)
+      wrapper.unmount()
     } finally {
       window.history.replaceState({}, '', '/')
     }

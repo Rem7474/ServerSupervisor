@@ -74,6 +74,16 @@
           {{ t('account.connectionsTab') }}
         </button>
       </li>
+      <li class="nav-item">
+        <button
+          type="button"
+          class="nav-link"
+          :class="{ active: activeTab === 'apiKeys' }"
+          @click="activeTab = 'apiKeys'"
+        >
+          {{ t('account.apiKeysTab') }}
+        </button>
+      </li>
     </ul>
 
     <!-- ── Onglet Profil ── -->
@@ -419,6 +429,9 @@
 
     <!-- ── Onglet Connexions ── -->
     <AccountSecurityPanel v-if="activeTab === 'logins'" />
+
+    <!-- ── Onglet Clés API ── -->
+    <AccountApiKeysPanel v-if="activeTab === 'apiKeys'" />
   </div>
 </template>
 
@@ -426,6 +439,7 @@
 import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
+import AccountApiKeysPanel from '../components/account/AccountApiKeysPanel.vue'
 import AccountSecurityPanel from '../components/account/AccountSecurityPanel.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import EmptyState from '../components/EmptyState.vue'
