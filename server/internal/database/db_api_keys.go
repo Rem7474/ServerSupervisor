@@ -20,8 +20,19 @@ type APIKeyAuthRecord struct {
 	Role      string
 }
 
-const apiKeySelect = `SELECT k.id, k.name, k.prefix, k.scope, u.username, k.expires_at, k.last_used_at, k.revoked_at, k.created_at
-	FROM api_keys k JOIN users u ON u.id = k.user_id`
+// The listing queries are spelled out in full (no string assembly) so each
+// one is a fixed statement.
+const (
+	apiKeyByIDQuery = `SELECT k.id, k.name, k.prefix, k.scope, u.username, k.expires_at, k.last_used_at, k.revoked_at, k.created_at
+	FROM api_keys k JOIN users u ON u.id = k.user_id
+	WHERE k.id = $1`
+	apiKeysByUserQuery = `SELECT k.id, k.name, k.prefix, k.scope, u.username, k.expires_at, k.last_used_at, k.revoked_at, k.created_at
+	FROM api_keys k JOIN users u ON u.id = k.user_id
+	WHERE k.user_id = $1 ORDER BY k.created_at DESC, k.id DESC`
+	allAPIKeysQuery = `SELECT k.id, k.name, k.prefix, k.scope, u.username, k.expires_at, k.last_used_at, k.revoked_at, k.created_at
+	FROM api_keys k JOIN users u ON u.id = k.user_id
+	ORDER BY k.created_at DESC, k.id DESC`
+)
 
 func scanAPIKey(row interface{ Scan(...any) error }) (models.APIKey, error) {
 	var k models.APIKey
@@ -62,7 +73,7 @@ func (db *DB) CreateAPIKey(ctx context.Context, userID int64, name, prefix, keyH
 
 // GetAPIKeyByID returns one key, sql.ErrNoRows when it does not exist.
 func (db *DB) GetAPIKeyByID(ctx context.Context, id int64) (*models.APIKey, error) {
-	k, err := scanAPIKey(db.conn.QueryRowContext(ctx, apiKeySelect+` WHERE k.id = $1`, id))
+	k, err := scanAPIKey(db.conn.QueryRowContext(ctx, apiKeyByIDQuery, id))
 	if err != nil {
 		return nil, err
 	}
@@ -71,12 +82,12 @@ func (db *DB) GetAPIKeyByID(ctx context.Context, id int64) (*models.APIKey, erro
 
 // ListAPIKeysByUser returns a user's keys, revoked ones included, newest first.
 func (db *DB) ListAPIKeysByUser(ctx context.Context, userID int64) ([]models.APIKey, error) {
-	return db.queryAPIKeys(ctx, apiKeySelect+` WHERE k.user_id = $1 ORDER BY k.created_at DESC, k.id DESC`, userID)
+	return db.queryAPIKeys(ctx, apiKeysByUserQuery, userID)
 }
 
 // ListAllAPIKeys returns every user's keys, newest first (admin view).
 func (db *DB) ListAllAPIKeys(ctx context.Context) ([]models.APIKey, error) {
-	return db.queryAPIKeys(ctx, apiKeySelect+` ORDER BY k.created_at DESC, k.id DESC`)
+	return db.queryAPIKeys(ctx, allAPIKeysQuery)
 }
 
 // CountActiveAPIKeys counts a user's keys that are neither revoked nor expired.

@@ -66,8 +66,8 @@ func apiKeyForbiddenRoute(method, fullPath string) bool {
 	return false
 }
 
-// bearerAPIKey returns the API key carried by "Authorization: Bearer ssk_…".
-func bearerAPIKey(r *http.Request) (string, bool) {
+// bearerSSKToken returns the API key carried by "Authorization: Bearer ssk_…".
+func bearerSSKToken(r *http.Request) (string, bool) {
 	scheme, value, ok := strings.Cut(r.Header.Get("Authorization"), " ")
 	if !ok || !strings.EqualFold(scheme, "Bearer") {
 		return "", false
@@ -106,7 +106,7 @@ func abortAPIError(c *gin.Context, e *apperr.Error) {
 func SessionOrAPIKeyMiddleware(cfg *config.Config, keys APIKeyAuthenticator, rl *IPRateLimiter) gin.HandlerFunc {
 	jwtAuth := JWTMiddleware(cfg)
 	return func(c *gin.Context) {
-		raw, ok := bearerAPIKey(c.Request)
+		raw, ok := bearerSSKToken(c.Request)
 		if !ok {
 			jwtAuth(c)
 			return
