@@ -68,3 +68,35 @@ describe('useAlertRuleForm — chat channels', () => {
     expect(channelChat.value).toEqual([])
   })
 })
+
+describe('useAlertRuleForm — agent target', () => {
+  it('defaults new rules to every host', () => {
+    const { form, buildPayload } = useAlertRuleForm()
+    expect(form.value.target_type).toBe('all')
+    expect(buildPayload()).toMatchObject({ target_type: 'all', host_id: null, host_group_id: null, target_tags: [] })
+  })
+
+  it('derives the target of rules saved before targeting existed', () => {
+    const { form, hydrateFormFromRule } = useAlertRuleForm()
+    hydrateFormFromRule({ metric: 'cpu', host_id: 'h1' })
+    expect(form.value.target_type).toBe('host')
+    hydrateFormFromRule({ metric: 'cpu', host_id: null })
+    expect(form.value.target_type).toBe('all')
+    hydrateFormFromRule({ metric: 'cpu', target_type: 'bogus', host_id: 'h1' })
+    expect(form.value.target_type).toBe('host')
+  })
+
+  it('hydrates an explicit tag target and sends only its tags', () => {
+    const { buildPayload, hydrateFormFromRule } = useAlertRuleForm()
+    hydrateFormFromRule({ metric: 'cpu', target_type: 'tag', target_tags: ['db'], host_id: 'h1', host_group_id: 'g1' })
+    expect(buildPayload()).toMatchObject({ target_type: 'tag', target_tags: ['db'], host_id: null, host_group_id: null })
+  })
+
+  it('omits the agent target for non-agent rules', () => {
+    const { buildPayload, hydrateFormFromRule } = useAlertRuleForm()
+    hydrateFormFromRule({ metric: 'docker_container_state', source_type: 'docker', target_type: 'tag', target_tags: ['db'] })
+    const payload = buildPayload()
+    expect(payload.target_type).toBeUndefined()
+    expect(payload.target_tags).toBeUndefined()
+  })
+})

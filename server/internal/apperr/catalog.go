@@ -278,7 +278,7 @@ var ErrorCatalog = map[string]ErrorMessage{
 	CodeHostGroupNameTaken:        {"en": "a host group with this name already exists", "fr": "un groupe d'hôtes porte déjà ce nom"},
 	CodeHostGroupMatchModeInvalid: {"en": "invalid match mode (allowed: all, any)", "fr": "mode de correspondance invalide (valeurs autorisées : all, any)"},
 	CodeHostGroupCriteriaRequired: {"en": "a group needs at least one tag or an OS filter", "fr": "un groupe doit définir au moins un tag ou un filtre d'OS"},
-	CodeHostGroupInUse:            {"en": "this group is targeted by {count} alert rule(s): retarget them before deleting it", "fr": "ce groupe est ciblé par {count} règle(s) d'alerte : changez leur cible avant de le supprimer"},
+	CodeHostGroupInUse:            {"en": "this group is still targeted by alert rules ({count}): retarget them before deleting it", "fr": "ce groupe est encore ciblé par des règles d'alerte ({count}) : changez leur cible avant de le supprimer"},
 
 	CodeRunbookNotFound:               {"en": "runbook not found", "fr": "runbook introuvable"},
 	CodeRunbookNameRequired:           {"en": "the runbook name is required", "fr": "le nom du runbook est requis"},

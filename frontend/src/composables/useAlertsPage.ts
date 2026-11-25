@@ -3,11 +3,13 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { useDateFormatter } from './useDateFormatter'
 import { useHostsStore } from '../stores/hosts'
 import { useAlertRulesStore } from '../stores/alertRules'
+import { useAuthStore } from '../stores/auth'
 import apiClient, { getApiErrorMessage } from '../api'
 import { storeToRefs } from 'pinia'
 import type { Host } from '../types/host'
 import type { ReleaseTracker } from '../types/tracker'
 import type { AlertRule, AlertRuleCapabilities, AlertRulePayload } from '../types/alert'
+import type { HostGroup } from '../types/generated'
 import type { WSNotificationMessage } from '../types/ws'
 import { i18n } from '../i18n'
 
@@ -19,6 +21,8 @@ interface UseAlertsPageApi {
   trackersError: Ref<string>
   rules: Ref<AlertRule[]>
   hosts: Ref<Host[]>
+  hostGroups: Ref<HostGroup[]>
+  loadHostGroups: () => Promise<void>
   loading: Ref<boolean>
   fetched: Ref<boolean>
   fetchError: Ref<string>
@@ -60,6 +64,21 @@ export function useAlertsPage(): UseAlertsPageApi {
   const capabilities: Ref<AlertRuleCapabilities | null> = ref(null)
   const capabilitiesLoading: Ref<boolean> = ref(false)
   const capabilitiesError: Ref<string> = ref('')
+  const hostGroups: Ref<HostGroup[]> = ref([])
+
+  // Host groups feed the rule target picker and the list's target labels.
+  // The endpoint is admin-only like rule editing, so other roles skip the
+  // call; a failure leaves the list empty (labels fall back to a generic
+  // "group" wording) rather than blocking the page.
+  async function loadHostGroups(): Promise<void> {
+    if (!useAuthStore().isAdmin) return
+    try {
+      const data = (await apiClient.getHostGroups()).data
+      hostGroups.value = Array.isArray(data) ? data : []
+    } catch {
+      hostGroups.value = []
+    }
+  }
 
   // Expose store state (reactive refs shared across navigations)
   const { rules, loading, fetched, error: fetchError } = storeToRefs(rulesStore)
@@ -76,6 +95,7 @@ export function useAlertsPage(): UseAlertsPageApi {
       apiClient.getProxmoxAlertRuleCapabilities(),
       apiClient.getSyntheticAlertRuleCapabilities(),
       apiClient.getDockerAlertCapabilities(),
+      loadHostGroups(),
     ])
 
     if (agentCapsResult.status === 'fulfilled' && proxmoxCapsResult.status === 'fulfilled') {
@@ -228,6 +248,8 @@ export function useAlertsPage(): UseAlertsPageApi {
     trackersError,
     rules,
     hosts,
+    hostGroups,
+    loadHostGroups,
     loading: loading as Ref<boolean>,
     fetched: fetched as Ref<boolean>,
     fetchError: fetchError as Ref<string>,
