@@ -305,6 +305,9 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		Journal:      true,
 		Restic:       r.cfg.CollectRestic,
 		NetworkFlows: r.cfg.CollectNetworkFlows,
+
+		NetworkDiscovery: true,
+		NetworkScan:      r.cfg.AllowNetworkScan,
 	}
 
 	diagnostics := collector.CheckConfig(r.cfg)

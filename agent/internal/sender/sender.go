@@ -34,6 +34,11 @@ type Capabilities struct {
 	Journal      bool `json:"journal"`
 	Restic       bool `json:"restic"`
 	NetworkFlows bool `json:"network_flows"`
+	// NetworkDiscovery is always true on agents that ship the discovery
+	// module (ARP table read); NetworkScan mirrors allow_network_scan (port
+	// scan and SNMP probes).
+	NetworkDiscovery bool `json:"network_discovery"`
+	NetworkScan      bool `json:"network_scan"`
 }
 
 // DockerPayload is the "docker" section of a report. The server decodes it into
@@ -262,6 +267,45 @@ func (s *Sender) StreamCommandChunk(ctx context.Context, commandID string, chunk
 	}
 
 	return nil
+}
+
+// StreamProgress sends a progress chunk like StreamCommandChunk and reports
+// whether the server asked to cancel the command: the server answers a
+// stream chunk with {"cancel": true} once an operator cancelled it. A server
+// that predates cancellation never sets the field, so this returns false.
+// Delivery failures are logged and treated as "keep going".
+func (s *Sender) StreamProgress(ctx context.Context, commandID string, chunk string) bool {
+	data, err := json.Marshal(struct {
+		CommandID string `json:"command_id"`
+		Chunk     string `json:"chunk"`
+	}{CommandID: commandID, Chunk: chunk})
+	if err != nil {
+		return false
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", s.cfg.ServerURL+"/api/agent/command/stream", bytes.NewReader(data))
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+
+	resp, err := s.commandClient.Do(req)
+	if err != nil {
+		slog.Warn("failed to stream progress", "command_id", commandID, "err", err)
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		slog.Warn("server returned non-OK status when streaming progress", "status", resp.StatusCode)
+		return false
+	}
+	var body struct {
+		Cancel bool `json:"cancel"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&body); err != nil {
+		return false
+	}
+	return body.Cancel
 }
 
 // SendAptStatus pushes a fresh APT status snapshot to the server out-of-band, after

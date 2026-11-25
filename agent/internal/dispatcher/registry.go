@@ -27,6 +27,7 @@ var moduleRegistry = map[string]ModuleHandler{
 	"crowdsec":  handleCrowdSec,
 	"compose":   handleCompose,
 	"restic":    handleRestic,
+	"discovery": handleDiscovery,
 }
 
 // dispatch picks the handler for cmd.Module and reports a clear error for
