@@ -20,6 +20,7 @@
     "test:browser:coverage": "vitest run --config vitest.browser.config.ts --coverage"
   },
   "dependencies": {
+    "@novnc/novnc": "1.7.0",
     "@tabler/core": "^1.6.0",
     "@tabler/icons-vue": "^3.47.0",
     "@xterm/addon-fit": "^0.11.0",

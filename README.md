@@ -118,13 +118,14 @@ tâches récentes et résultats de sauvegarde vzdump — avec liaison optionnell
 Sauvegardes / Mises à jour / Services / Journaux sécurité). `token_secret`
 stocké en base, jamais renvoyé au frontend.
 
-**Console interactive LXC** : un shell dans un conteneur directement depuis la
-fiche guest, relayé en WebSocket vers `termproxy` sur le nœud PVE — aucun
-ticket PVE n'atteint jamais le navigateur, aucune session n'est persistée.
-Admin uniquement, tracé dans les logs d'audit, et limité aux LXC (QEMU
-demanderait du VNC/RFB, un protocole différent). Demande un compte PVE avec
-`VM.Console` en plus du token API : l'API Proxmox n'accepte pas le token sur
-cet endpoint.
+**Consoles interactives** : un shell dans un conteneur LXC (relayé en
+WebSocket vers `termproxy`) et l'écran d'une VM QEMU (noVNC, relayé vers
+`vncproxy`/`vncwebsocket`, avec Ctrl+Alt+Suppr et plein écran), directement
+depuis la fiche guest. Le serveur garde les tickets PVE et répond lui-même à
+l'authentification VNC : aucun ticket ni mot de passe n'atteint le navigateur,
+aucune session n'est persistée. Admin uniquement, tracé dans les logs d'audit.
+Demande un compte PVE avec `VM.Console` en plus du token API : l'API Proxmox
+n'accepte pas le token sur ces endpoints.
 
 Guide complet (création du token PVE, identifiants console, permissions en
 écriture, posture admin vs authentifié par action, dépannage) :
@@ -1160,7 +1161,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `GET` | `/api/v1/hosts/:id/proxmox-candidates` | Guests candidats à la liaison | Authentifié |
 | `GET` | `/api/v1/hosts/:id/proxmox-disks` | Disques Proxmox du nœud hébergeant cet hôte | Authentifié |
 
-> La console LXC est un WebSocket, pas une route REST — voir la section
+> Les consoles LXC et VNC sont des WebSockets, pas des routes REST — voir la section
 > [WebSocket](#websocket-streaming-temps-réel).
 
 #### Settings
@@ -1183,6 +1184,7 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `/api/v1/ws/apt` | Flux statut APT |
 | `/api/v1/ws/commands/stream/:id` | Sortie live d'une commande par UUID |
 | `/api/v1/ws/proxmox/console/:guest_id` | Console interactive d'un conteneur LXC (relais bidirectionnel vers `termproxy`) — **Admin** |
+| `/api/v1/ws/proxmox/vnc/:guest_id` | Console VNC d'une VM QEMU (RFB relayé vers `vncwebsocket`, authentification VNC faite par le serveur) — **Admin** |
 | `/api/v1/ws/notifications` | Flux notifications (in-app + déclenche le push) |
 
 > Authentification WebSocket : cookie de session envoyé automatiquement à la connexion, avec repli sur l'envoi de `{"type":"auth","token":"<jwt>"}` en message une fois la connexion établie (pour les clients qui ne peuvent pas compter sur le cookie). Il n'y a **pas** de fallback `?token=` en query string — retiré volontairement (fuite potentielle dans les logs de proxy/l'historique navigateur).
@@ -1209,7 +1211,7 @@ Deux couches se superposent : un **rôle global** par utilisateur, et des
 
 | Rôle | Description |
 |---|---|
-| `admin` | Accès complet — gestion des utilisateurs, hôtes, alertes, settings, connexions Proxmox/NPM, console LXC |
+| `admin` | Accès complet — gestion des utilisateurs, hôtes, alertes, settings, connexions Proxmox/NPM, consoles LXC et VNC |
 | `operator` | Peut exécuter des commandes (apt, docker, systemd) et consulter l'historique |
 | `viewer` | Lecture seule — dashboards, métriques, statuts |
 

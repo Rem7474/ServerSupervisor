@@ -215,10 +215,20 @@
                     <span class="text-secondary small">({{ proxmoxLink?.node_name }})</span>
                   </div>
                   <div class="text-secondary small">
-                    {{ t('host.consoleTabDescription') }}
+                    {{ hasVncConsole ? t('host.consoleTabVncDescription') : t('host.consoleTabDescription') }}
                   </div>
                 </div>
                 <button
+                  v-if="hasVncConsole"
+                  type="button"
+                  class="btn btn-outline-primary"
+                  :disabled="showVncConsole"
+                  @click="openVncConsole"
+                >
+                  {{ t('host.consoleTabOpenVnc') }}
+                </button>
+                <button
+                  v-else
                   type="button"
                   class="btn btn-outline-primary"
                   :disabled="showLxcConsole"
@@ -235,6 +245,13 @@
       <!-- One side panel for both consoles: once the host has an LXC console the
            panel is the ProxmoxConsole wrapper, which shows either the terminal
            or the live command log, so there is a single panel and reopen button. -->
+      <ProxmoxVncConsoleLazy
+        v-if="hasVncConsole && hasOpenedVncConsole"
+        :guest-id="proxmoxLink?.guest_id"
+        :guest-name="proxmoxLink?.guest_name || ''"
+        :show="showVncConsole"
+        @close="showVncConsole = false"
+      />
       <ProxmoxConsoleLazy
         v-if="hasLxcConsole && hasOpenedLxcConsole"
         :guest-id="proxmoxLink?.guest_id"
@@ -440,7 +457,10 @@ const hostAlertsLink = computed(() => ({
   query: { tab: 'incidents', host: host.value?.name || host.value?.hostname || '' },
 }))
 
-const { hasLxcConsole, ProxmoxConsoleLazy, showLxcConsole, hasOpenedLxcConsole, consoleKind, openLxcConsole, reopenConsole, closeActiveConsole } = useHostLxcConsole({
+const {
+  hasLxcConsole, hasVncConsole, hasGuestConsole, ProxmoxConsoleLazy, ProxmoxVncConsoleLazy, showLxcConsole, hasOpenedLxcConsole,
+  showVncConsole, hasOpenedVncConsole, consoleKind, openLxcConsole, openVncConsole, reopenConsole, closeActiveConsole,
+} = useHostLxcConsole({
   isAdmin: () => !!auth.isAdmin, proxmoxLink, activeTab, showConsole, closeConsoleAndStream,
 })
 
@@ -453,7 +473,7 @@ const hostTabs = useHostTabs({
   exposureDomainCount,
   customTasksCount,
   tasksCount,
-  hasLxcConsole,
+  hasGuestConsole,
 })
 </script>
 

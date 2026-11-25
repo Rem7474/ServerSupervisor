@@ -117,6 +117,9 @@ const (
 	CodeProxmoxMetricsSourceInvalid   = "PROXMOX_METRICS_SOURCE_INVALID"
 	CodeProxmoxConsoleQemuUnsupported = "PROXMOX_CONSOLE_QEMU_UNSUPPORTED"
 	CodeProxmoxConsoleNotConfigured   = "PROXMOX_CONSOLE_NOT_CONFIGURED"
+	CodeProxmoxVNCQemuOnly            = "PROXMOX_VNC_QEMU_ONLY"
+	CodeProxmoxConsoleAdminOnly       = "PROXMOX_CONSOLE_ADMIN_ONLY"
+	CodeProxmoxGuestNotFound          = "PROXMOX_GUEST_NOT_FOUND"
 	CodeTrackerComposeTargetRequired  = "TRACKER_COMPOSE_TARGET_REQUIRED"
 	CodeTrackerNoInitialCheck         = "TRACKER_NO_INITIAL_CHECK"
 	CodeTrackerWatchOnly              = "TRACKER_WATCH_ONLY"
@@ -311,8 +314,11 @@ var ErrorCatalog = map[string]ErrorMessage{
 	CodeScheduledTaskCronInvalid:      {"en": "invalid cron expression: {reason}", "fr": "expression cron invalide : {reason}"},
 	CodeProxmoxLinkStatusInvalid:      {"en": "invalid status: must be suggested, confirmed or ignored", "fr": "status invalide : doit être suggested, confirmed ou ignored"},
 	CodeProxmoxMetricsSourceInvalid:   {"en": "invalid metrics_source: must be auto, agent or proxmox", "fr": "metrics_source invalide : doit être auto, agent ou proxmox"},
-	CodeProxmoxConsoleQemuUnsupported: {"en": "console is not available for QEMU VMs yet", "fr": "console non disponible pour les VM QEMU pour le moment"},
+	CodeProxmoxConsoleQemuUnsupported: {"en": "the terminal console is for LXC containers: use the VNC console for QEMU VMs", "fr": "la console terminal est réservée aux conteneurs LXC : utilisez la console VNC pour les VM QEMU"},
 	CodeProxmoxConsoleNotConfigured:   {"en": "PVE console is not configured for this connection: credentials required", "fr": "console PVE non configurée pour cette connexion : identifiants requis"},
+	CodeProxmoxVNCQemuOnly:            {"en": "the VNC console is only available for QEMU VMs", "fr": "la console VNC n'est disponible que pour les VM QEMU"},
+	CodeProxmoxConsoleAdminOnly:       {"en": "the Proxmox console is restricted to administrators", "fr": "la console Proxmox est réservée aux administrateurs"},
+	CodeProxmoxGuestNotFound:          {"en": "Proxmox guest not found", "fr": "invité Proxmox introuvable"},
 	CodeTrackerComposeTargetRequired:  {"en": "compose mode: configure a target VM and a compose project to trigger manually", "fr": "mode compose : configurez une VM cible et un projet compose pour déclencher manuellement"},
 	CodeTrackerNoInitialCheck:         {"en": "no initial check has run yet: wait for the next polling cycle before triggering manually", "fr": "aucune vérification initiale effectuée — attendez le prochain cycle de polling avant de déclencher manuellement"},
 	CodeTrackerWatchOnly:              {"en": "tracker is watch-only: configure a target VM and a task to trigger manually", "fr": "tracker en mode surveillance seule — configurez une VM cible et une tâche pour déclencher manuellement"},

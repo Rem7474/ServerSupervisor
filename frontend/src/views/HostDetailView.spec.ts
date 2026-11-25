@@ -5,6 +5,19 @@ import { setLocale } from '../i18n'
 
 const { addToast } = vi.hoisted(() => ({ addToast: vi.fn() }))
 vi.mock('../composables/useGlobalToast', () => ({ addToast }))
+vi.mock('../components/proxmox/ProxmoxVncConsole.vue', () => ({
+  __esModule: true,
+  default: defineComponent({
+    name: 'ProxmoxVncConsoleStub',
+    props: { guestId: { type: String, default: '' }, guestName: { type: String, default: '' }, show: Boolean },
+    emits: ['close'],
+    setup(props, { emit }) {
+      return () => h('div', { class: 'vnc-stub', 'data-guest': props.guestId, 'data-show': String(props.show) }, [
+        h('button', { class: 'vnc-stub-close', onClick: () => emit('close') }),
+      ])
+    },
+  }),
+}))
 vi.mock('../components/proxmox/ProxmoxConsole.vue', () => ({
   __esModule: true,
   default: defineComponent({
@@ -323,7 +336,7 @@ describe('HostDetailView — tabs', () => {
     expect(admin.find('.nav-tabs').text()).toContain('Permissions')
   })
 
-  it('shows the Console tab only for an admin on a host confirmed-linked to an LXC guest', () => {
+  it('shows the Console tab only for an admin on a host confirmed-linked to a Proxmox guest', () => {
     const linked = { status: 'confirmed', guest_type: 'lxc', guest_id: 'g1', guest_name: 'ct-web', node_name: 'pve1', vmid: 101 }
     const tabsFor = (isAdmin: boolean, link: AnyRecord | null) => {
       const api = baseUseHostDetail()
@@ -335,7 +348,8 @@ describe('HostDetailView — tabs', () => {
     expect(tabsFor(true, linked)).toContain('Console')
     expect(tabsFor(false, linked)).not.toContain('Console')
     expect(tabsFor(true, { ...linked, status: 'suggested' })).not.toContain('Console')
-    expect(tabsFor(true, { ...linked, guest_type: 'qemu' })).not.toContain('Console')
+    expect(tabsFor(true, { ...linked, guest_type: 'vm' })).toContain('Console')
+    expect(tabsFor(false, { ...linked, guest_type: 'vm' })).not.toContain('Console')
     expect(tabsFor(true, null)).not.toContain('Console')
   })
 
@@ -413,6 +427,33 @@ describe('HostDetailView — tabs', () => {
     api.showConsole.value = true
     await nextTick()
     expect(wrapper.find('.console-stub').attributes('data-terminal')).toBe('false')
+  })
+
+  it('opens the VNC dialog from the Console tab of a host linked to a QEMU VM, without the LXC terminal', async () => {
+    const api = baseUseHostDetail()
+    api.auth = reactive({ isAdmin: true, username: 'alice' })
+    api.proxmoxLink = ref({ status: 'confirmed', guest_type: 'vm', guest_id: 'g9', guest_name: 'win11', node_name: 'pve1', vmid: 100 })
+    useHostDetailMock.mockReturnValue(api)
+    const wrapper = mount(HostDetailView, { global: { stubs } })
+
+    api.activeTab.value = 'console'
+    await nextTick()
+    await flushPromises()
+    // Selecting the tab does not open a dialog by itself, unlike the LXC panel.
+    expect(wrapper.find('.vnc-stub').exists()).toBe(false)
+    expect(wrapper.find('.console-stub').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Écran graphique de la VM QEMU liée')
+
+    const openButton = wrapper.findAll('button').find((b) => b.text() === 'Ouvrir la console VNC')!
+    await openButton.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.vnc-stub').attributes('data-guest')).toBe('g9')
+    expect(wrapper.find('.vnc-stub').attributes('data-show')).toBe('true')
+    expect(openButton.attributes('disabled')).toBeDefined()
+
+    await wrapper.find('.vnc-stub-close').trigger('click')
+    expect(wrapper.find('.vnc-stub').attributes('data-show')).toBe('false')
+    expect(wrapper.find('.console-stub').exists()).toBe(false)
   })
 
   it('does not mount a console for a non-admin even if the Console tab key is active', async () => {

@@ -12,7 +12,7 @@ interface Options {
   exposureDomainCount: Ref<number>
   customTasksCount: Ref<number>
   tasksCount: Ref<number>
-  hasLxcConsole: Ref<boolean>
+  hasGuestConsole: Ref<boolean>
 }
 
 export function useHostTabs(o: Options) {
@@ -88,7 +88,7 @@ export function useHostTabs(o: Options) {
       badges: o.tasksCount.value ? [{ value: o.tasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
     })
     tabs.push({ key: 'timeline', label: 'Timeline', lazy: true })
-    if (o.hasLxcConsole.value) {
+    if (o.hasGuestConsole.value) {
       tabs.push({ key: 'console', label: t('host.consoleTabLabel') })
     }
 

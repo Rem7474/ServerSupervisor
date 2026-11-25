@@ -77,7 +77,7 @@
           class="d-flex gap-2"
         >
           <span
-            v-if="guest.guest_type === 'lxc' && consoleConfigured === false"
+            v-if="consoleConfigured === false"
             class="d-inline-flex align-items-center"
             :title="t('proxmox.consoleUnconfiguredAlertTitle')"
           >
@@ -89,11 +89,16 @@
           <button
             type="button"
             class="btn btn-sm btn-outline-secondary"
-            :disabled="guest.guest_type !== 'lxc'"
             :title="consoleButtonTitle"
-            @click="openConsole"
+            @click="guest.guest_type === 'vm' ? openVncConsole() : openConsole()"
           >
+            <IconDeviceDesktop
+              v-if="guest.guest_type === 'vm'"
+              :size="16"
+              class="icon me-1"
+            />
             <IconTerminal2
+              v-else
               :size="16"
               class="icon me-1"
             />
@@ -351,6 +356,13 @@
           @open="showConsole = true"
         />
       </div> <!-- /side-layout -->
+      <ProxmoxVncConsoleLazy
+        v-if="hasOpenedVncConsole"
+        :guest-id="guest.id"
+        :guest-name="guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}`"
+        :show="showVncConsole"
+        @close="showVncConsole = false"
+      />
     </div>
   </div>
 </template>
@@ -359,7 +371,7 @@
 import { computed, defineAsyncComponent, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { IconAlertTriangle, IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconDeviceDesktop, IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import EmptyState from '../components/EmptyState.vue'
@@ -416,6 +428,17 @@ const ProxmoxConsoleLazy = defineAsyncComponent(() => import('../components/prox
 function openConsole(): void {
   hasOpenedConsole.value = true
   showConsole.value = true
+}
+
+// QEMU VMs get the graphical VNC console (a dialog) instead of the LXC
+// terminal side panel; noVNC is loaded on first open only.
+const showVncConsole = ref(false)
+const hasOpenedVncConsole = ref(false)
+const ProxmoxVncConsoleLazy = defineAsyncComponent(() => import('../components/proxmox/ProxmoxVncConsole.vue'))
+
+function openVncConsole(): void {
+  hasOpenedVncConsole.value = true
+  showVncConsole.value = true
 }
 
 // Guests linked to a ServerSupervisor host already get their domain/IP

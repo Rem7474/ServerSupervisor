@@ -851,37 +851,65 @@ func (s *Service) GuestAction(ctx context.Context, guestID, action string, actor
 	return upid, nil
 }
 
-// OpenGuestConsole resolves a guest to its Proxmox connection/node and opens
-// a live termproxy console session on it. LXC only in V1 — QEMU needs a VNC
-// (RFB) proxy instead of termproxy, a materially different wire protocol
-// (see ROADMAP.md's Proxmox console V2 section).
+// consoleTarget resolves a guest to the PVE client and console-only user
+// credentials both console kinds need, after checking the guest is of the
+// expected type. The guest is returned even on error, once resolved, so the
+// WS handler can still attribute an audit entry to it.
 //
-// Unlike GuestAction, this needs the connection's console-only PVE user
-// credentials in addition to its API token: PVE's vncwebsocket upgrade
-// endpoint doesn't accept token auth (see proxmoxclient.Client.login). The
-// resolved guest is also returned so the caller (the WS handler) can log an
-// audit entry with node/vmid without a second lookup.
-func (s *Service) OpenGuestConsole(ctx context.Context, guestID string) (*models.ProxmoxGuest, *proxmoxclient.TermSession, error) {
+// The console needs the connection's console-only PVE user credentials in
+// addition to its API token: PVE's vncwebsocket upgrade endpoint doesn't
+// accept token auth (see proxmoxclient.Client.login).
+func (s *Service) consoleTarget(ctx context.Context, guestID, guestType string, wrongType *apperr.Error) (*models.ProxmoxGuest, *proxmoxclient.Client, string, string, error) {
 	guest, err := s.repo.GetProxmoxGuestByID(ctx, guestID)
-	if err != nil {
-		return nil, nil, apperr.NotFound("guest not found")
+	if err != nil || guest == nil {
+		return nil, nil, "", "", apperr.NotFound("guest not found").I18n(apperr.CodeProxmoxGuestNotFound, nil)
 	}
-	if guest.GuestType != "lxc" {
-		return guest, nil, apperr.Validation("console is not available for QEMU VMs yet").I18n(apperr.CodeProxmoxConsoleQemuUnsupported, nil)
+	if guest.GuestType != guestType {
+		return guest, nil, "", "", wrongType
 	}
 	secret, conn, err := s.resolveSecret(ctx, guest.ConnectionID)
 	if err != nil {
-		return guest, nil, err
+		return guest, nil, "", "", err
 	}
 	pveUsername, pvePassword, err := s.repo.GetProxmoxConsoleCredentials(ctx, guest.ConnectionID)
 	if err != nil {
-		return guest, nil, err
+		return guest, nil, "", "", err
 	}
 	if pveUsername == "" || pvePassword == "" {
-		return guest, nil, apperr.Validation("PVE console is not configured for this connection: credentials required").I18n(apperr.CodeProxmoxConsoleNotConfigured, nil)
+		return guest, nil, "", "", apperr.Validation("PVE console is not configured for this connection: credentials required").I18n(apperr.CodeProxmoxConsoleNotConfigured, nil)
 	}
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	return guest, proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify), pveUsername, pvePassword, nil
+}
+
+// OpenGuestConsole resolves an LXC guest to its Proxmox connection/node and
+// opens a live termproxy console session on it. QEMU VMs use the VNC
+// console instead (OpenGuestVNC): termproxy only exists for containers.
+// The resolved guest is also returned so the caller (the WS handler) can log
+// an audit entry with node/vmid without a second lookup.
+func (s *Service) OpenGuestConsole(ctx context.Context, guestID string) (*models.ProxmoxGuest, *proxmoxclient.TermSession, error) {
+	wrongType := apperr.Validation("the terminal console is for LXC containers: use the VNC console for QEMU VMs").I18n(apperr.CodeProxmoxConsoleQemuUnsupported, nil)
+	guest, client, pveUsername, pvePassword, err := s.consoleTarget(ctx, guestID, "lxc", wrongType)
+	if err != nil {
+		return guest, nil, err
+	}
 	session, err := client.OpenLXCConsole(ctx, guest.NodeName, guest.VMID, pveUsername, pvePassword)
+	if err != nil {
+		return guest, nil, apperr.BadGateway(err.Error())
+	}
+	return guest, session, nil
+}
+
+// OpenGuestVNC resolves a QEMU VM to its Proxmox connection/node and opens an
+// authenticated VNC (RFB) session on its display — same credentials and
+// guest resolution as OpenGuestConsole, different PVE endpoints (vncproxy
+// instead of termproxy) and wire protocol (see proxmoxclient.OpenQEMUVNC).
+func (s *Service) OpenGuestVNC(ctx context.Context, guestID string) (*models.ProxmoxGuest, *proxmoxclient.VNCSession, error) {
+	wrongType := apperr.Validation("the VNC console is only available for QEMU VMs").I18n(apperr.CodeProxmoxVNCQemuOnly, nil)
+	guest, client, pveUsername, pvePassword, err := s.consoleTarget(ctx, guestID, "vm", wrongType)
+	if err != nil {
+		return guest, nil, err
+	}
+	session, err := client.OpenQEMUVNC(ctx, guest.NodeName, guest.VMID, pveUsername, pvePassword)
 	if err != nil {
 		return guest, nil, apperr.BadGateway(err.Error())
 	}

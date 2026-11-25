@@ -292,14 +292,25 @@ describe('useProxmoxGuest — console configuration check', () => {
     expect(api.consoleButtonTitle.value).toBe('Ouvrir une console interactive')
   })
 
-  it('never checks console config for a non-lxc (QEMU) guest and shows the "coming soon" title', async () => {
-    getProxmoxGuests.mockResolvedValue({ data: [{ ...guest, guest_type: 'qemu' }] })
+  it('checks console config for a QEMU VM too and offers its VNC console', async () => {
+    getProxmoxGuests.mockResolvedValue({ data: [{ ...guest, guest_type: 'vm' }] })
+    getProxmoxInstance.mockResolvedValue({ data: { console_configured: true } })
 
     const { api } = mountUseProxmoxGuest()
     await flushPromises()
 
-    expect(getProxmoxInstance).not.toHaveBeenCalled()
-    expect(api.consoleButtonTitle.value).toBe('VM QEMU : bientôt disponible')
+    expect(getProxmoxInstance).toHaveBeenCalledWith('conn-1')
+    expect(api.consoleButtonTitle.value).toBe('Ouvrir la console graphique (VNC) de la VM')
+  })
+
+  it('warns about missing console credentials on a QEMU VM as on a container', async () => {
+    getProxmoxGuests.mockResolvedValue({ data: [{ ...guest, guest_type: 'vm' }] })
+    getProxmoxInstance.mockResolvedValue({ data: { console_configured: false } })
+
+    const { api } = mountUseProxmoxGuest()
+    await flushPromises()
+
+    expect(api.consoleButtonTitle.value).toContain('non configurée')
   })
 })
 

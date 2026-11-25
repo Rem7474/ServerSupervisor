@@ -35,7 +35,7 @@ const { getProxmoxInstance, getProxmoxGuestLink } = vi.hoisted(() => ({
   getProxmoxGuestLink: vi.fn(async (): Promise<{ data: GuestLinkFixture | null }> => ({ data: null })),
 }))
 
-const qemuGuest = { ...baseGuest, id: 'g2', guest_type: 'qemu' }
+const qemuGuest = { ...baseGuest, id: 'g2', guest_type: 'vm', vmid: 100, name: 'win11' }
 
 const { guestsResponse } = vi.hoisted(() => ({ guestsResponse: { data: [] as unknown[] } }))
 
@@ -79,6 +79,11 @@ function mountView() {
     global: {
       stubs: {
         ProxmoxConsoleLazy: { props: ['guestId', 'guestName', 'show'], template: '<div class="proxmox-console-stub" />' },
+        ProxmoxVncConsoleLazy: {
+          props: ['guestId', 'guestName', 'show'],
+          emits: ['close'],
+          template: '<div class="proxmox-vnc-stub" :data-guest="guestId" :data-show="String(show)"><button class="vnc-stub-close" @click="$emit(\'close\')" /></div>',
+        },
       },
     },
   })
@@ -130,7 +135,8 @@ describe('ProxmoxGuestView — console entry point', () => {
     expect(wrapper.find('.proxmox-console-stub').exists()).toBe(true)
   })
 
-  it('disables the Console button and skips the config check entirely for a QEMU guest', async () => {
+  it('opens the VNC dialog (not the LXC terminal) from the Console button of a QEMU guest', async () => {
+    getProxmoxInstance.mockResolvedValue({ data: { console_configured: true } })
     routeParamId.value = 'g2'
     guestsResponse.data = [qemuGuest]
 
@@ -138,12 +144,35 @@ describe('ProxmoxGuestView — console entry point', () => {
     await flushPromises()
     await flushPromises()
 
-    expect(getProxmoxInstance).not.toHaveBeenCalled()
-    const btn = wrapper.findAll('button').find((b) => b.text().includes('Console'))
-    expect(btn!.attributes('disabled')).toBeDefined()
-    expect(btn!.attributes('title')).toBe('VM QEMU : bientôt disponible')
-    // The "console not configured" warning icon is lxc-only.
-    expect(wrapper.find('[title*="Identifiants console PVE non configurés"]').exists()).toBe(false)
+    expect(getProxmoxInstance).toHaveBeenCalledWith('conn-1')
+    const btn = wrapper.findAll('button').find((b) => b.text().includes('Console'))!
+    expect(btn.attributes('disabled')).toBeUndefined()
+    expect(btn.attributes('title')).toBe('Ouvrir la console graphique (VNC) de la VM')
+    expect(wrapper.find('.proxmox-vnc-stub').exists()).toBe(false)
+
+    await btn.trigger('click')
+    await flushPromises()
+    const vnc = wrapper.find('.proxmox-vnc-stub')
+    expect(vnc.attributes('data-guest')).toBe('g2')
+    expect(vnc.attributes('data-show')).toBe('true')
+    expect(wrapper.find('.proxmox-console-stub').exists()).toBe(false)
+
+    await wrapper.find('.vnc-stub-close').trigger('click')
+    expect(wrapper.find('.proxmox-vnc-stub').attributes('data-show')).toBe('false')
+  })
+
+  it('warns when a QEMU guest\'s connection has no console credentials configured', async () => {
+    getProxmoxInstance.mockResolvedValue({ data: { console_configured: false } })
+    routeParamId.value = 'g2'
+    guestsResponse.data = [qemuGuest]
+
+    const wrapper = mountView()
+    await flushPromises()
+    await flushPromises()
+
+    const btn = wrapper.findAll('button').find((b) => b.text().includes('Console'))!
+    expect(btn.attributes('title')).toContain('Console PVE non configurée')
+    expect(wrapper.find('[title*="Identifiants console PVE non configurés"]').exists()).toBe(true)
   })
 
   it('shows the translated exposure hint and correlation link once the guest is confirmed-linked to a host', async () => {

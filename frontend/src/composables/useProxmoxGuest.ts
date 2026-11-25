@@ -294,22 +294,23 @@ export function useProxmoxGuest() {
   }
 
   // null = not checked yet (or the check itself failed — fail open, don't
-  // block the console button on a fetch error). Only meaningful for lxc
-  // guests; PVE console credentials live on the guest's Proxmox connection,
-  // not the guest itself, so this needs a separate lookup.
+  // block the console button on a fetch error). Both console kinds (LXC
+  // terminal, QEMU VNC) need the PVE console credentials, which live on the
+  // guest's Proxmox connection, not the guest itself, so this needs a
+  // separate lookup.
   const consoleConfigured = ref<boolean | null>(null)
 
   watch(guest, (g) => {
     consoleConfigured.value = null
-    if (!g || g.guest_type !== 'lxc') return
+    if (!g) return
     api.getProxmoxInstance(g.connection_id)
       .then((res) => { consoleConfigured.value = res.data.console_configured })
       .catch(() => { consoleConfigured.value = null })
   }, { immediate: true })
 
   const consoleButtonTitle = computed(() => {
-    if (!guest.value || guest.value.guest_type !== 'lxc') return t('proxmox.vmQemuComingSoonTitle')
     if (consoleConfigured.value === false) return t('proxmox.consoleNotConfiguredTitle')
+    if (guest.value?.guest_type === 'vm') return t('proxmox.openVncConsoleTitle')
     return t('proxmox.openConsoleTitle')
   })
 

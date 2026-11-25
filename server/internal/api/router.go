@@ -260,6 +260,7 @@ func registerWSRoutes(r *gin.Engine, h *ws.WSHandler, cfg *config.Config) {
 	g.GET("/apt", h.Apt)
 	g.GET("/commands/stream/:command_id", h.CommandStream)
 	g.GET("/proxmox/console/:guest_id", h.ProxmoxConsole)
+	g.GET("/proxmox/vnc/:guest_id", h.ProxmoxVNC)
 	g.GET("/notifications", h.NotificationStream)
 }
 

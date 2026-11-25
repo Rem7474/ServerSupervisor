@@ -14,6 +14,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/rfb/rfbtest"
 )
 
 // fakeRepo stubs the Repository; tests set only the fields they need.
@@ -265,7 +266,7 @@ func TestOpenGuestConsole_RejectsQemu(t *testing.T) {
 	}}
 	_, _, err := newSvc(repo).OpenGuestConsole(context.Background(), "g1")
 	if status(err) != 400 {
-		t.Fatalf("qemu guest console should be 400 (V1 is LXC-only), got %v", err)
+		t.Fatalf("qemu guest console should be 400 (termproxy is LXC-only), got %v", err)
 	}
 }
 
@@ -430,7 +431,7 @@ func fakeConsoleServer(t *testing.T) *httptest.Server {
 	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"data":{"ticket":"PVE:root@pam:AUTH=="}}`))
+		_, _ = w.Write([]byte(`{"data":{"ticket":"test-pve-ticket"}}`))
 	})
 	mux.HandleFunc("/nodes/pve1/lxc/101/termproxy", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"data":{"ticket":"PVEVNC:TERM==","port":31000,"user":"root@pam","upid":"UPID:.."}}`))
@@ -519,5 +520,103 @@ func TestTestConnectionByID_UsesStoredCredentials(t *testing.T) {
 	}
 	if !result.Success || !result.ConsoleConfigured || !result.ConsoleOK {
 		t.Errorf("expected a fully successful test, got %+v", result)
+	}
+}
+
+// vncRepo is a repository with one guest of the given type on connection c1,
+// whose API URL is apiURL, with console credentials configured.
+func vncRepo(guestType, apiURL string) *fakeRepo {
+	return &fakeRepo{
+		guestByID: map[string]*models.ProxmoxGuest{
+			"g1": {ID: "g1", GuestType: guestType, ConnectionID: "c1", NodeName: "pve1", VMID: 100},
+		},
+		enabledConns: []database.ProxmoxConnectionFull{{
+			ProxmoxConnection: models.ProxmoxConnection{ID: "c1"},
+			TokenSecret:       "secret",
+		}},
+		connByID: map[string]*models.ProxmoxConnection{
+			"c1": {ID: "c1", APIURL: apiURL, TokenID: "user@pve!token"},
+		},
+		consoleCreds: map[string][2]string{"c1": {"root@pam", "hunter2"}},
+	}
+}
+
+func TestOpenGuestVNC_GuestNotFound(t *testing.T) {
+	guest, _, err := newSvc(&fakeRepo{}).OpenGuestVNC(context.Background(), "missing")
+	if status(err) != http.StatusNotFound || guest != nil {
+		t.Fatalf("missing guest should be 404 with no guest, got %v / %+v", err, guest)
+	}
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.I18nKey != apperr.CodeProxmoxGuestNotFound {
+		t.Errorf("err = %#v, want the PROXMOX_GUEST_NOT_FOUND catalog key", err)
+	}
+}
+
+func TestOpenGuestVNC_RejectsLXC(t *testing.T) {
+	guest, _, err := newSvc(vncRepo("lxc", "https://pve.invalid:8006")).OpenGuestVNC(context.Background(), "g1")
+	if status(err) != http.StatusBadRequest {
+		t.Fatalf("lxc guest VNC should be 400, got %v", err)
+	}
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.I18nKey != apperr.CodeProxmoxVNCQemuOnly {
+		t.Errorf("err = %#v, want the PROXMOX_VNC_QEMU_ONLY catalog key", err)
+	}
+	if guest == nil || guest.ID != "g1" {
+		t.Error("the resolved guest should still be returned so the caller can audit the attempt")
+	}
+}
+
+func TestOpenGuestVNC_MissingCredentials(t *testing.T) {
+	repo := vncRepo("vm", "https://pve.invalid:8006")
+	repo.consoleCreds = nil
+	_, _, err := newSvc(repo).OpenGuestVNC(context.Background(), "g1")
+	if status(err) != http.StatusBadRequest {
+		t.Fatalf("missing console credentials should be 400, got %v", err)
+	}
+}
+
+func TestOpenGuestVNC_BadGatewayOnPVEFailure(t *testing.T) {
+	_, _, err := newSvc(vncRepo("vm", "http://127.0.0.1:1")).OpenGuestVNC(context.Background(), "g1")
+	if status(err) != http.StatusBadGateway {
+		t.Fatalf("PVE connection failure should be a 502 BadGateway, got %v", err)
+	}
+}
+
+func TestOpenGuestVNC_Success(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/access/ticket", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"test-pve-ticket"}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/qemu/100/vncproxy", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"data":{"ticket":"pw:PVEVNC:Q==","port":5900,"password":"pw"}}`))
+	})
+	mux.HandleFunc("/nodes/pve1/qemu/100/vncwebsocket", rfbtest.Handler("pw", "pw:PVEVNC:Q=="))
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	guest, session, err := newSvc(vncRepo("vm", srv.URL)).OpenGuestVNC(context.Background(), "g1")
+	if err != nil {
+		t.Fatalf("OpenGuestVNC: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+	if guest.ID != "g1" || session == nil {
+		t.Fatalf("got guest=%+v session=%v", guest, session)
+	}
+}
+
+func TestOpenGuestConsole_RejectsQemuWithVNCHint(t *testing.T) {
+	_, _, err := newSvc(vncRepo("vm", "https://pve.invalid:8006")).OpenGuestConsole(context.Background(), "g1")
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.I18nKey != apperr.CodeProxmoxConsoleQemuUnsupported {
+		t.Fatalf("err = %#v, want the PROXMOX_CONSOLE_QEMU_UNSUPPORTED catalog key", err)
+	}
+}
+
+func TestOpenGuestVNC_DisabledConnection(t *testing.T) {
+	repo := vncRepo("vm", "https://pve.invalid:8006")
+	repo.enabledConns = nil
+	guest, _, err := newSvc(repo).OpenGuestVNC(context.Background(), "g1")
+	if status(err) != http.StatusBadGateway || guest == nil {
+		t.Fatalf("a disabled connection should be a 502 with the guest resolved, got %v / %+v", err, guest)
 	}
 }
