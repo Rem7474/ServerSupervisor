@@ -12,7 +12,8 @@ import (
 // (no active-incident count; that join lives in GetAlertRules used by the engine).
 const alertRuleAPISelectCols = `
 id, name, enabled, source_type, host_id, proxmox_scope, docker_scope, metric, operator, threshold_warn, threshold_crit,
-threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, last_fired, created_at, updated_at, baseline_window_seconds`
+threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, last_fired, created_at, updated_at, baseline_window_seconds,
+target_type, host_group_id, target_tags::text`
 
 // scanAlertRuleAPI scans one alert rule row in alertRuleAPISelectCols order.
 func scanAlertRuleAPI(row interface {
@@ -24,14 +25,18 @@ func scanAlertRuleAPI(row interface {
 	var actionsJSON, proxmoxScopeJSON, dockerScopeJSON []byte
 	var lastFired, updatedAt sql.NullTime
 	var baselineWindowSeconds sql.NullInt64
+	var hostGroupID sql.NullString
+	var targetTagsJSON string
 
 	if err := row.Scan(
 		&rule.ID, &name, &rule.Enabled, &sourceType, &hostID, &proxmoxScopeJSON, &dockerScopeJSON, &rule.Metric,
 		&rule.Operator, &thresholdWarn, &thresholdCrit, &thresholdClearWarn, &thresholdClearCrit, &rule.DurationSeconds,
 		&actionsJSON, &lastFired, &rule.CreatedAt, &updatedAt, &baselineWindowSeconds,
+		&rule.TargetType, &hostGroupID, &targetTagsJSON,
 	); err != nil {
 		return rule, err
 	}
+	applyAlertRuleTarget(&rule, hostGroupID, targetTagsJSON)
 
 	if name.Valid {
 		rule.Name = &name.String
@@ -78,6 +83,18 @@ func scanAlertRuleAPI(row interface {
 	}
 	rule.NormalizeCompatibility()
 	return rule, nil
+}
+
+// applyAlertRuleTarget copies the scanned group id / tag list onto a rule.
+// An empty tag list stays nil so it is omitted from the JSON of rules that
+// do not target tags.
+func applyAlertRuleTarget(rule *models.AlertRule, hostGroupID sql.NullString, targetTagsJSON string) {
+	if hostGroupID.Valid {
+		rule.HostGroupID = &hostGroupID.String
+	}
+	if tags := parseTags(targetTagsJSON); len(tags) > 0 {
+		rule.TargetTags = tags
+	}
 }
 
 // ListAlertRulesAPI returns all alert rules for the API list (newest first).

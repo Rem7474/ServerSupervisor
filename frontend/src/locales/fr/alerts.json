@@ -427,5 +427,21 @@
   "incidentAcknowledgeError": "Impossible d'accuser réception",
   "templateApplyFailedCount": "{failed} échec | {failed} échecs",
   "notificationBellEnableHint": "Recevoir les alertes même quand l’onglet est fermé",
-  "notificationBellEnableButton": "Activer"
+  "notificationBellEnableButton": "Activer",
+  "sourceTargetLabel": "Cible",
+  "targetAll": "Tous les hôtes",
+  "targetHost": "Un hôte",
+  "targetGroup": "Un groupe",
+  "targetTag": "Des tags",
+  "sourceTargetHostPlaceholder": "Choisir un hôte",
+  "sourceTargetGroupLabel": "Groupe d'hôtes",
+  "sourceTargetGroupPlaceholder": "Choisir un groupe",
+  "sourceTargetGroupOption": "{name} ({count} hôte) | {name} ({count} hôtes)",
+  "sourceTargetNoGroupsHint": "Aucun groupe d'hôtes : créez-en un dans Paramètres › Groupes d'hôtes.",
+  "sourceTargetTagsLabel": "Tags ciblés",
+  "sourceTargetNoTagsHint": "Aucun hôte n'a de tag : ajoutez-en depuis la page d'un hôte (Modifier).",
+  "sourceTargetPreview": "{count} hôte couvert actuellement. | {count} hôtes couverts actuellement.",
+  "targetGroupLabel": "groupe {name}",
+  "targetUnknownGroupLabel": "groupe d'hôtes",
+  "targetTagsLabel": "tags {tags}"
 }

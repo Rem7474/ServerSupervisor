@@ -115,5 +115,13 @@
   "API_KEY_SCOPE_INVALID": "la portée doit être lecture ou écriture",
   "API_KEY_EXPIRY_INVALID": "la validité doit être comprise entre 0 (sans expiration) et {max} jours",
   "API_KEY_LIMIT_REACHED": "vous avez déjà {max} clés API actives : révoquez-en une d'abord",
-  "API_KEY_NOT_FOUND": "clé API introuvable"
+  "API_KEY_NOT_FOUND": "clé API introuvable",
+  "ALERT_HOST_GROUP_NOT_FOUND": "groupe d'hôtes introuvable pour cette règle",
+  "HOST_GROUP_NOT_FOUND": "groupe d'hôtes introuvable",
+  "HOST_GROUP_NAME_REQUIRED": "le nom du groupe est requis",
+  "HOST_GROUP_FIELD_TOO_LONG": "le nom du groupe et le filtre d'OS ne doivent pas dépasser 100 caractères",
+  "HOST_GROUP_NAME_TAKEN": "un groupe d'hôtes porte déjà ce nom",
+  "HOST_GROUP_MATCH_MODE_INVALID": "mode de correspondance invalide (valeurs autorisées : all, any)",
+  "HOST_GROUP_CRITERIA_REQUIRED": "un groupe doit définir au moins un tag ou un filtre d'OS",
+  "HOST_GROUP_IN_USE": "ce groupe est encore ciblé par des règles d'alerte ({count}) : changez leur cible avant de le supprimer"
 }

@@ -115,5 +115,13 @@
   "API_KEY_SCOPE_INVALID": "the scope must be read or write",
   "API_KEY_EXPIRY_INVALID": "the validity must be between 0 (never expires) and {max} days",
   "API_KEY_LIMIT_REACHED": "you already have {max} active API keys: revoke one first",
-  "API_KEY_NOT_FOUND": "API key not found"
+  "API_KEY_NOT_FOUND": "API key not found",
+  "ALERT_HOST_GROUP_NOT_FOUND": "host group not found for this rule",
+  "HOST_GROUP_NOT_FOUND": "host group not found",
+  "HOST_GROUP_NAME_REQUIRED": "the group name is required",
+  "HOST_GROUP_FIELD_TOO_LONG": "the group name and OS filter must not exceed 100 characters",
+  "HOST_GROUP_NAME_TAKEN": "a host group with this name already exists",
+  "HOST_GROUP_MATCH_MODE_INVALID": "invalid match mode (allowed: all, any)",
+  "HOST_GROUP_CRITERIA_REQUIRED": "a group needs at least one tag or an OS filter",
+  "HOST_GROUP_IN_USE": "this group is still targeted by alert rules ({count}): retarget them before deleting it"
 }

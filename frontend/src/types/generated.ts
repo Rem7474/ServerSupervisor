@@ -164,6 +164,16 @@ export interface AlertRule {
   name?: string;
   source_type?: AlertSourceType;
   host_id?: string;
+  /**
+   * TargetType selects the hosts an agent rule evaluates (AlertTarget*
+   * constants): HostID, every host, the members of HostGroupID, or the
+   * hosts carrying one of TargetTags. Resolved on every evaluation, so a
+   * host gaining a tag is covered without editing the rule. Empty for
+   * Docker/Proxmox rules, which carry their own scope.
+   */
+  target_type?: string;
+  host_group_id?: string;
+  target_tags?: string[];
   proxmox_scope?: ProxmoxMetricScope;
   docker_scope?: DockerMetricScope;
   metric: string;
@@ -297,6 +307,14 @@ export interface AlertRuleCreate {
   enabled: boolean;
   source_type: AlertSourceType;
   host_id?: string;
+  /**
+   * TargetType/HostGroupID/TargetTags — see AlertRule's field doc. An
+   * empty TargetType keeps the historical behavior: HostID when set,
+   * every host otherwise.
+   */
+  target_type: string;
+  host_group_id?: string;
+  target_tags: string[];
   proxmox_scope?: ProxmoxMetricScope;
   docker_scope?: DockerMetricScope;
   metric: string;
@@ -379,6 +397,13 @@ export interface AlertRuleUpdate {
   enabled?: boolean;
   source_type?: AlertSourceType;
   host_id?: string;
+  /**
+   * TargetType, when set, replaces the whole target at once: HostID,
+   * HostGroupID and TargetTags are taken as sent (nil clears them).
+   */
+  target_type?: string;
+  host_group_id?: string;
+  target_tags: string[];
   proxmox_scope?: ProxmoxMetricScope;
   docker_scope?: DockerMetricScope;
   metric?: string;
@@ -398,6 +423,22 @@ export interface AlertRuleUpdate {
   baseline_window_seconds?: number /* int */;
   actions?: AlertActions;
 }
+/**
+ * Agent rule target types — see AlertRule.TargetType.
+ */
+export const AlertTargetHost = "host";
+/**
+ * Agent rule target types — see AlertRule.TargetType.
+ */
+export const AlertTargetAll = "all";
+/**
+ * Agent rule target types — see AlertRule.TargetType.
+ */
+export const AlertTargetGroup = "group";
+/**
+ * Agent rule target types — see AlertRule.TargetType.
+ */
+export const AlertTargetTag = "tag";
 
 //////////
 // source: apikey.go
@@ -1113,6 +1154,57 @@ export interface HostExposure {
   total_requests: number /* int64 */;
   total_suspicious_requests: number /* int64 */;
   total_blocked_requests: number /* int64 */;
+}
+
+//////////
+// source: hostgroup.go
+
+/**
+ * Host group match modes: a host must carry every tag of the group ("all")
+ * or at least one of them ("any").
+ */
+export const HostGroupMatchAll = "all";
+/**
+ * Host group match modes: a host must carry every tag of the group ("all")
+ * or at least one of them ("any").
+ */
+export const HostGroupMatchAny = "any";
+/**
+ * HostGroup is a dynamic set of hosts defined by a matching rule over
+ * Host.Tags (and optionally Host.OS), never by a stored host list: who belongs
+ * to it is computed on every read and every alert evaluation, so tagging a
+ * new host is enough for it to join the group and every rule targeting it.
+ */
+export interface HostGroup {
+  id: string;
+  name: string;
+  description: string;
+  /**
+   * MatchMode is HostGroupMatchAll or HostGroupMatchAny.
+   */
+  match_mode: string;
+  tags: string[];
+  /**
+   * OSContains, when set, additionally requires Host.OS to contain this
+   * text (case-insensitive), e.g. "debian".
+   */
+  os_contains: string;
+  created_at: string;
+  updated_at: string;
+  /**
+   * MemberIDs is computed at read time from the current hosts, not stored.
+   */
+  member_ids: string[];
+}
+/**
+ * HostGroupRequest is the body of POST/PUT /host-groups.
+ */
+export interface HostGroupRequest {
+  name: string;
+  description: string;
+  match_mode: string;
+  tags: string[];
+  os_contains: string;
 }
 
 //////////

@@ -31,6 +31,23 @@ type fakeRepo struct {
 	composeProjectMissing bool
 	// resolveIncidentsErr makes ResolveOpenAlertIncidentsByRule fail.
 	resolveIncidentsErr error
+	// hostGroups are the groups GetHostGroupByID knows; any other id is
+	// reported missing (sql.ErrNoRows). hostGroupErr overrides both.
+	hostGroups   []models.HostGroup
+	hostGroupErr error
+}
+
+func (f *fakeRepo) GetHostGroupByID(_ context.Context, id string) (*models.HostGroup, error) {
+	if f.hostGroupErr != nil {
+		return nil, f.hostGroupErr
+	}
+	for i := range f.hostGroups {
+		if f.hostGroups[i].ID == id {
+			g := f.hostGroups[i]
+			return &g, nil
+		}
+	}
+	return nil, sql.ErrNoRows
 }
 
 func (f *fakeRepo) ListAlertRulesAPI(context.Context) ([]models.AlertRule, error) { return nil, nil }

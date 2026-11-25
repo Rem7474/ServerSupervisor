@@ -43,7 +43,10 @@ export interface AlertRulePayload {
   name?: string
   enabled?: boolean
   source_type?: AlertSourceType
+  target_type?: string
   host_id?: string
+  host_group_id?: string | null
+  target_tags?: string[]
   proxmox_scope?: ProxmoxMetricScope
   metric?: string
   operator?: string
