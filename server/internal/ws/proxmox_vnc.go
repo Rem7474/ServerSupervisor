@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -87,7 +88,9 @@ func (h *WSHandler) ProxmoxVNC(c *gin.Context) {
 		if guest != nil {
 			h.auditVNC(ctx, username, ip, guest, guestID, err)
 		}
-		slog.Warn("proxmox vnc: open failed", slog.String("guest_id", guestID), slog.Any("err", err))
+		// guest_id comes from the URL: strip line breaks before logging it.
+		safeGuestID := strings.NewReplacer("\n", "", "\r", "").Replace(guestID)
+		slog.Warn("proxmox vnc: open failed", slog.String("guest_id", safeGuestID), slog.Any("err", err))
 		closeVNCWithError(conn, err)
 		return
 	}

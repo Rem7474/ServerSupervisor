@@ -113,7 +113,7 @@ func expectedResponse(challenge []byte, password string) []byte {
 		return nil
 	}
 	out := make([]byte, 16)
-	block.Encrypt(out[:8], challenge[:8])
-	block.Encrypt(out[8:], challenge[8:])
+	block.Encrypt(out[:8], challenge[:8]) // NOSONAR — test fake of a protocol-mandated cipher (RFC 6143 §7.2.2)
+	block.Encrypt(out[8:], challenge[8:]) // NOSONAR — test fake of a protocol-mandated cipher (RFC 6143 §7.2.2)
 	return out
 }

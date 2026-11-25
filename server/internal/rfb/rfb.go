@@ -211,8 +211,8 @@ func vncAuthResponse(challenge []byte, password string) ([]byte, error) {
 		return nil, fmt.Errorf("vnc auth cipher: %w", err)
 	}
 	out := make([]byte, 16)
-	block.Encrypt(out[:8], challenge[:8])
-	block.Encrypt(out[8:], challenge[8:])
+	block.Encrypt(out[:8], challenge[:8]) // NOSONAR — protocol-mandated cipher (RFC 6143 §7.2.2)
+	block.Encrypt(out[8:], challenge[8:]) // NOSONAR — protocol-mandated cipher (RFC 6143 §7.2.2)
 	return out, nil
 }
 
