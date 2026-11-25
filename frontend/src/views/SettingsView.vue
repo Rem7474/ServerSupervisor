@@ -135,6 +135,11 @@
           <SettingsRegistryCredentialsCard :auth-is-admin="auth.isAdmin" />
         </div>
 
+        <!-- Host groups -->
+        <div v-show="tab === 'hostGroups'">
+          <SettingsHostGroupsCard :auth-is-admin="auth.isAdmin" />
+        </div>
+
         <!-- Retention -->
         <div v-show="tab === 'retention'">
           <SettingsRetentionCard
@@ -191,7 +196,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  IconAdjustments, IconAlertTriangle, IconBell, IconBrandDocker, IconDatabase, IconPlugConnected, IconShieldSearch,
+  IconAdjustments, IconAlertTriangle, IconBell, IconBrandDocker, IconDatabase, IconPlugConnected, IconShieldSearch, IconTags,
 } from '@tabler/icons-vue'
 import SettingsAdvancedConfigCard from '../components/settings/SettingsAdvancedConfigCard.vue'
 import SettingsDatabaseCard from '../components/settings/SettingsDatabaseCard.vue'
@@ -204,6 +209,7 @@ import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCar
 import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 import SettingsNPMCard from '../components/settings/SettingsNPMCard.vue'
 import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegistryCredentialsCard.vue'
+import SettingsHostGroupsCard from '../components/settings/SettingsHostGroupsCard.vue'
 import SettingsChatWebhooksCard from '../components/settings/SettingsChatWebhooksCard.vue'
 import { useSettings } from '../composables/useSettings'
 import { useChatWebhooks } from '../composables/useChatWebhooks'
@@ -214,6 +220,7 @@ const SETTINGS_TABS = computed(() => [
   { key: 'general', label: t('settings.tabs.general'), icon: IconAdjustments },
   { key: 'notifications', label: t('settings.tabs.notifications'), icon: IconBell },
   { key: 'integrations', label: t('settings.tabs.integrations'), icon: IconPlugConnected },
+  { key: 'hostGroups', label: t('settings.tabs.hostGroups'), icon: IconTags },
   { key: 'retention', label: t('settings.tabs.retention'), icon: IconDatabase },
   { key: 'threats', label: t('settings.tabs.threats'), icon: IconShieldSearch },
   { key: 'advanced', label: t('settings.tabs.advanced'), icon: IconBrandDocker },

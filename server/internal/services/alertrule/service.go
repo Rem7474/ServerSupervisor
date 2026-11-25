@@ -8,6 +8,7 @@ package alertrule
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -35,6 +36,7 @@ type Repository interface {
 	AcknowledgeAlertIncident(ctx context.Context, id int64, username string) error
 	GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error)
 	GetAllHosts(ctx context.Context) ([]models.Host, error)
+	GetHostGroupByID(ctx context.Context, id string) (*models.HostGroup, error)
 
 	// rule templates (ROADMAP.md item #9)
 	CreateAlertRuleTemplate(ctx context.Context, t *models.AlertRuleTemplate) error
@@ -118,6 +120,9 @@ func (s *Service) Create(ctx context.Context, req models.AlertRuleCreate) (*mode
 		Enabled:               req.Enabled,
 		SourceType:            req.SourceType,
 		HostID:                req.HostID,
+		TargetType:            req.TargetType,
+		HostGroupID:           req.HostGroupID,
+		TargetTags:            req.TargetTags,
 		ProxmoxScope:          req.ProxmoxScope,
 		DockerScope:           req.DockerScope,
 		Metric:                req.Metric,
@@ -166,8 +171,21 @@ func (s *Service) Update(ctx context.Context, id int64, req models.AlertRuleUpda
 	if req.Enabled != nil {
 		next.Enabled = *req.Enabled
 	}
-	if req.HostID != nil {
+	switch {
+	case req.TargetType != nil:
+		// A new target type replaces the whole target: the fields it does
+		// not use are cleared by Validate.
+		next.TargetType = *req.TargetType
 		next.HostID = req.HostID
+		next.HostGroupID = req.HostGroupID
+		next.TargetTags = req.TargetTags
+	case req.HostID != nil:
+		// Clients unaware of targets keep working: a host_id alone retargets
+		// the rule to that host.
+		next.HostID = req.HostID
+		if next.SourceType == models.AlertSourceAgent {
+			next.TargetType = models.AlertTargetHost
+		}
 	}
 	if req.Metric != nil {
 		next.Metric = *req.Metric
@@ -300,8 +318,45 @@ func (s *Service) validateScope(ctx context.Context, rule *models.AlertRule) err
 		return s.validateProxmoxScope(ctx, rule.ProxmoxScope)
 	case models.AlertSourceDocker:
 		return s.validateDockerScope(ctx, rule.DockerScope)
+	case models.AlertSourceAgent:
+		if rule.TargetType == models.AlertTargetGroup && rule.HostGroupID != nil {
+			if _, err := s.getHostGroup(ctx, *rule.HostGroupID); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// getHostGroup loads a group an agent rule targets, mapping a missing one to
+// a validation error on the rule.
+func (s *Service) getHostGroup(ctx context.Context, id string) (*models.HostGroup, error) {
+	g, err := s.repo.GetHostGroupByID(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, apperr.Validation("host group not found for this rule").I18n(apperr.CodeAlertHostGroupNotFound, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return g, nil
+}
+
+// agentTargets resolves the hosts an agent rule covers right now, the same
+// way the engine does (models.AlertRule.ResolveAgentTargets).
+func (s *Service) agentTargets(ctx context.Context, rule models.AlertRule) ([]models.Host, error) {
+	hosts, err := s.repo.GetAllHosts(ctx)
+	if err != nil {
+		return nil, apperr.Failed("failed to fetch hosts")
+	}
+	groups := map[string]models.HostGroup{}
+	if rule.TargetType == models.AlertTargetGroup && rule.HostGroupID != nil {
+		g, err := s.getHostGroup(ctx, *rule.HostGroupID)
+		if err != nil {
+			return nil, err
+		}
+		groups[g.ID] = *g
+	}
+	return rule.ResolveAgentTargets(hosts, groups), nil
 }
 
 func (s *Service) validateDockerScope(ctx context.Context, scope *models.DockerMetricScope) error {

@@ -37,7 +37,7 @@ function baseProps(overrides: Record<string, unknown> = {}) {
 
 describe('AlertRuleStepSource (characterization, per source-type branches)', () => {
   it('agent metric: renders name and host-target fields, both labelled', () => {
-    const wrapper = mount(AlertRuleStepSource, { props: baseProps() })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form: formFor('cpu', { target_type: 'host' }) }) })
     for (const id of ['alert-source-name', 'alert-source-host-id']) {
       expect(wrapper.find(`#${id}`).exists(), `#${id}`).toBe(true)
       expect(wrapper.find(`label[for="${id}"]`).exists(), `label for #${id}`).toBe(true)
@@ -100,11 +100,13 @@ describe('AlertRuleStepSource (characterization, per source-type branches)', () 
     expect(wrapper.find('#alert-source-docker-project').exists()).toBe(true)
   })
 
-  it('renders translated source-type buttons and the default "all hosts" option', () => {
+  it('renders translated source-type buttons and selects the "all hosts" target by default', () => {
     const wrapper = mount(AlertRuleStepSource, { props: baseProps() })
     expect(wrapper.text()).toContain('Synthétique')
     expect(wrapper.text()).toContain('🐳 Docker')
-    expect(wrapper.find('#alert-source-host-id option').text()).toBe('Tous les hôtes')
+    const pressed = wrapper.findAll('fieldset button[aria-pressed="true"]')
+    expect(pressed.map(b => b.text())).toEqual(['Tous les hôtes'])
+    expect(wrapper.find('#alert-source-host-id').exists()).toBe(false)
   })
 
   it('pluralizes the compose project service count', () => {
@@ -153,7 +155,7 @@ describe('AlertRuleStepSource — partial host metrics notice', () => {
 
 describe('AlertRuleStepSource — field writes emit a whole-object update:form, never mutate the prop', () => {
   it('hostIdModel (plain fieldModel) emits the merged form without touching sibling fields', async () => {
-    const form = formFor('cpu', { host_id: '' })
+    const form = formFor('cpu', { target_type: 'host', host_id: '' })
     const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form }) })
 
     await wrapper.find('#alert-source-host-id').setValue('host-1')
@@ -247,5 +249,95 @@ describe('AlertRuleStepSource — field writes emit a whole-object update:form, 
     const next = wrapper.emitted('update:form')![0][0] as AlertRuleFormData
     expect(next.proxmox_scope.scope_mode).toBe('node')
     expect(form.proxmox_scope.scope_mode).toBe('connection') // prop untouched
+  })
+})
+
+describe('AlertRuleStepSource — agent rule target', () => {
+  const hosts = [
+    { id: 'h1', name: 'web-1', tags: ['prod', 'web'] },
+    { id: 'h2', name: 'db-1', tags: ['prod', 'db'] },
+    { id: 'h3', name: 'lab', tags: [] },
+  ]
+  const hostGroups = [{ id: 'g1', name: 'Prod', member_ids: ['h1', 'h2'] }]
+
+  function lastForm(wrapper: ReturnType<typeof mount>): AlertRuleFormData {
+    const events = wrapper.emitted('update:form')!
+    return events[events.length - 1][0] as AlertRuleFormData
+  }
+
+  function targetButton(wrapper: ReturnType<typeof mount>, label: string) {
+    return wrapper.findAll('fieldset .btn-group button').find(b => b.text() === label)!
+  }
+
+  it('switching the target type drops the fields the new type does not use', async () => {
+    const form = formFor('cpu', { target_type: 'host', host_id: 'h1' })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form, hosts, hostGroups }) })
+
+    await targetButton(wrapper, 'Un groupe').trigger('click')
+
+    const next = lastForm(wrapper)
+    expect(next.target_type).toBe('group')
+    expect(next.host_id).toBeNull()
+    expect(next.target_tags).toEqual([])
+  })
+
+  it('keeps the current pick when re-selecting the same target type', async () => {
+    const form = formFor('cpu', { target_type: 'tag', target_tags: ['db'] })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form, hosts }) })
+
+    await targetButton(wrapper, 'Des tags').trigger('click')
+
+    expect(lastForm(wrapper).target_tags).toEqual(['db'])
+  })
+
+  it('group target: lists the groups with their member count and previews the coverage', async () => {
+    const form = formFor('cpu', { target_type: 'group', host_group_id: 'g1' })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form, hosts, hostGroups }) })
+
+    const options = wrapper.findAll('#alert-source-host-group option')
+    expect(options[1].text()).toBe('Prod (2 hôtes)')
+    expect(wrapper.find('label[for="alert-source-host-group"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('2 hôtes couverts actuellement.')
+
+    await wrapper.find('#alert-source-host-group').setValue('g1')
+    expect(lastForm(wrapper).host_group_id).toBe('g1')
+  })
+
+  it('group target without any group points to the settings page', () => {
+    const form = formFor('cpu', { target_type: 'group' })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form, hosts }) })
+    expect(wrapper.text()).toContain('Paramètres › Groupes d\'hôtes')
+    expect(wrapper.text()).not.toContain('couvert')
+  })
+
+  it('tag target: offers the union of host tags and toggles them case-insensitively', async () => {
+    const form = formFor('cpu', { target_type: 'tag', target_tags: ['PROD'] })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form, hosts }) })
+
+    const labels = wrapper.findAll('.form-check-label').map(l => l.text())
+    expect(labels).toEqual(['db', 'prod', 'web'])
+    expect(wrapper.text()).toContain('2 hôtes couverts actuellement.')
+
+    const boxes = wrapper.findAll('input[type="checkbox"]')
+    expect((boxes[1].element as HTMLInputElement).checked).toBe(true)
+
+    await boxes[1].trigger('change') // uncheck prod
+    expect(lastForm(wrapper).target_tags).toEqual([])
+    await boxes[0].trigger('change') // check db
+    expect(lastForm(wrapper).target_tags).toEqual(['PROD', 'db'])
+  })
+
+  it('tag target without any tagged host explains where tags come from', () => {
+    const form = formFor('cpu', { target_type: 'tag' })
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ form, hosts: [{ id: 'h', name: 'x' }] }) })
+    expect(wrapper.text()).toContain('Aucun hôte n\'a de tag')
+    expect(wrapper.text()).not.toContain('couvert')
+  })
+
+  it('a global metric only allows the "all hosts" target', () => {
+    const wrapper = mount(AlertRuleStepSource, { props: baseProps({ metricSupportsHostFilter: false }) })
+    const disabled = wrapper.findAll('fieldset .btn-group button').filter(b => b.attributes('disabled') !== undefined)
+    expect(disabled.map(b => b.text())).toEqual(['Un hôte', 'Un groupe', 'Des tags'])
+    expect(wrapper.text()).toContain('Cette métrique est globale')
   })
 })

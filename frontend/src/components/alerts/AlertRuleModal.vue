@@ -71,6 +71,7 @@
                 v-model:form="form"
                 :rule="rule"
                 :hosts="hosts"
+                :host-groups="hostGroups"
                 :capabilities="capabilities"
                 :capabilities-loading="capabilitiesLoading"
                 :capabilities-error="capabilitiesError"
@@ -218,6 +219,13 @@ import { getApiErrorMessage } from '../../api/client'
 interface Host {
   id: string
   name: string
+  tags?: string[] | null
+}
+
+interface HostGroupOption {
+  id: string
+  name: string
+  member_ids: string[]
 }
 
 interface TestResult {
@@ -238,6 +246,7 @@ const props = withDefaults(defineProps<{
   visible?: boolean
   rule?: AlertRule | null
   hosts?: Host[]
+  hostGroups?: HostGroupOption[]
   capabilities?: AlertRuleCapabilities | null
   capabilitiesLoading?: boolean
   capabilitiesError?: string
@@ -247,6 +256,7 @@ const props = withDefaults(defineProps<{
   visible: false,
   rule: null,
   hosts: () => [],
+  hostGroups: () => [],
   capabilities: null,
   capabilitiesLoading: false,
   capabilitiesError: '',
@@ -358,8 +368,13 @@ const canProceedStep = computed(() => {
   if (step.value === 1) {
     const hasBase = !!form.value.metric && !!form.value.name?.trim()
     if (!hasBase) return false
-    // "All hosts" is a valid selection for agent-based rules.
-    if (form.value.source_type === 'agent') return true
+    if (form.value.source_type === 'agent') {
+      // "All hosts" needs nothing more; the other targets need their pick.
+      if (form.value.target_type === 'host') return !!form.value.host_id
+      if (form.value.target_type === 'group') return !!form.value.host_group_id
+      if (form.value.target_type === 'tag') return form.value.target_tags.length > 0
+      return true
+    }
     // Synthetic rules are global by construction — no scope to validate.
     if (form.value.source_type === 'synthetic') return true
 
@@ -454,7 +469,10 @@ watch(
 watch(
   () => [
     form.value.source_type,
+    form.value.target_type,
     form.value.host_id,
+    form.value.host_group_id,
+    form.value.target_tags.join(','),
     form.value.metric,
     form.value.operator,
     form.value.threshold_warn,
@@ -495,7 +513,11 @@ watch(
   () => metricSupportsHostFilter.value,
   (supportsHost) => {
     if (!supportsHost || form.value.source_type === 'proxmox') {
+      // A global metric (not tied to a host) can only target every host.
+      form.value.target_type = 'all'
       form.value.host_id = null
+      form.value.host_group_id = null
+      form.value.target_tags = []
     }
   }
 )

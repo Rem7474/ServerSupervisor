@@ -117,6 +117,13 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 	maintenanceSet, _ := db.GetHostsInMaintenance(ctx)
 	openIncidents, _ := db.ListAllOpenAlertIncidents(ctx)
 
+	// Host groups are loaded once per tick; their membership is computed
+	// from the hosts above, so a newly tagged host is covered right away.
+	groupsByID, groupsErr := loadHostGroups(ctx, db)
+	if groupsErr != nil {
+		slog.ErrorContext(ctx, "alerts: failed to fetch host groups, group-targeted rules skipped this tick", slog.Any("err", groupsErr))
+	}
+
 	for _, rule := range rules {
 		if !rule.Enabled {
 			staleIncidents, _ := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
@@ -145,7 +152,12 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 		// Build evaluation targets:
 		// - agent metrics: real hosts
 		// - Proxmox metrics: synthetic targets (scope-based or per-entity for global rules)
-		hostsForRule := buildAlertEvaluationTargets(ctx, db, rule, hosts)
+		if groupsErr != nil && isAgentTargetedRule(rule) && rule.TargetType == models.AlertTargetGroup {
+			// Without the group definition the target set is unknown: skip
+			// rather than resolve every open incident as out of scope.
+			continue
+		}
+		hostsForRule := buildAlertEvaluationTargets(ctx, db, rule, hosts, groupsByID)
 		evaluatedTargets := make(map[string]struct{}, len(hostsForRule))
 
 		for _, host := range hostsForRule {
@@ -275,6 +287,61 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 		if isProxmoxGlobalScope(rule) {
 			resolveStaleGlobalProxmoxIncidents(ctx, db, chDispatch, pusher, rule, evaluatedTargets)
 		}
+		if isAgentTargetedRule(rule) {
+			resolveOutOfScopeIncidents(ctx, db, pusher, rule, outOfScopeIncidents(rule.ID, openIncidents, evaluatedTargets))
+		}
+	}
+}
+
+// loadHostGroups returns every host group keyed by id.
+func loadHostGroups(ctx context.Context, db *database.DB) (map[string]models.HostGroup, error) {
+	groups, err := db.ListHostGroups(ctx)
+	if err != nil {
+		return map[string]models.HostGroup{}, err
+	}
+	byID := make(map[string]models.HostGroup, len(groups))
+	for _, g := range groups {
+		byID[g.ID] = g
+	}
+	return byID, nil
+}
+
+// isAgentTargetedRule reports whether a rule evaluates real agent hosts
+// picked by its target (host, all, group, tag), as opposed to Docker,
+// Proxmox or synthetic targets.
+func isAgentTargetedRule(rule models.AlertRule) bool {
+	return !isSyntheticMetric(rule.Metric) && !isDockerMetric(rule.Metric) && !isProxmoxMetric(rule.Metric)
+}
+
+// outOfScopeIncidents returns the rule's open incidents on hosts it no
+// longer targets — a tag removed from the host, a group redefined, the rule
+// retargeted — so they do not stay open forever once nothing evaluates them.
+func outOfScopeIncidents(ruleID int64, openIncidents map[string]*models.AlertIncident, evaluatedTargets map[string]struct{}) []*models.AlertIncident {
+	var out []*models.AlertIncident
+	for _, inc := range openIncidents {
+		if inc == nil || inc.RuleID == nil || *inc.RuleID != ruleID {
+			continue
+		}
+		if _, ok := evaluatedTargets[inc.HostID]; ok {
+			continue
+		}
+		out = append(out, inc)
+	}
+	return out
+}
+
+// resolveOutOfScopeIncidents closes incidents whose host left the rule's
+// target. Silent like the maintenance path: the condition did not recover,
+// the host simply stopped being watched by this rule, so only the UI refresh
+// ping goes out — no "resolved" notification.
+func resolveOutOfScopeIncidents(ctx context.Context, db *database.DB, pusher NotificationPusher, rule models.AlertRule, incidents []*models.AlertIncident) {
+	for _, inc := range incidents {
+		if err := db.ResolveAlertIncident(ctx, inc.ID); err != nil {
+			slog.ErrorContext(ctx, "alerts: failed to resolve out-of-scope incident", slog.Int64("incident_id", inc.ID), slog.Any("err", err))
+			continue
+		}
+		slog.InfoContext(ctx, "alerts: incident resolved — host no longer targeted by the rule", slog.Int64("rule_id", rule.ID), slog.String("host", inc.HostID), slog.Int64("incident_id", inc.ID))
+		broadcastIncidentUpdate(pusher, "resolved", rule, inc.HostID)
 	}
 }
 
@@ -492,7 +559,7 @@ func proxmoxScopeLabel(scope *models.ProxmoxMetricScope) string {
 // For agent metrics, returns the provided hosts. For Proxmox metrics, returns a single
 // synthetic host record with ID from proxmoxScopeKey() to deduplicate incidents per scope.
 // For Docker metrics, returns synthetic targets per container or per host aggregate.
-func buildAlertEvaluationTargets(ctx context.Context, db *database.DB, rule models.AlertRule, hosts []models.Host) []models.Host {
+func buildAlertEvaluationTargets(ctx context.Context, db *database.DB, rule models.AlertRule, hosts []models.Host, groups map[string]models.HostGroup) []models.Host {
 	if isSyntheticMetric(rule.Metric) {
 		// Synthetic metrics are global — evaluate once with a single synthetic target so
 		// the engine creates exactly one incident per rule on fire.
@@ -507,16 +574,9 @@ func buildAlertEvaluationTargets(ctx context.Context, db *database.DB, rule mode
 		return buildDockerEvaluationTargets(ctx, db, rule)
 	}
 	if !isProxmoxMetric(rule.Metric) {
-		// For agent metrics, filter by HostID if set
-		if hasHostID(rule) {
-			for _, h := range hosts {
-				if h.ID == *rule.HostID {
-					return []models.Host{h}
-				}
-			}
-			return []models.Host{}
-		}
-		return hosts
+		// Agent metrics: the hosts the rule targets right now (one host,
+		// every host, the current members of a group, or the tagged hosts).
+		return rule.ResolveAgentTargets(hosts, groups)
 	}
 
 	if isProxmoxGlobalScope(rule) {
