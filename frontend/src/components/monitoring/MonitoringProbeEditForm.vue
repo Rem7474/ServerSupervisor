@@ -139,6 +139,28 @@
             </label>
           </div>
         </template>
+        <div class="col-md-6">
+          <label
+            for="monitoring-edit-probe-slo-target"
+            class="form-label"
+          >{{ t('monitoring.sloTargetLabel') }}</label>
+          <input
+            id="monitoring-edit-probe-slo-target"
+            v-model.number="probeForm.slo_target"
+            type="number"
+            min="0.001"
+            max="100"
+            step="0.001"
+            class="form-control"
+            aria-describedby="monitoring-edit-probe-slo-target-hint"
+          >
+          <div
+            id="monitoring-edit-probe-slo-target-hint"
+            class="form-hint"
+          >
+            {{ t('monitoring.sloTargetHint') }}
+          </div>
+        </div>
         <div class="col-12">
           <label class="form-check">
             <input

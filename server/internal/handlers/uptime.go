@@ -134,3 +134,14 @@ func (h *UptimeHandler) CheckNow(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, result)
 }
+
+// SLA returns every probe's availability over 7/30/90-day windows against its
+// objective, with the remaining error budget.
+func (h *UptimeHandler) SLA(c *gin.Context) {
+	report, err := h.svc.SLA(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, report)
+}

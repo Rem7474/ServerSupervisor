@@ -12,18 +12,28 @@ import (
 
 // fakeRepo is an in-memory Repository for fast, DB-free unit tests.
 type fakeRepo struct {
-	created   *models.UptimeProbe
-	updated   *models.UptimeProbe
-	recorded  []models.UptimeProbeResult
+	created    *models.UptimeProbe
+	updated    *models.UptimeProbe
+	recorded   []models.UptimeProbeResult
 	probe      *models.UptimeProbe
 	getErr     error
 	listProbe  []models.UptimeProbe
 	buckets    []models.UptimeHistoryBucket
 	bucketsErr error
+	daily      []models.UptimeDailyCount
+	dailyIDs   []string
+	dailyDays  int
+	dailyErr   error
+	listErr    error
+}
+
+func (f *fakeRepo) GetUptimeDailyCounts(_ context.Context, ids []string, days int) ([]models.UptimeDailyCount, error) {
+	f.dailyIDs, f.dailyDays = ids, days
+	return f.daily, f.dailyErr
 }
 
 func (f *fakeRepo) ListUptimeProbes(context.Context) ([]models.UptimeProbe, error) {
-	return f.listProbe, nil
+	return f.listProbe, f.listErr
 }
 func (f *fakeRepo) GetUptimeProbe(_ context.Context, _ string) (*models.UptimeProbe, error) {
 	return f.probe, f.getErr

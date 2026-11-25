@@ -25,6 +25,9 @@ type UptimeProbe struct {
 	ConsecutiveFailures int        `json:"consecutive_failures"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+	// SLOTarget is the availability objective in percent (99.9 = "three
+	// nines") the SLA view measures this probe against.
+	SLOTarget float64 `json:"slo_target"`
 	// NPMProxyHostID/Domain are set when this probe was created (and is still
 	// referenced) by an NPM proxy host's monitoring toggle — see
 	// npm.Service.UpdateProxyHostMonitoring. Deleting a probe with this set
@@ -47,7 +50,14 @@ type UptimeProbeRequest struct {
 	FollowRedirects   *bool  `json:"follow_redirects"`
 	VerifyTLS         *bool  `json:"verify_tls"`
 	Enabled           *bool  `json:"enabled"`
+	// SLOTarget is the availability objective in percent. Omitted on create
+	// means DefaultSLOTarget; omitted on update keeps the stored value.
+	SLOTarget *float64 `json:"slo_target"`
 }
+
+// DefaultSLOTarget is the availability objective given to a probe created
+// without an explicit one.
+const DefaultSLOTarget = 99.9
 
 // UptimeProbeResult is one historical execution sample for an UptimeProbe.
 type UptimeProbeResult struct {

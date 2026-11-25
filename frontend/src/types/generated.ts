@@ -1989,6 +1989,185 @@ export interface SettingsUpdateRequest {
 }
 
 //////////
+// source: sla.go
+
+/**
+ * SLA window status values.
+ */
+export const SLAStatusMet = "met";
+/**
+ * SLA window status values.
+ */
+export const SLAStatusAtRisk = "at_risk";
+/**
+ * SLA window status values.
+ */
+export const SLAStatusBreached = "breached";
+/**
+ * SLA window status values.
+ */
+export const SLAStatusNoData = "no_data";
+/**
+ * UptimeDailyCount is one probe's check counts for one UTC day.
+ */
+export interface UptimeDailyCount {
+  probe_id: string;
+  day: string;
+  total_checks: number /* int */;
+  up_checks: number /* int */;
+}
+/**
+ * SLAWindow is a probe's measured availability over a sliding window of
+ * calendar days (UTC), compared against its objective.
+ */
+export interface SLAWindow {
+  days: number /* int */;
+  /**
+   * CoveredDays is how many days of the window actually hold check results
+   * (a new probe, a disabled period or a history shorter than the window
+   * all lower it): the percentages below only describe those days.
+   */
+  covered_days: number /* int */;
+  total_checks: number /* int */;
+  up_checks: number /* int */;
+  /**
+   * UptimePercent is nil when the window holds no check at all.
+   */
+  uptime_percent?: number /* float64 */;
+  /**
+   * BudgetRemainingPercent is the share of the error budget (the failed
+   * checks the objective tolerates) still unused, clamped to [0, 100]. Nil
+   * without data.
+   */
+  budget_remaining_percent?: number /* float64 */;
+  /**
+   * AllowedDowntimeMinutes is the downtime the objective tolerates over the
+   * full window length, for orientation ("99.9 % over 30 days = 43 min").
+   */
+  allowed_downtime_minutes: number /* float64 */;
+  status: string; // met | at_risk | breached | no_data
+}
+/**
+ * ProbeSLA is the SLA report of one uptime probe.
+ */
+export interface ProbeSLA {
+  probe_id: string;
+  name: string;
+  enabled: boolean;
+  slo_target: number /* float64 */;
+  /**
+   * DataSince is the first UTC day (within the longest window) holding
+   * results; nil when there is none.
+   */
+  data_since?: string;
+  windows: SLAWindow[];
+}
+/**
+ * SLAReport is the response of GET /uptime/sla.
+ */
+export interface SLAReport {
+  generated_at: string;
+  window_days: number /* int */[];
+  probes: ProbeSLA[];
+}
+/**
+ * Public status values shown on the status page.
+ */
+export const PublicStatusOperational = "operational";
+/**
+ * Public status values shown on the status page.
+ */
+export const PublicStatusPartialOutage = "partial_outage";
+/**
+ * Public status values shown on the status page.
+ */
+export const PublicStatusMajorOutage = "major_outage";
+/**
+ * Public status values shown on the status page.
+ */
+export const PublicStatusUnknown = "unknown";
+/**
+ * StatusPageService is one probe an admin published on the status page.
+ */
+export interface StatusPageService {
+  probe_id: string;
+  public_name: string;
+}
+/**
+ * StatusPageConfig is the admin-side configuration of the public status page.
+ */
+export interface StatusPageConfig {
+  enabled: boolean;
+  title: string;
+  description: string;
+  services: StatusPageService[];
+  updated_at: string;
+}
+/**
+ * StatusPageConfigRequest is the body of PUT /status-page. Services are
+ * shown in the order given.
+ */
+export interface StatusPageConfigRequest {
+  enabled: boolean;
+  title: string;
+  description: string;
+  services: StatusPageService[];
+}
+/**
+ * PublishedProbe joins a published service with the live state of its probe.
+ * Server-side only: never serialized to the public endpoint as is.
+ */
+export interface PublishedProbe {
+}
+/**
+ * UptimeDownPeriod is a run of consecutive failed checks of one probe.
+ * ResolvedAt is the first successful check after it, nil while ongoing.
+ */
+export interface UptimeDownPeriod {
+}
+/**
+ * PublicStatusDay is one day of a service's 90-day bar.
+ */
+export interface PublicStatusDay {
+  date: string; // YYYY-MM-DD (UTC)
+  /**
+   * UptimePercent is nil for a day without any check.
+   */
+  uptime_percent?: number /* float64 */;
+}
+/**
+ * PublicStatusService is a published service as the public sees it: its
+ * public name and availability only.
+ */
+export interface PublicStatusService {
+  name: string;
+  status: string;
+  uptime_percent_90d?: number /* float64 */;
+  days: PublicStatusDay[];
+}
+/**
+ * PublicStatusIncident is a generic outage record: which public service, when
+ * it started and when it was resolved (nil while ongoing). No cause or error.
+ */
+export interface PublicStatusIncident {
+  service: string;
+  started_at: string;
+  resolved_at?: string;
+}
+/**
+ * PublicStatusPage is the response of the unauthenticated GET
+ * /api/public/status endpoint.
+ */
+export interface PublicStatusPage {
+  title: string;
+  description: string;
+  status: string;
+  generated_at: string;
+  services: PublicStatusService[];
+  incidents: PublicStatusIncident[];
+}
+
+//////////
 // source: synthetic.go
 
 /**
@@ -2015,6 +2194,11 @@ export interface UptimeProbe {
   created_at: string;
   updated_at: string;
   /**
+   * SLOTarget is the availability objective in percent (99.9 = "three
+   * nines") the SLA view measures this probe against.
+   */
+  slo_target: number /* float64 */;
+  /**
    * NPMProxyHostID/Domain are set when this probe was created (and is still
    * referenced) by an NPM proxy host's monitoring toggle — see
    * npm.Service.UpdateProxyHostMonitoring. Deleting a probe with this set
@@ -2039,7 +2223,17 @@ export interface UptimeProbeRequest {
   follow_redirects?: boolean;
   verify_tls?: boolean;
   enabled?: boolean;
+  /**
+   * SLOTarget is the availability objective in percent. Omitted on create
+   * means DefaultSLOTarget; omitted on update keeps the stored value.
+   */
+  slo_target?: number /* float64 */;
 }
+/**
+ * DefaultSLOTarget is the availability objective given to a probe created
+ * without an explicit one.
+ */
+export const DefaultSLOTarget = 99.9;
 /**
  * UptimeProbeResult is one historical execution sample for an UptimeProbe.
  */

@@ -1,5 +1,7 @@
 import { api } from './client'
-import type { UptimeProbe, UptimeProbeRequest, UptimeProbeResult, UptimeStats, UptimeHistoryBucket } from '../types/uptime'
+import type {
+  UptimeProbe, UptimeProbeRequest, UptimeProbeResult, UptimeStats, UptimeHistoryBucket, SLAReport,
+} from '../types/uptime'
 
 export const uptimeApi = {
   getUptimeProbes: () => api.get<{ probes: UptimeProbe[] }>('/v1/uptime/probes'),
@@ -14,4 +16,5 @@ export const uptimeApi = {
     api.get<{ buckets: UptimeHistoryBucket[] }>(`/v1/uptime/probes/${id}/history/buckets`, { params: { hours: hours ?? 24 }, signal }),
   getUptimeStats: (id: string, hours?: number, signal?: AbortSignal) =>
     api.get<UptimeStats>(`/v1/uptime/probes/${id}/stats`, { params: { hours: hours ?? 24 }, signal }),
+  getUptimeSLA: () => api.get<SLAReport>('/v1/uptime/sla'),
 }

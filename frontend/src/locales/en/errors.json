@@ -24,6 +24,11 @@
   "GIT_PROVIDER_NOT_FOUND": "repository not found on {provider} (404) — check owner/repo and the instance URL",
   "GIT_PROVIDER_ERROR": "{provider} API error ({status})",
   "INVALID_GIT_BASE_URL": "invalid instance URL: it must be an http(s) URL with a host, without credentials, query string, loopback or link-local address",
+  "INVALID_SLO_TARGET": "the availability objective must be greater than 0 and at most 100 %",
+  "STATUS_PAGE_PUBLIC_NAME": "each published service needs a public name of 1 to 80 characters",
+  "STATUS_PAGE_TEXT_TOO_LONG": "the status page title is limited to 120 characters and its description to 500",
+  "STATUS_PAGE_UNKNOWN_PROBE": "a published service refers to a probe that does not exist",
+  "STATUS_PAGE_DUPLICATE_PROBE": "a probe can only be published once",
   "legacy": {
     "hostNotFound": "Host not found",
     "unauthorized": "Unauthorized",

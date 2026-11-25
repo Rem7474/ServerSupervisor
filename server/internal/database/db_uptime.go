@@ -15,18 +15,18 @@ func (db *DB) CreateUptimeProbe(ctx context.Context, p models.UptimeProbe) (*mod
 	err := db.conn.QueryRowContext(ctx,
 		`INSERT INTO uptime_probes
 		 (name, type, target, interval_sec, timeout_sec, expected_status, expected_body_regex,
-		  follow_redirects, verify_tls, enabled)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		  follow_redirects, verify_tls, enabled, slo_target)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 		 RETURNING id, name, type, target, interval_sec, timeout_sec, expected_status, expected_body_regex,
 		           follow_redirects, verify_tls, enabled, last_status, last_latency_ms, last_status_code,
-		           last_error, last_checked_at, consecutive_failures, created_at, updated_at`,
+		           last_error, last_checked_at, consecutive_failures, created_at, updated_at, slo_target`,
 		p.Name, p.Type, p.Target, p.IntervalSec, p.TimeoutSec, p.ExpectedStatus, p.ExpectedBodyRegex,
-		p.FollowRedirects, p.VerifyTLS, p.Enabled,
+		p.FollowRedirects, p.VerifyTLS, p.Enabled, sloTargetOrDefault(p.SLOTarget),
 	).Scan(
 		&out.ID, &out.Name, &out.Type, &out.Target, &out.IntervalSec, &out.TimeoutSec,
 		&out.ExpectedStatus, &out.ExpectedBodyRegex, &out.FollowRedirects, &out.VerifyTLS, &out.Enabled,
 		&out.LastStatus, &out.LastLatencyMs, &out.LastStatusCode, &out.LastError, &out.LastCheckedAt,
-		&out.ConsecutiveFailures, &out.CreatedAt, &out.UpdatedAt,
+		&out.ConsecutiveFailures, &out.CreatedAt, &out.UpdatedAt, &out.SLOTarget,
 	)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func (db *DB) ListUptimeProbes(ctx context.Context) ([]models.UptimeProbe, error
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT p.id, p.name, p.type, p.target, p.interval_sec, p.timeout_sec, p.expected_status, p.expected_body_regex,
 		        p.follow_redirects, p.verify_tls, p.enabled, p.last_status, p.last_latency_ms, p.last_status_code,
-		        p.last_error, p.last_checked_at, p.consecutive_failures, p.created_at, p.updated_at,
+		        p.last_error, p.last_checked_at, p.consecutive_failures, p.created_at, p.updated_at, p.slo_target,
 		        n.id, COALESCE(n.domain_names[1], '')
 		 FROM uptime_probes p
 		 LEFT JOIN npm_proxy_hosts n ON n.uptime_probe_id = p.id
@@ -55,7 +55,7 @@ func (db *DB) ListUptimeProbes(ctx context.Context) ([]models.UptimeProbe, error
 			&p.ID, &p.Name, &p.Type, &p.Target, &p.IntervalSec, &p.TimeoutSec,
 			&p.ExpectedStatus, &p.ExpectedBodyRegex, &p.FollowRedirects, &p.VerifyTLS, &p.Enabled,
 			&p.LastStatus, &p.LastLatencyMs, &p.LastStatusCode, &p.LastError, &p.LastCheckedAt,
-			&p.ConsecutiveFailures, &p.CreatedAt, &p.UpdatedAt,
+			&p.ConsecutiveFailures, &p.CreatedAt, &p.UpdatedAt, &p.SLOTarget,
 			&p.NPMProxyHostID, &p.NPMProxyHostDomain,
 		); err != nil {
 			return nil, err
@@ -70,13 +70,13 @@ func (db *DB) GetUptimeProbe(ctx context.Context, id string) (*models.UptimeProb
 	err := db.conn.QueryRowContext(ctx,
 		`SELECT id, name, type, target, interval_sec, timeout_sec, expected_status, expected_body_regex,
 		        follow_redirects, verify_tls, enabled, last_status, last_latency_ms, last_status_code,
-		        last_error, last_checked_at, consecutive_failures, created_at, updated_at
+		        last_error, last_checked_at, consecutive_failures, created_at, updated_at, slo_target
 		 FROM uptime_probes WHERE id = $1`, id,
 	).Scan(
 		&p.ID, &p.Name, &p.Type, &p.Target, &p.IntervalSec, &p.TimeoutSec,
 		&p.ExpectedStatus, &p.ExpectedBodyRegex, &p.FollowRedirects, &p.VerifyTLS, &p.Enabled,
 		&p.LastStatus, &p.LastLatencyMs, &p.LastStatusCode, &p.LastError, &p.LastCheckedAt,
-		&p.ConsecutiveFailures, &p.CreatedAt, &p.UpdatedAt,
+		&p.ConsecutiveFailures, &p.CreatedAt, &p.UpdatedAt, &p.SLOTarget,
 	)
 	if err != nil {
 		return nil, err
@@ -89,10 +89,11 @@ func (db *DB) UpdateUptimeProbe(ctx context.Context, p models.UptimeProbe) error
 		`UPDATE uptime_probes
 		 SET name=$1, type=$2, target=$3, interval_sec=$4, timeout_sec=$5,
 		     expected_status=$6, expected_body_regex=$7, follow_redirects=$8, verify_tls=$9, enabled=$10,
+		     slo_target = CASE WHEN $12::numeric > 0 THEN $12::numeric ELSE slo_target END,
 		     updated_at=NOW()
 		 WHERE id=$11`,
 		p.Name, p.Type, p.Target, p.IntervalSec, p.TimeoutSec,
-		p.ExpectedStatus, p.ExpectedBodyRegex, p.FollowRedirects, p.VerifyTLS, p.Enabled, p.ID,
+		p.ExpectedStatus, p.ExpectedBodyRegex, p.FollowRedirects, p.VerifyTLS, p.Enabled, p.ID, p.SLOTarget,
 	)
 	return err
 }
@@ -108,7 +109,7 @@ func (db *DB) ListEnabledUptimeProbesDue(ctx context.Context) ([]models.UptimePr
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT id, name, type, target, interval_sec, timeout_sec, expected_status, expected_body_regex,
 		        follow_redirects, verify_tls, enabled, last_status, last_latency_ms, last_status_code,
-		        last_error, last_checked_at, consecutive_failures, created_at, updated_at
+		        last_error, last_checked_at, consecutive_failures, created_at, updated_at, slo_target
 		 FROM uptime_probes
 		 WHERE enabled = TRUE
 		   AND (last_checked_at IS NULL
@@ -125,7 +126,7 @@ func (db *DB) ListEnabledUptimeProbesDue(ctx context.Context) ([]models.UptimePr
 			&p.ID, &p.Name, &p.Type, &p.Target, &p.IntervalSec, &p.TimeoutSec,
 			&p.ExpectedStatus, &p.ExpectedBodyRegex, &p.FollowRedirects, &p.VerifyTLS, &p.Enabled,
 			&p.LastStatus, &p.LastLatencyMs, &p.LastStatusCode, &p.LastError, &p.LastCheckedAt,
-			&p.ConsecutiveFailures, &p.CreatedAt, &p.UpdatedAt,
+			&p.ConsecutiveFailures, &p.CreatedAt, &p.UpdatedAt, &p.SLOTarget,
 		); err != nil {
 			return nil, err
 		}

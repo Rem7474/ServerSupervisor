@@ -10,7 +10,7 @@ const RouterLinkStub = { props: ['to'], template: '<a :href="to"><slot /></a>' }
 const probeFixture: UptimeProbe = {
   id: 'probe-1', name: 'API prod', type: 'http', target: 'https://api.example.com',
   interval_sec: 60, timeout_sec: 10, expected_status: 200, expected_body_regex: '',
-  follow_redirects: true, verify_tls: true, enabled: true, last_status: 'up',
+  follow_redirects: true, verify_tls: true, enabled: true, slo_target: 99.9, last_status: 'up',
   consecutive_failures: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
   npm_proxy_host_id: 'npm-1', npm_proxy_host_domain: 'api.example.com',
 }

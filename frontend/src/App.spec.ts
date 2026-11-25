@@ -47,6 +47,7 @@ function mountApp() {
       { path: '/alerts', component: { template: '<div />' } },
       { path: '/audit', component: { template: '<div />' } },
       { path: '/login', component: { template: '<div />' } },
+      { path: '/status', component: { template: '<div class="standalone-page" />' }, meta: { standalone: true } },
     ],
   })
 
@@ -270,6 +271,21 @@ describe('App.vue — app-resume debounce', () => {
     expect(resumeSpy).toHaveBeenCalledTimes(1)
 
     window.removeEventListener('ss:app-resume', resumeSpy)
+    wrapper.unmount()
+  })
+})
+
+describe('App.vue — standalone pages', () => {
+  it('renders a standalone route without the app shell, even when signed in', async () => {
+    const { wrapper, router } = mountApp()
+    await router.push('/')
+    await flushPromises()
+    expect(wrapper.find('header.navbar').exists()).toBe(true)
+
+    await router.push('/status')
+    await flushPromises()
+    expect(wrapper.find('header.navbar').exists()).toBe(false)
+    expect(wrapper.find('.standalone-page').exists()).toBe(true)
     wrapper.unmount()
   })
 })
