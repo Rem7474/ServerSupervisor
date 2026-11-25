@@ -86,7 +86,9 @@ describe('AlertIncidentList', () => {
       props: { incidents: [incident({ correlated_with: 42 })] },
       ...mountOpts,
     })
-    expect(wrapper.find('[title="Corrélé avec l\'incident « hôte hors ligne » — pas de notification séparée"]').exists()).toBe(true)
+    // @tabler/icons-vue renders the `title` prop as an SVG <title> child
+    // (native tooltip + accessible name), not as a title attribute.
+    expect(wrapper.find('svg title').text()).toBe('Corrélé avec l\'incident « hôte hors ligne » — pas de notification séparée')
   })
 
   it('falls back to the translated unknown-source label when host_name is empty', () => {
