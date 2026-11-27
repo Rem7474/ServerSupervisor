@@ -132,3 +132,76 @@ func TestHandleDiscoverySNMP(t *testing.T) {
 		t.Fatalf("output = %s", output)
 	}
 }
+
+// Discovery commands run on their own worker, one at a time: Process returns
+// without waiting for them (the agent's other commands are not held back),
+// and a command beyond the queue bound is failed instead of waiting.
+func TestProcessRunsDiscoveryOffTheCommandLoop(t *testing.T) {
+	orig := readARPTable
+	t.Cleanup(func() { readARPTable = orig })
+	release := make(chan struct{})
+	started := make(chan struct{}, 8)
+	var running, maxRunning atomic.Int32
+	readARPTable = func() (*netdiscovery.ARPResult, error) {
+		n := running.Add(1)
+		if n > maxRunning.Load() {
+			maxRunning.Store(n)
+		}
+		started <- struct{}{}
+		<-release
+		running.Add(-1)
+		return &netdiscovery.ARPResult{}, nil
+	}
+	d, s, results := discoveryFixture(t, false)
+
+	done := make(chan struct{})
+	go func() {
+		cmds := []sender.PendingCommand{}
+		for i := range discoveryQueueSize + 2 { // 1 running + queue + 1 refused
+			cmds = append(cmds, sender.PendingCommand{ID: "d" + string(rune('0'+i)), Module: "discovery", Action: "arp"})
+		}
+		d.Process(s, cmds)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Process waited for the discovery job")
+	}
+	<-started
+
+	refused := func() int {
+		n := 0
+		for _, r := range results() {
+			if r["status"] == "failed" && strings.Contains(r["output"].(string), "already running") {
+				n++
+			}
+		}
+		return n
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for refused() != 1 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if refused() != 1 {
+		t.Fatalf("results = %v", results())
+	}
+
+	close(release)
+	deadline = time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		completed := 0
+		for _, r := range results() {
+			if r["status"] == "completed" {
+				completed++
+			}
+		}
+		if completed == discoveryQueueSize+1 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if maxRunning.Load() != 1 {
+		t.Fatalf("%d discovery jobs ran at once", maxRunning.Load())
+	}
+}

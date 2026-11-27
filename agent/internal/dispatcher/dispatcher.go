@@ -1,6 +1,8 @@
 // Package dispatcher runs agent commands with concurrency controls.
 // APT commands are serialized via a mutex (dpkg cannot run concurrently).
-// All other modules share a 4-slot semaphore.
+// All other modules share a 4-slot semaphore, except network discovery,
+// which runs on its own worker (one job at a time) so a long port scan never
+// holds back the host's other commands.
 //
 // Each module ("docker", "apt", "journal"…) is implemented in its own
 // handler_<module>.go file and registered in registry.go's moduleRegistry.
@@ -31,6 +33,16 @@ const maxCmdDuration = 45 * time.Minute
 // reached. Every other module keeps the maxCmdDuration behavior unchanged.
 const resticBackupMaxDuration = 24 * time.Hour
 
+// discoveryQueueSize is how many network discovery commands may wait behind
+// the one running. The server already allows a single active job per agent;
+// this bound only absorbs a re-delivery. Beyond it a command is failed.
+const discoveryQueueSize = 2
+
+type queuedCommand struct {
+	s   *sender.Sender
+	cmd sender.PendingCommand
+}
+
 // cmdTimeout returns the absolute ctx deadline for one command. Only
 // module=restic action=run_backup gets an exception from maxCmdDuration.
 func cmdTimeout(cmd sender.PendingCommand) time.Duration {
@@ -53,6 +65,9 @@ type Dispatcher struct {
 	cfgPath   string
 	updater   UpdaterFunc
 	composeMu sync.Map // project name -> *sync.Mutex (serialize compose updates per project)
+
+	discoveryOnce sync.Once
+	discoveryQ    chan queuedCommand
 }
 
 // lockCompose serializes compose updates for a single project. Concurrent
@@ -82,6 +97,10 @@ func New(cfg *config.Config, cfgPath string, tasks *config.TasksConfig, updater 
 func (d *Dispatcher) Process(s *sender.Sender, commands []sender.PendingCommand) {
 	var wg sync.WaitGroup
 	for _, cmd := range commands {
+		if cmd.Module == "discovery" {
+			d.enqueueDiscovery(s, cmd)
+			continue
+		}
 		wg.Add(1)
 		go func(c sender.PendingCommand) {
 			defer wg.Done()
@@ -108,4 +127,27 @@ func (d *Dispatcher) execute(s *sender.Sender, cmd sender.PendingCommand) {
 
 	slog.Info("processing command", "command_id", cmd.ID, "module", cmd.Module, "action", cmd.Action, "target", cmd.Target)
 	dispatch(ctx, d, s, cmd)
+}
+
+// enqueueDiscovery hands a network discovery command to the dedicated
+// worker without waiting for it: Process (and so the agent's sequential
+// command loop) returns while a scan runs. The worker runs one discovery
+// job at a time; a command arriving while the queue is full is failed.
+func (d *Dispatcher) enqueueDiscovery(s *sender.Sender, cmd sender.PendingCommand) {
+	d.discoveryOnce.Do(func() {
+		d.discoveryQ = make(chan queuedCommand, discoveryQueueSize)
+		go d.discoveryWorker()
+	})
+	select {
+	case d.discoveryQ <- queuedCommand{s: s, cmd: cmd}:
+	default:
+		slog.Warn("discovery queue full, command refused", "command_id", cmd.ID, "action", cmd.Action)
+		reportTerminal(context.Background(), s, cmd, "failed", "ERROR: another network discovery is already running on this agent")
+	}
+}
+
+func (d *Dispatcher) discoveryWorker() {
+	for q := range d.discoveryQ {
+		d.execute(q.s, q.cmd)
+	}
 }

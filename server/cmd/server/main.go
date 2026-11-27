@@ -49,6 +49,10 @@ func main() {
 		slog.ErrorContext(rootCtx, "refusing to start due to insecure configuration", slog.Any("err", err))
 		log.Fatalf("Refusing to start: %v. Set APP_ENV=dev to bypass for local development.", err)
 	}
+	if err := cfg.ValidateDiscovery(); err != nil {
+		slog.ErrorContext(rootCtx, "refusing to start due to invalid discovery configuration", slog.Any("err", err))
+		log.Fatalf("Refusing to start: %v", err)
+	}
 	if config.IsDevEnv() {
 		slog.InfoContext(rootCtx, "strict secret validation disabled in dev mode", slog.String("app_env", config.AppEnv()))
 	}

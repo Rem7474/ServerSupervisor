@@ -59,6 +59,10 @@ serveur ne peut pas faire émettre de trafic actif à un agent sans l'accord loc
 administrateur. L'agent revérifie toutes les bornes ci-dessous de son côté, indépendamment du
 serveur.
 
+Un agent exécute **une seule tâche de découverte à la fois**, sur un fil dédié : un scan en cours
+ne retarde pas les autres commandes de l'hôte (Docker, APT, journaux…). Le serveur refuse une
+nouvelle tâche (`409`) tant qu'une autre est en attente ou en cours sur le même agent.
+
 ### Table ARP
 
 Liste les voisins IPv4 résolus (entrées complètes uniquement) : IP, MAC, interface. Le serveur
@@ -71,13 +75,17 @@ base OUI complète.
 
 - lancé explicitement par un administrateur, après confirmation dans l'interface ;
 - cible : un bloc IPv4 privé (RFC 1918) entre `/24` et `/32`, jamais une adresse publique ;
-  le paramètre `DISCOVERY_ALLOWED_SUBNETS` restreint en plus les plages autorisées ;
+  le paramètre `DISCOVERY_ALLOWED_SUBNETS` restreint en plus les plages autorisées (une entrée
+  invalide dans la variable d'environnement empêche le démarrage du serveur) ;
 - ports : liste par défaut d'environ 85 ports d'infrastructure courants, ou liste explicite
   (`22,80,8000-8100`) plafonnée par `DISCOVERY_PORT_SCAN_MAX_PORTS` (1024 par défaut, 4096 au
   maximum) ;
 - connexions TCP complètes (`connect`), sans socket raw ni privilège ;
-- concurrence (64 par défaut, 256 au plus), débit (500 sondes/s par défaut, 2000 au plus),
-  timeout par sonde (800 ms par défaut) et durée totale (20 minutes) bornés ;
+- cadence fixée par le serveur : 64 connexions en parallèle, 500 sondes/s, 800 ms de timeout
+  par sonde ; l'agent les plafonne de son côté (256 en parallèle, 2000 sondes/s, 5 s) et arrête
+  le scan au bout de 10 minutes (résultat partiel signalé) ;
+- résultat borné à 256 ports ouverts par adresse et 4096 au total ; au-delà, le résultat est
+  signalé comme tronqué ;
 - annulable : une tâche en attente est annulée immédiatement ; une tâche en cours s'arrête à son
   prochain rapport de progression (toutes les 2 secondes) et renvoie le résultat partiel.
 
@@ -90,6 +98,8 @@ de `ifTable` (64 interfaces au plus). Même restriction de cible que le scan de 
 La communauté et les phrases secrètes v3 ne sont **jamais** stockées en base, renvoyées par
 l'API ni journalisées : le serveur les garde en mémoire (15 minutes au plus) sous une
 référence à usage unique et ne les ajoute à la commande qu'au moment où l'agent la récupère.
+L'annulation d'une sonde encore en attente efface ses identifiants, et un balayage périodique
+(toutes les minutes) supprime ceux qui ont expiré.
 Une tâche SNMP dont l'agent ne passe pas dans ce délai, ou survivant à un redémarrage du
 serveur, échoue avec un message explicite et doit être relancée.
 
@@ -115,6 +125,7 @@ Tous ces endpoints sont réservés aux administrateurs.
 | Le scan met plusieurs secondes à répondre | Normal et volontaire — il est synchrone, la réponse HTTP attend la fin des 254 pings (bornés à 64 en parallèle) d'un `/24` complet |
 | « L'agent de cet hôte ne prend pas en charge la découverte réseau » | Agent antérieur au module `discovery` : le mettre à jour |
 | « Le scan actif est désactivé sur cet agent » | `allow_network_scan` absent ou à `false` dans la configuration de l'agent (§4) |
+| « Une découverte est déjà en cours sur cet agent » | Une tâche est en attente ou en cours sur cet agent : attendre sa fin ou l'annuler |
 | Plage refusée « hors des sous-réseaux autorisés » | `DISCOVERY_ALLOWED_SUBNETS` est renseigné et ne contient pas la cible |
 | Tâche SNMP en échec « community is missing » | Identifiants expirés (tâche restée plus de 15 minutes en attente) ou serveur redémarré entre le lancement et la prise en charge : relancer |
 | Une adresse répondante n'apparaît pas comme "déjà enregistrée" alors qu'un hôte existe avec ce nom | Le rapprochement se fait par **adresse IP**, pas par nom — un hôte enregistré avec une IP différente (DHCP ayant changé) apparaîtra comme une nouvelle adresse |

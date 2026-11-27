@@ -33,6 +33,9 @@ func (r *discoveryRepoStub) GetRemoteCommandByID(_ context.Context, id string) (
 	}
 	return nil, errors.New("no rows")
 }
+func (r *discoveryRepoStub) GetRemoteCommandsByHostAndModule(context.Context, string, string, int) ([]models.RemoteCommand, error) {
+	return nil, nil
+}
 func (r *discoveryRepoStub) CancelPendingRemoteCommand(context.Context, string, string) (bool, error) {
 	return false, nil
 }

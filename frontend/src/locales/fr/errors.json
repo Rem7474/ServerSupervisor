@@ -110,6 +110,7 @@
   "DISCOVERY_AGENT_UNSUPPORTED": "l'agent de cet hôte ne prend pas en charge la découverte réseau : mettez l'agent à jour",
   "DISCOVERY_SCAN_DISABLED": "le scan actif est désactivé sur cet agent : ajoutez allow_network_scan: true à sa configuration",
   "DISCOVERY_SNMP_INVALID": "paramètre SNMP invalide ou manquant : {field}",
+  "DISCOVERY_JOB_ACTIVE": "une découverte est déjà en cours sur cet agent : attendez sa fin ou annulez-la",
   "SETTINGS_WEBHOOK_URL_INVALID": "URL de webhook {provider} invalide : elle doit être en https et ne pas cibler une adresse locale ou privée",
   "SETTINGS_WEBHOOK_NOT_CONFIGURED": "URL de webhook {provider} non configurée",
   "SETTINGS_WEBHOOK_SEND_FAILED": "échec de l'envoi du message de test {provider} : {reason}",

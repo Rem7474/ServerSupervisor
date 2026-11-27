@@ -163,6 +163,8 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	discoveryAgentSvc := discoverysvc.NewAgentService(db, dispatcher, cfg, wsH.GetStreamHub())
 	agentH.AddCommandInterceptor(discoveryAgentSvc)
 	agentH.AddCompletionListener(discoveryAgentSvc)
+	discoverySweepCtx, stopDiscoverySweep := context.WithCancel(context.Background())
+	go discoveryAgentSvc.RunSweeper(discoverySweepCtx)
 	discoveryH := handlers.NewDiscoveryHandler(discoverysvc.NewService(db), discoveryAgentSvc)
 	apiKeyService := apikeysvc.NewService(db)
 	apiKeyH := handlers.NewAPIKeyHandler(apiKeyService)
@@ -215,6 +217,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		agentRateLimiter.Stop()
 		apiKeyRateLimiter.Stop()
 		webhookRateLimiter.Stop()
+		stopDiscoverySweep()
 	}
 	return r, releaseTrackerH, proxmoxH, npmH, cleanup
 }

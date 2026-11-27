@@ -132,6 +132,7 @@ const (
 	CodeDiscoveryAgentUnsupported     = "DISCOVERY_AGENT_UNSUPPORTED"
 	CodeDiscoveryScanDisabled         = "DISCOVERY_SCAN_DISABLED"
 	CodeDiscoverySNMPInvalid          = "DISCOVERY_SNMP_INVALID"
+	CodeDiscoveryJobActive            = "DISCOVERY_JOB_ACTIVE"
 	CodeSettingsWebhookURLInvalid     = "SETTINGS_WEBHOOK_URL_INVALID"
 	CodeSettingsWebhookNotConfigured  = "SETTINGS_WEBHOOK_NOT_CONFIGURED"
 	CodeSettingsWebhookSendFailed     = "SETTINGS_WEBHOOK_SEND_FAILED"
@@ -351,6 +352,7 @@ var ErrorCatalog = map[string]ErrorMessage{
 	CodeDiscoveryAgentUnsupported:     {"en": "this host's agent does not support network discovery: update the agent", "fr": "l'agent de cet hôte ne prend pas en charge la découverte réseau : mettez l'agent à jour"},
 	CodeDiscoveryScanDisabled:         {"en": "active scanning is disabled on this agent: set allow_network_scan: true in its configuration", "fr": "le scan actif est désactivé sur cet agent : ajoutez allow_network_scan: true à sa configuration"},
 	CodeDiscoverySNMPInvalid:          {"en": "invalid or missing SNMP parameter: {field}", "fr": "paramètre SNMP invalide ou manquant : {field}"},
+	CodeDiscoveryJobActive:            {"en": "a discovery job is already running on this agent: wait for it to finish or cancel it", "fr": "une découverte est déjà en cours sur cet agent : attendez sa fin ou annulez-la"},
 	CodeAPIKeyInvalid:                 {"en": "invalid API key", "fr": "clé API invalide"},
 	CodeAPIKeyExpired:                 {"en": "API key expired", "fr": "clé API expirée"},
 	CodeAPIKeyRevoked:                 {"en": "API key revoked", "fr": "clé API révoquée"},

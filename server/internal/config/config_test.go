@@ -281,3 +281,28 @@ func TestGetCSVEnvOrDefault(t *testing.T) {
 		t.Fatalf("unexpected default csv: %v", resDef)
 	}
 }
+
+func TestValidateDiscovery(t *testing.T) {
+	valid := []Config{
+		{},
+		{DiscoveryAllowedSubnets: []string{"10.0.0.0/8", "192.168.1.0/24"}, DiscoveryPortScanMaxPorts: 4096},
+	}
+	for _, c := range valid {
+		if err := c.ValidateDiscovery(); err != nil {
+			t.Errorf("%+v: %v", c.DiscoveryAllowedSubnets, err)
+		}
+	}
+	invalid := []Config{
+		{DiscoveryAllowedSubnets: []string{"10.0.0.0/8 192.168.0.0/16"}}, // space separator
+		{DiscoveryAllowedSubnets: []string{"192.168.1.10"}},              // no prefix
+		{DiscoveryAllowedSubnets: []string{"10.0.0.0/8", "lan"}},         // text
+		{DiscoveryAllowedSubnets: []string{"8.8.8.0/24"}},                // public range
+		{DiscoveryPortScanMaxPorts: 5000},
+		{DiscoveryPortScanMaxPorts: -1},
+	}
+	for _, c := range invalid {
+		if err := c.ValidateDiscovery(); err == nil {
+			t.Errorf("%+v / %d accepted", c.DiscoveryAllowedSubnets, c.DiscoveryPortScanMaxPorts)
+		}
+	}
+}

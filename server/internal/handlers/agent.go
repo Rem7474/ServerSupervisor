@@ -69,6 +69,13 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	})
 }
 
+// maxCommandResultSize bounds one command result body. Agent outputs are
+// small in practice (journalctl is capped at 200 lines, APT and Docker
+// outputs stay well under a megabyte, a discovery result is bounded by the
+// agent); the margin covers a verbose custom task without letting a rogue
+// agent push an arbitrarily large row.
+const maxCommandResultSize = 16 * 1024 * 1024
+
 // ReportCommandResult receives command execution results from agents.
 func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 	hostID := c.GetString("host_id")
@@ -76,6 +83,8 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		respondError(c, apperr.Unauthorized("host not identified"))
 		return
 	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxCommandResultSize)
 
 	var result models.CommandResult
 	if err := c.ShouldBindJSON(&result); err != nil {

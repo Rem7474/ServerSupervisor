@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -635,6 +636,25 @@ func (c *Config) ValidateStrict() error {
 		return nil
 	}
 	return errors.Join(ErrInsecureConfig, errors.New(strings.Join(problems, "; ")))
+}
+
+// ValidateDiscovery checks the active-discovery settings read from the
+// environment. Unlike ValidateStrict it applies in every environment: an
+// invalid DISCOVERY_ALLOWED_SUBNETS entry (space separator, address without
+// prefix, public range, text) would otherwise change which ranges can be
+// scanned, so startup is refused.
+func (c *Config) ValidateDiscovery() error {
+	if len(c.DiscoveryAllowedSubnets) > 0 {
+		if err := validatePrivateCIDRList(strings.Join(c.DiscoveryAllowedSubnets, ",")); err != nil {
+			return fmt.Errorf("DISCOVERY_ALLOWED_SUBNETS: %w", err)
+		}
+	}
+	if c.DiscoveryPortScanMaxPorts != 0 {
+		if err := validatePortScanMaxPorts(strconv.Itoa(c.DiscoveryPortScanMaxPorts)); err != nil {
+			return fmt.Errorf("DISCOVERY_PORT_SCAN_MAX_PORTS: %w", err)
+		}
+	}
+	return nil
 }
 
 func (c *Config) DBDSN() string {

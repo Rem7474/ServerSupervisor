@@ -857,6 +857,10 @@ export interface PortScanResult {
   timed_out: boolean;
   duration_ms: number /* int64 */;
   hosts: PortScanHost[];
+  /**
+   * Truncated: the agent left open ports out (per-host or total cap).
+   */
+  truncated?: boolean;
 }
 /**
  * SNMPInterface is one ifTable row summary.
