@@ -89,6 +89,8 @@ var apiKeyOpenUndocumentedRoutes = map[string]bool{
 	"GET /api/v1/hosts/:id/tasks-yaml":                         true,
 	"GET /api/v1/hosts/:id/timeline":                           true,
 	"POST /api/v1/hosts/discover":                              true,
+	"GET /api/v1/discovery/limits":                             true,
+	"GET /api/v1/discovery/jobs/:id":                           true,
 	"DELETE /api/v1/maintenance-windows/:id":                   true,
 	"POST /api/v1/maintenance-windows/global":                  true,
 	"GET /api/v1/network":                                      true,

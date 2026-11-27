@@ -78,6 +78,13 @@ type Config struct {
 	// as before via the regular poll cycle.
 	DisableWSPush bool `yaml:"disable_ws_push"`
 
+	// AllowNetworkScan opts this agent in to the active network discovery
+	// probes the server can request (TCP connect port scan and SNMP GET on
+	// private RFC 1918 addresses). Reading the local ARP table is passive and
+	// always available. Off by default: a host's administrator decides
+	// locally whether its agent may probe the LAN.
+	AllowNetworkScan bool `yaml:"allow_network_scan"`
+
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
 
@@ -201,6 +208,9 @@ func Load(path string) (*Config, error) {
 	}
 	if env := os.Getenv("SUPERVISOR_DISABLE_WS_PUSH"); env != "" {
 		cfg.DisableWSPush = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_ALLOW_NETWORK_SCAN"); env != "" {
+		cfg.AllowNetworkScan = env == "true" || env == "1"
 	}
 	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
 		cfg.InsecureSkipVerify = env == "true" || env == "1"
@@ -377,6 +387,11 @@ log_format: "text"
 # to true only if your network blocks WebSocket upgrades to the server;
 # command delivery still works exactly as before via the regular poll cycle.
 disable_ws_push: false
+
+# Active network discovery: lets an administrator run a bounded TCP connect
+# port scan or an SNMP GET from this host towards private (RFC 1918)
+# addresses, a /24 at most. Reading the local ARP table needs no opt-in.
+allow_network_scan: false
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false

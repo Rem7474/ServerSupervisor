@@ -10,7 +10,9 @@
     "systemd": true,
     "journal": true,
     "restic": true,
-    "network_flows": true
+    "network_flows": true,
+    "network_discovery": true,
+    "network_scan": true
   },
   "diagnostics": [
     {

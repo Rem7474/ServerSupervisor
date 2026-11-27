@@ -31,6 +31,12 @@ func (h *AgentHandler) AddCompletionListener(listener agentsvc.CommandCompletion
 	h.svc.AddCompletionListener(listener)
 }
 
+// AddCommandInterceptor registers a command-delivery interceptor (credential
+// injection at claim time, cancellation signalling on stream chunks).
+func (h *AgentHandler) AddCommandInterceptor(i agentsvc.CommandInterceptor) {
+	h.svc.AddCommandInterceptor(i)
+}
+
 // ReceiveReport processes a full agent report (metrics + docker + apt).
 func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	hostID := c.GetString("host_id")
@@ -63,6 +69,13 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	})
 }
 
+// maxCommandResultSize bounds one command result body. Agent outputs are
+// small in practice (journalctl is capped at 200 lines, APT and Docker
+// outputs stay well under a megabyte, a discovery result is bounded by the
+// agent); the margin covers a verbose custom task without letting a rogue
+// agent push an arbitrarily large row.
+const maxCommandResultSize = 16 * 1024 * 1024
+
 // ReportCommandResult receives command execution results from agents.
 func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 	hostID := c.GetString("host_id")
@@ -70,6 +83,8 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		respondError(c, apperr.Unauthorized("host not identified"))
 		return
 	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxCommandResultSize)
 
 	var result models.CommandResult
 	if err := c.ShouldBindJSON(&result); err != nil {
@@ -101,8 +116,13 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.StreamCommandOutput(c.Request.Context(), hostID, chunk.CommandID, chunk.Chunk); err != nil {
+	cancel, err := h.svc.StreamCommandOutput(c.Request.Context(), hostID, chunk.CommandID, chunk.Chunk)
+	if err != nil {
 		respondError(c, err)
+		return
+	}
+	if cancel {
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "cancel": true})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})

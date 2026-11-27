@@ -46,7 +46,7 @@ func newHostsRouter(t *testing.T, role string) (*gin.Engine, *database.DB) {
 func newDiscoveryRouter(t *testing.T, role string) *gin.Engine {
 	t.Helper()
 	db, _ := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewDiscoveryHandler(discoverysvc.NewService(db))
+	h := handlers.NewDiscoveryHandler(discoverysvc.NewService(db), nil)
 
 	r := gin.New()
 	r.Use(withRole(role))

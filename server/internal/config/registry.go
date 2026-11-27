@@ -115,6 +115,8 @@ var AllParams = []ConfigParamDef{
 	// ==================== Network & Proxies ====================
 	csvParam("TRUSTED_PROXIES", "trusted_proxies", "network", "", "Proxies de confiance (CIDRs)", "Liste séparée par virgules des plages IP / reverse proxies autorisés à relayer les en-têtes X-Forwarded-For.", false),
 	csvParam("ALLOWED_ORIGINS", "allowed_origins", "network", "", "Origines WebSocket autorisées (CORS)", "Liste des origines web autorisées pour la connexion au flux WebSocket en direct.", false),
+	defParam("DISCOVERY_ALLOWED_SUBNETS", "discovery_allowed_subnets", "network", TypeCSV, "", "Sous-réseaux autorisés pour la découverte active", "Liste séparée par virgules des plages IPv4 privées (CIDR) que les scans de ports et sondes SNMP lancés depuis un agent peuvent cibler. Vide : toute plage privée RFC 1918.", false, true, false, validatePrivateCIDRList),
+	intParam("DISCOVERY_PORT_SCAN_MAX_PORTS", "discovery_port_scan_max_ports", "network", "1024", "Ports maximum par scan", "Nombre maximal de ports qu'un scan de ports peut cibler (1 à 4096).", false, validatePortScanMaxPorts),
 
 	// ==================== Database ====================
 	strParam("DB_HOST", "db_host", "database", "localhost", "Hôte de la base de données", "Nom d'hôte ou adresse IP du serveur PostgreSQL / TimescaleDB.", false, true),
@@ -235,6 +237,26 @@ func validatePort(val string) error {
 	p, err := strconv.Atoi(strings.TrimSpace(val))
 	if err != nil || p < 1 || p > 65535 {
 		return fmt.Errorf("port must be an integer between 1 and 65535, got '%s'", val)
+	}
+	return nil
+}
+
+// validatePrivateCIDRList accepts an empty list or comma-separated RFC 1918
+// IPv4 CIDRs.
+func validatePrivateCIDRList(val string) error {
+	for _, entry := range parseCSV(val) {
+		_, ipnet, err := net.ParseCIDR(entry)
+		if err != nil || ipnet.IP.To4() == nil || !ipnet.IP.IsPrivate() {
+			return fmt.Errorf("private IPv4 CIDR expected (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), got '%s'", entry)
+		}
+	}
+	return nil
+}
+
+func validatePortScanMaxPorts(val string) error {
+	i, err := strconv.Atoi(strings.TrimSpace(val))
+	if err != nil || i < 1 || i > 4096 {
+		return fmt.Errorf("integer between 1 and 4096 expected, got '%s'", val)
 	}
 	return nil
 }

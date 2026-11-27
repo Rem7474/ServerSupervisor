@@ -46,6 +46,13 @@ var apiKeyForbiddenRoutes = map[string]bool{
 	"/api/v1/hosts/:id/rotate-key":            true,
 	"/api/v1/hosts/:id/permissions":           true,
 	"/api/v1/hosts/:id/permissions/:username": true,
+	// Agent-run network discovery: the actions that send traffic on a LAN (ARP
+	// read, port scan, SNMP probe with its credentials) and their cancellation.
+	// Reading the limits and a job's result stays open.
+	"/api/v1/discovery/arp":             true,
+	"/api/v1/discovery/port-scan":       true,
+	"/api/v1/discovery/snmp":            true,
+	"/api/v1/discovery/jobs/:id/cancel": true,
 }
 
 // apiKeyForbiddenRoute reports whether a request on this route template with

@@ -1,10 +1,14 @@
-# Découverte réseau (scan de sous-réseau)
+# Découverte réseau
 
-Ping-sweep ICMP d'un bloc CIDR IPv4, pour ajouter plusieurs hôtes sans connaître chaque
-adresse à l'avance. Onglet **Scanner un sous-réseau** de la page **Ajouter un hôte**.
-Volontairement limité à "quelles adresses répondent à un ping" — pas de scan ARP, pas de scan
-de ports, pas de fingerprinting d'OS. Le scan lui-même n'enregistre aucun hôte : il ne fait que
-lister des adresses candidates, cross-référencées avec les hôtes déjà connus.
+Deux familles d'outils, pour inventorier un réseau privé et ajouter des hôtes sans connaître
+chaque adresse à l'avance :
+
+- le **ping sweep ICMP** (§1 à §3), exécuté par le serveur ;
+- la **découverte par agent** (§4) : table ARP, scan de ports TCP borné et sonde SNMP,
+  exécutés par un agent placé sur le réseau cible.
+
+Aucun de ces outils n'enregistre d'hôte : ils listent des adresses candidates,
+cross-référencées avec les hôtes déjà connus. Pas de fingerprinting d'OS, pas d'IPv6.
 
 ## 1. Lancer un scan
 
@@ -33,6 +37,85 @@ Le scan réutilise exactement le même code ICMP que les [sondes uptime de type 
 Un déploiement durci (`cap_drop: [ALL]`) doit ajouter `cap_add: [NET_RAW]`, sinon le scan
 répond avec une erreur explicite plutôt que de rapporter silencieusement zéro réponse.
 
+## 4. Découverte par agent (ARP, ports, SNMP)
+
+Le serveur tourne souvent dans un autre réseau que les machines à inventorier (VPS, conteneur,
+VLAN d'administration) : il ne voit ni leur table de voisinage, ni leurs adresses privées. Ces
+trois sondes s'exécutent donc **sur un agent** choisi par l'administrateur, à travers le modèle
+de commandes à distance habituel (module `discovery`) : file d'attente, prise en charge par
+l'agent, progression en direct, résultat, journal d'audit (`discovery_arp`,
+`discovery_port_scan`, `discovery_snmp`, `discovery_cancel`).
+
+### Activation côté agent
+
+| Sonde | Nature | Prérequis sur l'agent |
+|---|---|---|
+| Table ARP | Passive : lecture de `/proc/net/arp`, aucun paquet émis | Agent à jour (capacité `network_discovery`) |
+| Scan de ports | Active : connexions TCP | `allow_network_scan: true` (capacité `network_scan`) |
+| SNMP | Active : requêtes UDP GET | `allow_network_scan: true` (capacité `network_scan`) |
+
+`allow_network_scan` (variable `SUPERVISOR_ALLOW_NETWORK_SCAN`) vaut `false` par défaut : le
+serveur ne peut pas faire émettre de trafic actif à un agent sans l'accord local de son
+administrateur. L'agent revérifie toutes les bornes ci-dessous de son côté, indépendamment du
+serveur.
+
+Un agent exécute **une seule tâche de découverte à la fois**, sur un fil dédié : un scan en cours
+ne retarde pas les autres commandes de l'hôte (Docker, APT, journaux…). Le serveur refuse une
+nouvelle tâche (`409`) tant qu'une autre est en attente ou en cours sur le même agent.
+
+### Table ARP
+
+Liste les voisins IPv4 résolus (entrées complètes uniquement) : IP, MAC, interface. Le serveur
+ajoute une indication de fabricant pour une courte liste de préfixes MAC courants en homelab
+(VMware, QEMU/KVM, Proxmox VE, VirtualBox, Hyper-V, Xen, Docker, Raspberry Pi) et signale les
+MAC administrées localement (adresses aléatoires ou générées par logiciel). Ce n'est pas une
+base OUI complète.
+
+### Scan de ports TCP
+
+- lancé explicitement par un administrateur, après confirmation dans l'interface ;
+- cible : un bloc IPv4 privé (RFC 1918) entre `/24` et `/32`, jamais une adresse publique ;
+  le paramètre `DISCOVERY_ALLOWED_SUBNETS` restreint en plus les plages autorisées (une entrée
+  invalide dans la variable d'environnement empêche le démarrage du serveur) ;
+- ports : liste par défaut d'environ 85 ports d'infrastructure courants, ou liste explicite
+  (`22,80,8000-8100`) plafonnée par `DISCOVERY_PORT_SCAN_MAX_PORTS` (1024 par défaut, 4096 au
+  maximum) ;
+- connexions TCP complètes (`connect`), sans socket raw ni privilège ;
+- cadence fixée par le serveur : 64 connexions en parallèle, 500 sondes/s, 800 ms de timeout
+  par sonde ; l'agent les plafonne de son côté (256 en parallèle, 2000 sondes/s, 5 s) et arrête
+  le scan au bout de 10 minutes (résultat partiel signalé) ;
+- résultat borné à 256 ports ouverts par adresse et 4096 au total ; au-delà, le résultat est
+  signalé comme tronqué ;
+- annulable : une tâche en attente est annulée immédiatement ; une tâche en cours s'arrête à son
+  prochain rapport de progression (toutes les 2 secondes) et renvoie le résultat partiel.
+
+### SNMP
+
+GET SNMP v2c ou v3 (`noAuthNoPriv`, `authNoPriv`, `authPriv` ; SHA/SHA256, AES) sur `sysDescr`,
+`sysObjectID`, `sysUpTime`, `sysContact`, `sysName`, `sysLocation`, plus un résumé optionnel
+de `ifTable` (64 interfaces au plus). Même restriction de cible que le scan de ports.
+
+La communauté et les phrases secrètes v3 ne sont **jamais** stockées en base, renvoyées par
+l'API ni journalisées : le serveur les garde en mémoire (15 minutes au plus) sous une
+référence à usage unique et ne les ajoute à la commande qu'au moment où l'agent la récupère.
+L'annulation d'une sonde encore en attente efface ses identifiants, et un balayage périodique
+(toutes les minutes) supprime ceux qui ont expiré.
+Une tâche SNMP dont l'agent ne passe pas dans ce délai, ou survivant à un redémarrage du
+serveur, échoue avec un message explicite et doit être relancée.
+
+### API
+
+| Méthode | Endpoint | Rôle |
+|---|---|---|
+| `GET` | `/api/v1/discovery/limits` | Bornes : ports par défaut, maximum de ports, préfixe minimal, sous-réseaux autorisés |
+| `POST` | `/api/v1/discovery/arp` | `{host_id}` → `{job_id}` |
+| `POST` | `/api/v1/discovery/port-scan` | `{host_id, cidr, ports}` → `{job_id}` |
+| `POST` | `/api/v1/discovery/snmp` | `{host_id, target, version, community \| username…}` → `{job_id}` |
+| `GET` | `/api/v1/discovery/jobs/:id` | État et résultat d'une tâche |
+| `POST` | `/api/v1/discovery/jobs/:id/cancel` | Annuler une tâche |
+
+Tous ces endpoints sont réservés aux administrateurs.
+
 ## Dépannage
 
 | Symptôme | Cause probable |
@@ -40,6 +123,11 @@ répond avec une erreur explicite plutôt que de rapporter silencieusement zéro
 | Scan refusé avec une erreur de validation sur le CIDR | Préfixe hors bornes — un `/23` ou plus large est refusé (trop d'adresses), un `/31` ou plus étroit aussi (rien à balayer) |
 | Aucune adresse ne répond alors que le réseau est actif | `CAP_NET_RAW` manquant côté conteneur (§3), ou pare-feu/segmentation réseau qui bloque l'ICMP entre le conteneur serveur et le sous-réseau cible |
 | Le scan met plusieurs secondes à répondre | Normal et volontaire — il est synchrone, la réponse HTTP attend la fin des 254 pings (bornés à 64 en parallèle) d'un `/24` complet |
+| « L'agent de cet hôte ne prend pas en charge la découverte réseau » | Agent antérieur au module `discovery` : le mettre à jour |
+| « Le scan actif est désactivé sur cet agent » | `allow_network_scan` absent ou à `false` dans la configuration de l'agent (§4) |
+| « Une découverte est déjà en cours sur cet agent » | Une tâche est en attente ou en cours sur cet agent : attendre sa fin ou l'annuler |
+| Plage refusée « hors des sous-réseaux autorisés » | `DISCOVERY_ALLOWED_SUBNETS` est renseigné et ne contient pas la cible |
+| Tâche SNMP en échec « community is missing » | Identifiants expirés (tâche restée plus de 15 minutes en attente) ou serveur redémarré entre le lancement et la prise en charge : relancer |
 | Une adresse répondante n'apparaît pas comme "déjà enregistrée" alors qu'un hôte existe avec ce nom | Le rapprochement se fait par **adresse IP**, pas par nom — un hôte enregistré avec une IP différente (DHCP ayant changé) apparaîtra comme une nouvelle adresse |
 
 ## Pour aller plus loin

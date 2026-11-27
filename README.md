@@ -94,7 +94,7 @@ généré depuis le dossier [`wiki/`](wiki/) du dépôt :
 - **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
 - **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
 - **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring` — voir [Monitoring](https://github.com/Rem7474/ServerSupervisor/wiki/Monitoring)
-- **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic — voir [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery)
+- **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic ; depuis un agent du réseau cible : lecture de la table ARP, scan de ports TCP borné (plages privées uniquement, `/24` au plus) et sonde SNMP v2c/v3, les sondes actives exigeant `allow_network_scan: true` côté agent — voir [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery)
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Audit → Journal** : journal d'audit brut (`audit_logs`), filtrable par catégorie (alertes/authentification/réglages/commandes) et par date, export CSV ; rétention configurable globalement et par catégorie dans Réglages → Rétention
@@ -640,6 +640,7 @@ Comportement de `--init` :
 | `collect_network_flows` | Activer la collecte des flux réseau (conntrack) | `false` | `SUPERVISOR_COLLECT_NETWORK_FLOWS` |
 | `network_flows_top_n` | Nombre max de pairs distants remontés | `50` | `SUPERVISOR_NETWORK_FLOWS_TOP_N` |
 | `network_flows_l7_capture` | Lire le SNI TLS des connexions sortantes (nécessite `CAP_NET_RAW`) | `false` | `SUPERVISOR_NETWORK_FLOWS_L7_CAPTURE` |
+| `allow_network_scan` | Autoriser les sondes actives de découverte réseau (scan de ports TCP, SNMP) | `false` | `SUPERVISOR_ALLOW_NETWORK_SCAN` |
 | `disable_ws_push` | Désactiver le canal WebSocket de push de commandes (retour au polling) | `false` | `SUPERVISOR_DISABLE_WS_PUSH` |
 | `log_level` | Niveau de log (`debug`/`info`/`warn`/`error`) | `info` | `SUPERVISOR_LOG_LEVEL` |
 | `log_format` | Format de log (`text`/`json`) | `text` | `SUPERVISOR_LOG_FORMAT` |
@@ -849,6 +850,10 @@ curl http://localhost:8080/api/v1/hosts \
 | `POST` | `/api/v1/hosts` | Enregistrer un hôte | Admin |
 | `POST` | `/api/v1/hosts/bulk` | Enregistrer plusieurs hôtes en un appel (ex: après un scan réseau) | Admin |
 | `POST` | `/api/v1/hosts/discover` | Scanner un sous-réseau IPv4 par ping ICMP (`/24` à `/30`) | Admin |
+| `GET` | `/api/v1/discovery/limits` | Bornes de la découverte par agent (ports, préfixe, sous-réseaux autorisés) | Admin |
+| `POST` | `/api/v1/discovery/arp\|port-scan\|snmp` | Lancer une lecture ARP, un scan de ports ou une sonde SNMP depuis un agent | Admin |
+| `GET` | `/api/v1/discovery/jobs/:id` | État et résultat d'une tâche de découverte | Admin |
+| `POST` | `/api/v1/discovery/jobs/:id/cancel` | Annuler une tâche de découverte | Admin |
 | `GET` | `/api/v1/hosts/:id` | Détails d'un hôte | Viewer+ (par hôte) |
 | `PATCH` | `/api/v1/hosts/:id` | Modifier un hôte | Operator+ (par hôte) |
 | `DELETE` | `/api/v1/hosts/:id` | Supprimer un hôte | Operator+ (par hôte) |

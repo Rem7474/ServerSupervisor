@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -128,6 +129,12 @@ type Config struct {
 	// short applicative-job retention (internal/background/network_flows.go)
 	// rather than a fixed TimescaleDB policy, same posture as WebLogsRetentionDays.
 	NetworkFlowsRetentionDays int
+	// DiscoveryAllowedSubnets restricts the agent-run port scans and SNMP
+	// probes to these declared IPv4 CIDRs (on top of the always-enforced
+	// RFC 1918 rule). Empty means any private range.
+	DiscoveryAllowedSubnets []string
+	// DiscoveryPortScanMaxPorts caps the port list of one scan (1-4096).
+	DiscoveryPortScanMaxPorts int
 	// AuditRetentionDaysByCategory overrides AuditRetentionDays per audit
 	// log category (models.AuditCategories' keys) — settings-only (no env
 	// var: a per-category map doesn't fit the flat KEY=value env shape the
@@ -292,6 +299,8 @@ func Load() *Config {
 		AuditRetentionDays:        getIntEnv("AUDIT_RETENTION_DAYS", 90),
 		WebLogsRetentionDays:      getIntEnv("WEB_LOGS_RETENTION_DAYS", 30),
 		NetworkFlowsRetentionDays: getIntEnv("NETWORK_FLOWS_RETENTION_DAYS", 14),
+		DiscoveryAllowedSubnets:   getCSVEnv("DISCOVERY_ALLOWED_SUBNETS"),
+		DiscoveryPortScanMaxPorts: getIntEnv("DISCOVERY_PORT_SCAN_MAX_PORTS", 1024),
 
 		// Defaults below must match internal/threatdetect.DefaultWeights() —
 		// duplicated as literals rather than imported so this leaf config
@@ -421,6 +430,16 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) map[string]bool {
 		if i, err := strconv.Atoi(v); err == nil {
 			c.NetworkFlowsRetentionDays = i
 			applied["network_flows_retention_days"] = true
+		}
+	}
+	if v, ok := settings["discovery_allowed_subnets"]; ok && v != "" {
+		c.DiscoveryAllowedSubnets = parseCSV(v)
+		applied["discovery_allowed_subnets"] = true
+	}
+	if v, ok := settings["discovery_port_scan_max_ports"]; ok && v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			c.DiscoveryPortScanMaxPorts = i
+			applied["discovery_port_scan_max_ports"] = true
 		}
 	}
 	if c.JWTSecret == "" {
@@ -617,6 +636,25 @@ func (c *Config) ValidateStrict() error {
 		return nil
 	}
 	return errors.Join(ErrInsecureConfig, errors.New(strings.Join(problems, "; ")))
+}
+
+// ValidateDiscovery checks the active-discovery settings read from the
+// environment. Unlike ValidateStrict it applies in every environment: an
+// invalid DISCOVERY_ALLOWED_SUBNETS entry (space separator, address without
+// prefix, public range, text) would otherwise change which ranges can be
+// scanned, so startup is refused.
+func (c *Config) ValidateDiscovery() error {
+	if len(c.DiscoveryAllowedSubnets) > 0 {
+		if err := validatePrivateCIDRList(strings.Join(c.DiscoveryAllowedSubnets, ",")); err != nil {
+			return fmt.Errorf("DISCOVERY_ALLOWED_SUBNETS: %w", err)
+		}
+	}
+	if c.DiscoveryPortScanMaxPorts != 0 {
+		if err := validatePortScanMaxPorts(strconv.Itoa(c.DiscoveryPortScanMaxPorts)); err != nil {
+			return fmt.Errorf("DISCOVERY_PORT_SCAN_MAX_PORTS: %w", err)
+		}
+	}
+	return nil
 }
 
 func (c *Config) DBDSN() string {

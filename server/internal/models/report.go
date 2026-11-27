@@ -17,6 +17,11 @@ type AgentCapabilities struct {
 	// NetworkFlows only reflects whether the collector ran, not whether the
 	// kernel could actually provide byte counters — see NetworkFlowsReport.Available.
 	NetworkFlows bool `json:"network_flows"`
+	// NetworkDiscovery: the agent ships the discovery module (ARP read).
+	// NetworkScan: the agent's allow_network_scan opt-in for active probes
+	// (port scan, SNMP).
+	NetworkDiscovery bool `json:"network_discovery"`
+	NetworkScan      bool `json:"network_scan"`
 }
 
 // DiagnosticIssue mirrors agent/internal/collector.DiagnosticIssue — one

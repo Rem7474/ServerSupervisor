@@ -160,7 +160,12 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	npmService := npmsvc.NewService(db)
 	npmH := handlers.NewNPMHandler(npmService)
 	dashboardH := handlers.NewDashboardHandler(dashboardsvc.NewService(db))
-	discoveryH := handlers.NewDiscoveryHandler(discoverysvc.NewService(db))
+	discoveryAgentSvc := discoverysvc.NewAgentService(db, dispatcher, cfg, wsH.GetStreamHub())
+	agentH.AddCommandInterceptor(discoveryAgentSvc)
+	agentH.AddCompletionListener(discoveryAgentSvc)
+	discoverySweepCtx, stopDiscoverySweep := context.WithCancel(context.Background())
+	go discoveryAgentSvc.RunSweeper(discoverySweepCtx)
+	discoveryH := handlers.NewDiscoveryHandler(discoverysvc.NewService(db), discoveryAgentSvc)
 	apiKeyService := apikeysvc.NewService(db)
 	apiKeyH := handlers.NewAPIKeyHandler(apiKeyService)
 
@@ -212,6 +217,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		agentRateLimiter.Stop()
 		apiKeyRateLimiter.Stop()
 		webhookRateLimiter.Stop()
+		stopDiscoverySweep()
 	}
 	return r, releaseTrackerH, proxmoxH, npmH, cleanup
 }
@@ -332,6 +338,12 @@ func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *han
 	g.POST("/hosts", h.RegisterHost)
 	g.POST("/hosts/bulk", h.RegisterHostsBulk)
 	g.POST("/hosts/discover", discoveryH.Scan)
+	g.GET("/discovery/limits", discoveryH.Limits)
+	g.POST("/discovery/arp", discoveryH.StartARP)
+	g.POST("/discovery/port-scan", discoveryH.StartPortScan)
+	g.POST("/discovery/snmp", discoveryH.StartSNMP)
+	g.GET("/discovery/jobs/:id", discoveryH.GetJob)
+	g.POST("/discovery/jobs/:id/cancel", discoveryH.CancelJob)
 	g.GET("/metrics/summary", agentH.GetMetricsSummary)
 
 	// Per-host routes protected by HostPermissionMiddleware (viewer level).

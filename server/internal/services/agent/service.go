@@ -40,6 +40,16 @@ type StreamHub interface {
 	BroadcastStatus(commandID, status, output string)
 }
 
+// CommandInterceptor lets a domain take part in command delivery without the
+// agent protocol knowing about it: PrepareClaimed may enrich commands right
+// before they are handed to the agent (e.g. inject short-lived credentials
+// that are never persisted), and CancelRequested tells the agent, in the
+// answer to a stream chunk, that an operator cancelled a running command.
+type CommandInterceptor interface {
+	PrepareClaimed(ctx context.Context, hostID string, cmds []models.PendingCommand) []models.PendingCommand
+	CancelRequested(commandID string) bool
+}
+
 // Repository is the data-access port. *database.DB satisfies it structurally.
 type Repository interface {
 	GetHostStatus(ctx context.Context, id string) string
@@ -99,6 +109,7 @@ type Service struct {
 	bus                 *events.Bus
 	completionListeners []CommandCompletionListener
 	completionMu        sync.RWMutex
+	interceptors        []CommandInterceptor
 }
 
 func NewService(repo Repository, cfg *config.Config, streamHub StreamHub, notifPusher NotificationPusher, bus *events.Bus) *Service {
@@ -112,6 +123,23 @@ func (s *Service) AddCompletionListener(listener CommandCompletionListener) {
 	s.completionMu.Lock()
 	defer s.completionMu.Unlock()
 	s.completionListeners = append(s.completionListeners, listener)
+}
+
+// AddCommandInterceptor registers an interceptor. Call it during wiring,
+// before the server starts serving agents.
+func (s *Service) AddCommandInterceptor(i CommandInterceptor) {
+	if i == nil {
+		return
+	}
+	s.completionMu.Lock()
+	defer s.completionMu.Unlock()
+	s.interceptors = append(s.interceptors, i)
+}
+
+func (s *Service) commandInterceptors() []CommandInterceptor {
+	s.completionMu.RLock()
+	defer s.completionMu.RUnlock()
+	return append([]CommandInterceptor(nil), s.interceptors...)
 }
 
 // ReportResult is the outcome of an agent report: the commands to run + whether
@@ -163,6 +191,9 @@ func (s *Service) ReceiveReport(ctx context.Context, hostID, safeHostID string, 
 	}
 	if commands == nil {
 		commands = []models.PendingCommand{}
+	}
+	for _, i := range s.commandInterceptors() {
+		commands = i.PrepareClaimed(ctx, hostID, commands)
 	}
 
 	// A report refreshes everything the live views render for this host, so wake
@@ -254,14 +285,21 @@ func (s *Service) ReportCommandResult(ctx context.Context, hostID string, result
 	return nil
 }
 
-// StreamCommandOutput relays a live output chunk after verifying host ownership.
-func (s *Service) StreamCommandOutput(ctx context.Context, hostID, commandID, chunk string) error {
+// StreamCommandOutput relays a live output chunk after verifying host
+// ownership, and reports whether an operator asked to cancel the command so
+// the handler can tell the agent in its answer.
+func (s *Service) StreamCommandOutput(ctx context.Context, hostID, commandID, chunk string) (bool, error) {
 	cmd, err := s.repo.GetRemoteCommandByID(ctx, commandID)
 	if err != nil || cmd.HostID != hostID {
-		return apperr.Forbidden("command does not belong to host")
+		return false, apperr.Forbidden("command does not belong to host")
 	}
 	s.streamHub.Broadcast(commandID, chunk)
-	return nil
+	for _, i := range s.commandInterceptors() {
+		if i.CancelRequested(commandID) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // UpdateAptStatus upserts a host's APT status pushed out-of-band by the agent.

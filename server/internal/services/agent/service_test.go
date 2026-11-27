@@ -424,7 +424,7 @@ func TestStreamCommandOutput_ForbiddenWhenNotOwned(t *testing.T) {
 	repo := &fakeRepo{cmd: &models.RemoteCommand{HostID: "other"}}
 	hub := &recordingStreamHub{}
 	s := newSvc(repo, hub)
-	err := s.StreamCommandOutput(context.Background(), "h1", "c1", "chunk")
+	_, err := s.StreamCommandOutput(context.Background(), "h1", "c1", "chunk")
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || ae.HTTPStatus != 403 {
 		t.Fatalf("want 403, got %v", err)
@@ -475,3 +475,49 @@ func TestLogAuditAction_WithoutModuleNoCommand(t *testing.T) {
 type listenerFunc func(commandID, status string)
 
 func (f listenerFunc) HandleCommandCompletion(commandID, status string) { f(commandID, status) }
+
+// fakeInterceptor records the commands it saw and flags one command as cancelled.
+type fakeInterceptor struct {
+	seenHost  string
+	cancelled string
+}
+
+func (f *fakeInterceptor) PrepareClaimed(_ context.Context, hostID string, cmds []models.PendingCommand) []models.PendingCommand {
+	f.seenHost = hostID
+	return append(cmds, models.PendingCommand{ID: "injected"})
+}
+
+func (f *fakeInterceptor) CancelRequested(id string) bool { return id == f.cancelled }
+
+func TestReceiveReport_RunsCommandInterceptors(t *testing.T) {
+	s := newSvc(&fakeRepo{}, &recordingStreamHub{})
+	icpt := &fakeInterceptor{}
+	s.AddCommandInterceptor(nil) // ignored
+	s.AddCommandInterceptor(icpt)
+	res, err := s.ReceiveReport(context.Background(), "h1", "h1", &models.AgentReport{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if icpt.seenHost != "h1" || len(res.Commands) != 1 || res.Commands[0].ID != "injected" {
+		t.Fatalf("interceptor not applied: host=%q commands=%+v", icpt.seenHost, res.Commands)
+	}
+}
+
+func TestStreamCommandOutput_ReportsCancellation(t *testing.T) {
+	repo := &fakeRepo{cmd: &models.RemoteCommand{HostID: "h1"}}
+	hub := &recordingStreamHub{}
+	s := newSvc(repo, hub)
+	s.AddCommandInterceptor(&fakeInterceptor{cancelled: "c1"})
+
+	cancel, err := s.StreamCommandOutput(context.Background(), "h1", "c1", "chunk")
+	if err != nil || !cancel {
+		t.Fatalf("cancel=%v err=%v, want cancel", cancel, err)
+	}
+	if hub.chunkBroadcasts != 1 {
+		t.Errorf("the chunk must still be broadcast")
+	}
+	cancel, err = s.StreamCommandOutput(context.Background(), "h1", "c2", "chunk")
+	if err != nil || cancel {
+		t.Fatalf("cancel=%v err=%v for a command nobody cancelled", cancel, err)
+	}
+}

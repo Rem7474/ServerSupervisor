@@ -271,3 +271,37 @@ func TestFailRunningCommandsOnAgentReconnect_OnlyTouchesGivenHost(t *testing.T) 
 		t.Errorf("cmdB on unrelated host must remain running, got %q", b.Status)
 	}
 }
+
+func TestRemoteCommand_CancelPendingOnlyBeforeClaim(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	seedTestHost(t, db)
+	ctx := context.Background()
+
+	pending, err := db.CreateRemoteCommand(ctx, testHostID, "discovery", "port_scan", "", "{}", "alice", nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	ok, err := db.CancelPendingRemoteCommand(ctx, pending.ID, "cancelled")
+	if err != nil || !ok {
+		t.Fatalf("cancel pending: ok=%v err=%v", ok, err)
+	}
+	got, err := db.GetRemoteCommandByID(ctx, pending.ID)
+	if err != nil || got.Status != "failed" || got.Output != "cancelled" || got.EndedAt == nil {
+		t.Fatalf("cancelled row = %+v (%v)", got, err)
+	}
+	if claimed, _ := db.ClaimPendingRemoteCommands(ctx, testHostID); len(claimed) != 0 {
+		t.Fatalf("a cancelled command must not be claimed: %+v", claimed)
+	}
+
+	running, err := db.CreateRemoteCommand(ctx, testHostID, "discovery", "port_scan", "", "{}", "alice", nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := db.ClaimPendingRemoteCommands(ctx, testHostID); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	ok, err = db.CancelPendingRemoteCommand(ctx, running.ID, "cancelled")
+	if err != nil || ok {
+		t.Fatalf("a claimed command must not be cancelled here: ok=%v err=%v", ok, err)
+	}
+}
