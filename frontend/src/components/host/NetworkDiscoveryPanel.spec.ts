@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { setLocale } from '../../i18n'
 import NetworkDiscoveryPanel from './NetworkDiscoveryPanel.vue'
+import AgentDiscoveryPanel from './AgentDiscoveryPanel.vue'
 
 const { discoverHosts, registerHostsBulk } = vi.hoisted(() => ({
   discoverHosts: vi.fn(),
@@ -143,5 +144,31 @@ describe('NetworkDiscoveryPanel', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('IP already exists')
+  })
+
+  it('switches between the ping sweep and the agent tools with tabs', async () => {
+    const wrapper = mount(NetworkDiscoveryPanel, { global: { stubs: { AgentDiscoveryPanel: true } } })
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs.map((t) => t.text())).toEqual(['Ping (serveur)', 'Table ARP', 'Scan de ports', 'SNMP'])
+    expect(tabs[0].attributes('aria-selected')).toBe('true')
+    // The agent panel is only mounted once an agent tool is opened.
+    expect(wrapper.findComponent(AgentDiscoveryPanel).exists()).toBe(false)
+
+    await tabs[2].trigger('click')
+    const agent = wrapper.findComponent(AgentDiscoveryPanel)
+    expect(agent.props('tool')).toBe('port_scan')
+    const panels = wrapper.findAll('[role="tabpanel"]')
+    expect(panels[1].attributes('style')).toContain('display: none')
+    expect(panels[0].attributes('aria-labelledby')).toBe(tabs[2].attributes('id'))
+
+    await tabs[2].trigger('keydown', { key: 'ArrowRight' })
+    expect(agent.props('tool')).toBe('snmp')
+    await wrapper.findAll('[role="tab"]')[3].trigger('keydown', { key: 'ArrowRight' })
+    expect(wrapper.findAll('[role="tab"]')[0].attributes('aria-selected')).toBe('true')
+    // Back on ping: the agent panel stays mounted (a running scan survives).
+    expect(wrapper.findComponent(AgentDiscoveryPanel).exists()).toBe(true)
+    expect(wrapper.findComponent(AgentDiscoveryPanel).props('tool')).toBe('arp')
+    await wrapper.findAll('[role="tab"]')[0].trigger('keydown', { key: 'ArrowLeft' })
+    expect(wrapper.findAll('[role="tab"]')[3].attributes('aria-selected')).toBe('true')
   })
 })

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { setLocale } from '../i18n'
 import {
   compareStrings,
+  formatBitRate,
   formatBytes,
   formatDate,
   formatDateLong,
@@ -115,5 +116,18 @@ describe('formatters', () => {
       expect(compareStrings('éclair', 'zebra')).toBeLessThan(0)
       expect(compareStrings('host10', 'host9', { numeric: true })).toBeGreaterThan(0)
     })
+  })
+})
+
+describe('formatBitRate', () => {
+  beforeEach(() => setLocale('fr'))
+
+  it('scales network speeds in base 1000 with the locale decimal separator', () => {
+    expect(formatBitRate(0)).toBe('-')
+    expect(formatBitRate(undefined, '?')).toBe('?')
+    expect(formatBitRate(512)).toBe('512 b/s')
+    expect(formatBitRate(100_000_000)).toBe('100 Mb/s')
+    expect(formatBitRate(2_500_000_000)).toBe('2,5 Gb/s')
+    expect(formatBitRate(4e15)).toBe('4000 Tb/s')
   })
 })
