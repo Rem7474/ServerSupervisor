@@ -27,7 +27,8 @@ export function useAccount() {
 
   const signal = useAbortSignal()
   const requestedTab = new URLSearchParams(window.location.search).get('tab')
-  const activeTab = ref(requestedTab === 'logins' ? 'logins' : 'profile')
+  const tabFromQuery: Record<string, string> = { logins: 'logins', 'api-keys': 'apiKeys' }
+  const activeTab = ref(tabFromQuery[requestedTab ?? ''] ?? 'profile')
 
   const profile = ref<Profile | null>(null)
 

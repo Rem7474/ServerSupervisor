@@ -22,6 +22,7 @@ import { runbooksApi } from './runbooks'
 import { dashboardApi } from './dashboard'
 import { backupApi } from './backup'
 import { maintenanceApi } from './maintenance'
+import { apiKeysApi } from './apiKeys'
 import { hostGroupsApi } from './hostGroups'
 
 // Re-export shared helpers/types so `import api, { getApiErrorMessage } from '../api'`
@@ -53,5 +54,6 @@ export default {
   ...dashboardApi,
   ...backupApi,
   ...maintenanceApi,
+  ...apiKeysApi,
   ...hostGroupsApi,
 }

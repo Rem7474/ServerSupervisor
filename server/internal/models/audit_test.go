@@ -11,6 +11,8 @@ func TestCategorizeAuditAction(t *testing.T) {
 		{"alert_resolved", AuditCategoryAlert},
 		{"alert_escalated", AuditCategoryAlert},
 		{"unblock_ip", AuditCategoryAuth},
+		{"api_key_create", AuditCategoryAuth},
+		{"api_key_revoke", AuditCategoryAuth},
 		{"update_settings", AuditCategorySettings},
 		{"cleanup_metrics", AuditCategorySettings},
 		{"cleanup_audit_logs", AuditCategorySettings},

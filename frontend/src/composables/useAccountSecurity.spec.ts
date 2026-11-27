@@ -146,7 +146,7 @@ describe('useAccountSecurity', () => {
     expect(dialog.title.value).toBe('Révoquer les autres sessions')
     dialog.onConfirm()
     await p
-    expect(api.revokeSuccess.value).toBe('Toutes les autres sessions ont été révoquées.')
+    expect(api.revokeSuccess.value).toBe('Toutes les autres sessions et toutes vos clés API ont été révoquées.')
   })
 
   it('shows a translated error when revoking sessions fails', async () => {

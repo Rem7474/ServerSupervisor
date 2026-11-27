@@ -94,7 +94,7 @@ func (h *AuditHandler) ExportAuditLogs(c *gin.Context) {
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 
 	w := csv.NewWriter(c.Writer)
-	_ = w.Write([]string{"id", "created_at", "username", "category", "action", "host_name", "ip_address", "status", "details"})
+	_ = w.Write([]string{"id", "created_at", "username", "category", "action", "host_name", "ip_address", "status", "details", "api_key_id"})
 	for _, l := range logs {
 		_ = w.Write([]string{
 			strconv.FormatInt(l.ID, 10),
@@ -106,6 +106,7 @@ func (h *AuditHandler) ExportAuditLogs(c *gin.Context) {
 			l.IPAddress,
 			l.Status,
 			l.Details,
+			auditAPIKeyID(l.APIKeyID),
 		})
 	}
 	w.Flush()
@@ -233,4 +234,12 @@ func (h *AuditHandler) GetAuditLogsByUser(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"user": username, "logs": logs})
+}
+
+// auditAPIKeyID renders the optional API key id of an audit entry for CSV.
+func auditAPIKeyID(id *int64) string {
+	if id == nil {
+		return ""
+	}
+	return strconv.FormatInt(*id, 10)
 }

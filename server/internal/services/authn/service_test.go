@@ -21,6 +21,9 @@ type fakeRepo struct {
 	failCount   int
 	pwUpdated   string
 	loginEvents []bool
+	keysActive  int64
+	revokeErr   error
+	audits      []string
 }
 
 func (f *fakeRepo) GetUserByUsername(context.Context, string) (*models.User, error) {
@@ -45,6 +48,14 @@ func (f *fakeRepo) RotateRefreshToken(context.Context, string, string, time.Time
 }
 func (f *fakeRepo) RevokeRefreshToken(context.Context, string) error             { return nil }
 func (f *fakeRepo) RevokeAllOtherSessions(context.Context, string, string) error { return nil }
+func (f *fakeRepo) RevokeAllAPIKeysForUser(context.Context, string) (int64, error) {
+	if f.revokeErr != nil {
+		return 0, f.revokeErr
+	}
+	n := f.keysActive
+	f.keysActive = 0
+	return n, nil
+}
 func (f *fakeRepo) UpdateUserPassword(_ context.Context, _, hash string) error {
 	f.pwUpdated = hash
 	return nil
@@ -63,7 +74,8 @@ func (f *fakeRepo) GetCurrentlyBlockedIPs(context.Context, time.Time, int) ([]st
 	return nil, nil
 }
 func (f *fakeRepo) UpsertIPUnblock(context.Context, string, string) error { return nil }
-func (f *fakeRepo) CreateAuditLog(context.Context, string, string, string, string, string, string) (int64, error) {
+func (f *fakeRepo) CreateAuditLog(_ context.Context, _, action, _, _, details, _ string) (int64, error) {
+	f.audits = append(f.audits, action+" "+details)
 	return 1, nil
 }
 func (f *fakeRepo) GetLoginEventsByUser(context.Context, string, int, int) ([]models.LoginEvent, error) {
@@ -153,17 +165,53 @@ func TestAuthenticate_Success(t *testing.T) {
 func TestChangePassword(t *testing.T) {
 	repo := &fakeRepo{user: userWithPassword(t, "current")}
 	svc := newSvc(repo)
-	if err := svc.ChangePassword(context.Background(), "alice", "current", "short"); httpStatus(err) != 400 {
+	if err := svc.ChangePassword(context.Background(), "alice", "1.2.3.4", "current", "short"); httpStatus(err) != 400 {
 		t.Errorf("short new password should be 400, got %v", err)
 	}
-	if err := svc.ChangePassword(context.Background(), "alice", "wrong", "longenough"); httpStatus(err) != 401 {
+	if err := svc.ChangePassword(context.Background(), "alice", "1.2.3.4", "wrong", "longenough"); httpStatus(err) != 401 {
 		t.Errorf("wrong current password should be 401, got %v", err)
 	}
-	if err := svc.ChangePassword(context.Background(), "alice", "current", "longenough"); err != nil {
+	if err := svc.ChangePassword(context.Background(), "alice", "1.2.3.4", "current", "longenough"); err != nil {
 		t.Fatalf("valid change: %v", err)
 	}
 	if repo.pwUpdated == "" {
 		t.Error("password hash should have been persisted")
+	}
+}
+
+func TestChangePassword_RevokesAPIKeys(t *testing.T) {
+	repo := &fakeRepo{user: userWithPassword(t, "current"), keysActive: 2}
+	svc := newSvc(repo)
+	if err := svc.ChangePassword(context.Background(), "alice", "1.2.3.4", "current", "longenough"); err != nil {
+		t.Fatalf("change: %v", err)
+	}
+	if repo.keysActive != 0 || len(repo.audits) != 1 || repo.audits[0] != "api_key_revoke_all reason=password_change count=2" {
+		t.Fatalf("keys left=%d audits=%v", repo.keysActive, repo.audits)
+	}
+	// No active key left: nothing to audit.
+	if err := svc.ChangePassword(context.Background(), "alice", "1.2.3.4", "current", "longenough"); err != nil || len(repo.audits) != 1 {
+		t.Fatalf("second change: err=%v audits=%v", err, repo.audits)
+	}
+	repo.revokeErr = errors.New("db down")
+	if err := svc.ChangePassword(context.Background(), "alice", "1.2.3.4", "current", "longenough"); httpStatus(err) != 500 {
+		t.Fatalf("a failed key revocation must fail the request, got %v", err)
+	}
+}
+
+func TestRevokeAllSessions_RevokesAPIKeys(t *testing.T) {
+	repo := &fakeRepo{keysActive: 1}
+	svc := newSvc(repo)
+	if err := svc.RevokeAllSessions(context.Background(), "alice", "1.2.3.4", ""); httpStatus(err) != 400 {
+		t.Fatalf("missing refresh token must be 400, got %v", err)
+	}
+	if repo.keysActive != 1 {
+		t.Fatal("a rejected request must not revoke keys")
+	}
+	if err := svc.RevokeAllSessions(context.Background(), "alice", "1.2.3.4", "refresh"); err != nil {
+		t.Fatalf("revoke all: %v", err)
+	}
+	if repo.keysActive != 0 || len(repo.audits) != 1 || repo.audits[0] != "api_key_revoke_all reason=revoke_all_sessions count=1" {
+		t.Fatalf("keys left=%d audits=%v", repo.keysActive, repo.audits)
 	}
 }
 

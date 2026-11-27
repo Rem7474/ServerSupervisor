@@ -22,6 +22,7 @@ import (
 	"github.com/serversupervisor/server/internal/safego"
 	"github.com/serversupervisor/server/internal/scheduler"
 	alertrulesvc "github.com/serversupervisor/server/internal/services/alertrule"
+	apikeysvc "github.com/serversupervisor/server/internal/services/apikey"
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
@@ -84,6 +85,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.TrustedProxyCIDRs)
 	r.Use(RateLimiterMiddleware(ipRateLimiter))
 	agentRateLimiter := NewIPRateLimiter(cfg.AgentRateLimitRPS, cfg.AgentRateLimitBurst, cfg.TrustedProxyCIDRs)
+	// Per-API-key token buckets, same rate/burst as the per-IP limiter: a key
+	// shared by several clients behind different IPs stays bounded too.
+	apiKeyRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.TrustedProxyCIDRs)
 	// Stricter limiter for the unauthenticated public webhook receiver (5 req/s, burst 10).
 	webhookRateLimiter := NewIPRateLimiter(5, 10, cfg.TrustedProxyCIDRs)
 
@@ -157,6 +161,8 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	npmH := handlers.NewNPMHandler(npmService)
 	dashboardH := handlers.NewDashboardHandler(dashboardsvc.NewService(db))
 	discoveryH := handlers.NewDiscoveryHandler(discoverysvc.NewService(db))
+	apiKeyService := apikeysvc.NewService(db)
+	apiKeyH := handlers.NewAPIKeyHandler(apiKeyService)
 
 	networkSvc.SetIPInventoryBuilder(func(ctx context.Context) (*models.NetworkIPInventory, error) {
 		return networkview.BuildIPInventory(ctx, db, proxmoxService, npmService)
@@ -166,11 +172,13 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerMetricsRoute(r, cfg, db, wsH, notifHub)
 	registerWSRoutes(r, wsH, cfg)
 	registerAgentRoutes(r, db, cfg, agentH, wsH, agentRateLimiter)
+	registerOpenAPIRoute(r)
 
 	v1 := r.Group("/api/v1")
-	v1.Use(JWTMiddleware(cfg))
+	v1.Use(SessionOrAPIKeyMiddleware(cfg, apiKeyService, apiKeyRateLimiter))
 	v1.Use(cookies.CSRFMiddleware())
 	registerAuthRoutes(v1, authH)
+	registerAPIKeyRoutes(v1, apiKeyH)
 	registerWebLogsRoutes(v1, webLogsH)
 	registerHostRoutes(v1, hostH, agentH, discoveryH, db)
 	registerDockerRoutes(v1, dockerH, systemH, networkH, agentH)
@@ -202,6 +210,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	cleanup := func() {
 		ipRateLimiter.Stop()
 		agentRateLimiter.Stop()
+		apiKeyRateLimiter.Stop()
 		webhookRateLimiter.Stop()
 	}
 	return r, releaseTrackerH, proxmoxH, npmH, cleanup
@@ -293,6 +302,19 @@ func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
 	g.POST("/auth/webauthn/register/begin", h.BeginWebAuthnRegistration)
 	g.POST("/auth/webauthn/register/finish", h.FinishWebAuthnRegistration)
 	g.DELETE("/auth/webauthn/credentials/:id", h.DeleteWebAuthnCredential)
+}
+
+// registerAPIKeyRoutes: every user manages their own keys under /auth (closed
+// to API keys, like the rest of /auth); admins also list every key and may
+// revoke any of them through the same DELETE route.
+func registerAPIKeyRoutes(g *gin.RouterGroup, h *handlers.APIKeyHandler) {
+	g.GET("/auth/api-keys", h.ListMine)
+	g.POST("/auth/api-keys", h.Create)
+	g.DELETE("/auth/api-keys/:id", h.Revoke)
+
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.GET("/api-keys", h.ListAll)
 }
 
 func registerWebLogsRoutes(g *gin.RouterGroup, h *handlers.WebLogsHandler) {

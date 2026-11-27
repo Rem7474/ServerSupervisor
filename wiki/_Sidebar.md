@@ -21,6 +21,7 @@
 - [Notifications](Notifications.md)
 
 **Compte & Sécurité**
+- [API](API.md)
 - [Two-Factor-Authentication](Two-Factor-Authentication.md)
 - [SSO-OIDC](SSO-OIDC.md)
 
