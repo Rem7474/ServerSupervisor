@@ -8,6 +8,9 @@ interface RouteMeta {
   // Permission string checked via auth.hasPermission — for routes open to
   // operator+admin but not viewer, where requiresAdmin is too coarse.
   requiresPermission?: string
+  // Rendered without the app shell (navbar, menus), even for a signed-in
+  // user: the public status page looks the same for everyone.
+  standalone?: boolean
 }
 
 const routes: RouteRecordRaw[] = [
@@ -15,6 +18,14 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'Login',
     component: () => import('../views/LoginView.vue'),
+  },
+  {
+    // Public, unauthenticated, read-only. The server answers 404 for this
+    // path (and its JSON endpoint) while the page is disabled.
+    path: '/status',
+    name: 'StatusPage',
+    component: () => import('../views/StatusPageView.vue'),
+    meta: { standalone: true },
   },
   {
     path: '/',

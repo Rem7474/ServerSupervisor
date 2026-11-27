@@ -47,6 +47,13 @@ const (
 	CodeGitProviderError        = "GIT_PROVIDER_ERROR"
 	CodeInvalidGitBaseURL       = "INVALID_GIT_BASE_URL"
 
+	// Uptime SLA and public status page
+	CodeInvalidSLOTarget         = "INVALID_SLO_TARGET"
+	CodeStatusPagePublicName     = "STATUS_PAGE_PUBLIC_NAME"
+	CodeStatusPageTextTooLong    = "STATUS_PAGE_TEXT_TOO_LONG"
+	CodeStatusPageUnknownProbe   = "STATUS_PAGE_UNKNOWN_PROBE"
+	CodeStatusPageDuplicateProbe = "STATUS_PAGE_DUPLICATE_PROBE"
+
 	// Alert rules (internal/services/alertrule)
 	CodeAlertRuleNotFound                = "ALERT_RULE_NOT_FOUND"
 	CodeAlertSourceTypeImmutable         = "ALERT_SOURCE_TYPE_IMMUTABLE"
@@ -244,6 +251,27 @@ var ErrorCatalog = map[string]ErrorMessage{
 	CodeInvalidGitBaseURL: {
 		"en": "invalid instance URL: it must be an http(s) URL with a host, without credentials, query string, loopback or link-local address",
 		"fr": "URL d'instance invalide : elle doit être une URL http(s) avec un hôte, sans identifiants, paramètres, adresse loopback ni lien-local",
+	},
+
+	CodeInvalidSLOTarget: {
+		"en": "the availability objective must be greater than 0 and at most 100 %",
+		"fr": "l'objectif de disponibilité doit être supérieur à 0 et au plus égal à 100 %",
+	},
+	CodeStatusPagePublicName: {
+		"en": "each published service needs a public name of 1 to 80 characters",
+		"fr": "chaque service publié doit avoir un nom public de 1 à 80 caractères",
+	},
+	CodeStatusPageTextTooLong: {
+		"en": "the status page title is limited to 120 characters and its description to 500",
+		"fr": "le titre de la page de statut est limité à 120 caractères et sa description à 500",
+	},
+	CodeStatusPageUnknownProbe: {
+		"en": "a published service refers to a probe that does not exist",
+		"fr": "un service publié fait référence à une sonde inexistante",
+	},
+	CodeStatusPageDuplicateProbe: {
+		"en": "a probe can only be published once",
+		"fr": "une sonde ne peut être publiée qu'une seule fois",
 	},
 
 	CodeAlertRuleNotFound:             {"en": "alert rule not found", "fr": "règle d'alerte introuvable"},

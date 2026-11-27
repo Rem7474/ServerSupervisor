@@ -9,7 +9,7 @@ import type { CertForm } from '../../composables/useSslCertificates'
 function probe(): ProbeForm {
   return reactive({
     id: '', name: '', type: 'http', target: '', interval_sec: 60, timeout_sec: 10, expected_status: 200,
-    expected_body_regex: '', follow_redirects: true, verify_tls: true, enabled: true,
+    expected_body_regex: '', follow_redirects: true, verify_tls: true, enabled: true, slo_target: 99.9,
   })
 }
 function cert(): CertForm {

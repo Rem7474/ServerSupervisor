@@ -46,6 +46,7 @@ import (
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
+	statuspagesvc "github.com/serversupervisor/server/internal/services/statuspage"
 	systemsvc "github.com/serversupervisor/server/internal/services/system"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
@@ -86,6 +87,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentRateLimiter := NewIPRateLimiter(cfg.AgentRateLimitRPS, cfg.AgentRateLimitBurst, cfg.TrustedProxyCIDRs)
 	// Stricter limiter for the unauthenticated public webhook receiver (5 req/s, burst 10).
 	webhookRateLimiter := NewIPRateLimiter(5, 10, cfg.TrustedProxyCIDRs)
+	// Unauthenticated public status page (JSON + SPA entry point): 2 req/s,
+	// burst 10, on top of the service's own 30 s cache.
+	statusPageRateLimiter := NewIPRateLimiter(2, 10, cfg.TrustedProxyCIDRs)
 
 	// Instantiate handlers
 	authnService := authnsvc.NewService(db, cfg)
@@ -152,6 +156,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	hostGroupsH := handlers.NewHostGroupsHandler(hostgroupsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
+	statusPageH := handlers.NewStatusPageHandler(statuspagesvc.NewService(db), spaIndexPath)
 	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher, cfg))
 	npmService := npmsvc.NewService(db)
 	npmH := handlers.NewNPMHandler(npmService)
@@ -163,6 +168,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	})
 
 	registerPublicRoutes(r, authH, oidcH, db)
+	registerPublicStatusPageRoutes(r, statusPageH, statusPageRateLimiter)
 	registerMetricsRoute(r, cfg, db, wsH, notifHub)
 	registerWSRoutes(r, wsH, cfg)
 	registerAgentRoutes(r, db, cfg, agentH, wsH, agentRateLimiter)
@@ -192,6 +198,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerHostGroupRoutes(v1, hostGroupsH)
 	registerUptimeRoutes(v1, uptimeH)
 	registerSSLRoutes(v1, sslH)
+	registerStatusPageRoutes(v1, statusPageH)
 	registerBackupRoutes(v1, backupH)
 	registerNPMRoutes(v1, npmH)
 	registerDashboardRoutes(v1, dashboardH)
@@ -203,6 +210,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		ipRateLimiter.Stop()
 		agentRateLimiter.Stop()
 		webhookRateLimiter.Stop()
+		statusPageRateLimiter.Stop()
 	}
 	return r, releaseTrackerH, proxmoxH, npmH, cleanup
 }
@@ -624,6 +632,7 @@ func registerUptimeRoutes(g *gin.RouterGroup, h *handlers.UptimeHandler) {
 	g.GET("/uptime/probes/:id/history", h.History)
 	g.GET("/uptime/probes/:id/history/buckets", h.HistoryBuckets)
 	g.GET("/uptime/probes/:id/stats", h.Stats)
+	g.GET("/uptime/sla", h.SLA)
 
 	// Write endpoints: admin only
 	admin := g.Group("")
@@ -632,6 +641,22 @@ func registerUptimeRoutes(g *gin.RouterGroup, h *handlers.UptimeHandler) {
 	admin.PUT("/uptime/probes/:id", h.Update)
 	admin.DELETE("/uptime/probes/:id", h.Delete)
 	admin.POST("/uptime/probes/:id/check-now", h.CheckNow)
+}
+
+// registerPublicStatusPageRoutes mounts the unauthenticated, read-only status
+// page: the SPA entry point and its dedicated JSON endpoint, both answering
+// 404 while the page is disabled, behind their own rate limiter.
+func registerPublicStatusPageRoutes(r *gin.Engine, h *handlers.StatusPageHandler, rl *IPRateLimiter) {
+	r.GET("/api/public/status", RateLimiterMiddleware(rl), h.Public)
+	r.GET("/status", RateLimiterMiddleware(rl), h.Page)
+}
+
+// registerStatusPageRoutes mounts the admin configuration of the status page.
+func registerStatusPageRoutes(g *gin.RouterGroup, h *handlers.StatusPageHandler) {
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.GET("/status-page", h.GetConfig)
+	admin.PUT("/status-page", h.UpdateConfig)
 }
 
 func registerDashboardRoutes(g *gin.RouterGroup, h *handlers.DashboardHandler) {
@@ -704,6 +729,9 @@ func (w *assetCacheWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// spaIndexPath is the SPA entry point, served for every non-API route.
+const spaIndexPath = "./frontend/dist/index.html"
+
 func registerStaticFiles(r *gin.Engine) {
 	// Static hashed assets: cached for 1 year immutable ONLY on 200/304 (never on 404)
 	assets := r.Group("/assets")
@@ -727,7 +755,7 @@ func registerStaticFiles(r *gin.Engine) {
 		r.HEAD(path, handler)
 	}
 
-	serveNoCacheFile("/", "./frontend/dist/index.html")
+	serveNoCacheFile("/", spaIndexPath)
 	serveNoCacheFile("/manifest.json", "./frontend/dist/manifest.json")
 	serveNoCacheFile("/favicon.svg", "./frontend/dist/favicon.svg")
 	serveNoCacheFile("/service-worker.js", "./frontend/dist/service-worker.js")
@@ -741,6 +769,6 @@ func registerStaticFiles(r *gin.Engine) {
 		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 		c.Header("Pragma", "no-cache")
 		c.Header("Expires", "0")
-		c.File("./frontend/dist/index.html")
+		c.File(spaIndexPath)
 	})
 }

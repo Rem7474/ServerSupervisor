@@ -24,6 +24,11 @@
   "GIT_PROVIDER_NOT_FOUND": "dépôt introuvable sur {provider} (404) — vérifiez owner/repo et l'URL de l'instance",
   "GIT_PROVIDER_ERROR": "erreur {provider} API ({status})",
   "INVALID_GIT_BASE_URL": "URL d'instance invalide : elle doit être une URL http(s) avec un hôte, sans identifiants, paramètres, adresse loopback ni lien-local",
+  "INVALID_SLO_TARGET": "l'objectif de disponibilité doit être supérieur à 0 et au plus égal à 100 %",
+  "STATUS_PAGE_PUBLIC_NAME": "chaque service publié doit avoir un nom public de 1 à 80 caractères",
+  "STATUS_PAGE_TEXT_TOO_LONG": "le titre de la page de statut est limité à 120 caractères et sa description à 500",
+  "STATUS_PAGE_UNKNOWN_PROBE": "un service publié fait référence à une sonde inexistante",
+  "STATUS_PAGE_DUPLICATE_PROBE": "une sonde ne peut être publiée qu'une seule fois",
   "legacy": {
     "hostNotFound": "Hôte introuvable",
     "unauthorized": "Accès non autorisé",

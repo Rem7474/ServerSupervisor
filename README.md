@@ -92,7 +92,7 @@ généré depuis le dossier [`wiki/`](wiki/) du dépôt :
 - **Versions** : suivi des releases GitHub/GitLab/Gitea et des digests d'images Docker, notification ou déclenchement automatique (script ou `compose pull && up -d`) — voir [Git Webhooks & Suivi de releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
 - **Webhooks Git** : endpoint public HMAC-authentifié déclenché par un push/tag/release, exécute une tâche `tasks.yaml` avec le contexte du commit injecté — voir [Git Webhooks & Suivi de releases](https://github.com/Rem7474/ServerSupervisor/wiki/Git-Webhooks-and-Releases)
 - **Runbooks** : séquences admin-only de plusieurs étapes de commandes multi-hôtes, whitelist stricte côté serveur — voir [Runbooks & Tâches planifiées](https://github.com/Rem7474/ServerSupervisor/wiki/Runbooks-and-Scheduled-Tasks)
-- **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring` — voir [Monitoring](https://github.com/Rem7474/ServerSupervisor/wiki/Monitoring)
+- **Monitoring** : sondes HTTP/TCP/ICMP synthétiques (uptime) — le check ICMP couvre les équipements non-agentables (switch, imprimante, caméra IP…) — et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`, objectif de disponibilité (SLO) par sonde avec fenêtres 7/30/90 jours et budget d'erreur restant, page de statut publique optionnelle sur `/status` (services choisis par l'admin, nom public, aucun détail technique exposé) — voir [Monitoring](https://github.com/Rem7474/ServerSupervisor/wiki/Monitoring)
 - **Découverte réseau** : scan ping ICMP d'un sous-réseau IPv4 (`/24` à `/30`) sur la page « Ajouter un hôte » — liste les adresses qui répondent, marque celles déjà enregistrées, ajout en masse des nouvelles avec récupération des clés API en un clic — voir [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery)
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
@@ -1030,6 +1030,10 @@ le même mécanisme ICMP et nécessite donc la même capacité.
 | `PUT` | `/api/v1/uptime/probes/:id` | Modifier une sonde | Admin |
 | `DELETE` | `/api/v1/uptime/probes/:id` | Supprimer une sonde | Admin |
 | `POST` | `/api/v1/uptime/probes/:id/check-now` | Vérification immédiate | Admin |
+| `GET` | `/api/v1/uptime/sla` | SLA par sonde (fenêtres 7/30/90 j, budget d'erreur, couverture réelle) | Authentifié |
+| `GET` | `/api/v1/status-page` | Configuration de la page de statut publique | Admin |
+| `PUT` | `/api/v1/status-page` | Activer/désactiver la page, choisir les services publiés et leur nom public | Admin |
+| `GET` | `/api/public/status` | Données de la page de statut (404 si désactivée, cache 30 s, limité par IP) | Public |
 | `GET` | `/api/v1/ssl/certificates` | Liste des certificats suivis | Authentifié |
 | `GET` | `/api/v1/ssl/certificates/:id` | Détail d'un certificat | Authentifié |
 | `GET` | `/api/v1/ssl/certificates/:id/history` | Historique des checks | Authentifié |

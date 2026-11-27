@@ -20,6 +20,17 @@
                just pre-select a type the modal's own toggle already covers. -->
           <button
             type="button"
+            class="btn btn-outline-secondary btn-sm"
+            @click="statusPageOpen = true"
+          >
+            <IconWorld
+              :size="14"
+              class="icon me-1"
+            />
+            {{ t('monitoring.statusPage.openButton') }}
+          </button>
+          <button
+            type="button"
             class="btn btn-primary btn-sm"
             @click="panelRef?.openCreateProbe()"
           >
@@ -34,18 +45,28 @@
     </div>
 
     <MonitoringOverviewPanel ref="panelRef" />
+
+    <MonitoringSlaPanel class="mt-3" />
+
+    <StatusPageSettingsModal
+      v-if="statusPageOpen"
+      @close="statusPageOpen = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { IconPlus } from '@tabler/icons-vue'
+import { IconPlus, IconWorld } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import MonitoringOverviewPanel from '../components/monitoring/MonitoringOverviewPanel.vue'
+import MonitoringSlaPanel from '../components/monitoring/MonitoringSlaPanel.vue'
+import StatusPageSettingsModal from '../components/monitoring/StatusPageSettingsModal.vue'
 
 const auth = useAuthStore()
 const { t } = useI18n()
 
 const panelRef = ref<InstanceType<typeof MonitoringOverviewPanel> | null>(null)
+const statusPageOpen = ref(false)
 </script>

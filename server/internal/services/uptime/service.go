@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
@@ -27,6 +28,7 @@ type Repository interface {
 	GetUptimeStats(ctx context.Context, probeID string, windowHours int) (*models.UptimeStats, error)
 	GetUptimeHistoryBuckets(ctx context.Context, probeID string, windowHours int, buckets int) ([]models.UptimeHistoryBucket, error)
 	RecordUptimeProbeResult(ctx context.Context, r models.UptimeProbeResult) error
+	GetUptimeDailyCounts(ctx context.Context, probeIDs []string, days int) ([]models.UptimeDailyCount, error)
 }
 
 // HistoryBucketCount is the fixed number of time slices returned by HistoryBuckets,
@@ -42,11 +44,12 @@ type ProbeRunner func(ctx context.Context, p models.UptimeProbe) models.UptimePr
 type Service struct {
 	repo    Repository
 	runOnce ProbeRunner
+	now     func() time.Time
 }
 
 // NewService wires the service with the production probe runner.
 func NewService(repo Repository) *Service {
-	return &Service{repo: repo, runOnce: synthetic.RunOnce}
+	return &Service{repo: repo, runOnce: synthetic.RunOnce, now: time.Now}
 }
 
 // probeFromRequest maps a create/update request onto a probe model, applying the
@@ -82,7 +85,21 @@ func probeFromRequest(p models.UptimeProbeRequest) models.UptimeProbe {
 	if p.Enabled != nil {
 		m.Enabled = *p.Enabled
 	}
+	// Zero means "unset": the repository applies DefaultSLOTarget on create
+	// and keeps the stored objective on update.
+	if p.SLOTarget != nil {
+		m.SLOTarget = *p.SLOTarget
+	}
 	return m
+}
+
+// validateRequest checks the fields the database would otherwise reject with
+// an opaque constraint error.
+func validateRequest(p models.UptimeProbeRequest) error {
+	if p.SLOTarget != nil {
+		return ValidateSLOTarget(*p.SLOTarget)
+	}
+	return nil
 }
 
 // ListProbes returns all probes (never nil).
@@ -111,12 +128,18 @@ func (s *Service) GetProbe(ctx context.Context, id string) (*models.UptimeProbe,
 
 // CreateProbe validates+defaults the request and persists a new probe.
 func (s *Service) CreateProbe(ctx context.Context, req models.UptimeProbeRequest) (*models.UptimeProbe, error) {
+	if err := validateRequest(req); err != nil {
+		return nil, err
+	}
 	return s.repo.CreateUptimeProbe(ctx, probeFromRequest(req))
 }
 
 // UpdateProbe applies the request to the probe identified by id and returns the
 // stored result.
 func (s *Service) UpdateProbe(ctx context.Context, id string, req models.UptimeProbeRequest) (*models.UptimeProbe, error) {
+	if err := validateRequest(req); err != nil {
+		return nil, err
+	}
 	m := probeFromRequest(req)
 	m.ID = id
 	if err := s.repo.UpdateUptimeProbe(ctx, m); err != nil {

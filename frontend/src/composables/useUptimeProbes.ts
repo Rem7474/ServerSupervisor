@@ -34,9 +34,12 @@ export interface ProbeForm {
   follow_redirects: boolean
   verify_tls: boolean
   enabled: boolean
+  slo_target: number
 }
 
 const REFRESH_SEC = 30
+/** Mirrors models.DefaultSLOTarget on the server. */
+export const DEFAULT_SLO_TARGET = 99.9
 const PAGE_SIZE = 25
 
 export interface UseUptimeProbesOptions {
@@ -201,7 +204,8 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
 
   function emptyProbeForm(): ProbeForm {
     return { id: '', name: '', type: 'http', target: '', interval_sec: 60, timeout_sec: 10,
-      expected_status: 200, expected_body_regex: '', follow_redirects: true, verify_tls: true, enabled: true }
+      expected_status: 200, expected_body_regex: '', follow_redirects: true, verify_tls: true, enabled: true,
+      slo_target: DEFAULT_SLO_TARGET }
   }
 
   function openCreateProbe(): void {
@@ -216,6 +220,7 @@ export function useUptimeProbes(options: UseUptimeProbesOptions = {}) {
       interval_sec: p.interval_sec, timeout_sec: p.timeout_sec,
       expected_status: p.expected_status, expected_body_regex: p.expected_body_regex || '',
       follow_redirects: p.follow_redirects, verify_tls: p.verify_tls, enabled: p.enabled,
+      slo_target: p.slo_target || DEFAULT_SLO_TARGET,
     }
     probeFormError.value = ''
     probeModalOpen.value = true

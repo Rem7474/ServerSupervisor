@@ -7,7 +7,7 @@
     >{{ t('common.skipToContent') }}</a>
 
     <!-- Sidebar + Main -->
-    <div v-if="auth.isAuthenticated">
+    <div v-if="auth.isAuthenticated && !isStandalone">
       <!-- Row 1: brand + global status/actions (always visible, never collapses) -->
       <header class="navbar navbar-expand-md navbar-dark">
         <div class="container-xl flex-nowrap">
@@ -261,7 +261,7 @@
       <CommandPalette v-if="paletteOpen" />
     </div>
 
-    <!-- Login page (no sidebar) -->
+    <!-- Login page and standalone pages (no sidebar) -->
     <router-view v-else />
   </div>
 </template>
@@ -291,6 +291,8 @@ const auth = useAuthStore()
 const hostsStore = useHostsStore()
 const router = useRouter()
 const route = useRoute()
+// Pages such as the public status page render without the app shell.
+const isStandalone = computed(() => route.meta.standalone === true)
 
 const { isOpen: paletteOpen, toggle: paletteToggle } = useCommandPalette()
 const navbarOpen = ref(false)

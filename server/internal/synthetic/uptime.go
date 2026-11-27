@@ -30,6 +30,8 @@ type UptimeDB interface {
 	ListEnabledUptimeProbesDue(ctx context.Context) ([]models.UptimeProbe, error)
 	RecordUptimeProbeResult(ctx context.Context, r models.UptimeProbeResult) error
 	CleanupOldUptimeResults(ctx context.Context, olderThan time.Duration) (int64, error)
+	RollupUptimeDaily(ctx context.Context, sinceDays int) (int64, error)
+	CleanupOldUptimeDaily(ctx context.Context, keepDays int) (int64, error)
 }
 
 const (
@@ -37,6 +39,18 @@ const (
 	uptimeTick = 10 * time.Second
 	// resultRetention is how long we keep individual probe result rows.
 	resultRetention = 30 * 24 * time.Hour
+	// rollupTick is how often the worker folds the last complete days of raw
+	// results into uptime_probe_daily.
+	rollupTick = time.Hour
+	// rollupBackfillDays is how far back the startup rollup goes: every day
+	// still fully covered by resultRetention.
+	rollupBackfillDays = 29
+	// rollupRecentDays is how far back each hourly rollup goes: yesterday and
+	// the day before, so a day is rewritten with its final counts once closed.
+	rollupRecentDays = 2
+	// DailyRetentionDays is how long the daily rollup is kept: long enough
+	// for the 90-day SLA windows and status page bars, with a year of margin.
+	DailyRetentionDays = 400
 )
 
 // RunUptimeWorker runs the uptime probe loop until ctx is cancelled.
@@ -46,6 +60,10 @@ func RunUptimeWorker(ctx context.Context, db UptimeDB) {
 	defer tick.Stop()
 	cleanup := time.NewTicker(6 * time.Hour)
 	defer cleanup.Stop()
+	rollup := time.NewTicker(rollupTick)
+	defer rollup.Stop()
+
+	rollupDaily(ctx, db, rollupBackfillDays)
 
 	for {
 		select {
@@ -58,7 +76,20 @@ func RunUptimeWorker(ctx context.Context, db UptimeDB) {
 				// Best-effort log via stdlib log in caller; keep this package quiet.
 				_ = n
 			}
+			if _, err := db.CleanupOldUptimeDaily(ctx, DailyRetentionDays); err != nil {
+				slog.WarnContext(ctx, "uptime: failed to clean up daily rollup", slog.Any("err", err))
+			}
+		case <-rollup.C:
+			rollupDaily(ctx, db, rollupRecentDays)
 		}
+	}
+}
+
+// rollupDaily folds the raw results of the last sinceDays complete UTC days
+// into uptime_probe_daily. Failures are logged and retried on the next tick.
+func rollupDaily(ctx context.Context, db UptimeDB, sinceDays int) {
+	if _, err := db.RollupUptimeDaily(ctx, sinceDays); err != nil {
+		slog.WarnContext(ctx, "uptime: failed to roll up daily results", slog.Any("err", err))
 	}
 }
 

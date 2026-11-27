@@ -4,11 +4,12 @@ import { reactive } from 'vue'
 import { setLocale } from '../../i18n'
 import MonitoringProbeEditForm from './MonitoringProbeEditForm.vue'
 import type { ProbeForm } from '../../composables/useUptimeProbes'
+import fr from '../../locales/fr/monitoring.json'
 
 function form(over: Partial<ProbeForm> = {}): ProbeForm {
   return reactive({
     id: 'p1', name: 'API', type: 'http', target: 'https://x.io', interval_sec: 60, timeout_sec: 10,
-    expected_status: 200, expected_body_regex: '', follow_redirects: true, verify_tls: true, enabled: true, ...over,
+    expected_status: 200, expected_body_regex: '', follow_redirects: true, verify_tls: true, enabled: true, slo_target: 99.9, ...over,
   })
 }
 
@@ -43,12 +44,22 @@ describe('MonitoringProbeEditForm', () => {
     expect(w.text()).toContain('host:port')
     f.type = 'icmp'
     await w.vm.$nextTick()
-    expect(w.find('.form-hint').exists()).toBe(true)
+    expect(w.text()).toContain(fr.icmpHint)
     expect(w.text()).toContain('Hôte ou IP')
   })
 
   it('has no icmp hint for http probes', () => {
-    expect(mountForm(form()).find('.form-hint').exists()).toBe(false)
+    expect(mountForm(form()).text()).not.toContain(fr.icmpHint)
+  })
+
+  it('binds the SLO target to the form with its described hint', async () => {
+    const f = form({ slo_target: 99.9 })
+    const w = mountForm(f)
+    const input = w.find('#monitoring-edit-probe-slo-target')
+    expect(input.attributes('aria-describedby')).toBe('monitoring-edit-probe-slo-target-hint')
+    expect(w.find('label[for="monitoring-edit-probe-slo-target"]').exists()).toBe(true)
+    await input.setValue('99.5')
+    expect(f.slo_target).toBe(99.5)
   })
 
   it('toggles the enabled checkbox on the form', async () => {
