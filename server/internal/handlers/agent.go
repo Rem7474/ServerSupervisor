@@ -31,6 +31,12 @@ func (h *AgentHandler) AddCompletionListener(listener agentsvc.CommandCompletion
 	h.svc.AddCompletionListener(listener)
 }
 
+// AddCommandInterceptor registers a command-delivery interceptor (credential
+// injection at claim time, cancellation signalling on stream chunks).
+func (h *AgentHandler) AddCommandInterceptor(i agentsvc.CommandInterceptor) {
+	h.svc.AddCommandInterceptor(i)
+}
+
 // ReceiveReport processes a full agent report (metrics + docker + apt).
 func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	hostID := c.GetString("host_id")
@@ -101,8 +107,13 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.StreamCommandOutput(c.Request.Context(), hostID, chunk.CommandID, chunk.Chunk); err != nil {
+	cancel, err := h.svc.StreamCommandOutput(c.Request.Context(), hostID, chunk.CommandID, chunk.Chunk)
+	if err != nil {
 		respondError(c, err)
+		return
+	}
+	if cancel {
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "cancel": true})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})

@@ -87,6 +87,8 @@ Docker déjà définie, pas l'inverse.
 | `LOG_FORMAT` | `LOG_FORMAT` | Logging | select | `json` | Non | Oui | Format des logs (json, text) |
 | `TRUSTED_PROXIES` | `TRUSTED_PROXIES` | Réseau | csv | `""` | Non | Non | CIDRs des reverse proxies autorisés |
 | `ALLOWED_ORIGINS` | `ALLOWED_ORIGINS` | Réseau | csv | `""` | Non | Non | Origines autorisées pour WebSocket CORS |
+| `DISCOVERY_ALLOWED_SUBNETS` | `DISCOVERY_ALLOWED_SUBNETS` | Réseau | csv | `""` | Non | Non | Plages IPv4 privées (CIDR) que les scans de ports et sondes SNMP lancés depuis un agent peuvent cibler ; vide = toute plage RFC 1918 |
+| `DISCOVERY_PORT_SCAN_MAX_PORTS` | `DISCOVERY_PORT_SCAN_MAX_PORTS` | Réseau | int | `1024` | Non | Non | Nombre maximal de ports par scan de ports (1 à 4096) |
 | `DB_HOST` | `DB_HOST` | Base | string | `localhost` | Non | Oui | Hôte PostgreSQL / TimescaleDB |
 | `DB_PORT` | `DB_PORT` | Base | int | `5432` | Non | Oui | Port TCP PostgreSQL |
 | `DB_USER` | `DB_USER` | Base | string | `supervisor` | Non | Oui | Utilisateur PostgreSQL |
@@ -182,10 +184,10 @@ Tous les endpoints sont sécurisés et strictement réservés au rôle `admin` :
         "has_conflict": false
       }
     ],
-    "total_params": 75,
+    "total_params": 77,
     "env_count": 12,
     "ui_count": 4,
-    "default_count": 36,
+    "default_count": 38,
     "conflict_count": 0,
     "categories": ["server", "logging", "network", "database", "auth", "oidc", "notifications", "integrations", "retention", "threats"]
   }

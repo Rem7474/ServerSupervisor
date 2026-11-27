@@ -117,6 +117,20 @@ func (db *DB) UpdateRemoteCommandStatus(ctx context.Context, id, status, output 
 	}
 }
 
+// CancelPendingRemoteCommand fails a command that no agent has claimed yet,
+// atomically: it reports false when the command already left 'pending' (the
+// agent claimed it, or it ended), so a cancel never races the claim query.
+func (db *DB) CancelPendingRemoteCommand(ctx context.Context, id, output string) (bool, error) {
+	res, err := db.conn.ExecContext(ctx,
+		`UPDATE remote_commands SET status = 'failed', output = $1, ended_at = NOW() WHERE id = $2 AND status = 'pending'`,
+		output, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
 func (db *DB) GetRemoteCommandByID(ctx context.Context, id string) (*models.RemoteCommand, error) {
 	var cmd models.RemoteCommand
 	var startedAt, endedAt sql.NullTime

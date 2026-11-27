@@ -114,6 +114,14 @@ const (
 	CodeDiscoveryCIDRInvalid          = "DISCOVERY_CIDR_INVALID"
 	CodeDiscoveryIPv4Only             = "DISCOVERY_IPV4_ONLY"
 	CodeDiscoveryPrefixRange          = "DISCOVERY_PREFIX_RANGE"
+	CodeDiscoveryPrivateOnly          = "DISCOVERY_PRIVATE_ONLY"
+	CodeDiscoverySubnetNotAllowed     = "DISCOVERY_SUBNET_NOT_ALLOWED"
+	CodeDiscoveryIPInvalid            = "DISCOVERY_IP_INVALID"
+	CodeDiscoveryPortsInvalid         = "DISCOVERY_PORTS_INVALID"
+	CodeDiscoveryTooManyPorts         = "DISCOVERY_TOO_MANY_PORTS"
+	CodeDiscoveryAgentUnsupported     = "DISCOVERY_AGENT_UNSUPPORTED"
+	CodeDiscoveryScanDisabled         = "DISCOVERY_SCAN_DISABLED"
+	CodeDiscoverySNMPInvalid          = "DISCOVERY_SNMP_INVALID"
 	CodeSettingsWebhookURLInvalid     = "SETTINGS_WEBHOOK_URL_INVALID"
 	CodeSettingsWebhookNotConfigured  = "SETTINGS_WEBHOOK_NOT_CONFIGURED"
 	CodeSettingsWebhookSendFailed     = "SETTINGS_WEBHOOK_SEND_FAILED"
@@ -304,6 +312,14 @@ var ErrorCatalog = map[string]ErrorMessage{
 	CodeSettingsWebhookURLInvalid:     {"en": "invalid {provider} webhook URL: it must be an https URL that does not target a local or private address", "fr": "URL de webhook {provider} invalide : elle doit être en https et ne pas cibler une adresse locale ou privée"},
 	CodeSettingsWebhookNotConfigured:  {"en": "{provider} webhook URL not configured", "fr": "URL de webhook {provider} non configurée"},
 	CodeSettingsWebhookSendFailed:     {"en": "could not send the {provider} test message: {reason}", "fr": "échec de l'envoi du message de test {provider} : {reason}"},
+	CodeDiscoveryPrivateOnly:          {"en": "only private IPv4 addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) can be probed", "fr": "seules les adresses IPv4 privées (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) peuvent être sondées"},
+	CodeDiscoverySubnetNotAllowed:     {"en": "{target} is outside the subnets allowed for active discovery ({allowed})", "fr": "{target} est hors des sous-réseaux autorisés pour la découverte active ({allowed})"},
+	CodeDiscoveryIPInvalid:            {"en": "invalid IPv4 address", "fr": "adresse IPv4 invalide"},
+	CodeDiscoveryPortsInvalid:         {"en": "invalid port list near \"{value}\": use ports (1-65535) and ranges such as 22,80,8000-8100", "fr": "liste de ports invalide près de « {value} » : utilisez des ports (1-65535) et des plages comme 22,80,8000-8100"},
+	CodeDiscoveryTooManyPorts:         {"en": "too many ports: {max} at most per scan", "fr": "trop de ports : {max} au maximum par scan"},
+	CodeDiscoveryAgentUnsupported:     {"en": "this host's agent does not support network discovery: update the agent", "fr": "l'agent de cet hôte ne prend pas en charge la découverte réseau : mettez l'agent à jour"},
+	CodeDiscoveryScanDisabled:         {"en": "active scanning is disabled on this agent: set allow_network_scan: true in its configuration", "fr": "le scan actif est désactivé sur cet agent : ajoutez allow_network_scan: true à sa configuration"},
+	CodeDiscoverySNMPInvalid:          {"en": "invalid or missing SNMP parameter: {field}", "fr": "paramètre SNMP invalide ou manquant : {field}"},
 	CodeDiscoveryPrefixRange:          {"en": "the prefix must be between /{min} and /{max} (254 addresses max)", "fr": "le préfixe doit être compris entre /{min} et /{max} (254 adresses max)"},
 }
 

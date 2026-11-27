@@ -670,6 +670,144 @@ export interface DiscoveredHost {
   existing_host_id?: string;
   existing_host_name?: string;
 }
+/**
+ * DiscoveryAgentRequest picks the agent that runs an ARP table read.
+ */
+export interface DiscoveryAgentRequest {
+  host_id: string;
+}
+/**
+ * PortScanRequest starts a port scan from an agent. Ports accepts a list of
+ * ports and ranges ("22,80,8000-8100"); empty means the default top ports.
+ */
+export interface PortScanRequest {
+  host_id: string;
+  cidr: string;
+  ports: string;
+}
+/**
+ * SNMPProbeRequest starts an SNMP GET from an agent. Community and the v3
+ * passphrases are write-only: they are handed to the agent when it claims
+ * the command and are never stored, logged nor returned.
+ */
+export interface SNMPProbeRequest {
+  host_id: string;
+  target: string;
+  port: number /* int */;
+  version: string; // 2c | 3
+  include_interfaces: boolean;
+  community: string;
+  username: string;
+  security_level: string; // noAuthNoPriv | authNoPriv | authPriv
+  auth_protocol: string; // SHA | SHA256
+  auth_passphrase: string;
+  priv_protocol: string; // AES
+  priv_passphrase: string;
+}
+/**
+ * DiscoveryJobStarted is returned when a discovery command is queued.
+ */
+export interface DiscoveryJobStarted {
+  job_id: string;
+}
+/**
+ * DiscoveryLimits describes the bounds the UI must respect.
+ */
+export interface DiscoveryLimits {
+  default_ports: number /* int */[];
+  max_ports: number /* int */;
+  min_prefix_len: number /* int */;
+  allowed_subnets: string[];
+}
+/**
+ * ARPNeighbor is one ARP/neighbour table entry seen by the agent.
+ */
+export interface ARPNeighbor {
+  ip: string;
+  mac: string;
+  interface: string;
+  vendor_hint?: string;
+  locally_administered: boolean;
+  already_registered: boolean;
+  existing_host_id?: string;
+  existing_host_name?: string;
+}
+/**
+ * ARPResult is the outcome of an ARP table read.
+ */
+export interface ARPResult {
+  entries: ARPNeighbor[];
+  truncated?: boolean;
+}
+/**
+ * PortScanHost is one address with at least one open TCP port.
+ */
+export interface PortScanHost {
+  ip: string;
+  open_ports: number /* int */[];
+  already_registered: boolean;
+  existing_host_id?: string;
+  existing_host_name?: string;
+}
+/**
+ * PortScanResult is the outcome of a port scan; partial when Cancelled or
+ * TimedOut.
+ */
+export interface PortScanResult {
+  cidr: string;
+  hosts_scanned: number /* int */;
+  ports_scanned: number /* int */;
+  probes_done: number /* int */;
+  probes_total: number /* int */;
+  cancelled: boolean;
+  timed_out: boolean;
+  duration_ms: number /* int64 */;
+  hosts: PortScanHost[];
+}
+/**
+ * SNMPInterface is one ifTable row summary.
+ */
+export interface SNMPInterface {
+  index: number /* int */;
+  descr: string;
+  speed_bps: number /* uint64 */;
+  phys_address?: string;
+  admin_status: string;
+  oper_status: string;
+}
+/**
+ * SNMPResult is the outcome of an SNMP probe (system group + optional
+ * interface summary). Never carries credentials.
+ */
+export interface SNMPResult {
+  target: string;
+  version: string;
+  sys_descr: string;
+  sys_object_id: string;
+  sys_uptime_seconds: number /* uint64 */;
+  sys_contact: string;
+  sys_name: string;
+  sys_location: string;
+  interfaces?: SNMPInterface[];
+  interfaces_truncated?: boolean;
+  interfaces_error?: string;
+}
+/**
+ * DiscoveryJob is the state of one agent-run discovery command. Exactly one
+ * of ARP / PortScan / SNMP is set once the job completed.
+ */
+export interface DiscoveryJob {
+  id: string;
+  host_id: string;
+  kind: string; // arp | port_scan | snmp
+  status: string; // pending | running | completed | failed
+  error?: string;
+  arp?: ARPResult;
+  port_scan?: PortScanResult;
+  snmp?: SNMPResult;
+  created_at: string;
+  ended_at?: string;
+}
 
 //////////
 // source: docker.go
@@ -1801,6 +1939,13 @@ export interface AgentCapabilities {
    * kernel could actually provide byte counters — see NetworkFlowsReport.Available.
    */
   network_flows: boolean;
+  /**
+   * NetworkDiscovery: the agent ships the discovery module (ARP read).
+   * NetworkScan: the agent's allow_network_scan opt-in for active probes
+   * (port scan, SNMP).
+   */
+  network_discovery: boolean;
+  network_scan: boolean;
 }
 /**
  * DiagnosticIssue mirrors agent/internal/collector.DiagnosticIssue — one

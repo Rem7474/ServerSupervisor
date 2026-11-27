@@ -106,6 +106,14 @@
       "label": "Proxies de confiance (CIDRs)",
       "description": "Liste séparée par virgules des plages IP / reverse proxies autorisés à relayer les en-têtes X-Forwarded-For."
     },
+    "DISCOVERY_ALLOWED_SUBNETS": {
+      "label": "Sous-réseaux autorisés pour la découverte active",
+      "description": "Liste séparée par virgules des plages IPv4 privées (CIDR) que les scans de ports et sondes SNMP lancés depuis un agent peuvent cibler. Vide : toute plage privée RFC 1918."
+    },
+    "DISCOVERY_PORT_SCAN_MAX_PORTS": {
+      "label": "Ports maximum par scan",
+      "description": "Nombre maximal de ports qu'un scan de ports peut cibler (1 à 4096)."
+    },
     "ALLOWED_ORIGINS": {
       "label": "Origines WebSocket autorisées (CORS)",
       "description": "Liste des origines web autorisées pour la connexion au flux WebSocket en direct."

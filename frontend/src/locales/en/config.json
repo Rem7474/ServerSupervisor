@@ -106,6 +106,14 @@
       "label": "Trusted proxies (CIDRs)",
       "description": "Comma-separated list of IP ranges / reverse proxies allowed to relay X-Forwarded-For headers."
     },
+    "DISCOVERY_ALLOWED_SUBNETS": {
+      "label": "Subnets allowed for active discovery",
+      "description": "Comma-separated private IPv4 ranges (CIDR) that port scans and SNMP probes run from an agent may target. Empty: any RFC 1918 private range."
+    },
+    "DISCOVERY_PORT_SCAN_MAX_PORTS": {
+      "label": "Maximum ports per scan",
+      "description": "Maximum number of ports a single port scan may target (1 to 4096)."
+    },
     "ALLOWED_ORIGINS": {
       "label": "Allowed WebSocket origins (CORS)",
       "description": "List of web origins allowed to connect to the live WebSocket stream."
