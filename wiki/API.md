@@ -23,6 +23,9 @@ utilisation, son expiration et son état (active, expirée, révoquée). Un util
 25 clés actives. La création et la révocation sont tracées dans le journal d'audit
 (catégorie *auth*).
 
+Les actions effectuées avec une clé apparaissent dans le journal d'audit au nom de son
+propriétaire, avec l'identifiant de la clé (`api_key_id`, aussi présent dans l'export CSV).
+
 ## 2. Utiliser une clé
 
 ```bash
@@ -56,6 +59,20 @@ de son propriétaire :
 
 Ces opérations restent disponibles depuis l'interface, avec une session.
 
+> **Clé en écriture d'un administrateur.** Elle donne accès à tout ce qu'un administrateur
+> pilote : runbooks, tâches planifiées, commandes Docker/systemd/APT, actions Proxmox,
+> règles d'alerte qui déclenchent une commande, décisions CrowdSec. Sa fuite équivaut à celle
+> d'une session administrateur sans MFA. L'interface affiche un avertissement à sa création.
+>
+> Recommandations : préférer une clé `read` dès que l'outil ne fait que consulter ; pour une
+> clé `write`, la créer depuis un compte dont le rôle suffit (`operator` plutôt qu'`admin`
+> quand c'est possible), lui donner une **expiration courte** (30 ou 90 jours) et la
+> renouveler, une clé par outil pour pouvoir en révoquer une seule.
+
+Chaque route de `/api/v1` est classée dans le code : documentée dans la spécification,
+refusée aux clés, ou explicitement ouverte aux clés sans être documentée. Un test du serveur
+échoue sur une route qui n'entre dans aucune de ces catégories.
+
 ## 4. Limitation de débit
 
 Chaque clé a son propre quota, aux mêmes valeurs que la limite par IP (`RATE_LIMIT_RPS`,
@@ -76,7 +93,10 @@ qu'elles existent dans le routeur.
 
 *Mon compte → Clés API → icône corbeille* révoque une clé immédiatement : les requêtes
 suivantes répondent `401`. Une clé expirée répond aussi `401`, avec un message distinct.
-Supprimer un utilisateur supprime ses clés.
+
+Changer son mot de passe ou utiliser *Révoquer les autres sessions* révoque aussi **toutes**
+les clés API de l'utilisateur (entrée d'audit `api_key_revoke_all`) : c'est la réaction
+attendue à une compromission présumée du compte. Supprimer un utilisateur supprime ses clés.
 
 Un administrateur liste toutes les clés du serveur avec `GET /api/v1/api-keys` et révoque
 n'importe laquelle avec `DELETE /api/v1/auth/api-keys/{id}`, depuis une session.

@@ -154,9 +154,9 @@
   "disableWord": "Désactiver",
   "mfaDisabledMessage": "MFA désactivé.",
   "disableMfaError": "Erreur lors de la désactivation",
-  "revokeSessionsConfirmMessage": "Tous vos autres appareils/onglets connectés seront déconnectés immédiatement. Cette session-ci reste active.",
+  "revokeSessionsConfirmMessage": "Tous vos autres appareils/onglets connectés seront déconnectés immédiatement et toutes vos clés API seront révoquées. Cette session-ci reste active.",
   "revokeWord": "Révoquer",
-  "sessionsRevokedMessage": "Toutes les autres sessions ont été révoquées.",
+  "sessionsRevokedMessage": "Toutes les autres sessions et toutes vos clés API ont été révoquées.",
   "revokeSessionsError": "Erreur lors de la révocation des sessions.",
   "keyAddedMessage": "Clé de sécurité ajoutée.",
   "couldNotAddKeyError": "Impossible d'ajouter cette clé de sécurité",
@@ -209,5 +209,8 @@
   "apiKeyRevokeConfirmTitle": "Révoquer la clé API",
   "apiKeyRevokeConfirmMessage": "La clé « {name} » cessera immédiatement de fonctionner. Cette action est irréversible.",
   "apiKeyRevokedMessage": "Clé « {name} » révoquée",
-  "apiKeyRevokeError": "Impossible de révoquer la clé API"
+  "apiKeyRevokeError": "Impossible de révoquer la clé API",
+  "passwordChangeRevokesApiKeysHint": "Changer le mot de passe révoque aussi toutes vos clés API.",
+  "apiKeysRevocationHint": "Changer votre mot de passe ou révoquer toutes vos sessions révoque aussi toutes vos clés API.",
+  "apiKeyAdminWriteWarning": "Une clé en écriture d'administrateur pilote toute la flotte : runbooks, tâches planifiées, commandes Docker/systemd/APT, actions Proxmox, règles d'alerte qui déclenchent une commande, décisions CrowdSec. Réservez-la à un usage précis, donnez-lui une expiration courte et conservez-la comme un mot de passe administrateur."
 }

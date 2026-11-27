@@ -25,6 +25,9 @@
         <p class="text-secondary mb-2">
           {{ t('account.apiKeysExplanation') }}
         </p>
+        <p class="text-secondary small mb-2">
+          {{ t('account.apiKeysRevocationHint') }}
+        </p>
         <p class="text-secondary small mb-3">
           {{ t('account.apiKeysUsageHint') }}
           <code>Authorization: Bearer ssk_…</code>
@@ -202,6 +205,13 @@
               <div class="form-hint">
                 {{ scope === 'write' ? t('account.apiKeyScopeWriteHint') : t('account.apiKeyScopeReadHint') }}
               </div>
+              <div
+                v-if="adminWrite"
+                class="alert alert-warning mt-2 mb-0"
+                role="alert"
+              >
+                {{ t('account.apiKeyAdminWriteWarning') }}
+              </div>
             </div>
             <div class="mb-1">
               <label
@@ -251,6 +261,8 @@
                 :value="secret"
                 type="text"
                 class="form-control font-monospace"
+                autocomplete="off"
+                spellcheck="false"
                 readonly
                 @focus="($event.target as HTMLInputElement).select()"
               >
@@ -321,7 +333,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, useId } from 'vue'
+import { computed, onMounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { IconCheck, IconCopy, IconKey, IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../EmptyState.vue'
@@ -330,6 +342,7 @@ import { API_KEY_EXPIRY_OPTIONS, apiKeyStatus, useApiKeys } from '../../composab
 import type { ApiKeyStatus } from '../../composables/useApiKeys'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useModalChrome } from '../../composables/useModalChrome'
+import { useAuthStore } from '../../stores/auth'
 
 const { t } = useI18n()
 const uid = useId()
@@ -355,6 +368,11 @@ const {
   copySecret,
   revoke,
 } = useApiKeys()
+
+const auth = useAuthStore()
+// A write key inherits every action the owner's role allows: for an admin
+// that is the whole fleet, hence the explicit warning.
+const adminWrite = computed(() => auth.isAdmin && scope.value === 'write')
 
 const statusClass: Record<ApiKeyStatus, string> = {
   active: 'bg-success-lt text-success',

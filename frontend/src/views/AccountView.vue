@@ -281,6 +281,10 @@
                   </div>
                 </div>
 
+                <p class="form-hint mb-3">
+                  {{ t('account.passwordChangeRevokesApiKeysHint') }}
+                </p>
+
                 <div
                   v-if="pwError"
                   class="alert alert-danger mb-3"

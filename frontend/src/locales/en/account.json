@@ -154,9 +154,9 @@
   "disableWord": "Disable",
   "mfaDisabledMessage": "MFA disabled.",
   "disableMfaError": "Error while disabling",
-  "revokeSessionsConfirmMessage": "All your other connected devices/tabs will be disconnected immediately. This session stays active.",
+  "revokeSessionsConfirmMessage": "All your other connected devices/tabs will be disconnected immediately and all your API keys will be revoked. This session stays active.",
   "revokeWord": "Revoke",
-  "sessionsRevokedMessage": "All other sessions have been revoked.",
+  "sessionsRevokedMessage": "All other sessions and all your API keys have been revoked.",
   "revokeSessionsError": "Error while revoking sessions.",
   "keyAddedMessage": "Security key added.",
   "couldNotAddKeyError": "Unable to add this security key",
@@ -209,5 +209,8 @@
   "apiKeyRevokeConfirmTitle": "Revoke API key",
   "apiKeyRevokeConfirmMessage": "Key \"{name}\" stops working immediately. This cannot be undone.",
   "apiKeyRevokedMessage": "Key \"{name}\" revoked",
-  "apiKeyRevokeError": "Could not revoke the API key"
+  "apiKeyRevokeError": "Could not revoke the API key",
+  "passwordChangeRevokesApiKeysHint": "Changing the password also revokes all your API keys.",
+  "apiKeysRevocationHint": "Changing your password or revoking all your sessions also revokes all your API keys.",
+  "apiKeyAdminWriteWarning": "An administrator's write key controls the whole fleet: runbooks, scheduled tasks, Docker/systemd/APT commands, Proxmox actions, alert rules that trigger a command, CrowdSec decisions. Keep it for one precise use, give it a short expiry and store it like an administrator password."
 }

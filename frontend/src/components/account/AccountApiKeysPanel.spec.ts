@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { setLocale } from '../../i18n'
+import { useAuthStore } from '../../stores/auth'
 import type { APIKey } from '../../types/generated'
 
 const { listMyApiKeys, createApiKey, revokeApiKey } = vi.hoisted(() => ({
@@ -96,6 +97,8 @@ describe('AccountApiKeysPanel', () => {
     expect(createApiKey).toHaveBeenCalledWith({ name: 'backup', scope: 'write', expires_in_days: 0 })
     const secretInput = wrapper.find<HTMLInputElement>('[role="dialog"] input[readonly]')
     expect(secretInput.element.value).toBe('ssk_eeeeeeee_secret')
+    expect(secretInput.attributes('autocomplete')).toBe('off')
+    expect(secretInput.attributes('spellcheck')).toBe('false')
     // No close cross and no backdrop dismissal on the secret step.
     expect(wrapper.find('[role="dialog"] .btn-close').exists()).toBe(false)
     await wrapper.find('[role="dialog"]').trigger('click')
@@ -136,6 +139,25 @@ describe('AccountApiKeysPanel', () => {
     await wrapper.find('[role="dialog"] form').trigger('submit')
     await flushPromises()
     expect(wrapper.find('[role="dialog"] .alert-danger').text()).toBe('nom invalide')
+    wrapper.unmount()
+  })
+
+  it('warns an administrator who picks the write scope', async () => {
+    const wrapper = mountPanel()
+    await flushPromises()
+    await wrapper.find('.card-header button').trigger('click')
+    const scope = wrapper.find('[role="dialog"] select')
+    const warning = () => wrapper.find('[role="dialog"] .alert-warning')
+
+    useAuthStore().setAuth({ role: 'admin', username: 'admin' } as never, 'admin')
+    await wrapper.vm.$nextTick()
+    expect(warning().exists()).toBe(false)
+    await scope.setValue('write')
+    expect(warning().text()).toContain('pilote toute la flotte')
+
+    useAuthStore().setAuth({ role: 'operator', username: 'op' } as never, 'operator')
+    await wrapper.vm.$nextTick()
+    expect(warning().exists()).toBe(false)
     wrapper.unmount()
   })
 })
