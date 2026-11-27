@@ -723,7 +723,7 @@ function getPortSetting(hostId: string, portNumber: number): PortSetting {
 }
 
 function addServiceRow(): void {
-  networkServices.value.push({
+  networkServices.value = [...networkServices.value, {
     id: `svc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     name: '',
     domain: '',
@@ -735,7 +735,7 @@ function addServiceRow(): void {
     linkToProxy: false,
     linkToAuthelia: false,
     exposedToInternet: false,
-  })
+  }]
 }
 
 async function removeServiceRow(serviceId: string): Promise<void> {
