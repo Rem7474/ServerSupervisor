@@ -36,6 +36,19 @@
             :title="isAgentUpToDate(host.agent_version) ? t('host.agentUpToDateTitle') : t('host.agentUpdateAvailableTitle')"
             compact
           />
+          <ul
+            v-if="host?.tags?.length"
+            class="list-inline mb-0 d-flex flex-wrap gap-1"
+            :aria-label="t('host.tagsListAriaLabel')"
+          >
+            <li
+              v-for="tag in host.tags"
+              :key="tag"
+              class="list-inline-item m-0"
+            >
+              <span class="badge bg-secondary-lt text-secondary">{{ tag }}</span>
+            </li>
+          </ul>
         </div>
       </div>
       <div class="d-flex flex-wrap align-items-center justify-content-lg-end gap-2">

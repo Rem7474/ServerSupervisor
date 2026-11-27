@@ -63,11 +63,21 @@ export interface DockerScope {
   crit_states: string[]  // container states triggering crit alert (docker_container_state)
 }
 
+/**
+ * How an agent rule picks its hosts: one host, every host, the current
+ * members of a host group, or every host carrying one of the tags. Resolved
+ * by the server on every evaluation.
+ */
+export type AgentTargetType = 'host' | 'all' | 'group' | 'tag'
+
 export interface AlertRuleFormData {
   name: string
   enabled: boolean
   source_type: 'agent' | 'proxmox' | 'synthetic' | 'docker'
+  target_type: AgentTargetType
   host_id: string | null
+  host_group_id: string | null
+  target_tags: string[]
   proxmox_scope: ProxmoxScope
   docker_scope: DockerScope
   metric: string
@@ -88,7 +98,10 @@ export interface AlertRuleInput {
   name?: string
   enabled?: boolean
   source_type?: 'agent' | 'proxmox' | 'synthetic' | 'docker'
+  target_type?: string
   host_id?: string | null
+  host_group_id?: string | null
+  target_tags?: string[] | null
   metric?: string
   proxmox_scope?: Partial<ProxmoxScope>
   docker_scope?: Partial<DockerScope>
@@ -109,7 +122,11 @@ export interface AlertRuleInput {
   }
 }
 
-interface AlertRulePayload extends Omit<AlertRuleFormData, 'proxmox_scope' | 'docker_scope' | 'threshold_clear_warn' | 'threshold_clear_crit'> {
+interface AlertRulePayload extends Omit<AlertRuleFormData, 'proxmox_scope' | 'docker_scope' | 'threshold_clear_warn' | 'threshold_clear_crit' | 'target_type' | 'host_group_id' | 'target_tags'> {
+  // Only sent for agent rules; Docker/Proxmox/synthetic rules carry their own scope.
+  target_type?: AgentTargetType
+  host_group_id?: string | null
+  target_tags?: string[]
   proxmox_scope: ProxmoxScope | null
   docker_scope: DockerScope | null
   threshold_clear_warn: number | null
@@ -132,6 +149,15 @@ interface AlertRuleFormApi {
   buildPayload: () => AlertRulePayload
 }
 
+const TARGET_TYPES: AgentTargetType[] = ['host', 'all', 'group', 'tag']
+
+// Rules saved before targeting existed have no target_type: a host_id means
+// that host, no host_id means every host (same derivation as the server).
+function resolveTargetType(rule: AlertRuleInput): AgentTargetType {
+  if (TARGET_TYPES.includes(rule.target_type as AgentTargetType)) return rule.target_type as AgentTargetType
+  return rule.host_id ? 'host' : 'all'
+}
+
 function normalizeOptionalNumber(value: unknown): number | undefined {
   if (value === null || value === undefined || value === '') return undefined
   const n = Number(value)
@@ -151,7 +177,10 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     name: '',
     enabled: true,
     source_type: 'agent',
+    target_type: 'all',
     host_id: null,
+    host_group_id: null,
+    target_tags: [],
     metric: 'cpu',
     proxmox_scope: {
       scope_mode: 'global',
@@ -212,7 +241,10 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       source_type:
         rule.source_type ||
         (isDockerMetric(metric) ? 'docker' : isProxmoxMetric(metric) ? 'proxmox' : isSyntheticMetric(metric) ? 'synthetic' : 'agent'),
+      target_type: resolveTargetType(rule),
       host_id: rule.host_id ?? null,
+      host_group_id: rule.host_group_id ?? null,
+      target_tags: rule.target_tags ?? [],
       metric,
       proxmox_scope: {
         scope_mode: scope.scope_mode || 'global',
@@ -392,8 +424,20 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     const thresholdClearWarn = normalizeOptionalNumber(form.value.threshold_clear_warn) ?? null
     const thresholdClearCrit = normalizeOptionalNumber(form.value.threshold_clear_crit) ?? null
 
+    const { target_type: targetType, host_group_id: hostGroupId, target_tags: targetTags, ...rest } = form.value
+    const target: Pick<AlertRulePayload, 'target_type' | 'host_id' | 'host_group_id' | 'target_tags'> =
+      form.value.source_type === 'agent'
+        ? {
+            target_type: targetType,
+            host_id: targetType === 'host' ? form.value.host_id : null,
+            host_group_id: targetType === 'group' ? hostGroupId : null,
+            target_tags: targetType === 'tag' ? [...targetTags] : [],
+          }
+        : { host_id: form.value.host_id }
+
     return {
-      ...form.value,
+      ...rest,
+      ...target,
       threshold_clear_warn: thresholdClearWarn,
       threshold_clear_crit: thresholdClearCrit,
       source_type: form.value.source_type,

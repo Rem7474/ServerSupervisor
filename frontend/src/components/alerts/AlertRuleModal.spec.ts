@@ -199,3 +199,64 @@ describe('AlertRuleModal (characterization)', () => {
     }
   })
 })
+
+describe('AlertRuleModal — agent rule target', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setLocale('fr')
+  })
+
+  const baseRule = {
+    id: 7, name: 'Cible', source_type: 'agent', metric: 'cpu', operator: '>',
+    threshold_warn: 70, threshold_crit: 85, duration: 0, actions: { channels: [] },
+  }
+  const hosts = [{ id: 'h1', name: 'web-1', tags: ['web'] }]
+  const hostGroups = [{ id: 'g1', name: 'Prod', member_ids: ['h1'] }]
+
+  const nextButton = (wrapper: ReturnType<typeof mountModal>) =>
+    wrapper.findAll('button').find((b) => b.text().includes('Suivant'))!
+
+  async function submitPayload(wrapper: ReturnType<typeof mountModal>): Promise<Record<string, unknown>> {
+    for (let i = 0; i < 2; i++) {
+      await nextButton(wrapper).trigger('click')
+      await nextTick()
+    }
+    await wrapper.findAll('button').find((b) => b.text().includes('Mettre à jour'))!.trigger('click')
+    await flushPromises()
+    return wrapper.emitted('submit')![0][0] as Record<string, unknown>
+  }
+
+  it.each([
+    ['host without a host', { target_type: 'host' }, true],
+    ['group without a group', { target_type: 'group' }, true],
+    ['tag without a tag', { target_type: 'tag', target_tags: [] }, true],
+    ['group with a group', { target_type: 'group', host_group_id: 'g1' }, false],
+    ['tag with a tag', { target_type: 'tag', target_tags: ['web'] }, false],
+    ['every host', { target_type: 'all' }, false],
+  ])('step 1 blocks a %s', async (_label, target, blocked) => {
+    const wrapper = mountModal({ rule: { ...baseRule, ...target }, hosts, hostGroups })
+    await nextTick()
+    expect(nextButton(wrapper).attributes('disabled') !== undefined).toBe(blocked)
+  })
+
+  it('submits the tag target alone, without a stale host or group', async () => {
+    const wrapper = mountModal({ rule: { ...baseRule, target_type: 'tag', target_tags: ['web'], host_id: 'h1' }, hosts, hostGroups })
+    await nextTick()
+    expect(await submitPayload(wrapper)).toMatchObject({
+      target_type: 'tag', target_tags: ['web'], host_id: null, host_group_id: null,
+    })
+  })
+
+  it('submits the group target', async () => {
+    const wrapper = mountModal({ rule: { ...baseRule, target_type: 'group', host_group_id: 'g1' }, hosts, hostGroups })
+    await nextTick()
+    expect(await submitPayload(wrapper)).toMatchObject({ target_type: 'group', host_group_id: 'g1', target_tags: [] })
+  })
+
+  it('opens a rule saved before targeting existed on its host', async () => {
+    const wrapper = mountModal({ rule: { ...baseRule, host_id: 'h1' }, hosts, hostGroups })
+    await nextTick()
+    expect((wrapper.find('#alert-source-host-id').element as HTMLSelectElement).value).toBe('h1')
+    expect(await submitPayload(wrapper)).toMatchObject({ target_type: 'host', host_id: 'h1' })
+  })
+})

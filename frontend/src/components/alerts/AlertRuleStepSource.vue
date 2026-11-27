@@ -58,37 +58,126 @@
       </div>
     </div>
 
-    <div
+    <fieldset
       v-if="form.source_type === 'agent'"
       class="mb-3"
     >
-      <label
-        for="alert-source-host-id"
-        class="form-label"
-      >{{ t('alerts.sourceTargetHostLabel') }}</label>
-      <select
-        id="alert-source-host-id"
-        v-model="hostIdModel"
-        class="form-select"
-        :disabled="!metricSupportsHostFilter"
+      <legend class="form-label">
+        {{ t('alerts.sourceTargetLabel') }}
+      </legend>
+      <div
+        class="btn-group w-100 mb-2"
+        role="group"
+        :aria-label="t('alerts.sourceTargetLabel')"
       >
-        <option :value="null">
-          {{ t('alerts.allHostsBadge') }}
-        </option>
-        <option
-          v-for="host in hosts"
-          :key="host.id"
-          :value="host.id"
+        <button
+          v-for="option in targetOptions"
+          :key="option.value"
+          type="button"
+          class="btn btn-sm"
+          :class="form.target_type === option.value ? 'btn-primary' : 'btn-outline-primary'"
+          :aria-pressed="form.target_type === option.value"
+          :disabled="!metricSupportsHostFilter && option.value !== 'all'"
+          @click="setTargetType(option.value)"
         >
-          {{ host.name }}
-        </option>
-      </select>
+          {{ option.label }}
+        </button>
+      </div>
+
+      <div v-if="form.target_type === 'host'">
+        <label
+          for="alert-source-host-id"
+          class="form-label"
+        >{{ t('alerts.sourceTargetHostLabel') }}</label>
+        <select
+          id="alert-source-host-id"
+          v-model="hostIdModel"
+          class="form-select"
+        >
+          <option
+            :value="null"
+            disabled
+          >
+            {{ t('alerts.sourceTargetHostPlaceholder') }}
+          </option>
+          <option
+            v-for="host in hosts"
+            :key="host.id"
+            :value="host.id"
+          >
+            {{ host.name }}
+          </option>
+        </select>
+      </div>
+
+      <div v-else-if="form.target_type === 'group'">
+        <label
+          for="alert-source-host-group"
+          class="form-label"
+        >{{ t('alerts.sourceTargetGroupLabel') }}</label>
+        <select
+          id="alert-source-host-group"
+          v-model="hostGroupIdModel"
+          class="form-select"
+        >
+          <option
+            :value="null"
+            disabled
+          >
+            {{ t('alerts.sourceTargetGroupPlaceholder') }}
+          </option>
+          <option
+            v-for="group in hostGroups"
+            :key="group.id"
+            :value="group.id"
+          >
+            {{ t('alerts.sourceTargetGroupOption', { name: group.name, count: group.member_ids.length }, group.member_ids.length) }}
+          </option>
+        </select>
+        <small
+          v-if="hostGroups.length === 0"
+          class="form-hint"
+        >{{ t('alerts.sourceTargetNoGroupsHint') }}</small>
+      </div>
+
+      <div v-else-if="form.target_type === 'tag'">
+        <div
+          v-if="availableTags.length"
+          class="d-flex flex-wrap gap-2"
+          role="group"
+          :aria-label="t('alerts.sourceTargetTagsLabel')"
+        >
+          <label
+            v-for="tag in availableTags"
+            :key="tag"
+            class="form-check form-check-inline m-0"
+          >
+            <input
+              class="form-check-input"
+              type="checkbox"
+              :checked="form.target_tags.some(x => x.toLowerCase() === tag.toLowerCase())"
+              @change="toggleTargetTag(tag)"
+            >
+            <span class="form-check-label">{{ tag }}</span>
+          </label>
+        </div>
+        <small
+          v-else
+          class="form-hint"
+        >{{ t('alerts.sourceTargetNoTagsHint') }}</small>
+      </div>
+
       <small
         v-if="!metricSupportsHostFilter"
         :id="`host-filter-hint-${rule?.id || 'new'}`"
         class="form-hint"
       >{{ t('alerts.sourceHostFilterHint') }}</small>
-    </div>
+      <small
+        v-else-if="targetPreview !== null"
+        class="form-hint"
+        aria-live="polite"
+      >{{ t('alerts.sourceTargetPreview', { count: targetPreview }, targetPreview) }}</small>
+    </fieldset>
 
 
     <div class="mb-2 fw-semibold">
@@ -481,18 +570,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { AlertRuleFormData, DockerScope } from '../../composables/useAlertRuleForm'
+import type { AgentTargetType, AlertRuleFormData, DockerScope } from '../../composables/useAlertRuleForm'
+import { collectHostTags, hostHasTag } from '../../utils/tags'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 import { getEntityStateLabel } from '../../utils/statusClasses'
 import type { AlertRuleCapabilities, AlertHostCapabilities, AlertScopeOption, AlertDockerHostScope } from '../../types/alert'
 
 interface MetricCard { value: string; label: string; icon: string }
-interface HostOption { id: string; name: string }
+interface HostOption { id: string; name: string; tags?: string[] | null }
+interface HostGroupOption { id: string; name: string; member_ids: string[] }
 
 const props = defineProps<{
   form: AlertRuleFormData
   rule?: { id?: number | string } | null
   hosts: HostOption[]
+  hostGroups?: HostGroupOption[]
   capabilities?: Pick<AlertRuleCapabilities, 'metrics'> | null
   capabilitiesLoading?: boolean
   capabilitiesError?: string
@@ -566,6 +658,49 @@ function dockerScopeModel<K extends keyof DockerScope>(key: K) {
 
 const nameModel = fieldModel('name')
 const hostIdModel = fieldModel('host_id')
+const hostGroupIdModel = fieldModel('host_group_id')
+
+const hostGroups = computed(() => props.hostGroups ?? [])
+const availableTags = computed(() => collectHostTags(props.hosts))
+
+const targetOptions = computed<{ value: AgentTargetType; label: string }[]>(() => [
+  { value: 'all', label: t('alerts.targetAll') },
+  { value: 'host', label: t('alerts.targetHost') },
+  { value: 'group', label: t('alerts.targetGroup') },
+  { value: 'tag', label: t('alerts.targetTag') },
+])
+
+// Switching the target type drops the fields the new type does not use, in
+// the same emit, so a stale host/group/tag never rides along to the server.
+function setTargetType(value: AgentTargetType): void {
+  emit('update:form', {
+    ...props.form,
+    target_type: value,
+    host_id: value === 'host' ? props.form.host_id : null,
+    host_group_id: value === 'group' ? props.form.host_group_id : null,
+    target_tags: value === 'tag' ? props.form.target_tags : [],
+  })
+}
+
+function toggleTargetTag(tag: string): void {
+  const has = props.form.target_tags.some(x => x.toLowerCase() === tag.toLowerCase())
+  updateForm('target_tags', has
+    ? props.form.target_tags.filter(x => x.toLowerCase() !== tag.toLowerCase())
+    : [...props.form.target_tags, tag])
+}
+
+// Number of hosts the tag/group target covers right now (null for host/all).
+const targetPreview = computed<number | null>(() => {
+  if (props.form.target_type === 'tag') {
+    if (props.form.target_tags.length === 0) return null
+    return props.hosts.filter(h => props.form.target_tags.some(tag => hostHasTag(h, tag))).length
+  }
+  if (props.form.target_type === 'group') {
+    const group = hostGroups.value.find(g => g.id === props.form.host_group_id)
+    return group ? group.member_ids.length : null
+  }
+  return null
+})
 const proxmoxScopeModeModel = proxmoxScopeModel('scope_mode')
 const proxmoxConnectionIdModel = proxmoxScopeModel('connection_id')
 const proxmoxNodeIdModel = proxmoxScopeModel('node_id')

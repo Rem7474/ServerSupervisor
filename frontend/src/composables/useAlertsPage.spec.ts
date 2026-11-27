@@ -9,6 +9,7 @@ vi.mock('../api', () => ({
     updateAlertRule: vi.fn(),
     deleteAlertRule: vi.fn(),
     getReleaseTrackers: vi.fn(),
+    getHostGroups: vi.fn(),
   },
   getApiErrorMessage: (e: unknown, fallback?: string) =>
     (e as { message?: string })?.message || fallback || 'erreur',
@@ -21,6 +22,7 @@ vi.mock('./useConfirmDialog', () => ({
 
 import apiClient from '../api'
 import { useAlertsPage } from './useAlertsPage'
+import { useAuthStore } from '../stores/auth'
 import type { AlertRule } from '../types/alert'
 
 const rule = { id: 1, name: 'CPU high', enabled: true } as AlertRule
@@ -125,5 +127,44 @@ describe('useAlertsPage', () => {
       expect(p.alertsTab.value).toBe('releases')
       expect(apiClient.getReleaseTrackers).toHaveBeenCalledTimes(1)
     })
+  })
+})
+
+describe('useAlertsPage — host groups', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  function asRole(role: string): void {
+    const auth = useAuthStore()
+    auth.$patch({ role } as never)
+  }
+
+  it('loads the groups for an admin', async () => {
+    asRole('admin')
+    vi.mocked(apiClient.getHostGroups).mockResolvedValue({ data: [{ id: 'g1', name: 'Prod' }] } as never)
+    const p = useAlertsPage()
+    await p.loadHostGroups()
+    expect(p.hostGroups.value).toEqual([{ id: 'g1', name: 'Prod' }])
+  })
+
+  it('never calls the admin-only endpoint for other roles', async () => {
+    asRole('viewer')
+    const p = useAlertsPage()
+    await p.loadHostGroups()
+    expect(apiClient.getHostGroups).not.toHaveBeenCalled()
+    expect(p.hostGroups.value).toEqual([])
+  })
+
+  it('falls back to an empty list on failure or an unexpected body', async () => {
+    asRole('admin')
+    const p = useAlertsPage()
+    vi.mocked(apiClient.getHostGroups).mockRejectedValue(new Error('boom'))
+    await p.loadHostGroups()
+    expect(p.hostGroups.value).toEqual([])
+    vi.mocked(apiClient.getHostGroups).mockResolvedValue({ data: null } as never)
+    await p.loadHostGroups()
+    expect(p.hostGroups.value).toEqual([])
   })
 })

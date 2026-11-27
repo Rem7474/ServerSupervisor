@@ -23,6 +23,9 @@ type EngineFuncs struct {
 type TestRunInput struct {
 	SourceType         models.AlertSourceType     `json:"source_type"`
 	HostID             *string                    `json:"host_id"`
+	TargetType         string                     `json:"target_type"`
+	HostGroupID        *string                    `json:"host_group_id"`
+	TargetTags         []string                   `json:"target_tags"`
 	ProxmoxScope       *models.ProxmoxMetricScope `json:"proxmox_scope"`
 	DockerScope        *models.DockerMetricScope  `json:"docker_scope"`
 	Metric             string                     `json:"metric" binding:"required"`
@@ -48,6 +51,9 @@ func (in TestRunInput) toRule() models.AlertRule {
 	return models.AlertRule{
 		SourceType:         in.SourceType,
 		HostID:             in.HostID,
+		TargetType:         in.TargetType,
+		HostGroupID:        in.HostGroupID,
+		TargetTags:         in.TargetTags,
 		ProxmoxScope:       in.ProxmoxScope,
 		DockerScope:        in.DockerScope,
 		Metric:             in.Metric,
@@ -76,26 +82,11 @@ func (s *Service) TestRun(ctx context.Context, in TestRunInput) ([]TestRunResult
 	}
 
 	rule := in.toRule()
-
-	// Test endpoint supports agent-wide preview when host_id is omitted.
-	validationRule := rule
-	if validationRule.SourceType == models.AlertSourceAgent && validationRule.HostID == nil {
-		placeholderHostID := "__test_all_hosts__"
-		validationRule.HostID = &placeholderHostID
-	}
-	if err := validationRule.Validate(); err != nil {
+	if err := rule.Validate(); err != nil {
 		return nil, false, apperr.Validation(err.Error())
 	}
-
-	switch rule.SourceType {
-	case models.AlertSourceProxmox:
-		if err := s.ValidateProxmoxScope(ctx, rule.ProxmoxScope); err != nil {
-			return nil, false, err
-		}
-	case models.AlertSourceDocker:
-		if err := s.ValidateDockerScope(ctx, rule.DockerScope); err != nil {
-			return nil, false, err
-		}
+	if err := s.validateScope(ctx, &rule); err != nil {
+		return nil, false, err
 	}
 
 	// Staleness only applies to the auth-failures metric; everything else is
@@ -132,14 +123,11 @@ func (s *Service) TestRun(ctx context.Context, in TestRunInput) ([]TestRunResult
 			eval(target)
 		}
 	default:
-		hosts, err := s.repo.GetAllHosts(ctx)
+		targets, err := s.agentTargets(ctx, rule)
 		if err != nil {
-			return nil, false, apperr.Failed("failed to fetch hosts")
+			return nil, false, err
 		}
-		for _, host := range hosts {
-			if rule.HostID != nil && *rule.HostID != host.ID {
-				continue
-			}
+		for _, host := range targets {
 			eval(host)
 		}
 	}

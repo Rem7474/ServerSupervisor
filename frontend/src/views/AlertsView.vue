@@ -65,6 +65,7 @@
         <AlertRuleList
           :rules="rules"
           :hosts="hosts"
+          :host-groups="hostGroups"
           :loading="loading"
           :fetched="fetched"
           :error="saveError"
@@ -145,6 +146,7 @@
         :visible="showModal"
         :rule="editingRule"
         :hosts="hosts"
+        :host-groups="hostGroups"
         :capabilities="capabilities"
         :capabilities-loading="capabilitiesLoading"
         :capabilities-error="capabilitiesError"
@@ -205,6 +207,7 @@ const {
   trackersError,
   rules,
   hosts,
+  hostGroups,
   loading,
   fetched,
   fetchError,

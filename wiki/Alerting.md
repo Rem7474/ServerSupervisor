@@ -18,7 +18,8 @@ passe quand ils sont franchis.
 | Champ | Rôle |
 |---|---|
 | `source_type` | `agent` (métriques d'un hôte), `proxmox` (cluster/nœud/guest) ou `synthetic` (sondes uptime / certificats SSL) |
-| `host_id` / `proxmox_scope` / `docker_scope` | La cible, selon la source. Une règle Docker est forcément rattachée à un hôte ; une règle Proxmox est au niveau cluster |
+| `target_type` (+ `host_id` / `host_group_id` / `target_tags`) | La cible d'une règle agent : un hôte, tous les hôtes, un groupe d'hôtes ou des tags — voir [§8](#8-ciblage-des-règles-agent--hôte-groupe-tags) |
+| `proxmox_scope` / `docker_scope` | La cible d'une règle Proxmox ou Docker. Une règle Docker est forcément rattachée à un hôte ; une règle Proxmox est au niveau cluster |
 | `metric` + `operator` | Ce qu'on mesure (`cpu_usage`, `memory_usage`, `status_offline`, …) et la comparaison (`>`, `>=`, `<`, `<=`) |
 | `threshold_warn` / `threshold_crit` | Les deux niveaux de sévérité. Les deux sont optionnels, mais au moins un doit être renseigné |
 | `threshold_clear_warn` / `threshold_clear_crit` | Seuils de **sortie** (hystérésis) — voir [§2](#2-hystérésis--pourquoi-deux-jeux-de-seuils) |
@@ -205,6 +206,62 @@ Ce n'est **pas** un lien vivant :
 
 Le filtrage du sélecteur d'hôtes accepte le nom **ou** un tag d'hôte.
 
+Pour qu'une seule règle suive automatiquement un ensemble d'hôtes (y compris
+ceux ajoutés plus tard), une règle ciblant un groupe ou un tag (§8) est plus
+adaptée qu'un modèle.
+
+## 8. Ciblage des règles agent : hôte, groupe, tags
+
+Une règle agent choisit ses hôtes par `target_type` :
+
+| `target_type` | Champ associé | Hôtes évalués |
+|---|---|---|
+| `host` | `host_id` | Cet hôte uniquement |
+| `all` | — | Tous les hôtes |
+| `group` | `host_group_id` | Les membres actuels du groupe |
+| `tag` | `target_tags` | Les hôtes portant **au moins un** des tags |
+
+La cible est résolue **à chaque évaluation** (toutes les 60 s), à partir des
+tags courants des hôtes : un hôte qui reçoit un tag entre dans les règles qui
+ciblent ce tag ou un groupe qui le contient, sans modifier la règle. Un hôte
+qui sort du périmètre (tag retiré, groupe redéfini, règle reciblée) voit ses
+incidents ouverts sur cette règle résolus silencieusement, comme pour une
+fenêtre de maintenance : pas de notification « résolu », seulement le
+rafraîchissement de la liste.
+
+Les comparaisons de tags ignorent la casse (`Prod` = `prod`).
+
+**Groupes d'hôtes** (Paramètres › Groupes d'hôtes, admin uniquement,
+`/api/v1/host-groups`). Un groupe stocke une **règle**, jamais une liste
+d'hôtes :
+
+- `tags` + `match_mode` : `all` (l'hôte porte tous les tags) ou `any` (au moins
+  un) ;
+- `os_contains` (optionnel) : le nom de l'OS de l'hôte doit contenir ce texte
+  (par exemple `debian`), en plus des tags. Un filtre d'OS seul suffit à
+  définir un groupe ;
+- un groupe sans tag ni filtre d'OS est refusé : il ne correspondrait à aucun
+  hôte.
+
+Les membres affichés (`member_ids`) sont calculés à la lecture. Un groupe
+ciblé par au moins une règle ne peut pas être supprimé : la règle cesserait
+d'alerter sans que personne ne le voie. Il faut d'abord changer la cible des
+règles concernées.
+
+Les tags se modifient depuis la page d'un hôte (bouton **Modifier**, Operator+
+sur cet hôte). Ils sont affichés dans l'en-tête de l'hôte et dans la liste du
+tableau de bord, qui permet de filtrer par tag.
+
+**Compatibilité.** Les règles créées avant l'existence du ciblage gardent leur
+périmètre exact : une règle avec `host_id` cible cet hôte (`host`), une règle
+sans `host_id` cible tous les hôtes (`all`). Une règle envoyée à l'API sans
+`target_type` suit la même dérivation.
+
+Pour une métrique globale, non liée à un hôte, le formulaire ne propose que
+la cible « Tous les hôtes ».
+Les règles Docker et Proxmox gardent leur propre portée (`docker_scope`,
+`proxmox_scope`) et ignorent `target_type`.
+
 ## Dépannage
 
 | Symptôme | Cause probable |
@@ -216,6 +273,8 @@ Le filtrage du sélecteur d'hôtes accepte le nom **ou** un tag d'hôte.
 | Un hôte tombe et je ne reçois qu'une alerte au lieu de dix | Comportement voulu — les incidents fils sont corrélés (voir [§5](#5-corrélation--éviter-la-cascade--hôte-down-)). Ils sont bien enregistrés, marqués d'une icône de lien |
 | Modifier un modèle n'a rien changé sur les règles existantes | Voulu — un modèle est un moule, pas un lien vivant (voir [§7](#7-modèles-de-règles)) |
 | Une règle sur un guest Proxmox n'est pas couverte par ma fenêtre de maintenance d'hôte | Seule une fenêtre **globale** couvre une cible non-agent (voir [§6](#6-fenêtres-de-maintenance)) |
+| Un nouvel hôte n'est pas surveillé par une règle de groupe | Il ne porte pas les tags du groupe, ou son OS ne contient pas le filtre d'OS. L'aperçu « N hôtes correspondent » du formulaire de groupe le montre (voir [§8](#8-ciblage-des-règles-agent--hôte-groupe-tags)) |
+| Impossible de supprimer un groupe d'hôtes | Une règle le cible encore : changez la cible de ces règles d'abord |
 
 ## Pour aller plus loin
 
@@ -223,4 +282,4 @@ Le filtrage du sélecteur d'hôtes accepte le nom **ou** un tag d'hôte.
 - [Runbooks-and-Scheduled-Tasks.md](Runbooks-and-Scheduled-Tasks.md) : le
   vocabulaire module/action/cible partagé par `command_trigger`
 - [ROADMAP.md](https://github.com/Rem7474/ServerSupervisor/blob/main/ROADMAP.md) : canaux de notification supplémentaires (#6),
-  groupes dynamiques d'hôtes et règles par groupe (#7)
+  permissions par groupe d'hôtes (#7)
