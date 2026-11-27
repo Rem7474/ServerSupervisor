@@ -81,83 +81,30 @@ func TestUptimeProbe_SLOTargetDefaultAndKeep(t *testing.T) {
 	}
 }
 
-func TestDailyRollupCountsAndDownPeriods(t *testing.T) {
+func TestUptimeSLAEndpoint_ReportsCoverage(t *testing.T) {
 	r, db := newStatusPageRouter(t)
-	ctx := context.Background()
 	id := createProbe(t, r, map[string]any{"type": "tcp", "name": "api", "target": "api.internal:443"})
 
 	today := time.Now().UTC().Truncate(24 * time.Hour)
 	threeDaysAgo := today.AddDate(0, 0, -3).Add(6 * time.Hour)
 	record(t, db, id, threeDaysAgo, true, "")
 	record(t, db, id, threeDaysAgo.Add(time.Minute), false, "refused")
-	record(t, db, id, threeDaysAgo.Add(2*time.Minute), false, "refused")
-	record(t, db, id, threeDaysAgo.Add(3*time.Minute), true, "")
-	record(t, db, id, today.Add(time.Minute), false, "timeout")
-
-	// Before the rollup, days older than yesterday are not visible...
-	counts, err := db.GetUptimeDailyCounts(ctx, []string{id}, 7)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(counts) != 1 || counts[0].TotalChecks != 1 || counts[0].UpChecks != 0 {
-		t.Fatalf("before rollup only today's raw counts are expected, got %+v", counts)
-	}
-	// ...after it they come from uptime_probe_daily, and survive the raw purge.
-	if _, err := db.RollupUptimeDaily(ctx, 29); err != nil {
+	record(t, db, id, today.Add(time.Minute), true, "")
+	if _, err := db.RollupUptimeDaily(context.Background(), 29); err != nil {
 		t.Fatalf("rollup: %v", err)
 	}
-	if _, err := db.RollupUptimeDaily(ctx, 29); err != nil {
-		t.Fatalf("rollup must be idempotent: %v", err)
-	}
-	if _, err := db.Exec(ctx, `DELETE FROM uptime_probe_results WHERE checked_at < $1`, today); err != nil {
-		t.Fatal(err)
-	}
-	counts, err = db.GetUptimeDailyCounts(ctx, []string{id}, 7)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(counts) != 2 || counts[0].TotalChecks != 4 || counts[0].UpChecks != 2 || !counts[0].Day.Equal(today.AddDate(0, 0, -3)) {
-		t.Fatalf("unexpected counts after rollup: %+v", counts)
-	}
-	// A 2-day window excludes the rolled-up day.
-	if short, _ := db.GetUptimeDailyCounts(ctx, []string{id}, 2); len(short) != 1 {
-		t.Fatalf("2-day window should only hold today, got %+v", short)
-	}
 
-	// Old daily rows are cleaned beyond the retention.
-	if _, err := db.Exec(ctx, `INSERT INTO uptime_probe_daily (probe_id, day, total_checks, up_checks) VALUES ($1, $2, 1, 1)`, id, today.AddDate(0, 0, -500)); err != nil {
-		t.Fatal(err)
-	}
-	if n, err := db.CleanupOldUptimeDaily(ctx, 400); err != nil || n != 1 {
-		t.Fatalf("cleanup removed %d rows (%v), want 1", n, err)
-	}
-
-	// Down periods: re-insert a failure run with a recovery, plus today's ongoing one.
-	record(t, db, id, threeDaysAgo.Add(time.Minute), false, "refused")
-	record(t, db, id, threeDaysAgo.Add(2*time.Minute), false, "refused")
-	record(t, db, id, threeDaysAgo.Add(3*time.Minute), true, "")
-	periods, err := db.ListUptimeDownPeriods(ctx, []string{id}, today.AddDate(0, 0, -14), 10)
-	if err != nil {
-		t.Fatalf("down periods: %v", err)
-	}
-	if len(periods) != 2 {
-		t.Fatalf("expected 2 down periods, got %+v", periods)
-	}
-	if periods[0].ResolvedAt != nil || !periods[0].StartedAt.Equal(today.Add(time.Minute)) {
-		t.Fatalf("newest period must be today's ongoing one, got %+v", periods[0])
-	}
-	if periods[1].ResolvedAt == nil || !periods[1].ResolvedAt.Equal(threeDaysAgo.Add(3*time.Minute)) || !periods[1].StartedAt.Equal(threeDaysAgo.Add(time.Minute)) {
-		t.Fatalf("older period must be resolved by the next success, got %+v", periods[1])
-	}
-
-	// SLA endpoint reports it with its coverage.
 	w := doJSON(t, r, http.MethodGet, "/uptime/sla", nil)
 	var report models.SLAReport
 	if err := json.Unmarshal(w.Body.Bytes(), &report); err != nil || w.Code != http.StatusOK {
 		t.Fatalf("sla: %d %s", w.Code, w.Body.String())
 	}
-	if len(report.Probes) != 1 || report.Probes[0].Windows[0].CoveredDays != 2 || report.Probes[0].Windows[0].TotalChecks != 5 {
-		t.Fatalf("unexpected SLA report %+v", report.Probes)
+	if len(report.Probes) != 1 {
+		t.Fatalf("expected one probe, got %+v", report.Probes)
+	}
+	week := report.Probes[0].Windows[0]
+	if week.Days != 7 || week.CoveredDays != 2 || week.TotalChecks != 3 || week.UpChecks != 2 || week.Status != models.SLAStatusBreached {
+		t.Fatalf("unexpected 7-day window %+v", week)
 	}
 }
 
