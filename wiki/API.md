@@ -56,6 +56,10 @@ de son propriétaire :
   registre, webhooks Git, abonnements Web Push ;
 - enregistrement d'hôtes (`POST /hosts`, `/hosts/bulk`), rotation de clé d'agent et
   permissions par hôte.
+- découverte réseau par agent qui émet du trafic sur un réseau : lecture ARP, scan de ports,
+  sonde SNMP et annulation d'un job (`POST /discovery/arp`, `/discovery/port-scan`,
+  `/discovery/snmp`, `/discovery/jobs/{id}/cancel`). La lecture des limites et du résultat
+  d'un job (`GET /discovery/limits`, `/discovery/jobs/{id}`) reste ouverte.
 
 Ces opérations restent disponibles depuis l'interface, avec une session.
 
