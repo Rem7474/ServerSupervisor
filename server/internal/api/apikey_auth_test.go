@@ -227,6 +227,12 @@ func TestAPIKeyForbiddenRoute(t *testing.T) {
 		{http.MethodGet, "/api/v1/npm/connections/:id/proxy-hosts", true},
 		{http.MethodPost, "/api/v1/push/subscribe", true},
 		{http.MethodGet, "/api/v1/users", true},
+		{http.MethodPost, "/api/v1/discovery/arp", true},
+		{http.MethodPost, "/api/v1/discovery/port-scan", true},
+		{http.MethodPost, "/api/v1/discovery/snmp", true},
+		{http.MethodPost, "/api/v1/discovery/jobs/:id/cancel", true},
+		{http.MethodGet, "/api/v1/discovery/jobs/:id", false},
+		{http.MethodGet, "/api/v1/discovery/limits", false},
 	}
 	for _, tc := range cases {
 		if got := apiKeyForbiddenRoute(tc.method, tc.path); got != tc.want {
