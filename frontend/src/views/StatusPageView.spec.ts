@@ -72,7 +72,7 @@ describe('StatusPageView', () => {
     await flushPromises()
     const incidents = wrapper.findAll('[data-test="incident"]')
     expect(incidents).toHaveLength(2)
-    expect(incidents[0]!.text()).toContain('Indisponibilité de API')
+    expect(incidents[0]!.text()).toContain('Indisponibilité : API')
     expect(incidents[0]!.text()).toContain('En cours depuis')
     expect(incidents[1]!.text()).toContain('1 h 15 min')
   })

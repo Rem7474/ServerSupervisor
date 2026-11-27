@@ -225,7 +225,7 @@
     "today": "aujourd'hui",
     "incidentsTitle": "Incidents récents (14 jours)",
     "noIncidents": "Aucun incident sur les 14 derniers jours.",
-    "incidentOutage": "Indisponibilité de {service}",
+    "incidentOutage": "Indisponibilité : {service}",
     "incidentOngoing": "En cours depuis {start}",
     "incidentResolved": "{start} → {end} ({duration})",
     "noServices": "Aucun service n'est publié pour l'instant.",
