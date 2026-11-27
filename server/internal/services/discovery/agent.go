@@ -41,6 +41,22 @@ const (
 	snmpMinPassphrase  = 8
 	snmpMaxCredential  = 255
 	cancelledJobOutput = "cancelled"
+	// sweepInterval is how often RunSweeper drops expired SNMP credentials
+	// and stale cancel requests, whatever the discovery activity.
+	sweepInterval = time.Minute
+	// activeJobLookback is how many of a host's latest discovery commands
+	// are checked for one still pending or running.
+	activeJobLookback = 5
+)
+
+// Port-scan pacing sent to the agent with every scan (the agent clamps
+// them again): one probe timeout, parallel probes and probes per second.
+// At this rate a /24 with the default port list takes about a minute and
+// the largest allowed scan stays under the agent's duration cap.
+const (
+	scanProbeTimeoutMs = 800
+	scanConcurrency    = 64
+	scanRatePerSecond  = 500
 )
 
 // DefaultPorts is the port list scanned when the request names none: common
@@ -66,6 +82,7 @@ type AgentRepository interface {
 	GetHost(ctx context.Context, id string) (*models.Host, error)
 	GetAllHosts(ctx context.Context) ([]models.Host, error)
 	GetRemoteCommandByID(ctx context.Context, id string) (*models.RemoteCommand, error)
+	GetRemoteCommandsByHostAndModule(ctx context.Context, hostID, module string, limit int) ([]models.RemoteCommand, error)
 	CancelPendingRemoteCommand(ctx context.Context, id, output string) (bool, error)
 	CreateAuditLog(ctx context.Context, username, action, hostID, ipAddress, details, status string) (int64, error)
 }
@@ -111,6 +128,10 @@ type AgentService struct {
 	mu        sync.Mutex
 	secrets   map[string]heldSecret // secret_ref -> credentials, in memory only
 	cancelled map[string]time.Time  // command id -> cancel request time
+
+	// startMu serialises the "no active job on this agent" check with the
+	// dispatch that follows it, so two concurrent requests cannot both pass.
+	startMu sync.Mutex
 }
 
 // NewAgentService wires the service. status may be nil.
@@ -184,11 +205,13 @@ func (s *AgentService) checkTargetPrefix(p netip.Prefix) error {
 	if !private {
 		return apperr.Validation("only private IPv4 addresses can be probed").I18n(apperr.CodeDiscoveryPrivateOnly, nil)
 	}
-	allowed := s.allowedSubnets()
-	if len(allowed) == 0 {
+	// No list configured: any private range. A configured list allows only
+	// its valid entries; one with no valid entry allows nothing (startup
+	// validation refuses such a list, this is the fail-closed fallback).
+	if len(s.cfg.DiscoveryAllowedSubnets) == 0 {
 		return nil
 	}
-	for _, a := range allowed {
+	for _, a := range s.allowedSubnets() {
 		if a.Bits() <= p.Bits() && a.Contains(p.Addr()) {
 			return nil
 		}
@@ -300,7 +323,10 @@ func (s *AgentService) StartPortScan(ctx context.Context, actor Actor, req model
 	if err := s.requireAgent(ctx, req.HostID, true); err != nil {
 		return "", err
 	}
-	payload := map[string]any{"cidr": prefix.String(), "ports": ports}
+	payload := map[string]any{
+		"cidr": prefix.String(), "ports": ports,
+		"timeout_ms": scanProbeTimeoutMs, "concurrency": scanConcurrency, "rate_per_second": scanRatePerSecond,
+	}
 	audit := map[string]any{"cidr": prefix.String(), "ports": len(ports)}
 	return s.dispatch(ctx, actor, req.HostID, "port_scan", prefix.String(), payload, audit)
 }
@@ -427,7 +453,28 @@ func (s *AgentService) sweepLocked() {
 	}
 }
 
+// ensureNoActiveJob refuses a new job while another discovery job of the
+// same agent is still pending or running: an agent runs one at a time.
+func (s *AgentService) ensureNoActiveJob(ctx context.Context, hostID string) error {
+	cmds, err := s.repo.GetRemoteCommandsByHostAndModule(ctx, hostID, discoveryModule, activeJobLookback)
+	if err != nil {
+		return apperr.Failed("failed to check the agent's discovery jobs")
+	}
+	for _, c := range cmds {
+		if c.Status == "pending" || c.Status == "running" {
+			return apperr.Conflict("a discovery job is already running on this agent").
+				I18n(apperr.CodeDiscoveryJobActive, map[string]string{"job_id": c.ID})
+		}
+	}
+	return nil
+}
+
 func (s *AgentService) dispatch(ctx context.Context, actor Actor, hostID, action, target string, payload, auditDetails map[string]any) (string, error) {
+	s.startMu.Lock()
+	defer s.startMu.Unlock()
+	if err := s.ensureNoActiveJob(ctx, hostID); err != nil {
+		return "", err
+	}
 	body, _ := json.Marshal(payload)
 	details, _ := json.Marshal(auditDetails)
 	res, err := s.disp.Create(ctx, dispatch.Request{
@@ -519,6 +566,7 @@ func (s *AgentService) Cancel(ctx context.Context, actor Actor, id string) (*mod
 			return nil, apperr.Failed("failed to cancel the job")
 		}
 		if ok {
+			s.forgetSecret(cmd.Payload)
 			if s.status != nil {
 				s.status.BroadcastStatus(id, "failed", cancelledJobOutput)
 			}
@@ -533,6 +581,42 @@ func (s *AgentService) Cancel(ctx context.Context, actor Actor, id string) (*mod
 	details, _ := json.Marshal(map[string]string{"job_id": id, "kind": cmd.Action})
 	_, _ = s.repo.CreateAuditLog(ctx, actor.Username, "discovery_cancel", cmd.HostID, actor.IPAddress, string(details), "success")
 	return s.Job(ctx, id)
+}
+
+// forgetSecret drops the credentials held for an SNMP command that will
+// never be claimed (cancelled while pending).
+func (s *AgentService) forgetSecret(payload string) {
+	var p struct {
+		SecretRef string `json:"secret_ref"`
+	}
+	if json.Unmarshal([]byte(payload), &p) != nil || p.SecretRef == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.secrets, p.SecretRef)
+}
+
+// Sweep drops expired SNMP credentials and stale cancel requests.
+func (s *AgentService) Sweep() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sweepLocked()
+}
+
+// RunSweeper calls Sweep every sweepInterval until ctx ends, so expired
+// credentials do not wait for the next SNMP request to be dropped.
+func (s *AgentService) RunSweeper(ctx context.Context) {
+	t := time.NewTicker(sweepInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			s.Sweep()
+		}
+	}
 }
 
 func (s *AgentService) markCancelled(id string) {

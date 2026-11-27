@@ -22,13 +22,17 @@ const (
 	MaxConcurrency      = 256
 	DefaultRatePerSec   = 500
 	MaxRatePerSec       = 2000
+	// MaxOpenPortsPerHost and MaxOpenPortsTotal bound the result size; the
+	// result is flagged truncated past them.
+	MaxOpenPortsPerHost = 256
+	MaxOpenPortsTotal   = 4096
 )
 
 // Vars rather than consts so tests can shorten them.
 var (
 	// MaxScanDuration stops a scan that would otherwise run for too long;
 	// the result is reported as partial (timed_out).
-	MaxScanDuration = 20 * time.Minute
+	MaxScanDuration = 10 * time.Minute
 	// ProgressInterval is how often Scan reports progress.
 	ProgressInterval = 2 * time.Second
 )
@@ -60,6 +64,9 @@ type ScanResult struct {
 	TimedOut     bool       `json:"timed_out"`
 	DurationMs   int64      `json:"duration_ms"`
 	Hosts        []ScanHost `json:"hosts"`
+	// Truncated is set when open ports were left out of Hosts because of
+	// MaxOpenPortsPerHost or MaxOpenPortsTotal.
+	Truncated bool `json:"truncated,omitempty"`
 }
 
 // Progress is a periodic scan progress snapshot.
@@ -187,8 +194,8 @@ func Scan(ctx context.Context, req ScanRequest, dial DialFunc, progress func(Pro
 		ProbesDone:   int(done.Load()),
 		ProbesTotal:  total,
 		DurationMs:   time.Since(start).Milliseconds(),
-		Hosts:        sortedHosts(open),
 	}
+	res.Hosts, res.Truncated = sortedHosts(open)
 	if res.ProbesDone < total {
 		if ctx.Err() != nil {
 			res.Cancelled = true
@@ -235,19 +242,31 @@ func probeOpen(ctx context.Context, dial DialFunc, pr probe, timeout time.Durati
 	return true
 }
 
-func sortedHosts(open map[netip.Addr][]int) []ScanHost {
+// sortedHosts orders hosts by address and ports ascending, keeping at most
+// MaxOpenPortsPerHost ports per host and MaxOpenPortsTotal overall (lowest
+// addresses and ports first). truncated reports whether anything was left out.
+func sortedHosts(open map[netip.Addr][]int) (hosts []ScanHost, truncated bool) {
 	addrs := make([]netip.Addr, 0, len(open))
 	for a := range open {
 		addrs = append(addrs, a)
 	}
 	sort.Slice(addrs, func(i, j int) bool { return addrs[i].Less(addrs[j]) })
-	hosts := make([]ScanHost, 0, len(addrs))
+	hosts = make([]ScanHost, 0, len(addrs))
+	budget := MaxOpenPortsTotal
 	for _, a := range addrs {
 		ports := open[a]
 		sort.Ints(ports)
-		hosts = append(hosts, ScanHost{IP: a.String(), OpenPorts: ports})
+		keep := min(len(ports), MaxOpenPortsPerHost, budget)
+		if keep < len(ports) {
+			truncated = true
+		}
+		if keep == 0 {
+			continue
+		}
+		hosts = append(hosts, ScanHost{IP: a.String(), OpenPorts: ports[:keep]})
+		budget -= keep
 	}
-	return hosts
+	return hosts, truncated
 }
 
 // ErrScanDisabled is returned when the agent's configuration does not allow

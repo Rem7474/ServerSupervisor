@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -185,5 +186,43 @@ func TestScanUsesRealDialerByDefault(t *testing.T) {
 	}
 	if res.ProbesDone != 1 {
 		t.Fatalf("probes done = %d", res.ProbesDone)
+	}
+}
+
+func TestSortedHostsBoundsResult(t *testing.T) {
+	many := func(n int) []int {
+		out := make([]int, n)
+		for i := range out {
+			out[i] = n - i // reversed: sortedHosts sorts before cutting
+		}
+		return out
+	}
+	hosts, truncated := sortedHosts(map[netip.Addr][]int{
+		netip.MustParseAddr("10.0.0.2"): {443, 22},
+		netip.MustParseAddr("10.0.0.1"): {80},
+	})
+	if truncated || len(hosts) != 2 || hosts[0].IP != "10.0.0.1" || hosts[1].OpenPorts[0] != 22 {
+		t.Fatalf("small result = %+v %v", hosts, truncated)
+	}
+
+	// Per-host cap: lowest ports kept.
+	hosts, truncated = sortedHosts(map[netip.Addr][]int{netip.MustParseAddr("10.0.0.1"): many(MaxOpenPortsPerHost + 10)})
+	if !truncated || len(hosts[0].OpenPorts) != MaxOpenPortsPerHost || hosts[0].OpenPorts[0] != 1 {
+		t.Fatalf("per-host cap: %d ports, truncated=%v", len(hosts[0].OpenPorts), truncated)
+	}
+
+	// Total cap: lowest addresses kept, the rest dropped.
+	open := map[netip.Addr][]int{}
+	nHosts := MaxOpenPortsTotal/MaxOpenPortsPerHost + 2
+	for i := range nHosts {
+		open[netip.AddrFrom4([4]byte{10, 0, 1, byte(i + 1)})] = many(MaxOpenPortsPerHost)
+	}
+	hosts, truncated = sortedHosts(open)
+	total := 0
+	for _, h := range hosts {
+		total += len(h.OpenPorts)
+	}
+	if !truncated || total != MaxOpenPortsTotal || hosts[0].IP != "10.0.1.1" || len(hosts) != MaxOpenPortsTotal/MaxOpenPortsPerHost {
+		t.Fatalf("total cap: %d ports over %d hosts, truncated=%v", total, len(hosts), truncated)
 	}
 }

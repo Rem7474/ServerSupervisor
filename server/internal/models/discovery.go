@@ -105,6 +105,8 @@ type PortScanResult struct {
 	TimedOut     bool           `json:"timed_out"`
 	DurationMs   int64          `json:"duration_ms"`
 	Hosts        []PortScanHost `json:"hosts"`
+	// Truncated: the agent left open ports out (per-host or total cap).
+	Truncated bool `json:"truncated,omitempty"`
 }
 
 // SNMPInterface is one ifTable row summary.

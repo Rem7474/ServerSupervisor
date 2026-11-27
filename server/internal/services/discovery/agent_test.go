@@ -26,6 +26,7 @@ type fakeAgentRepo struct {
 	cancelOK    bool
 	cancelErr   error
 	cancelCalls int
+	listErr     error
 	audits      []string
 }
 
@@ -43,6 +44,19 @@ func (f *fakeAgentRepo) GetRemoteCommandByID(_ context.Context, id string) (*mod
 		return c, nil
 	}
 	return nil, errors.New("no rows")
+}
+
+func (f *fakeAgentRepo) GetRemoteCommandsByHostAndModule(_ context.Context, hostID, module string, _ int) ([]models.RemoteCommand, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []models.RemoteCommand
+	for _, c := range f.commands {
+		if c.HostID == hostID && c.Module == module {
+			out = append(out, *c)
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeAgentRepo) CancelPendingRemoteCommand(_ context.Context, id, output string) (bool, error) {
@@ -152,6 +166,61 @@ func TestValidateScanCIDR(t *testing.T) {
 	}
 }
 
+// A configured list whose entries are all invalid must not fall back to
+// "any private range": it allows nothing.
+func TestAllowedSubnetsFailClosed(t *testing.T) {
+	s, _, _, _ := fixture(fullAgent)
+	s.cfg.DiscoveryAllowedSubnets = []string{"10.0.0.0/8 192.168.0.0/16", "192.168.1.1", "lan"}
+	for _, cidr := range []string{"10.0.0.0/24", "192.168.1.0/24"} {
+		if _, err := s.ValidateScanCIDR(cidr); i18nKey(t, err) != apperr.CodeDiscoverySubnetNotAllowed {
+			t.Errorf("%s: %v", cidr, err)
+		}
+	}
+	if _, err := s.validateTarget("192.168.1.1"); i18nKey(t, err) != apperr.CodeDiscoverySubnetNotAllowed {
+		t.Errorf("snmp target: %v", err)
+	}
+	s.cfg.DiscoveryAllowedSubnets = nil
+	if _, err := s.ValidateScanCIDR("10.0.0.0/24"); err != nil {
+		t.Fatalf("no list configured: %v", err)
+	}
+}
+
+// One discovery job at a time per agent: a pending or running job blocks
+// the next start with a 409, a finished one does not, another agent is not
+// affected.
+func TestOneActiveJobPerAgent(t *testing.T) {
+	s, repo, disp, _ := fixture(fullAgent)
+	repo.hosts["h2"] = &models.Host{ID: "h2", Collectors: fullAgent}
+	for _, status := range []string{"pending", "running"} {
+		repo.commands["busy"] = &models.RemoteCommand{ID: "busy", HostID: "h1", Module: "discovery", Action: "port_scan", Status: status}
+		_, err := s.StartARP(context.Background(), admin, "h1")
+		var ae *apperr.Error
+		if !errors.As(err, &ae) || ae.HTTPStatus != 409 || ae.I18nKey != apperr.CodeDiscoveryJobActive || ae.Params["job_id"] != "busy" {
+			t.Fatalf("%s job: %v", status, err)
+		}
+	}
+	if len(disp.reqs) != 0 {
+		t.Fatal("a job was dispatched while another one is active")
+	}
+	// The SNMP credentials of a refused probe are not kept.
+	_, err := s.StartSNMP(context.Background(), admin, models.SNMPProbeRequest{HostID: "h1", Target: "10.0.0.2", Version: "2c", Community: testCommunity})
+	if i18nKey(t, err) != apperr.CodeDiscoveryJobActive || len(s.secrets) != 0 {
+		t.Fatalf("snmp refused: %v, %d secrets held", err, len(s.secrets))
+	}
+	if _, err := s.StartARP(context.Background(), admin, "h2"); err != nil {
+		t.Fatalf("other agent: %v", err)
+	}
+	repo.commands["busy"].Status = "completed"
+	repo.commands["other"] = &models.RemoteCommand{ID: "other", HostID: "h1", Module: "docker", Status: "running"}
+	if _, err := s.StartARP(context.Background(), admin, "h1"); err != nil {
+		t.Fatalf("finished job / other module: %v", err)
+	}
+	repo.listErr = errors.New("db down")
+	if _, err := s.StartARP(context.Background(), admin, "h1"); err == nil {
+		t.Fatal("lookup error swallowed")
+	}
+}
+
 func TestParsePorts(t *testing.T) {
 	ports, err := ParsePorts("", 10)
 	if err != nil || len(ports) != len(DefaultPorts) {
@@ -204,7 +273,7 @@ func TestStartPortScan(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := disp.reqs[0]
-	if r.Action != "port_scan" || r.Target != "192.168.1.0/24" || r.Payload != `{"cidr":"192.168.1.0/24","ports":[22,80]}` {
+	if r.Action != "port_scan" || r.Target != "192.168.1.0/24" || r.Payload != `{"cidr":"192.168.1.0/24","concurrency":64,"ports":[22,80],"rate_per_second":500,"timeout_ms":800}` {
 		t.Fatalf("request = %+v", r)
 	}
 	if r.Audit.Details != `{"cidr":"192.168.1.0/24","ports":2}` {
@@ -355,6 +424,49 @@ func TestCancelPendingJob(t *testing.T) {
 	}
 }
 
+// Cancelling an SNMP probe no agent claimed yet drops its credentials.
+func TestCancelPendingSNMPForgetsSecret(t *testing.T) {
+	s, repo, disp, _ := fixture(fullAgent)
+	if _, err := s.StartSNMP(context.Background(), admin, models.SNMPProbeRequest{HostID: "h1", Target: "10.0.0.2", Version: "2c", Community: testCommunity}); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.secrets) != 1 {
+		t.Fatalf("secrets held = %d", len(s.secrets))
+	}
+	repo.commands["cmd-1"] = &models.RemoteCommand{ID: "cmd-1", HostID: "h1", Module: "discovery", Action: "snmp", Status: "pending", Payload: disp.reqs[0].Payload}
+	repo.cancelOK = true
+	if _, err := s.Cancel(context.Background(), admin, "cmd-1"); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.secrets) != 0 {
+		t.Fatal("credentials of a cancelled probe are still held")
+	}
+	s.forgetSecret("not json") // tolerated
+}
+
+// The sweeper drops expired credentials without waiting for SNMP activity.
+func TestSweeperDropsExpiredSecrets(t *testing.T) {
+	s, _, _, _ := fixture(fullAgent)
+	now := time.Now()
+	s.now = func() time.Time { return now }
+	s.holdSecret("ref", snmpSecrets{Community: testCommunity})
+	s.Sweep()
+	if len(s.secrets) != 1 {
+		t.Fatal("a live secret was swept")
+	}
+	now = now.Add(secretTTL + time.Second)
+	s.Sweep()
+	if len(s.secrets) != 0 {
+		t.Fatal("expired secret kept")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { s.RunSweeper(ctx); close(done) }()
+	cancel()
+	<-done
+}
+
 func TestCancelPendingClaimedMeanwhile(t *testing.T) {
 	s, repo, _, st := fixture(fullAgent)
 	repo.commands["c1"] = &models.RemoteCommand{ID: "c1", Module: "discovery", Action: "port_scan", Status: "pending"}
@@ -414,7 +526,7 @@ func TestJobResults(t *testing.T) {
 		Output: `{"entries":[{"ip":"192.168.1.9","mac":"BC:24:11:00:00:01","interface":"eth0"},{"ip":"192.168.1.20","mac":"02:42:ac:11:00:02","interface":"docker0"},{"ip":"192.168.1.30","mac":"a6:00:00:00:00:01","interface":"eth0"}]}`}
 	repo.commands["arp-empty"] = &models.RemoteCommand{ID: "arp-empty", Module: "discovery", Action: "arp", Status: "completed", Output: `{}`}
 	repo.commands["scan"] = &models.RemoteCommand{ID: "scan", Module: "discovery", Action: "port_scan", Status: "completed",
-		Output: `{"cidr":"192.168.1.0/24","cancelled":true,"hosts":[{"ip":"192.168.1.9","open_ports":[22]},{"ip":"192.168.1.50","open_ports":[80]}]}`}
+		Output: `{"cidr":"192.168.1.0/24","cancelled":true,"truncated":true,"hosts":[{"ip":"192.168.1.9","open_ports":[22]},{"ip":"192.168.1.50","open_ports":[80]}]}`}
 	repo.commands["scan-empty"] = &models.RemoteCommand{ID: "scan-empty", Module: "discovery", Action: "port_scan", Status: "completed", Output: `{}`}
 	repo.commands["snmp"] = &models.RemoteCommand{ID: "snmp", Module: "discovery", Action: "snmp", Status: "completed", Output: `{"target":"192.168.1.9","sys_name":"nas"}`}
 	repo.commands["failed"] = &models.RemoteCommand{ID: "failed", Module: "discovery", Action: "snmp", Status: "failed", Output: "ERROR: SNMP request failed: timeout"}
@@ -441,7 +553,7 @@ func TestJobResults(t *testing.T) {
 	}
 
 	job, _ = s.Job(context.Background(), "scan")
-	if !job.PortScan.Cancelled || !job.PortScan.Hosts[0].AlreadyRegistered || job.PortScan.Hosts[1].AlreadyRegistered {
+	if !job.PortScan.Cancelled || !job.PortScan.Truncated || !job.PortScan.Hosts[0].AlreadyRegistered || job.PortScan.Hosts[1].AlreadyRegistered {
 		t.Fatalf("scan = %+v", job.PortScan)
 	}
 	if job, _ := s.Job(context.Background(), "scan-empty"); job.PortScan.Hosts == nil {
