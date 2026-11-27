@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/serversupervisor/server/internal/apperr"
 )
 
 // ========== Alerts ==========
@@ -66,6 +68,9 @@ const (
 	AlertSourceAgent   AlertSourceType = "agent"
 	AlertSourceProxmox AlertSourceType = "proxmox"
 	AlertSourceDocker  AlertSourceType = "docker"
+	// AlertSourceSynthetic covers the uptime/SSL metrics, evaluated once per
+	// rule rather than per host.
+	AlertSourceSynthetic AlertSourceType = "synthetic"
 )
 
 // ===== Alert capability discovery (metric catalogs + scope options) =====
@@ -428,6 +433,23 @@ func IsDockerMetric(metric string) bool {
 	}
 }
 
+// IsSyntheticMetric reports whether a metric belongs to synthetic monitoring
+// (uptime probes, SSL certificates).
+func IsSyntheticMetric(metric string) bool {
+	switch metric {
+	case "uptime_down_count", "ssl_min_days_remaining":
+		return true
+	default:
+		return false
+	}
+}
+
+// SyntheticTarget is the single pseudo-host a synthetic rule is evaluated
+// against, so it opens at most one incident per rule.
+func SyntheticTarget(metric string) Host {
+	return Host{ID: "synthetic:" + metric, Name: "Monitoring synthétique", Status: "online", LastSeen: time.Now()}
+}
+
 func IsProxmoxMetric(metric string) bool {
 	switch metric {
 	case "proxmox_storage_percent", "proxmox_node_cpu_percent", "proxmox_node_memory_percent",
@@ -598,7 +620,7 @@ func (ar *AlertRule) validateAgentTarget() error {
 	switch ar.TargetType {
 	case AlertTargetHost:
 		if ar.HostID == nil || strings.TrimSpace(*ar.HostID) == "" {
-			return fmt.Errorf("une alerte agent ciblant un hote doit preciser l'hote")
+			return apperr.Validation("an agent rule targeting a host must name the host").I18n(apperr.CodeAlertTargetHostRequired, nil)
 		}
 		ar.HostGroupID = nil
 		ar.TargetTags = nil
@@ -608,19 +630,19 @@ func (ar *AlertRule) validateAgentTarget() error {
 		ar.TargetTags = nil
 	case AlertTargetGroup:
 		if ar.HostGroupID == nil || strings.TrimSpace(*ar.HostGroupID) == "" {
-			return fmt.Errorf("une alerte ciblant un groupe doit preciser le groupe")
+			return apperr.Validation("a rule targeting a group must name the group").I18n(apperr.CodeAlertTargetGroupRequired, nil)
 		}
 		ar.HostID = nil
 		ar.TargetTags = nil
 	case AlertTargetTag:
 		ar.TargetTags = NormalizeTags(ar.TargetTags)
 		if len(ar.TargetTags) == 0 {
-			return fmt.Errorf("une alerte ciblant des tags doit preciser au moins un tag")
+			return apperr.Validation("a rule targeting tags must name at least one tag").I18n(apperr.CodeAlertTargetTagsRequired, nil)
 		}
 		ar.HostID = nil
 		ar.HostGroupID = nil
 	default:
-		return fmt.Errorf("type de cible invalide: %s", ar.TargetType)
+		return apperr.Validation("invalid target type").I18n(apperr.CodeAlertTargetTypeInvalid, map[string]string{"type": ar.TargetType})
 	}
 	return nil
 }
@@ -701,6 +723,13 @@ func (ar *AlertRule) Validate() error {
 		if err := ar.DockerScope.Validate(ar.Metric); err != nil {
 			return err
 		}
+	case AlertSourceSynthetic:
+		if !IsSyntheticMetric(ar.Metric) {
+			return apperr.Validation("not a synthetic metric").I18n(apperr.CodeAlertSyntheticMetricRequired, map[string]string{"metric": ar.Metric})
+		}
+		ar.clearAgentTarget()
+		ar.ProxmoxScope = nil
+		ar.DockerScope = nil
 	default:
 		return fmt.Errorf("source_type invalide")
 	}

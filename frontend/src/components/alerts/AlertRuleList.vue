@@ -112,6 +112,7 @@
               <span
                 v-if="ruleSourceType(rule) === 'agent'"
                 class="badge bg-secondary-lt text-secondary"
+                :title="agentTargetHint(rule)"
               >{{ t('alerts.agentSourceLabel', { host: agentTargetLabel(rule) }) }}</span>
               <span
                 v-else-if="ruleSourceType(rule) === 'docker'"
@@ -294,13 +295,25 @@ const sortedRules = computed(() => {
   })
 })
 
+// Group definitions are admin-only: a viewer gets a short label on the badge
+// and the reason in its tooltip.
+function isRestrictedGroup(rule: AlertRule): boolean {
+  return !props.isAdmin && rule.target_type === 'group'
+    && !props.hostGroups.some((g) => g.id === rule.host_group_id)
+}
+
+function agentTargetHint(rule: AlertRule): string | undefined {
+  return isRestrictedGroup(rule) ? t('alerts.targetRestrictedGroupHint') : undefined
+}
+
 // Who an agent rule watches: a host, every host, a group or tags. Rules
 // saved before targeting existed have no target_type (host_id decides).
 function agentTargetLabel(rule: AlertRule): string {
   const target = rule.target_type || (rule.host_id ? 'host' : 'all')
   if (target === 'group') {
     const group = props.hostGroups.find((g) => g.id === rule.host_group_id)
-    return group ? t('alerts.targetGroupLabel', { name: group.name }) : t('alerts.targetUnknownGroupLabel')
+    if (group) return t('alerts.targetGroupLabel', { name: group.name })
+    return props.isAdmin ? t('alerts.targetUnknownGroupLabel') : t('alerts.targetRestrictedGroupLabel')
   }
   if (target === 'tag') {
     return t('alerts.targetTagsLabel', { tags: (rule.target_tags || []).join(', ') })

@@ -99,10 +99,24 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	if n > 0 {
-		return apperr.Conflict("host group is targeted by alert rules").
-			I18n(apperr.CodeHostGroupInUse, map[string]string{"count": strconv.Itoa(n)})
+		return inUse(n)
 	}
-	return s.repo.DeleteHostGroup(ctx, id)
+	// A rule can start targeting the group between the count and the delete:
+	// the foreign key then refuses the delete, reported the same way.
+	if err := s.repo.DeleteHostGroup(ctx, id); errors.Is(err, models.ErrHostGroupInUse) {
+		if n, cerr := s.repo.CountAlertRulesForHostGroup(ctx, id); cerr == nil && n > 0 {
+			return inUse(n)
+		}
+		return inUse(1)
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
+func inUse(n int) error {
+	return apperr.Conflict("host group is targeted by alert rules").
+		I18n(apperr.CodeHostGroupInUse, map[string]string{"count": strconv.Itoa(n)})
 }
 
 func (s *Service) get(ctx context.Context, id string) (*models.HostGroup, error) {

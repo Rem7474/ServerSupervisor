@@ -16,6 +16,7 @@ type fakeRepo struct {
 	created    *models.AlertRule
 	updated    *models.AlertRule
 	deleted    bool
+	deletedBy  string
 	template   *models.AlertRuleTemplate
 	hostExists bool
 	allHosts   []models.Host
@@ -62,7 +63,10 @@ func (f *fakeRepo) UpdateAlertRule(_ context.Context, r *models.AlertRule) error
 	f.updated = r
 	return nil
 }
-func (f *fakeRepo) DeleteAlertRule(context.Context, int64) error     { f.deleted = true; return nil }
+func (f *fakeRepo) DeleteAlertRule(_ context.Context, _ int64, actor string) error {
+	f.deleted, f.deletedBy = true, actor
+	return nil
+}
 func (f *fakeRepo) HostExists(context.Context, string) (bool, error) { return f.hostExists, nil }
 func (f *fakeRepo) DockerContainerExists(_ context.Context, containerID, _ string) (bool, error) {
 	return containerID != f.missingContainerID, nil
@@ -223,8 +227,18 @@ func TestGet_NotFound(t *testing.T) {
 }
 
 func TestDelete_NotFound(t *testing.T) {
-	if status(newSvc(&fakeRepo{getErr: sql.ErrNoRows}).Delete(context.Background(), 9)) != 404 {
+	if status(newSvc(&fakeRepo{getErr: sql.ErrNoRows}).Delete(context.Background(), 9, "admin")) != 404 {
 		t.Error("deleting a missing rule should be 404")
+	}
+}
+
+func TestDelete_PassesTheActor(t *testing.T) {
+	repo := &fakeRepo{rule: &models.AlertRule{ID: 9}}
+	if err := newSvc(repo).Delete(context.Background(), 9, "alice"); err != nil {
+		t.Fatal(err)
+	}
+	if !repo.deleted || repo.deletedBy != "alice" {
+		t.Errorf("deleted=%v by %q", repo.deleted, repo.deletedBy)
 	}
 }
 

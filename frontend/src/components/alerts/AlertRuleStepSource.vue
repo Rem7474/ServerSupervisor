@@ -661,7 +661,9 @@ const hostIdModel = fieldModel('host_id')
 const hostGroupIdModel = fieldModel('host_group_id')
 
 const hostGroups = computed(() => props.hostGroups ?? [])
-const availableTags = computed(() => collectHostTags(props.hosts))
+// Host tags plus the tags the rule already targets: a tag no host carries any
+// more stays listed (checked) so it can still be seen and unticked.
+const availableTags = computed(() => collectHostTags([...props.hosts, { tags: props.form.target_tags }]))
 
 const targetOptions = computed<{ value: AgentTargetType; label: string }[]>(() => [
   { value: 'all', label: t('alerts.targetAll') },

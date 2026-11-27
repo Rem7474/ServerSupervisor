@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/serversupervisor/server/internal/database"
@@ -150,5 +151,62 @@ func TestHostGroups_RoundTripAndRuleReference(t *testing.T) {
 	}
 	if _, err := db.GetHostGroupByID(ctx, g.ID); !errors.Is(err, sql.ErrNoRows) {
 		t.Errorf("group still present after delete: %v", err)
+	}
+}
+
+// Group ids are compared as UUIDs: any spelling of the id names the group,
+// and the foreign key refusal comes back as models.ErrHostGroupInUse.
+func TestHostGroups_UUIDLookupAndInUseError(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	g := &models.HostGroup{Name: "Web", MatchMode: models.HostGroupMatchAll, Tags: []string{"web"}}
+	if err := db.CreateHostGroup(ctx, g); err != nil {
+		t.Fatal(err)
+	}
+	upper := strings.ToUpper(g.ID)
+	got, err := db.GetHostGroupByID(ctx, upper)
+	if err != nil || got.ID != g.ID {
+		t.Fatalf("upper-case lookup = %+v, %v", got, err)
+	}
+	if err := db.UpdateHostGroup(ctx, &models.HostGroup{ID: upper, Name: "Web 2", MatchMode: "all", Tags: []string{"web"}}); err != nil {
+		t.Fatalf("upper-case update: %v", err)
+	}
+	if err := db.UpdateHostGroup(ctx, &models.HostGroup{ID: "nope", Name: "x", MatchMode: "all"}); !errors.Is(err, sql.ErrNoRows) {
+		t.Errorf("non-uuid update: err = %v, want ErrNoRows", err)
+	}
+
+	rule := &models.AlertRule{TargetType: models.AlertTargetGroup, HostGroupID: &g.ID}
+	createCPURule(t, db, rule)
+	if n, err := db.CountAlertRulesForHostGroup(ctx, upper); err != nil || n != 1 {
+		t.Fatalf("upper-case count = %d, %v", n, err)
+	}
+	if n, err := db.CountAlertRulesForHostGroup(ctx, "nope"); err != nil || n != 0 {
+		t.Fatalf("non-uuid count = %d, %v", n, err)
+	}
+	if err := db.DeleteHostGroup(ctx, upper); !errors.Is(err, models.ErrHostGroupInUse) {
+		t.Fatalf("delete of a targeted group: err = %v, want ErrHostGroupInUse", err)
+	}
+	if err := db.DeleteHostGroup(ctx, "nope"); err != nil {
+		t.Fatalf("non-uuid delete: %v", err)
+	}
+}
+
+// Migration 103: target_type only takes the values the engine handles, and a
+// group target always names its group.
+func TestAlertRules_TargetTypeCheck(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	rule := &models.AlertRule{TargetType: models.AlertTargetAll}
+	createCPURule(t, db, rule)
+	if _, err := db.Exec(ctx, `UPDATE alert_rules SET target_type = 'everywhere' WHERE id = $1`, rule.ID); err == nil {
+		t.Error("unknown target_type accepted")
+	}
+	if _, err := db.Exec(ctx, `UPDATE alert_rules SET target_type = 'group', host_group_id = NULL WHERE id = $1`, rule.ID); err == nil {
+		t.Error("group target without host_group_id accepted")
+	}
+	if _, err := db.Exec(ctx, `UPDATE alert_rules SET target_type = 'tag' WHERE id = $1`, rule.ID); err != nil {
+		t.Errorf("valid target_type refused: %v", err)
 	}
 }

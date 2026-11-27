@@ -22,7 +22,7 @@ type Repository interface {
 	GetAlertRuleByID(ctx context.Context, id int64) (*models.AlertRule, error)
 	CreateAlertRule(ctx context.Context, rule *models.AlertRule) error
 	UpdateAlertRule(ctx context.Context, rule *models.AlertRule) error
-	DeleteAlertRule(ctx context.Context, id int64) error
+	DeleteAlertRule(ctx context.Context, id int64, actor string) error
 	HostExists(ctx context.Context, id string) (bool, error)
 	DockerContainerExists(ctx context.Context, id, hostID string) (bool, error)
 	ComposeProjectExists(ctx context.Context, name, hostID string) (bool, error)
@@ -136,7 +136,7 @@ func (s *Service) Create(ctx context.Context, req models.AlertRuleCreate) (*mode
 		Actions:               req.Actions,
 	}
 	if err := rule.Validate(); err != nil {
-		return nil, apperr.Validation(err.Error())
+		return nil, ruleValidationError(err)
 	}
 	if err := s.validateScope(ctx, &rule); err != nil {
 		return nil, err
@@ -229,7 +229,7 @@ func (s *Service) Update(ctx context.Context, id int64, req models.AlertRuleUpda
 		return err
 	}
 	if err := next.Validate(); err != nil {
-		return apperr.Validation(err.Error())
+		return ruleValidationError(err)
 	}
 	if err := s.validateScope(ctx, &next); err != nil {
 		return err
@@ -252,13 +252,15 @@ func (s *Service) Update(ctx context.Context, id int64, req models.AlertRuleUpda
 }
 
 // Delete removes a rule, returning apperr.NotFound when it does not exist.
-func (s *Service) Delete(ctx context.Context, id int64) error {
+// Delete removes a rule; its open incidents are resolved silently and
+// audited under actor's name.
+func (s *Service) Delete(ctx context.Context, id int64, actor string) error {
 	if _, err := s.repo.GetAlertRuleByID(ctx, id); err == sql.ErrNoRows {
 		return apperr.NotFound("alert rule not found").I18n(apperr.CodeAlertRuleNotFound, nil)
 	} else if err != nil {
 		return err
 	}
-	return s.repo.DeleteAlertRule(ctx, id)
+	return s.repo.DeleteAlertRule(ctx, id, actor)
 }
 
 // ===== incidents =====
@@ -320,9 +322,12 @@ func (s *Service) validateScope(ctx context.Context, rule *models.AlertRule) err
 		return s.validateDockerScope(ctx, rule.DockerScope)
 	case models.AlertSourceAgent:
 		if rule.TargetType == models.AlertTargetGroup && rule.HostGroupID != nil {
-			if _, err := s.getHostGroup(ctx, *rule.HostGroupID); err != nil {
+			g, err := s.getHostGroup(ctx, *rule.HostGroupID)
+			if err != nil {
 				return err
 			}
+			// Store the group's canonical id whatever UUID spelling was sent.
+			rule.HostGroupID = &g.ID
 		}
 	}
 	return nil
@@ -448,6 +453,7 @@ var validAlertMetrics = map[string]bool{
 	"docker_container_state": true, "docker_compose_degraded_services": true,
 	"restic_backup_age_hours": true, "restic_repo_size_bytes": true,
 	"bandwidth_vs_rolling_avg": true,
+	"uptime_down_count":        true, "ssl_min_days_remaining": true,
 }
 
 func validateAlertRuleMetricOperator(metric, operator string) error {
@@ -529,6 +535,16 @@ func validateAlertActions(actions *models.AlertActions) error {
 		}
 	}
 	return nil
+}
+
+// ruleValidationError keeps the i18n code of a catalogued rule validation
+// error and wraps the remaining plain errors as a 400.
+func ruleValidationError(err error) error {
+	var ae *apperr.Error
+	if errors.As(err, &ae) {
+		return ae
+	}
+	return apperr.Validation(err.Error())
 }
 
 func normalizeRuleSourceType(source models.AlertSourceType, metric string) models.AlertSourceType {

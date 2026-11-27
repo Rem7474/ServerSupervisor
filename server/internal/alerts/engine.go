@@ -333,7 +333,8 @@ func outOfScopeIncidents(ruleID int64, openIncidents map[string]*models.AlertInc
 // resolveOutOfScopeIncidents closes incidents whose host left the rule's
 // target. Silent like the maintenance path: the condition did not recover,
 // the host simply stopped being watched by this rule, so only the UI refresh
-// ping goes out — no "resolved" notification.
+// ping goes out — no "resolved" notification. Each resolution is audited as
+// alert_resolved_out_of_scope.
 func resolveOutOfScopeIncidents(ctx context.Context, db *database.DB, pusher NotificationPusher, rule models.AlertRule, incidents []*models.AlertIncident) {
 	for _, inc := range incidents {
 		if err := db.ResolveAlertIncident(ctx, inc.ID); err != nil {
@@ -341,6 +342,10 @@ func resolveOutOfScopeIncidents(ctx context.Context, db *database.DB, pusher Not
 			continue
 		}
 		slog.InfoContext(ctx, "alerts: incident resolved — host no longer targeted by the rule", slog.Int64("rule_id", rule.ID), slog.String("host", inc.HostID), slog.Int64("incident_id", inc.ID))
+		details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d,"severity":"%s"}`, rule.ID, inc.ID, inc.Severity)
+		if _, auditErr := db.CreateAuditLog(ctx, "alert-engine", "alert_resolved_out_of_scope", inc.HostID, "", details, "success"); auditErr != nil {
+			slog.WarnContext(ctx, "alerts: failed to write alert_resolved_out_of_scope audit log", slog.Int64("incident_id", inc.ID), slog.Any("err", auditErr))
+		}
 		broadcastIncidentUpdate(pusher, "resolved", rule, inc.HostID)
 	}
 }
@@ -487,12 +492,7 @@ func isProxmoxMetric(metric string) bool {
 // subsystem (uptime probes, SSL certificates). These metrics are global and
 // evaluated once per rule, not per host.
 func isSyntheticMetric(metric string) bool {
-	switch metric {
-	case "uptime_down_count", "ssl_min_days_remaining":
-		return true
-	default:
-		return false
-	}
+	return models.IsSyntheticMetric(metric)
 }
 
 // hasHostID checks if a rule explicitly filters by host ID.
@@ -563,12 +563,7 @@ func buildAlertEvaluationTargets(ctx context.Context, db *database.DB, rule mode
 	if isSyntheticMetric(rule.Metric) {
 		// Synthetic metrics are global — evaluate once with a single synthetic target so
 		// the engine creates exactly one incident per rule on fire.
-		return []models.Host{{
-			ID:       "synthetic:" + rule.Metric,
-			Name:     "Monitoring synthétique",
-			Status:   "online",
-			LastSeen: time.Now(),
-		}}
+		return []models.Host{models.SyntheticTarget(rule.Metric)}
 	}
 	if isDockerMetric(rule.Metric) {
 		return buildDockerEvaluationTargets(ctx, db, rule)

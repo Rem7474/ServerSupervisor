@@ -442,6 +442,8 @@
   "sourceTargetNoTagsHint": "Aucun hôte n'a de tag : ajoutez-en depuis la page d'un hôte (Modifier).",
   "sourceTargetPreview": "{count} hôte couvert actuellement. | {count} hôtes couverts actuellement.",
   "targetGroupLabel": "groupe {name}",
-  "targetUnknownGroupLabel": "groupe d'hôtes",
+  "targetRestrictedGroupHint": "Le détail des groupes d'hôtes est réservé aux administrateurs",
+  "targetRestrictedGroupLabel": "groupe masqué",
+  "targetUnknownGroupLabel": "groupe d'hôtes introuvable",
   "targetTagsLabel": "tags {tags}"
 }

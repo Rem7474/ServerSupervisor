@@ -179,7 +179,6 @@ describe('AlertRuleList — agent rule target label', () => {
     ['legacy rule without host', {}, 'Agent › Tous les hôtes'],
     ['all hosts', { target_type: 'all' }, 'Agent › Tous les hôtes'],
     ['known group', { target_type: 'group', host_group_id: 'g1' }, 'Agent › groupe Prod'],
-    ['group not loaded', { target_type: 'group', host_group_id: 'gone' }, 'Agent › groupe d\'hôtes'],
     ['tags', { target_type: 'tag', target_tags: ['db', 'web'] }, 'Agent › tags db, web'],
     ['unknown host id', { target_type: 'host', host_id: 'h9' }, 'Agent › h9'],
   ])('%s', (_label, target, expected) => {
@@ -189,5 +188,22 @@ describe('AlertRuleList — agent rule target label', () => {
       fetched: true,
     })
     expect(wrapper.text()).toContain(expected)
+  })
+
+  // Groups are only loaded for admins: a viewer gets a short label with the
+  // reason as tooltip, an admin whose group is missing gets "unknown".
+  it.each([
+    [false, 'Agent › groupe masqué', 'Le détail des groupes d\'hôtes est réservé aux administrateurs'],
+    [true, 'Agent › groupe d\'hôtes introuvable', undefined],
+  ])('group not loaded (admin=%s)', (isAdmin, expected, hint) => {
+    const wrapper = mountList({
+      rules: [{ id: 1, name: 'r', metric: 'cpu', operator: '>', source_type: 'agent', target_type: 'group', host_group_id: 'g9' }],
+      hostGroups: [],
+      isAdmin,
+      fetched: true,
+    })
+    expect(wrapper.text()).toContain(expected)
+    const badge = wrapper.findAll('span.badge').find((b) => b.text().startsWith('Agent'))
+    expect(badge?.attributes('title')).toBe(hint)
   })
 })

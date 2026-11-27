@@ -53,6 +53,11 @@ export const AlertSourceAgent: AlertSourceType = "agent";
 export const AlertSourceProxmox: AlertSourceType = "proxmox";
 export const AlertSourceDocker: AlertSourceType = "docker";
 /**
+ * AlertSourceSynthetic covers the uptime/SSL metrics, evaluated once per
+ * rule rather than per host.
+ */
+export const AlertSourceSynthetic: AlertSourceType = "synthetic";
+/**
  * AlertMetricCapability describes a metric the UI can build a rule on.
  */
 export interface AlertMetricCapability {

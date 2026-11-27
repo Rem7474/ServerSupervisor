@@ -62,6 +62,17 @@ func TestEvaluateAlerts_TagTargetFollowsHostTags(t *testing.T) {
 	if _, err := db.GetOpenAlertIncident(ctx, rule.ID, "tag-host-db"); err == nil {
 		t.Error("incident must be resolved once the host leaves the rule's scope")
 	}
+	logs, err := db.GetAuditLogsByHost(ctx, "tag-host-db", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var audited bool
+	for _, l := range logs {
+		audited = audited || l.Action == "alert_resolved_out_of_scope"
+	}
+	if !audited {
+		t.Errorf("out-of-scope resolution not audited: %+v", logs)
+	}
 }
 
 // A group-targeted rule evaluates the group's current members.

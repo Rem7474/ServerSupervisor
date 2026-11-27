@@ -227,7 +227,12 @@ ciblent ce tag ou un groupe qui le contient, sans modifier la règle. Un hôte
 qui sort du périmètre (tag retiré, groupe redéfini, règle reciblée) voit ses
 incidents ouverts sur cette règle résolus silencieusement, comme pour une
 fenêtre de maintenance : pas de notification « résolu », seulement le
-rafraîchissement de la liste.
+rafraîchissement de la liste et une entrée d'audit
+`alert_resolved_out_of_scope`.
+
+La suppression d'une règle résout de la même façon ses incidents encore
+ouverts, sans notification, avec une entrée d'audit
+`alert_resolved_rule_deleted` au nom de l'utilisateur qui supprime.
 
 Les comparaisons de tags ignorent la casse (`Prod` = `prod`).
 
@@ -255,12 +260,27 @@ tableau de bord, qui permet de filtrer par tag.
 **Compatibilité.** Les règles créées avant l'existence du ciblage gardent leur
 périmètre exact : une règle avec `host_id` cible cet hôte (`host`), une règle
 sans `host_id` cible tous les hôtes (`all`). Une règle envoyée à l'API sans
-`target_type` suit la même dérivation.
+`target_type` suit la même dérivation : un `POST /api/v1/alert-rules` agent
+sans `target_type` ni `host_id` crée une règle sur **tous les hôtes**. Pour
+cibler un seul hôte, envoyer `host_id` (ou `target_type: "host"` avec
+`host_id`).
+
+`target_type` n'accepte que `host`, `all`, `group`, `tag` (et la valeur vide
+des règles non agent) ; une règle `group` a toujours un `host_group_id`
+(contrainte `chk_alert_rules_target_type`). Les identifiants de groupe sont
+des UUID, comparés sans tenir compte de la casse.
 
 Pour une métrique globale, non liée à un hôte, le formulaire ne propose que
 la cible « Tous les hôtes ».
 Les règles Docker et Proxmox gardent leur propre portée (`docker_scope`,
-`proxmox_scope`) et ignorent `target_type`.
+`proxmox_scope`) et ignorent `target_type`. Les règles synthétiques
+(`source_type: "synthetic"`, métriques `uptime_down_count` et
+`ssl_min_days_remaining`) sont évaluées une seule fois par règle et ignorent
+aussi `target_type`.
+
+Dans la liste des règles, un utilisateur non admin voit « groupe masqué » à la
+place du nom du groupe, avec une infobulle qui en donne la raison : la
+définition des groupes n'est lisible que par les admins.
 
 ## Dépannage
 

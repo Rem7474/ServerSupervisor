@@ -64,7 +64,7 @@ func TestAlertRule_CRUDRoundTrip(t *testing.T) {
 		t.Errorf("actions.channels not preserved across JSONB round-trip: %+v", found.Actions)
 	}
 
-	if err := db.DeleteAlertRule(ctx, rule.ID); err != nil {
+	if err := db.DeleteAlertRule(ctx, rule.ID, "admin"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 
@@ -191,5 +191,44 @@ func TestAlertIncident_ResolveAllOpenByRule(t *testing.T) {
 	open, _ = db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
 	if len(open) != 0 {
 		t.Fatalf("expected 0 open after bulk resolve, got %d", len(open))
+	}
+}
+
+// Deleting a rule resolves its open incidents (they would otherwise stay
+// open forever with a NULL rule_id) and audits each one under the deleter.
+func TestDeleteAlertRule_ResolvesOpenIncidents(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "host-gamma"
+	if err := db.RegisterHost(ctx, &models.Host{ID: hostID, Name: "gamma", Hostname: "gamma.local", Status: "online"}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+	warn := 80.0
+	rule := &models.AlertRule{SourceType: models.AlertSourceAgent, TargetType: models.AlertTargetAll, Metric: "cpu", Operator: ">", ThresholdWarn: &warn, Enabled: true}
+	if err := db.CreateAlertRule(ctx, rule); err != nil {
+		t.Fatal(err)
+	}
+	openID, err := db.CreateAlertIncident(ctx, rule.ID, hostID, 91, "crit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DeleteAlertRule(ctx, rule.ID, "alice"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	var resolved bool
+	if err := db.QueryRow(ctx, `SELECT resolved_at IS NOT NULL FROM alert_incidents WHERE id = $1`, openID).Scan(&resolved); err != nil {
+		t.Fatal(err)
+	}
+	if !resolved {
+		t.Error("incident of the deleted rule left open")
+	}
+	logs, err := db.GetAuditLogsByUser(ctx, "alice", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(logs) != 1 || logs[0].Action != "alert_resolved_rule_deleted" || logs[0].HostID != hostID {
+		t.Fatalf("audit logs = %+v", logs)
 	}
 }

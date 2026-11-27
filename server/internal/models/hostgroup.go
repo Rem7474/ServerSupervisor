@@ -1,9 +1,14 @@
 package models
 
 import (
+	"errors"
 	"strings"
 	"time"
 )
+
+// ErrHostGroupInUse is returned when deleting a group an alert rule still
+// targets (the foreign key refused the delete).
+var ErrHostGroupInUse = errors.New("host group is targeted by alert rules")
 
 // Host group match modes: a host must carry every tag of the group ("all")
 // or at least one of them ("any").
