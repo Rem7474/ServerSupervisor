@@ -189,25 +189,28 @@ export function useAgentDiscovery() {
     void poll(kind, id)
   }
 
-  async function start(kind: AgentDiscoveryKind, call: () => Promise<{ data: { job_id: string } }>): Promise<void> {
-    if (!hostId.value || isActive(kind)) return
+  /** Starts a job; resolves true once the server accepted it. */
+  async function start(kind: AgentDiscoveryKind, call: () => Promise<{ data: { job_id: string } }>): Promise<boolean> {
+    if (!hostId.value || isActive(kind)) return false
     errors[kind] = ''
     starting[kind] = true
     try {
       const res = await call()
       follow(kind, res.data.job_id)
+      return true
     } catch (e: unknown) {
       errors[kind] = getApiErrorMessage(e, t('discovery.startError'))
+      return false
     } finally {
       starting[kind] = false
     }
   }
 
-  function startArp(): Promise<void> {
+  function startArp(): Promise<boolean> {
     return start('arp', () => apiClient.startArpDiscovery(hostId.value))
   }
 
-  function startPortScan(): Promise<void> {
+  function startPortScan(): Promise<boolean> {
     return start('port_scan', () =>
       apiClient.startPortScan({ host_id: hostId.value, cidr: cidr.value.trim(), ports: ports.value.trim() }),
     )
@@ -233,13 +236,17 @@ export function useAgentDiscovery() {
     }
   }
 
-  async function startSnmp(): Promise<void> {
+  async function startSnmp(): Promise<boolean> {
     const req = snmpRequest()
-    await start('snmp', () => apiClient.startSnmpProbe(req))
-    // Credentials are write-only: never kept in the page once sent.
-    snmp.community = ''
-    snmp.authPassphrase = ''
-    snmp.privPassphrase = ''
+    const accepted = await start('snmp', () => apiClient.startSnmpProbe(req))
+    // Credentials are write-only: dropped from the page once the server
+    // accepted them, kept after a refusal so the user can fix and resend.
+    if (accepted) {
+      snmp.community = ''
+      snmp.authPassphrase = ''
+      snmp.privPassphrase = ''
+    }
+    return accepted
   }
 
   async function cancel(kind: AgentDiscoveryKind): Promise<void> {

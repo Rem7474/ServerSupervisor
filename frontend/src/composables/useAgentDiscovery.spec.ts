@@ -210,8 +210,9 @@ describe('useAgentDiscovery', () => {
       community: '', username: 'mon', security_level: 'authPriv', auth_protocol: 'SHA256',
       auth_passphrase: 'pass-one', priv_protocol: 'AES', priv_passphrase: 'pass-two',
     }))
-    // Cleared even when the start failed.
-    expect(d.snmp.authPassphrase).toBe('')
+    // Kept after a refused start, so the form can be corrected and resent.
+    expect(d.snmp.authPassphrase).toBe('pass-one')
+    expect(d.snmp.privPassphrase).toBe('pass-two')
 
     Object.assign(d.snmp, { securityLevel: 'authNoPriv', authPassphrase: 'pass-one', privPassphrase: 'pass-two' })
     await d.startSnmp()

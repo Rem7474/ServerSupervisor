@@ -50,6 +50,10 @@ describe('DiscoveryJobResult', () => {
     let w = render({ kind: 'port_scan', port_scan: { ...scan, hosts: [{ ip: '10.0.0.5', open_ports: [22, 443], already_registered: false }] } })
     expect(w.text()).toContain('Scan annulé : résultat partiel (100 / 508 sondes)')
     expect(w.findAll('.badge.font-monospace').map((b) => b.text())).toEqual(['22', '443'])
+    expect(w.text()).not.toContain('résultat tronqué')
+
+    w = render({ kind: 'port_scan', port_scan: { ...scan, truncated: true, hosts: [{ ip: '10.0.0.5', open_ports: [22], already_registered: false }] } })
+    expect(w.text()).toContain('résultat tronqué : certains ports ouverts ne sont pas listés')
 
     w = render({ kind: 'port_scan', port_scan: { ...scan, cancelled: false, timed_out: true, hosts: [] } })
     expect(w.text()).toContain('Durée maximale atteinte')

@@ -73,6 +73,7 @@
   "scanPartialCancelled": "Scan cancelled: partial result ({done} / {total} probes).",
   "scanPartialTimedOut": "Maximum duration reached: partial result ({done} / {total} probes).",
   "scanSummary": "{hosts} address(es) with open ports out of {addresses} scanned, {ports} ports, in {duration}.",
+  "scanTruncated": "result truncated: some open ports are not listed",
   "scanEmptyTitle": "No open port",
   "scanEmptySubtitle": "No address answered on the scanned ports.",
   "sysName": "Name",

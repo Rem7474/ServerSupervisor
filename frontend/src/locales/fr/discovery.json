@@ -73,6 +73,7 @@
   "scanPartialCancelled": "Scan annulé : résultat partiel ({done} / {total} sondes).",
   "scanPartialTimedOut": "Durée maximale atteinte : résultat partiel ({done} / {total} sondes).",
   "scanSummary": "{hosts} adresse(s) avec ports ouverts sur {addresses} scannées, {ports} ports, en {duration}.",
+  "scanTruncated": "résultat tronqué : certains ports ouverts ne sont pas listés",
   "scanEmptyTitle": "Aucun port ouvert",
   "scanEmptySubtitle": "Aucune adresse n'a répondu sur les ports scannés.",
   "sysName": "Nom",

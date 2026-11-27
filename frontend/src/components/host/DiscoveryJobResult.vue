@@ -81,6 +81,7 @@
     </div>
     <div class="text-secondary small mb-2">
       {{ t('discovery.scanSummary', { hosts: job.port_scan.hosts.length, addresses: job.port_scan.hosts_scanned, ports: job.port_scan.ports_scanned, duration: formatDurationSecs(Math.round(job.port_scan.duration_ms / 1000)) }) }}
+      <span v-if="job.port_scan.truncated"> — {{ t('discovery.scanTruncated') }}</span>
     </div>
     <EmptyState
       v-if="!job.port_scan.hosts.length"
