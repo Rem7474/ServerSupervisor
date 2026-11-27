@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/serversupervisor/server/internal/authctx"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -20,12 +21,19 @@ type AuditLogFilter struct {
 }
 
 func (db *DB) CreateAuditLog(ctx context.Context, username, action, hostID, ipAddress, details, status string) (int64, error) {
+	// The API key that authenticated the request, if any, is read from ctx
+	// (set by the API-key middleware) so every audit writer records it
+	// without threading it through each call site.
+	var apiKeyID *int64
+	if id, ok := authctx.APIKeyID(ctx); ok {
+		apiKeyID = &id
+	}
 	var id int64
 	err := db.conn.QueryRowContext(ctx,
-		`INSERT INTO audit_logs (username, action, host_id, ip_address, details, status, category)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`INSERT INTO audit_logs (username, action, host_id, ip_address, details, status, category, api_key_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 RETURNING id`,
-		username, action, hostID, ipAddress, details, status, models.CategorizeAuditAction(action),
+		username, action, hostID, ipAddress, details, status, models.CategorizeAuditAction(action), apiKeyID,
 	).Scan(&id)
 	if err != nil {
 		return 0, err
@@ -37,7 +45,7 @@ func (db *DB) CreateAuditLog(ctx context.Context, username, action, hostID, ipAd
 func (db *DB) GetAuditLogs(ctx context.Context, limit, offset int, f AuditLogFilter) ([]models.AuditLog, error) {
 	query := `SELECT al.id, al.username, al.action, al.host_id,
 			COALESCE(h.name, '') AS host_name,
-			al.ip_address, al.details, al.status, al.created_at, al.category
+			al.ip_address, al.details, al.status, al.created_at, al.category, al.api_key_id
 		 FROM audit_logs al
 		 LEFT JOIN hosts h ON al.host_id = h.id
 		 WHERE 1=1`
@@ -71,7 +79,7 @@ func (db *DB) GetAuditLogsByHost(ctx context.Context, hostID string, limit int) 
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT al.id, al.username, al.action, al.host_id,
 			COALESCE(h.name, '') AS host_name,
-			al.ip_address, al.details, al.status, al.created_at, al.category
+			al.ip_address, al.details, al.status, al.created_at, al.category, al.api_key_id
 		 FROM audit_logs al
 		 LEFT JOIN hosts h ON al.host_id = h.id
 		 WHERE al.host_id = $1
@@ -89,7 +97,7 @@ func (db *DB) GetAuditLogsByUser(ctx context.Context, username string, limit int
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT al.id, al.username, al.action, al.host_id,
 			COALESCE(h.name, '') AS host_name,
-			al.ip_address, al.details, al.status, al.created_at, al.category
+			al.ip_address, al.details, al.status, al.created_at, al.category, al.api_key_id
 		 FROM audit_logs al
 		 LEFT JOIN hosts h ON al.host_id = h.id
 		 WHERE al.username = $1
@@ -155,7 +163,7 @@ func scanAuditLogs(rows *sql.Rows) ([]models.AuditLog, error) {
 	for rows.Next() {
 		var l models.AuditLog
 		if err := rows.Scan(&l.ID, &l.Username, &l.Action, &l.HostID, &l.HostName, &l.IPAddress,
-			&l.Details, &l.Status, &l.CreatedAt, &l.Category); err != nil {
+			&l.Details, &l.Status, &l.CreatedAt, &l.Category, &l.APIKeyID); err != nil {
 			continue
 		}
 		logs = append(logs, l)

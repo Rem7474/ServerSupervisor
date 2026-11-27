@@ -103,4 +103,7 @@ type AuditLog struct {
 	// models/audit.go) — drives per-category retention and the audit log
 	// browser's filter.
 	Category string `json:"category" db:"category"`
+	// APIKeyID is the API key that authenticated the request which produced
+	// this entry; nil for a session, the agent or a background job.
+	APIKeyID *int64 `json:"api_key_id,omitempty" db:"api_key_id"`
 }

@@ -14,6 +14,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -46,6 +47,7 @@ type Repository interface {
 	RotateRefreshToken(ctx context.Context, currentTokenHash, newTokenHash string, expiresAt time.Time) (int64, error)
 	RevokeRefreshToken(ctx context.Context, tokenHash string) error
 	RevokeAllOtherSessions(ctx context.Context, username, currentTokenHash string) error
+	RevokeAllAPIKeysForUser(ctx context.Context, username string) (int64, error)
 	UpdateUserPassword(ctx context.Context, username, passwordHash string) error
 	SetUserTOTPSecret(ctx context.Context, userID int64, secret, backupCodes string, enabled bool) error
 	DisableUserMFA(ctx context.Context, username string) error
@@ -259,8 +261,10 @@ func (s *Service) signAccess(user *models.User) (token string, expiresAt time.Ti
 
 // ===== password / MFA =====
 
-// ChangePassword verifies the current password and stores a new one.
-func (s *Service) ChangePassword(ctx context.Context, username, current, next string) error {
+// ChangePassword verifies the current password and stores a new one. The
+// user's API keys are revoked too: a password change is how a user reacts to
+// a suspected compromise, and a key would otherwise outlive it.
+func (s *Service) ChangePassword(ctx context.Context, username, clientIP, current, next string) error {
 	if len(next) < 8 {
 		return apperr.Validation("password must be at least 8 characters")
 	}
@@ -277,6 +281,20 @@ func (s *Service) ChangePassword(ctx context.Context, username, current, next st
 	}
 	if err := s.repo.UpdateUserPassword(ctx, username, string(hash)); err != nil {
 		return apperr.Internal(err)
+	}
+	return s.revokeAPIKeys(ctx, username, clientIP, "password_change")
+}
+
+// revokeAPIKeys revokes every API key of username and audits it when at least
+// one key was still active.
+func (s *Service) revokeAPIKeys(ctx context.Context, username, clientIP, reason string) error {
+	n, err := s.repo.RevokeAllAPIKeysForUser(ctx, username)
+	if err != nil {
+		return apperr.Internal(err)
+	}
+	if n > 0 {
+		details := fmt.Sprintf("reason=%s count=%d", reason, n)
+		_, _ = s.repo.CreateAuditLog(ctx, username, "api_key_revoke_all", "", clientIP, details, "success")
 	}
 	return nil
 }
@@ -377,15 +395,16 @@ func (s *Service) LoginEvents(ctx context.Context, username string, limit, offse
 	return events, nil
 }
 
-// RevokeAllSessions revokes every refresh token for the user except the current one.
-func (s *Service) RevokeAllSessions(ctx context.Context, username, currentRefresh string) error {
+// RevokeAllSessions revokes every refresh token for the user except the
+// current one, and every API key of the user.
+func (s *Service) RevokeAllSessions(ctx context.Context, username, clientIP, currentRefresh string) error {
 	if currentRefresh == "" {
 		return apperr.Validation("missing refresh token")
 	}
 	if err := s.repo.RevokeAllOtherSessions(ctx, username, hashToken(currentRefresh)); err != nil {
 		return apperr.Internal(err)
 	}
-	return nil
+	return s.revokeAPIKeys(ctx, username, clientIP, "revoke_all_sessions")
 }
 
 // AllLoginEvents returns a page of login events across all users (admin).
