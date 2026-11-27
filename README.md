@@ -20,6 +20,7 @@ généré depuis le dossier [`wiki/`](wiki/) du dépôt :
 | [Alerting](https://github.com/Rem7474/ServerSupervisor/wiki/Alerting) | Moteur d'alertes (seuils, hystérésis, incidents, ack/escalade, corrélation, maintenance, modèles) |
 | [Monitoring](https://github.com/Rem7474/ServerSupervisor/wiki/Monitoring) | Sondes uptime HTTP/TCP/ICMP et certificats SSL/TLS |
 | [Notifications](https://github.com/Rem7474/ServerSupervisor/wiki/Notifications) | Centre de notifications in-app et Web Push (VAPID) |
+| [API](https://github.com/Rem7474/ServerSupervisor/wiki/API) | Clés API personnelles (portées, routes refusées) et spécification OpenAPI |
 | [Two-Factor-Authentication](https://github.com/Rem7474/ServerSupervisor/wiki/Two-Factor-Authentication) | TOTP et clés de sécurité/passkeys (WebAuthn) |
 | [Host-Discovery](https://github.com/Rem7474/ServerSupervisor/wiki/Host-Discovery) | Scan de sous-réseau et ajout en masse |
 | [Custom-Tasks-Examples](https://github.com/Rem7474/ServerSupervisor/wiki/Custom-Tasks-Examples) | Exemples de `tasks.yaml` prêts à copier |
@@ -201,6 +202,7 @@ planifiée, fuseau horaire d'exécution du cron, dépannage) :
 - Interface de configuration centralisée (`/settings` → Configuration avancée) : paramètres serveur éditables à chaud, avec la variable d'environnement prioritaire quand elle est définie
 - MFA/2FA optionnel par compte : TOTP et/ou clés de sécurité/passkeys WebAuthn (y compris connexion sans mot de passe via passkey discoverable)
 - API Keys uniques par agent avec rotation
+- Clés API personnelles pour scripts et outils tiers (`Authorization: Bearer ssk_…`) : secret affiché une seule fois et stocké haché, portée lecture ou écriture bornée par le rôle du propriétaire, expiration, révocation, quota par clé, routes sensibles refusées ; spécification OpenAPI 3 servie sur `/api/v1/openapi.json` — voir [API](https://github.com/Rem7474/ServerSupervisor/wiki/API)
 - Vérification stricte de l'appartenance des commandes à chaque hôte
 - Rate limiting par IP avec cleanup automatique et support reverse proxy
 - CORS multi-origines configurable

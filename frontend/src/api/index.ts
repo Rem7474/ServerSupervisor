@@ -22,6 +22,7 @@ import { runbooksApi } from './runbooks'
 import { dashboardApi } from './dashboard'
 import { backupApi } from './backup'
 import { maintenanceApi } from './maintenance'
+import { apiKeysApi } from './apiKeys'
 import { hostGroupsApi } from './hostGroups'
 import { discoveryApi } from './discovery'
 
@@ -54,6 +55,7 @@ export default {
   ...dashboardApi,
   ...backupApi,
   ...maintenanceApi,
+  ...apiKeysApi,
   ...hostGroupsApi,
   ...discoveryApi,
 }

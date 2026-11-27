@@ -134,7 +134,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		respondError(c, apperr.Validation("invalid request"))
 		return
 	}
-	if err := h.svc.ChangePassword(c.Request.Context(), username, req.CurrentPassword, req.NewPassword); err != nil {
+	if err := h.svc.ChangePassword(c.Request.Context(), username, c.ClientIP(), req.CurrentPassword, req.NewPassword); err != nil {
 		respondError(c, err)
 		return
 	}
@@ -309,7 +309,7 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
-	if err := h.svc.RevokeAllSessions(c.Request.Context(), username, readRefreshToken(c)); err != nil {
+	if err := h.svc.RevokeAllSessions(c.Request.Context(), username, c.ClientIP(), readRefreshToken(c)); err != nil {
 		respondError(c, err)
 		return
 	}

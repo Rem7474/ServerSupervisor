@@ -41,7 +41,7 @@ func CategorizeAuditAction(action string) string {
 	switch {
 	case strings.HasPrefix(action, "alert_"):
 		return AuditCategoryAlert
-	case action == "unblock_ip":
+	case action == "unblock_ip" || strings.HasPrefix(action, "api_key_"):
 		return AuditCategoryAuth
 	case action == "update_settings" || action == "cleanup_metrics" || action == "cleanup_audit_logs":
 		return AuditCategorySettings
