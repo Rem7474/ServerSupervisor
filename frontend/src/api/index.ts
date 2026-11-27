@@ -23,6 +23,7 @@ import { dashboardApi } from './dashboard'
 import { backupApi } from './backup'
 import { maintenanceApi } from './maintenance'
 import { hostGroupsApi } from './hostGroups'
+import { discoveryApi } from './discovery'
 
 // Re-export shared helpers/types so `import api, { getApiErrorMessage } from '../api'`
 // and type imports keep resolving.
@@ -54,4 +55,5 @@ export default {
   ...backupApi,
   ...maintenanceApi,
   ...hostGroupsApi,
+  ...discoveryApi,
 }

@@ -101,6 +101,23 @@ export function formatBytes(bytes: NumberInput, empty = '-'): string {
   return `${n} ${i18n.global.t(BYTE_UNIT_KEYS[i])}`
 }
 
+/**
+ * Format a link speed in bits per second (base 1000, as network speeds are
+ * quoted): "100 Mb/s", "2,5 Gb/s". Zero or missing (unknown) is `empty`.
+ */
+export function formatBitRate(bps: NumberInput, empty = '-'): string {
+  if (!bps) return empty
+  const units = ['b/s', 'kb/s', 'Mb/s', 'Gb/s', 'Tb/s']
+  let value = bps
+  let i = 0
+  while (value >= 1000 && i < units.length - 1) {
+    value /= 1000
+    i++
+  }
+  const n = new Intl.NumberFormat(localeTag(), { maximumFractionDigits: 1, useGrouping: false }).format(value)
+  return `${n} ${units[i]}`
+}
+
 /** Format an integer with the active locale's grouping separator. */
 export function formatNumber(value: NumberInput): string {
   return new Intl.NumberFormat(localeTag()).format(Number(value) || 0)

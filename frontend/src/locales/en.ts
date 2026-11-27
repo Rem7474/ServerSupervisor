@@ -12,6 +12,7 @@ import apt from './en/apt.json'
 import auth from './en/auth.json'
 import common from './en/common.json'
 import dashboard from './en/dashboard.json'
+import discovery from './en/discovery.json'
 import docker from './en/docker.json'
 import errors from './en/errors.json'
 import host from './en/host.json'
@@ -35,6 +36,7 @@ export default {
   common,
   config,
   dashboard,
+  discovery,
   docker,
   errors,
   host,
