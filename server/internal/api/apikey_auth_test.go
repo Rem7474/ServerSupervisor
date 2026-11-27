@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
+	"github.com/serversupervisor/server/internal/authctx"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/models"
 	apikeysvc "github.com/serversupervisor/server/internal/services/apikey"
@@ -45,10 +46,12 @@ func newKeyRouter(keys APIKeyAuthenticator, rl *IPRateLimiter) *gin.Engine {
 	v1 := r.Group("/api/v1")
 	v1.Use(SessionOrAPIKeyMiddleware(&config.Config{JWTSecret: "test-secret"}, keys, rl))
 	echo := func(c *gin.Context) {
+		keyID, _ := authctx.APIKeyID(c.Request.Context())
 		c.JSON(http.StatusOK, gin.H{
 			"username":    c.GetString("username"),
 			"role":        c.GetString("role"),
 			"auth_method": c.GetString("auth_method"),
+			"ctx_key_id":  keyID,
 		})
 	}
 	v1.GET("/hosts", echo)
@@ -96,6 +99,10 @@ func TestSessionOrAPIKey_KeyActsAsItsOwner(t *testing.T) {
 	}
 	if got.body["username"] != "alice" || got.body["role"] != models.RoleAdmin || got.body["auth_method"] != "api_key" {
 		t.Fatalf("context not populated from the key: %v", got.body)
+	}
+	// The request context carries the key id down to the audit writer.
+	if got.body["ctx_key_id"] != float64(1) {
+		t.Fatalf("request context key id = %v, want 1", got.body["ctx_key_id"])
 	}
 }
 

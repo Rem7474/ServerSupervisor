@@ -17,3 +17,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys (user_id);
+
+-- Audit entries written while serving a request authenticated by an API key
+-- record that key. No foreign key: the trace outlives the key (a deleted user
+-- takes their keys with them, the audit trail stays).
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS api_key_id BIGINT;

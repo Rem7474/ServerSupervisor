@@ -47,11 +47,10 @@ var idEncoding = base32.StdEncoding.WithPadding(base32.NoPadding)
 // Repository is the data-access port. *database.DB satisfies it structurally.
 type Repository interface {
 	GetUserByUsername(ctx context.Context, username string) (*models.User, error)
-	CreateAPIKey(ctx context.Context, userID int64, name, prefix, keyHash, scope string, expiresAt *time.Time) (*models.APIKey, error)
+	CreateAPIKey(ctx context.Context, userID int64, maxActive int, name, prefix, keyHash, scope string, expiresAt *time.Time) (*models.APIKey, error)
 	GetAPIKeyByID(ctx context.Context, id int64) (*models.APIKey, error)
 	ListAPIKeysByUser(ctx context.Context, userID int64) ([]models.APIKey, error)
 	ListAllAPIKeys(ctx context.Context) ([]models.APIKey, error)
-	CountActiveAPIKeys(ctx context.Context, userID int64) (int, error)
 	RevokeAPIKey(ctx context.Context, id int64) (bool, error)
 	GetAPIKeyForAuth(ctx context.Context, prefix string) (*database.APIKeyAuthRecord, error)
 	TouchAPIKeyLastUsed(ctx context.Context, id int64) error
@@ -148,14 +147,6 @@ func (s *Service) Create(ctx context.Context, username, clientIP string, req mod
 	if err != nil {
 		return nil, err
 	}
-	active, err := s.repo.CountActiveAPIKeys(ctx, u.ID)
-	if err != nil {
-		return nil, err
-	}
-	if active >= MaxActiveKeysPerUser {
-		return nil, apperr.Conflict("too many active API keys").
-			I18n(apperr.CodeAPIKeyLimitReached, map[string]string{"max": strconv.Itoa(MaxActiveKeysPerUser)})
-	}
 	var expiresAt *time.Time
 	if req.ExpiresInDays > 0 {
 		t := s.now().Add(time.Duration(req.ExpiresInDays) * 24 * time.Hour)
@@ -165,7 +156,11 @@ func (s *Service) Create(ctx context.Context, username, clientIP string, req mod
 	if err != nil {
 		return nil, apperr.Internal(fmt.Errorf("generate api key: %w", err))
 	}
-	created, err := s.repo.CreateAPIKey(ctx, u.ID, name, prefix, HashKey(key), req.Scope, expiresAt)
+	created, err := s.repo.CreateAPIKey(ctx, u.ID, MaxActiveKeysPerUser, name, prefix, HashKey(key), req.Scope, expiresAt)
+	if errors.Is(err, database.ErrAPIKeyLimitReached) {
+		return nil, apperr.Conflict("too many active API keys").
+			I18n(apperr.CodeAPIKeyLimitReached, map[string]string{"max": strconv.Itoa(MaxActiveKeysPerUser)})
+	}
 	if err != nil {
 		return nil, err
 	}

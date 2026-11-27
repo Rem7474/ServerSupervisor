@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
+	"github.com/serversupervisor/server/internal/authctx"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/models"
@@ -139,6 +140,7 @@ func SessionOrAPIKeyMiddleware(cfg *config.Config, keys APIKeyAuthenticator, rl 
 		c.Set("role", p.Role)
 		c.Set("auth_method", "api_key")
 		c.Set("api_key_id", p.KeyID)
+		c.Request = c.Request.WithContext(authctx.WithAPIKeyID(c.Request.Context(), p.KeyID))
 		c.Next()
 	}
 }

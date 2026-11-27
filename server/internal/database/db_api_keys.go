@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -57,15 +58,44 @@ func (db *DB) queryAPIKeys(ctx context.Context, query string, args ...any) ([]mo
 	return keys, rows.Err()
 }
 
-// CreateAPIKey stores a new key (hash only) and returns it as listed.
-func (db *DB) CreateAPIKey(ctx context.Context, userID int64, name, prefix, keyHash, scope string, expiresAt *time.Time) (*models.APIKey, error) {
+// ErrAPIKeyLimitReached is returned by CreateAPIKey when the user already has
+// maxActive active keys.
+var ErrAPIKeyLimitReached = errors.New("api key limit reached")
+
+// CreateAPIKey stores a new key (hash only) and returns it as listed, unless
+// the user already has maxActive keys that are neither revoked nor expired.
+// The owner's users row is locked for the transaction, so concurrent creations
+// for one user are serialized and the limit cannot be overshot.
+func (db *DB) CreateAPIKey(ctx context.Context, userID int64, maxActive int, name, prefix, keyHash, scope string, expiresAt *time.Time) (*models.APIKey, error) {
+	tx, err := db.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	var locked int64
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&locked); err != nil {
+		return nil, err
+	}
+	var active int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM api_keys
+		 WHERE user_id = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`,
+		userID,
+	).Scan(&active); err != nil {
+		return nil, err
+	}
+	if active >= maxActive {
+		return nil, ErrAPIKeyLimitReached
+	}
 	var id int64
-	err := db.conn.QueryRowContext(ctx,
+	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO api_keys (user_id, name, prefix, key_hash, scope, expires_at)
 		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
 		userID, name, prefix, keyHash, scope, expiresAt,
-	).Scan(&id)
-	if err != nil {
+	).Scan(&id); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return db.GetAPIKeyByID(ctx, id)
@@ -90,15 +120,17 @@ func (db *DB) ListAllAPIKeys(ctx context.Context) ([]models.APIKey, error) {
 	return db.queryAPIKeys(ctx, allAPIKeysQuery)
 }
 
-// CountActiveAPIKeys counts a user's keys that are neither revoked nor expired.
-func (db *DB) CountActiveAPIKeys(ctx context.Context, userID int64) (int, error) {
-	var n int
-	err := db.conn.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM api_keys
-		 WHERE user_id = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`,
-		userID,
-	).Scan(&n)
-	return n, err
+// RevokeAllAPIKeysForUser revokes every key of the user that is not revoked
+// yet and returns how many it revoked.
+func (db *DB) RevokeAllAPIKeysForUser(ctx context.Context, username string) (int64, error) {
+	res, err := db.conn.ExecContext(ctx,
+		`UPDATE api_keys SET revoked_at = now()
+		 WHERE revoked_at IS NULL AND user_id = (SELECT id FROM users WHERE username = $1)`,
+		username)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // RevokeAPIKey marks a key revoked. It reports false when the key was already

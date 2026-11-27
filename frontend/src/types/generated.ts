@@ -716,6 +716,11 @@ export interface AuditLog {
    * browser's filter.
    */
   category: string;
+  /**
+   * APIKeyID is the API key that authenticated the request which produced
+   * this entry; nil for a session, the agent or a background job.
+   */
+  api_key_id?: number /* int64 */;
 }
 
 //////////

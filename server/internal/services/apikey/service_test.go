@@ -20,7 +20,6 @@ type fakeRepo struct {
 	keys      map[int64]*models.APIKey
 	auth      map[string]*database.APIKeyAuthRecord
 	active    int
-	countErr  error
 	createErr error
 	authErr   error
 	touchErr  error
@@ -51,9 +50,12 @@ func (f *fakeRepo) GetUserByUsername(_ context.Context, username string) (*model
 	return nil, sql.ErrNoRows
 }
 
-func (f *fakeRepo) CreateAPIKey(_ context.Context, userID int64, name, prefix, keyHash, scope string, expiresAt *time.Time) (*models.APIKey, error) {
+func (f *fakeRepo) CreateAPIKey(_ context.Context, userID int64, maxActive int, name, prefix, keyHash, scope string, expiresAt *time.Time) (*models.APIKey, error) {
 	if f.createErr != nil {
 		return nil, f.createErr
+	}
+	if f.active >= maxActive {
+		return nil, database.ErrAPIKeyLimitReached
 	}
 	f.created.prefix, f.created.hash, f.created.scope, f.created.expiresAt = prefix, keyHash, scope, expiresAt
 	k := &models.APIKey{ID: int64(len(f.keys) + 1), Name: name, Prefix: prefix, Scope: scope, ExpiresAt: expiresAt}
@@ -89,10 +91,6 @@ func (f *fakeRepo) ListAllAPIKeys(context.Context) ([]models.APIKey, error) {
 		out = append(out, *k)
 	}
 	return out, nil
-}
-
-func (f *fakeRepo) CountActiveAPIKeys(context.Context, int64) (int, error) {
-	return f.active, f.countErr
 }
 
 func (f *fakeRepo) RevokeAPIKey(_ context.Context, id int64) (bool, error) {
@@ -290,12 +288,6 @@ func TestCreate_PropagatesFailures(t *testing.T) {
 	boom := errors.New("boom")
 
 	repo := newFakeRepo()
-	repo.countErr = boom
-	if _, err := newTestService(repo).Create(context.Background(), "alice", "", models.APIKeyCreateRequest{Name: "x", Scope: "read"}); !errors.Is(err, boom) {
-		t.Fatalf("count error: got %v", err)
-	}
-
-	repo = newFakeRepo()
 	repo.createErr = boom
 	if _, err := newTestService(repo).Create(context.Background(), "alice", "", models.APIKeyCreateRequest{Name: "x", Scope: "read"}); !errors.Is(err, boom) {
 		t.Fatalf("insert error: got %v", err)
