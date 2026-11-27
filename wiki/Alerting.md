@@ -278,9 +278,9 @@ Les règles Docker et Proxmox gardent leur propre portée (`docker_scope`,
 `ssl_min_days_remaining`) sont évaluées une seule fois par règle et ignorent
 aussi `target_type`.
 
-Dans la liste des règles, un utilisateur non admin voit « un groupe d'hôtes
-(détail réservé aux admins) » à la place du nom du groupe : la définition des
-groupes n'est lisible que par les admins.
+Dans la liste des règles, un utilisateur non admin voit « groupe masqué » à la
+place du nom du groupe, avec une infobulle qui en donne la raison : la
+définition des groupes n'est lisible que par les admins.
 
 ## Dépannage
 

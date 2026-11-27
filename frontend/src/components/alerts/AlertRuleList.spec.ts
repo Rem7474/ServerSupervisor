@@ -190,12 +190,12 @@ describe('AlertRuleList — agent rule target label', () => {
     expect(wrapper.text()).toContain(expected)
   })
 
-  // Groups are only loaded for admins: a viewer gets an explicit label, an
-  // admin whose group is missing gets "unknown".
+  // Groups are only loaded for admins: a viewer gets a short label with the
+  // reason as tooltip, an admin whose group is missing gets "unknown".
   it.each([
-    [false, 'Agent › un groupe d\'hôtes (détail réservé aux admins)'],
-    [true, 'Agent › groupe d\'hôtes introuvable'],
-  ])('group not loaded (admin=%s)', (isAdmin, expected) => {
+    [false, 'Agent › groupe masqué', 'Le détail des groupes d\'hôtes est réservé aux administrateurs'],
+    [true, 'Agent › groupe d\'hôtes introuvable', undefined],
+  ])('group not loaded (admin=%s)', (isAdmin, expected, hint) => {
     const wrapper = mountList({
       rules: [{ id: 1, name: 'r', metric: 'cpu', operator: '>', source_type: 'agent', target_type: 'group', host_group_id: 'g9' }],
       hostGroups: [],
@@ -203,5 +203,7 @@ describe('AlertRuleList — agent rule target label', () => {
       fetched: true,
     })
     expect(wrapper.text()).toContain(expected)
+    const badge = wrapper.findAll('span.badge').find((b) => b.text().startsWith('Agent'))
+    expect(badge?.attributes('title')).toBe(hint)
   })
 })
